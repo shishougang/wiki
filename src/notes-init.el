@@ -32,6 +32,21 @@
          :recursive t
          :base-extension "css\\|js\\|png\\|jpg\\|gif\\|pdf\\|mp3\\|swf\\|zip\\|gz\\|txt\\|el"
          :publishing-function org-publish-attachment)
+
+
+        ("octopress" 
+          :base-directory "~/Dropbox/Blog/octopress/source/org_posts/"
+          :base-extension "org"
+          :publishing-directory "~/Dropbox/Blog/octopress/source/_posts/"
+          :sub-superscript ""
+          :recursive t
+          :publishing-function org-publish-org-to-html
+          :headline-levels 4
+          :html-extension "markdown"
+          :body-only t)
+
+
+        
         ("wiki" 
          :components ("wiki-org" "wiki-static")
          :author "shougangshi@gmail.com")
