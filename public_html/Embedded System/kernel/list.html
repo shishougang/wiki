@@ -3,11 +3,11 @@
                "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<title>General-Purpose Memory Controller(GMPC)</title>
+<title>list in kernel</title>
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
-<meta name="title" content="General-Purpose Memory Controller(GMPC)"/>
+<meta name="title" content="list in kernel"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-07-28 22:30:50 HKT"/>
+<meta name="generated" content="2012-07-28 22:30:51 HKT"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -97,69 +97,95 @@
 </div>
 
 <div id="content">
-<h1 class="title">General-Purpose Memory Controller(GMPC)</h1>
+<h1 class="title">list in kernel</h1>
 
+
+<p>
+<a href="http://isis.poly.edu/kulesh/stuff/src/klist/">http://isis.poly.edu/kulesh/stuff/src/klist/</a>
+<a href="http://blog.csdn.net/xubin341719/article/details/7098611">http://blog.csdn.net/xubin341719/article/details/7098611</a>
+<a href="http://bbs.chinaunix.net/thread-1981115-1-1.html">http://bbs.chinaunix.net/thread-1981115-1-1.html</a>
+</p>
+<p>
+<a href="http://www.groad.net/bbs/read.php?tid-3544.html">http://www.groad.net/bbs/read.php?tid-3544.html</a>
+<a href="http://hi.baidu.com/ever__love/blog/item/ee8f40f9a99ec7294e4aea68.html">http://hi.baidu.com/ever__love/blog/item/ee8f40f9a99ec7294e4aea68.html</a>
+</p>
 
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">So, in retrospective, here is a list of things to keep in mind:</a></li>
-<li><a href="#sec-2"></a></li>
+<li><a href="#sec-1">list<sub>for</sub><sub>each</sub><sub>entry</sub></a></li>
 </ul>
 </div>
 </div>
 
 <div id="outline-container-1" class="outline-2">
-<h2 id="sec-1">So, in retrospective, here is a list of things to keep in mind:</h2>
+<h2 id="sec-1">list<sub>for</sub><sub>each</sub><sub>entry</sub></h2>
 <div class="outline-text-2" id="text-1">
 
 
-<ul>
-<li>I implemented the FPGA device driver as a platform device driver. I chose ioctl() function calls to let user application access the FPGA;
-
+<p>
+/**
+</p><ul>
+<li>list<sub>for</sub><sub>each</sub><sub>entry</sub>  -       iterate over list of given type
 </li>
-<li>Timing  specifications must be set in nanoseconds in the gpmc<sub>timings</sub> structure, not gpmc<sub>clocks</sub> ticks, as I originally assumed they were;
-
+<li>@pos:        the type * to use as a loop cursor.
 </li>
-<li>compiling the kernel gpmc driver in debug mode helps tracing down incorrect timings: it's easy to specify timing values which exceed the range of their respective bit maps in GPMC config registers;
-
+<li>@head:       the head for your list.
 </li>
-<li>At first, make sure the kernel does not turn off unused clocks (it's a kernel config option).
-
-</li>
-<li>Make sure that the gpmc<sub>clock</sub> pad is set as input/output: the GPMC hardware monitors it to tweak its timing.
-
-</li>
-<li>keep it simple: use simple memory interface signals (ex: static RAM cs*, rd*, wr* signals) and relaxed timings: for example, my read/write cycles take about 200ns to complete and I use a 100MHz gpmc<sub>clock</sub>.
-
-</li>
-<li>don't be afraid to 'hack' the kernel: need to call hidden (static)
-  kernel GPMC functions? Just export() them. I had to do so in order
-  to do extra configuration works on the GPMC-FPGA intervace.
+<li>@member:     the name of the list<sub>struct</sub> within the struct.
 </li>
 </ul>
 
+<p> */
+        for (pos = list<sub>entry</sub>((head)-&gt;next, typeof(*pos), member);      \
+             &amp;pos-&gt;member != (head);    \
+             pos = list<sub>entry</sub>(pos-&gt;member.next, typeof(*pos), member))
+</p>
 
+<p>
+/**
+</p><ul>
+<li>list<sub>entry</sub> - get the struct for this entry
+</li>
+<li>@ptr:        the &amp;struct list<sub>head</sub> pointer.
+</li>
+<li>@type:       the type of the struct this is embedded in.
+</li>
+<li>@member:     the name of the list<sub>struct</sub> within the struct.
+</li>
+</ul>
 
-</div>
-
-</div>
-
-<div id="outline-container-2" class="outline-2">
-<h2 id="sec-2"></h2>
-<div class="outline-text-2" id="text-2">
+<p> */
+        container<sub>of</sub>(ptr, type, member)
+</p>
 
 
 <p>
-<a href="http://e2e.ti.com/support/dsp/omap_applications_processors/f/447/t/104077.aspx">http://e2e.ti.com/support/dsp/omap_applications_processors/f/447/t/104077.aspx</a>
-<a href="http://processors.wiki.ti.com/index.php/Tips_for_configuring_OMAP35x_and_AM-DM37x_GPMC_registers">http://processors.wiki.ti.com/index.php/Tips_for_configuring_OMAP35x_and_AM-DM37x_GPMC_registers</a>
-</p></div>
+/**
+</p><ul>
+<li>container<sub>of</sub> - cast a member of a structure out to the containing structure
+</li>
+<li>@ptr:        the pointer to the member.
+</li>
+<li>@type:       the type of the container struct this is embedded in.
+</li>
+<li>@member:     the name of the member within the struct.
+</li>
+<li>
+</li>
+</ul>
+
+<p> */
+        const typeof( ((type *)0)-&gt;member ) *_<sub>mptr</sub> = (ptr);    \
+        (type *)( (char *)_<sub>mptr</sub> - offsetof(type,member) );})
+</p>
+</div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-07-28 22:30:50 HKT</p>
+<p class="date">Date: 2012-07-28 22:30:51 HKT</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.09 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

@@ -1,0 +1,213 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: c9, Performance Monitor Control Register
+#+OPTIONS: num:nil
+
+The purpose of the Performance MoNitor Control (PMNC) Register is to
+control the operation of the four Performance Monitor Count Registers,
+and the Cycle Counter Register:[fn:6]
+
+The PMNC Register is:
++ a read/write register common to Secure and Nonsecure states
++ accessible as determined by *c9, User Enable Register*.[fn:1]
+
+* enable the perfromance counter
+Accessing the performance counters isn't difficult, but you have to enable them from kernel-mode. By default the counters are disabled.
+
+In a nutshell you have to execute the following two lines inside the
+kernel. Either as a loadable module or just adding the two lines
+somewhere in the *board-init* will do:
+
+#+begin_src c
+  /* enable user-mode access to the performance counter*/
+    asm ("MCR p15, 0, %0, C9, C14, 0\n\t" :: "r"(1)); 
+  
+    /* disable counter overflow interrupts (just in case)*/
+    asm ("MCR p15, 0, %0, C9, C14, 2\n\t" :: "r"(0x8000000f));
+#+end_src
+Once you did this the cycle counter will start incrementing for each
+cycle. Overflows of the register will go unnoticed and don't cause any
+problems (except they might mess up your measurements).
+
+** c9, User Enable Register
+=asm ("MCR p15, 0, %0, C9, C14, 0\n\t" :: "r"(1));=
+
+The purpose of the USER ENable (USEREN) Register is to enable User
+mode to have access to the Performance Monitor Registers.[fn:2]
+
+To access the USEREN Register, read or write CP15 with:
+
+=MRC p15, 0, <Rd>, c9, c14, 0 ; Read USEREN Register=
+
+=MCR p15, 0, <Rd>, c9, c14, 0 ; Write USEREN Register=
+** c9, Interrupt Enable Clear Register
+=asm ("MCR p15, 0, %0, C9, C14, 2\n\t" :: "r"(0x8000000f));=
+
+The purpose of the INTerrupt ENable Clear (INTENC) Register is to
+determine if any of the Performance Monitor Count Registers,
+PMCNT0-PMCNT3 and CCNT, generate an interrupt on overflow.[fn:3]
+
+To access the INTENC Register, read or write CP15 with:
+
+=MRC p15, 0, <Rd>, c9, c14, 2 ; Read INTENC Register=
+
+=MCR p15, 0, <Rd>, c9, c14, 2 ; Write INTENC Register=
+* access the cycle-counter from the user-mode
+Now you want to access the cycle-counter from the user-mode:
+
+We start with a function that reads the register:
+#+begin_src c
+static inline unsigned int get_cyclecount (void)
+{
+  unsigned int value;
+  // Read CCNT Register
+  asm volatile ("MRC p15, 0, %0, c9, c13, 0\t\n": "=r"(value));  
+  return value;
+}
+#+end_src
+And you most likely want to reset and set the divider as well:
+#+begin_src c
+static inline void init_perfcounters (int32_t do_reset, int32_t enable_divider)
+{
+  // in general enable all counters (including cycle counter)
+  int32_t value = 1;
+
+  // peform reset:  
+  if (do_reset)
+  {
+    value |= 2;     // reset all counters to zero.
+    value |= 4;     // reset cycle counter to zero.
+  } 
+
+  if (enable_divider)
+    value |= 8;     // enable "by 64" divider for CCNT.
+
+  value |= 16;
+
+  // program the performance-counter control-register:
+  asm volatile ("MCR p15, 0, %0, c9, c12, 0\t\n" :: "r"(value));  
+
+  // enable all counters:  
+  asm volatile ("MCR p15, 0, %0, c9, c12, 1\t\n" :: "r"(0x8000000f));  
+
+  // clear overflows:
+  asm volatile ("MCR p15, 0, %0, c9, c12, 3\t\n" :: "r"(0x8000000f));
+}
+#+end_src
+=do_reset= will set the cycle-counter to zero. Easy as that.
+
+=enable_diver= will enable the 1/64 cycle divider. Without this flag set
+you'll be measuring each cycle. With it enabled the counter gets
+increased for every 64 cycles. This is useful if you want to measure
+long times that would otherwise cause the counter to overflow.
+
+** c9, Cycle Count Register
+=asm volatile ("MRC p15, 0, %0, c9, c13, 0\t\n": "=r"(value));=
+
+The purpose of the Cycle CouNT (CCNT) Register is to count the number
+of clock cycles since the register was reset. [fn:5]
+
+To access the CCNT Register, read or write CP15 with:
+
+=MRC p15, 0, <Rd>, c9, c13, 0 ; Read CCNT Register=
+=MCR p15, 0, <Rd>, c9, c13, 0 ; Write CCNT Register=
+**  c9, Performance Monitor Control Register
+=asm volatile ("MCR p15, 0, %0, c9, c12, 0\t\n" :: "r"(value));=
+
+To access the PMNC Register, read or write CP15 with:[fn:6]
+
+=MRC p15, 0, <Rd>, c9, c12, 0 ; Read PMNC Register=
+
+=MCR p15, 0, <Rd>, c9, c12, 0 ; Write PMNC Register=
+
+**  c9, Count Enable Set Register
+=asm volatile ("MCR p15, 0, %0, c9, c12, 1\t\n" :: "r"(0x8000000f));=
+The purpose of the CouNT ENable Set (CNTENS) Register is to enable or
+disable any of the Performance Monitor Count Registers.
+
+When reading this register, any enable that reads as 0 indicates the
+counter is disabled. Any enable that reads as 1 indicates the counter
+is enabled.
+
+When writing this register, any enable written with a value of 0 is
+ignored, that is, not updated. Any enable written with a value of 1
+indicates the counter is enabled.[fn:7]
+
+To access the CNTENS Register, read or write CP15 with:
+
+=MRC p15, 0, <Rd>, c9, c12, 1 ; Read CNTENS Register=
+
+=MCR p15, 0, <Rd>, c9, c12, 1 ; Write CNTENS Register=
+
+** c9, Overflow Flag Status Register
+=asm volatile ("MCR p15, 0, %0, c9, c12, 3\t\n" :: "r"(0x8000000f));=
+The purpose of the Overflow Flag Status (FLAG) Register is to enable
+or disable any of the performance monitor counters producing an
+overflow flag.[fn:8]
+
+To access the FLAG Register, read or write CP15 with:
+
+=MRC p15, 0, <Rd>, c9, c12, 3 ; Read FLAG Register=
+
+=MCR p15, 0, <Rd>, c9, c12, 3 ; Write FLAG Register=
+
+
+* How to use it
+#+begin_src c
+ // init counters:
+  init_perfcounters (1, 0); 
+
+  // measure the counting overhead:
+  unsigned int overhead = get_cyclecount();
+  overhead = get_cyclecount() - overhead;    
+
+  unsigned int t = get_cyclecount();
+
+  // do some stuff here..
+  call_my_function();
+
+  t = get_cyclecount() - t;
+
+  printf ("function took exactly %d cycles (including function call)
+  ", t - overhead);
+#+end_src
+
+Should work on all Cortex-A8 CPUs.
+
+ *some notes:*
+
+Using these counters you'll measure the exact time between the two
+calls to =get_cyclecount()= including everything spent in other
+processes or in the kernel. There is no way to restrict the
+measurement to your process or a single thread.
+
+Also calling =get_cyclecount()= isn't free. It will compile to a single
+asm-instruction, but moves from the co-processor will stall the entire
+ARM pipeline. The overhead is quite high and can skew your
+measurement. Fortunately the overhead is also fixed, so you can
+measure it and subtract it from your timings.
+
+In this  example I did that for every measurement. Don't do this in
+practice. An interrupt will sooner or later occur between the two
+calls and skew your measurements even further. I suggest that you
+measure the overhead a couple of times on an idle system, ignore all
+outsiders and use a fixed constant instead.[fn:4]
+
+
+* Footnotes
+
+[fn:1] [[http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0344k/Bgbcjifb.html][Cortex-A8 Technical Reference Manua]]
+
+[fn:2] [[http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0344k/Bgbcjifb.html][c9, User Enable Register]]
+
+[fn:3] [[http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0344k/Bgbcjifb.html][c9, Interrupt Enable Clear Register]]
+
+[fn:4] [[http://stackoverflow.com/questions/3247373/how-to-measure-program-execution-time-in-arm-cortex-a8-processor][stackoverflow]]
+
+[fn:5] [[http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0344k/Bgbcjifb.html][c9, Cycle Count Register]]
+
+[fn:6] [[http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0344k/Bgbcjifb.html][c9, Performance Monitor Control Register]]
+
+[fn:7] [[http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0344k/Bgbcjifb.html][c9, Count Enable Set Register]]
+
+[fn:8] [[http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0344k/Bgbcjifb.html][c9, Overflow Flag Status Register]]
+
