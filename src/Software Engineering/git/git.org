@@ -39,14 +39,106 @@ $ git push origin gh-pages
 
 #To unpublish a project page, delete the remote gh-pages branch:
 git push origin --delete gh-pages
-
 #+END_SRC
 
 * Setting up a custom domain with Pages
 #+BEGIN_SRC sh
-touch CNAME
-
+echo 'example.com' >>  CNAME
 #+END_SRC
+** Top-level domain (TLD)
+For a TLD like example.com, you should use an A record pointing to
+204.232.175.78:[fn:1]
+
+在Linux终端下检查：
+#+begin_src sh
+dig example.com +nostats +nocomments +nocmd
+# Look up DNS record for example.com
+
+# ;example.com.                    IN      A
+# example.com.             3259    IN      A       204.232.175.78
+#+end_src
+** Subdomains
+When working with a subdomain it is best to set a CNAME record
+pointing to your user pages subdomain. 
+
+在Linux终端下检查：
+#+begin_src sh
+ dig www.example.com +nostats +nocomments +nocmd
+# ;www.example.com.                 IN      A
+# www.example.com.          3592    IN      CNAME   username.github.com.
+# username.github.com.      43192   IN      A       204.232.175.78
+#+end_src
+
+
+* public and private.
+Consider how a common Git workflow falls apart.
+
+/Create a branch off Master, do work, and merge it back into Master
+when you’re done/
+
+Most of the time this behaves as you expect because Master changed
+since you branched. Then one day you merge a feature branch into
+Master, but Master hasn’t diverged. Instead of creating a merge
+commit, Git points Master to the latest commit on the feature branch,
+or “fast forwards.”[[http://sandofsky.com/images/fast_forward.pdf][Picture]] [fn:2]
+
+So you add a new rule: “When you merge in your feature branch, use
+=–no-ff= to force a new commit.” 
+** Short lived work
+#+begin_src sh
+    git checkout -b private_feature_branch
+    touch file1.txt
+    git add file1.txt
+    git commit -am "WIP"
+#+end_src
+When I’m done, instead of a vanilla git merge, I’ll run:
+#+begin_src sh
+    git checkout master
+    git merge --squash private_feature_branch
+    git commit -v
+#+end_src
+Then I spend a minute writing a detailed commit message.
+
+** Larger work
+If my checkpoint commits followed a logical progression, I can use
+rebase’s Interactive Mode.
+
+Interactive mode is powerful. You can use it to edit an old commits,
+split them up, reorder them, and in this case squash a few.
+
+On my feature branch:
+#+begin_src sh
+    git rebase --interactive master
+#+end_src 
+By default, each commit uses “pick,” which doesn’t modify the commit.
+#+begin_src sh
+    pick ccd6e62 Work on back button
+    pick 1c83feb Bug fixes
+    pick f9d0c33 Start work on toolbar
+#+end_src
+I change the operation to “squash,” which squashes the second commit
+into the first.
+#+begin_src sh
+    pick ccd6e62 Work on back button
+    squash 1c83feb Bug fixes
+    pick f9d0c33 Start work on toolbar
+#+end_src
+When I save and close, a new editor prompts me for the commit message
+    of the combined commit, and then I’m done.
+** Declaring Branch Bankruptcy
+It’s easiest to grab the raw diff create a clean branch.
+#+begin_src sh
+    git checkout master
+    git checkout -b cleaned_up_branch
+    git merge --squash private_feature_branch
+    git reset
+#+end_src
+** The intended workflow is:
+1. Create a private branch off a public branch.
+2. Regularly commit your work to this private branch.
+3. Once your code is perfect, clean up its history.
+4. Merge the cleaned-up branch back into the public branch.
+
 
 * other
 内建的图形化 git：
@@ -57,4 +149,11 @@ git config color.ui true
 git config format.pretty oneline
 交互地添加文件至缓存区：
 git add -i
+
+* Footnotes
+
+[fn:1] [[https://help.github.com/articles/setting-up-a-custom-domain-with-pages][Setting up a custom domain with Pages]]
+
+[fn:2] [[http://sandofsky.com/blog/git-workflow.html][Understanding the Git Workflow]]
+
 
