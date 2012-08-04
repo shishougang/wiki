@@ -1,0 +1,90 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Direct memory access (DMA)
+#+OPTIONS: num:nil
+* Overview
+Direct memory access (DMA) is a feature of modern computers that
+allows certain hardware subsystems within the computer to access
+system memory independently of the central processing unit
+(CPU).[fn:1]
+
+The three primary data transfer mechanisms for computer-based data
+acquisition are polling, interrupts (also known as programmed I/O),
+and direct memory access (DMA).[fn:2]
+
+DMA has several advantages over polling and interrupts.
++ DMA is fast because a dedicated piece of hardware
+transfers data from one computer location to another and only one or two bus read/write cycles are required per
+piece of data transferred.
++ DMA also minimizes latency in servicing a data
+acquisition device because the dedicated hardware responds more quickly than interrupts, and transfer time is
+short.
++ DMA also off-loads the processor, which means the processor does not have to execute any instructions to
+transfer data.
+
+A DMA
+controller manages several DMA channels, each of which can be programmed to perform a sequence of these
+DMA transfers. Devices, usually I/O peripherals, that acquire data that must be read (or devices that must
+output data and be written to) signal the DMA controller to perform a DMA transfer by asserting a hardware
+DMA request signal. A DMA request signal for each channel is routed to the DMA controller. This signal is
+monitored and responded to in much the same way that a processor handles interrupts. When the DMA
+controller sees a DMA request, the DMA controller responds by performing one or many data transfers from
+that I/O device into system memory or vice versa. Channels must be enabled by the processor for the DMA
+controller to respond to DMA requests. The number of transfers performed, transfer modes used, and memory
+locations accessed depends on how the DMA channel is programmed.
+
+[[./DMA Controller Architecture.jpg]]
+
+When the value in the
+current count register goes from 0 to -1, a terminal count (TC) signal
+is generated, which signifies the
+completion of the DMA transfer sequence. This termination event is
+referred to as reaching terminal count. DMA controllers often generate
+a hardware TC pulse during the last cycle of a DMA transfer sequence.
+This signal can be monitored by the I/O devices participating in the DMA
+transfers.
+
+DMA controllers require reprogramming when a DMA channel reaches TC.
+Thus, DMA controllers require some CPU time, but far less than is
+required for the CPU to service device I/O interrupts. When a DMA
+channel reaches TC, the processor may need to reprogram the controller
+for additional DMA transfers. Some DMA controllers interrupt the
+processor whenever a channel terminates. DMA controllers also have
+mechanisms for automatically reprogramming a DMA channel when the DMA
+transfer sequence completes. These mechanisms include
+/autoinitialization/ and /buffer chaining/.
+
+
+
+* Modes of operation
+** Burst mode
+An entire block of data is transferred in one contiguous sequence.
+Once the DMA controller is granted access to the system bus by the
+CPU, it transfers all bytes of data in the data block before releasing
+control of the system buses back to the CPU. The mode is also called
+=Block Transfer Mode=.
+** Cycle stealing mode
+In the cycle stealing mode, the DMA controller obtains access to the
+system bus the same way as in burst mode, using BR (Bus Request) and
+BG (Bus Grant) signals, which are the two signals controlling the
+interface between the CPU and the DMA controller. However, in cycle
+stealing mode, after one byte of data transfer, the control of the
+system bus is deasserted to the CPU via BG. It is then continually
+requested again via BR, transferring one byte of data per request,
+until the entire block of data has been transferred.
+** Transparent mode
+The transparent mode takes the most time to transfer a block of data,
+yet it is also the most efficient mode in terms of overall system
+performance. The DMA controller only transfers data when the CPU is
+performing operations that do not use the system buses. It is the
+primary *advantage* of the transparent mode that the CPU never stops
+executing its programs and the DMA transfer is free in terms of time.
+The *disadvantage* of the transparent mode is that the hardware needs to
+determine when the CPU is not using the system buses, which can be
+complex and relatively expensive.
+
+* Footnotes
+
+[fn:1] [[http://en.wikipedia.org/wiki/Direct_memory_access][wiki]]
+
+[fn:2] [[./DMAFundamentals.pdf][DMA Fundamentals on Various PC Platforms]]
+
