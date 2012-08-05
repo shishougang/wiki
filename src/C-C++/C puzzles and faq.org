@@ -1,0 +1,152 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE:  C puzzles and FAQ
+#+OPTIONS: num:nil
+
+* read() and write() truncate buffer length
+
+https://bugzilla.redhat.com/show_bug.cgi?id=612839
+
+* 在宏定义中使用 do...while[fn:1]
+** do...while(0)消除goto语句
+通常，如果在一个函数中开始要分配一些资源，然后在中途执行过程中如果遇到
+错误则退出函数，当然，退出前先释放资源，我们的代码可能是这样：
+
+*** version 1
+#+begin_src c
+bool Execute()
+{
+   // 分配资源
+   int *p = new int;
+   bool bOk(true);
+
+   // 执行并进行错误处理
+   bOk = func1();
+   if(!bOk) 
+   {
+      delete p;   
+      p = NULL;
+      return false;
+   }
+
+   bOk = func2();
+   if(!bOk) 
+   {
+      delete p;   
+      p = NULL;
+      return false;
+   }
+
+   bOk = func3();
+   if(!bOk) 
+   {
+      delete p;   
+      p = NULL;
+      return false;
+   }
+
+   // ..........
+
+   // 执行成功，释放资源并返回
+    delete p;   
+    p = NULL;
+    return true;
+   
+}
+#+end_src
+这里一个最大的问题就是代码的冗余，而且我每增加一个操作，就需要做相应的
+错误处理，非常不灵活。于是我们想到了goto:
+
+*** version 2
+#+begin_src c
+bool Execute()
+{
+   // 分配资源
+   int *p = new int;
+   bool bOk(true);
+
+   // 执行并进行错误处理
+   bOk = func1();
+   if(!bOk) goto errorhandle;
+
+   bOk = func2();
+   if(!bOk) goto errorhandle;
+
+   bOk = func3();
+   if(!bOk) goto errorhandle;
+
+   // ..........
+
+   // 执行成功，释放资源并返回
+    delete p;   
+    p = NULL;
+    return true;
+
+errorhandle:
+    delete p;   
+    p = NULL;
+    return false;
+   
+}
+#+end_src
+代码冗余是消除了，但是我们引入了C++中身份比较微妙的goto语句，虽然正确
+的使用goto可以大大提高程序的灵活性与简洁性，但太灵 活的东西往往是很危
+险的，它会让我们的程序捉摸不定，那么怎么才能避免使用goto语句，又能消除
+代码冗余呢，请看do...while(0)循环：
+
+*** version 3
+#+begin_src c
+bool Execute()
+{
+   // 分配资源
+   int *p = new int;
+
+   bool bOk(true);
+   do
+   {
+      // 执行并进行错误处理
+      bOk = func1();
+      if(!bOk) break;
+
+      bOk = func2();
+      if(!bOk) break;
+
+      bOk = func3();
+      if(!bOk) break;
+
+      // ..........
+
+   }while(0);
+
+    // 释放资源
+    delete p;   
+    p = NULL;
+    return bOk;
+   
+}
+#+end_src
+* Swap
+ *swap1*
+#+begin_src c
+void swap1(int *q1,int *q2)
+{
+  int temp;
+  temp = *q1;
+  *q1 = *q2;
+  *q2 = temp;
+}
+#+end_src
+ *swap2*
+#+begin_src c
+void swap2(int *q1, int *q2)
+{
+  int *temp;
+  temp = q1;
+  q1 = q2;
+  q2 = temp;
+}
+#+end_src
+* Footnotes
+
+[fn:1] http://blog.csdn.net/carry1314lele/article/details/2191113
+
+
