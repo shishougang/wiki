@@ -2,8 +2,6 @@
 #+TITLE: The C Programming Language Notes
 #+OPTIONS: num:nil H:1
 
-
-
 [[http://cm.bell-labs.com/cm/cs/cbook/][The C Programming Language]], second edition by [[http://www.cs.bell-labs.com/who/bwk/][Kernighan]] and [[http://www.cs.bell-labs.com/who/dmr/][Ritchie]].
 
 Other people working through the book may be interested in the [[http://www.eskimo.com/~scs/cclass/krnotes/top.html][Notes to Accompany The C Programming Language]] by [[http://www.eskimo.com/~scs/][Steve Summit]], maintainer of
@@ -66,6 +64,19 @@ On other systems, you may have to do some research to learn how to
 send EOF.
 
 * Chapter 2
+
+** page 39 
+Be careful to distinguish between a character constant and a string
+that contains a single character: 'x' is not the same as "x". The
+former is an integer used to produce the numeric value of the letter x
+in the machine;s character set. The latter is an array of characters
+that contains one character( the letter x) and a '\0'.
+
+Name in different enumerations must be distinct. Values need not be
+distinct in the same enumeration.
+** page 40 
+External and static variables are initialized to zero by default.
+
 ** page 41
 The % operator cannot be applied to =float= or =double=. The direction
 of truncation for / and the sign of the result for % are
@@ -88,7 +99,6 @@ just mean ``add one''; it means ``add one to a variable'' or ``make a
 variable's value one more than it was before.'' But (i+j) is not a
 variable, it's an expression; so there's no place for ++ to store the
 incremented result. 
-
 
 
 ** page 52 Precedence and Order of Evaluation
@@ -120,6 +130,7 @@ which the two calls of =pop= are evaluated is not defined. To
 guarantee the right order, it is necessary to pop the first value into
 a temporary variable as we did in = 
 * Chapter 5
+
 ** page 96
 the swap example on page 96 does work.
 #+begin_src c
@@ -175,7 +186,431 @@ the compiler might have used the same little block of memory to
 initialize both pointers, and we wouldn't want a change to one to
 alter the other.) 
 
-** 
+** page 112
+#+begin_verse
+More generally, only the first dimension (subscript) of an array is free; all the others have to be specified.
+#+end_verse
+This just says what we said already: when declaring an array as a
+function parameter, you can leave off the first dimension because it
+is the overall length and not knowing it causes no immediate problems
+(unless you accidentally go off the end). But the compiler always
+needs to know the other dimensions, so that it knows how the rown and
+columns line up.
+
+If a two-dimensional array is to be passed to a function, the
+parameter declaration in the function must include the number of
+columns; the number of rows i irrelevant, since what is passed is, as
+before, a pointer to an array of rows, where each row is an array of
+13 ints.
 * Chapter 6
+** page 135
+=sizeof= returns the size counted in bytes, where the C definition of
+``byte'' is ``the size of a char.'' In other words, =sizeof(char)= is
+always 1. (It turns out that it's not necessarily the case, though,
+that a byte or a char is 8 bits.) 
+** page 138
+#+begin_verse
+Don't assume, however, that the size of a structure is the sum of the sizes of its members.
+#+end_verse
+If this isn't the sort of thing you'd be likely to assume, you don't
+have to remember the reason, which is mildly esoteric (having to do
+with memory alignment requirements).
+** page 142
+We can test for this in two different ways, either before or after we
+make the ``last'' recursive call:
+#+begin_src c
+	void treeprint(struct tnode *p)
+	{
+		if(p->left != NULL)
+			treeprint(p->left);
+		printf("%4d %s\n", p->count, p->word);
+		if(p->right != NULL)
+			treeprint(p->right);
+	}
+#+end_src
+or
+#+begin_src c
+	void treeprint(struct tnode *p)
+	{
+		if(p == NULL)
+			return;
+
+		treeprint(p->left);
+		printf("%4d %s\n", p->count, p->word);
+		treeprint(p->right);
+	}
+#+end_src
+Sometimes, there's little difference between one approach and the
+other. Here, though, the second approach (which is
+		equivalent to the code on page 142) has a distinct
+		advantage: it will work even if the very first call is
+		on an empty tree (in this case, if there were no words
+		in the input). As we mentioned earlier, it's extremely
+		nice if programs work well at their boundary
+		conditions, even if we don't think those conditions
+		are likely to occur.
+
+** page 143
+#+begin_src c
+char str[] = "a";
+sizeof(str); /*2*/
+strlen(str); /*1*/
+#+end_src
+
 * Chapter 7
+** page 152
+Note that the stdio library generally does newline translation for
+you. If you know that lines are terminated by a linefeed on Unix and a
+carriage return on the Macintosh and a carriage-return/linefeed
+combination on MS-DOS, you don't have to worry about these things in
+C, because the line termination will always appear to a C program to
+be a single '\n'.
+
+** page 166
+strstr(s,t)	return pointer to first t in s, or NULL if not present
+
+** page 168(Random Number Gneration)
+the code for returning a floating-point random number in the interval [0,1) should be
+
+	=#define frand() ((double) rand() / (RAND_MAX+1.0))=
+If you want to get random integers from M to N, you can use something like
+
+	=M + (int)(frand() * (N-M+1))=
+
+``[Setting] the seed for rand'' refers to the fact that, by default,
+the sequence of pseudo-random numbers returned by rand is the same
+each time your program runs. To randomize it, you can call srand at
+the beginning of the program, handing it some truly random number,
+such as a value having to do with the time of day. (One way is with
+code like
+#+begin_src c
+	#include <stdlib.h>
+	#include <time.h>
+	srand((unsigned int)time((time_t *)NULL));
+#+end_src
+which uses the time function mentioned on page 256 in appendix B10.)
+
+One other caveat about rand: don't try to generate random 0/1 values (to simulate a coin flip, perhaps) with code like
+
+	=rand() % 2=
+This looks like it ought to work, but it turns out that on some systems rand isn't always perfectly random, and returns values which consistently alternate even, odd, even, odd, etc. (In fact, for similar reasons, you shouldn't usually use rand() % N for any value of N.) A good way to get random 0/1 values would be
+	=(int)(frand() * 2)=
+based on the other frand() examples above.
+
 * Chapter 8
+* Appendix A: Reference Manual
+** A.2.5.2 Character Constants
+| Name            | Abstract | character | Name          | Abstract | Character |
+|-----------------+----------+-----------+---------------+----------+-----------|
+| newline         | NT(LF)   | \n        | backslash     | \        | \\        |
+| horizontal tab  | HT       | \t        | question mark | ?        | \?        |
+| vertical        | VT       | \v        | single quote  | '        | \'        |
+| backspace       | BS       | \b        | double quote  | "        | \"        |
+| carriage return | CR       | \r        | octal number  | ooo      | \ooo      |
+| audible         | BEL      | \a        |               |          |           |
+
+** A.8.6.1 Pointer Declarators
+In a declaration T D where D has the form
+ =*= type-qualifier-list_opt D1
+and the type of the identifier in the declaration T D1 is ``type-modifier T,'' the type of the
+identifier of D is ``type-modifier type-qualifier-list pointer to T.'' Qualifiers following * apply
+to pointer itself, rather than to the object to which the pointer points.
+
+For example, consider the declaration
+int *ap[];
+
+Here, ap[] plays the role of D1; a declaration ``int ap[]'' (below) would give ap the type
+``array of int,'' the type-qualifier list is empty, and the type-modifier is ``array of.'' Hence the
+actual declaration gives ap the type ``array to pointers to int.''
+** A.8.8 Type names
+#+begin_src c
+int 
+int * 
+int *[3]
+int (*)[]
+int *()
+int (*[])(void)
+#+end_src
+name respectively the types ``integer,'' ``pointer to integer,'' ``array of 3 pointers to integers,''
+``pointer to an unspecified number of integers,'' ``function of unspecified parameters returning
+pointer to integer,'' and ``array, of unspecified size, of pointers to functions with no
+parameters each returning an integer.''
+** A.12.3 Macro Definition and Expansion
+
+First, if an occurrence of a
+parameter in the replacement token sequence is immediately preceded by #, string quotes (")
+are placed around the corresponding parameter, and then both the # and the parameter
+identifier are replaced by the quoted argument. A \ character is inserted before each " or \
+character that appears surrounding, or inside, a string literal or character constant in the
+argument.
+
+Second, if the definition token sequence for either kind of macro contains a ## operator, then
+just after replacement of the parameters, each ## is deleted, together with any white space on
+either side, so as to concatenate the adjacent tokens and form a new token. The effect is
+undefined if invalid tokens are produced, or if the result depends on the order of processing of
+the ## operators. Also, ## may not appear at the beginning or end of a replacement token
+sequence.
+
+Given the definition
+#+begin_src c
+ #define tempfile(dir) #dir "%s"
+#+end_src
+the macro call =tempfile(/usr/tmp)= yields
+
+ "/usr/tmp" "%s"
+
+which will subsequently be catenated into a single string. After
+#+begin_src c
+ #define cat(x, y) x ## y
+#+end_src
+
+the call =cat(var, 123)= yields var123. However, the call =cat(cat(1,2),3)= is undefined:
+the presence of ## prevents the arguments of the outer call from being expanded. Thus it
+produces the token string
+
+=cat ( 1 , 2 )3=
+
+and )3 (the catenation of the last token of the first argument with the first token of the second)
+is not a legal token. If a second level of macro definition is
+introduced,
+#+begin_src c
+ #define xcat(x, y)  cat(x,y)
+#+end_src
+things work more smoothly; =xcat(xcat(1, 2), 3)= does produce 123, because the
+expansion of xcat itself does not involve the ## operator.
+** A.12.7 Error Generation
+A preprocessor line of the form
+ # error token-sequence_opt
+causes the preprocessor to write a diagnostic message that includes the token sequence.
+** A.12.8 Pragmas
+A control line of the form
+ # pragma token-sequence_opt
+causes the preprocessor to perform an implementation-dependent action. An unrecognized
+pragma is ignored.
+** A.12.10 Predefined names
+Several identifiers are predefined, and expand to produce special information. They, and also
+the preprocessor expansion operator defined, may not be undefined or
+redefined.
+
++ __LINE__ A decimal constant containing the current source line number.
++ __FILE__ A string literal containing the name of the file being compiled.
++ __DATE__ A string literal containing the date of compilation, in the form "Mmmm dd yyyy"
++ __TIME__ A string literal containing the time of compilation, in the form "hh:mm:ss"
++ __STDC__ The constant 1. It is intended that this identifier be
+  defined to be 1 only in standard-conforming implementations.
+
+
+
+
+* Appendix B - Standard Library
+#+begin_src c
+<assert.h> <ctype.h> <errno.h> <float.h> <limits.h>
+<locale.h> <math.h> <setjmp.h> <signal.h> <stdarg.h>
+<stddef.h> <stdio.h> <stdlib.h> <string.h> <time.h>
+#+end_src
+** B.2 Character Class Tests: <ctype.h>
+#+begin_src c
+isalnum(c) isalpha(c) or isdigit(c) is true
+isalpha(c)
+isupper(c) or islower(c) is true
+iscntrl(c) control character
+isdigit(c) decimal digit
+isgraph(c) printing character except space
+islower(c) lower-case letter
+isprint(c) printing character including space
+ispunct(c) printing character except space or letter or digit
+isspace(c) space, formfeed, newline, carriage return, tab, vertical tab
+isupper(c) upper-case letter
+isxdigit(c) hexadecimal digit
+int tolower(c) convert c to lower case
+int toupper(c) convert c to upper case
+#+end_src
+** B.5 Utility Functions: <stdlib.h>
+
++ double atof(const char *s) atof converts s to double; it is equivalent to strtod(s, (char**)NULL).
++ int atoi(const char *s) converts s to int; it is equivalent to (int)strtol(s, (char**)NULL, 10).
++ long atol(const char *s) converts s to long; it is equivalent to strtol(s, (char**)NULL, 10).
++ double strtod(const char *s, char **endp) strtod converts the prefix
+  of s to double, ignoring leading white space; it stores a pointer to
+  any unconverted suffix in *endp unless endp is NULL. If the answer
+  would overflow, HUGE_VAL is returned with the proper sign; if the
+  answer would underflow, zero is returned. In either case errno is set to ERANGE.
++ long strtol(const char *s, char **endp, int base) strtol converts
+  the prefix of s to long, ignoring leading white space; it stores a
+  pointer to any unconverted suffix in *endp unless endp is NULL. If
+  base is between 2 and 36, conversion is done assuming that the input
+  is written in that base. If base is zero, the base is 8, 10, or 16;
+  leading 0 implies octal and leading 0x or 0X hexadecimal. Letters in
+  either case represent digits from 10 to base-1; a leading 0x or 0X
+  is permitted in base 16. If the answer would overflow, LONG_MAX or
+  LONG_MIN is returned, depending on the sign of the result, and errno
+  is set to ERANGE.
++ unsigned long strtoul(const char *s, char **endp, int base)  strtoul
+  is the same as strtol except that the result is unsigned long and
+  the error value is ULONG_MAX.
++ int rand(void) rand returns a pseudo-random integer in the range 0
+  to RAND_MAX, which is at least 32767.
++ void srand(unsigned int seed) srand uses seed as the seed for a new
+  sequence of pseudo-random numbers. The initial seed is 1.
++ void *calloc(size_t nobj, size_t size) calloc returns a pointer to
+  space for an array of nobj objects, each of size size, or NULL if
+  the request cannot be satisfied. The space is initialized to zero
+  bytes.
+
++ void *malloc(size_t size) malloc returns a pointer to space for an
+  object of size size, or NULL if the request cannot be satisfied. The space is uninitialized.
++ void *realloc(void *p, size_t size) realloc changes the size of the
+  object pointed to by p to size. The contents will be unchanged up to
+  the minimum of the old and new sizes. If the new size is larger, the
+  new space is uninitialized. realloc returns a pointer to the new
+  space, or NULL if the request cannot be satisfied, in which case *p is unchanged.
++ void free(void *p)  free deallocates the space pointed to by p; it
+  does nothing if p is NULL. p must be a pointer to space previously
+  allocated by calloc, malloc, or realloc.
+
++ void abort(void)  abort causes the program to terminate abnormally, as if by raise(SIGABRT).
++ void exit(int status) exit causes normal program termination. atexit
+  functions are called in reverse order of registration, open files
+  are flushed, open streams are closed, and control is returned to the
+  environment. How status is returned to the environment is
+  implementation- dependent, but zero is taken as successful
+  termination. The values EXIT_SUCCESS and EXIT_FAILURE may also be used.
++ int atexit(void (*fcn)(void))  atexit registers the function fcn to
+  be called when the program terminates normally; it returns non-zero
+  if the registration cannot be made.
+
++ int system(const char *s)  system passes the string s to the
+  environment for execution. If s is NULL, system returns non-zero if
+  there is a command processor. If s is not NULL, the return value is
+  implementation-dependent.
+
++ char *getenv(const char *name)  getenv returns the environment
+  string associated with name, or NULL if no string exists. Details are implementation-dependent.
++ void *bsearch(const void *key, const void *base, size_t n, size_t
+  size, int (*cmp)(const void *keyval, const void *datum)) bsearch
+  searches base[0]...base[n-1] for an item that matches *key. The
+  function cmp must return negative if its first argument (the search
+  key) is less than its second (a table entry), zero if equal, and
+  positive if greater. Items in the array base must be in ascending
+  order. bsearch returns a pointer to a matching item, or NULL if none
+  exists.
+
++ void qsort(void *base, size_t n, size_t size, int (*cmp)(const void
+  *, const void *)) qsort sorts into ascending order an array
+  base[0]...base[n-1] of objects of size size. The comparison function cmp is as in bsearch.
++ int abs(int n) abs returns the absolute value of its int argument.
++ long labs(long n) labs returns the absolute value of its long argument.
++ div_t div(int num, int denom) div computes the quotient and
+  remainder of num/denom. The results are stored in the int members
+  quot and rem of a structure of type div_t.
+
++ ldiv_t ldiv(long num, long denom) ldiv computes the quotient and
+  remainder of num/denom. The results are stored in the long members
+  quot and rem of a structure of type ldiv_t
+
+
+
+
+** B.7 Variable Argument Lists: <stdarg.h>
+The header <stdarg.h> provides facilities for stepping through a list of function arguments
+of unknown number and type.
+#+begin_src c
+va_list ap;
+va_start(va_list ap, lastarg);
+type va_arg(va_list ap, type);
+void va_end(va_list ap);
+#+end_src
+** B.8 Non-local Jumps: <setjmp.h>
+The declarations in <setjmp.h> provide a way to avoid the normal function call and return
+sequence, typically to permit an immediate return from a deeply nested function call.
++ int setjmp(jmp_buf env)
+
+The macro setjmp saves state information in env for use by longjmp. The return is
+zero from a direct call of setjmp, and non-zero from a subsequent call of longjmp. A
+call to setjmp can only occur in certain contexts, basically the test of if, switch, and
+loops, and only in simple relational expressions.
+
+#+begin_src c
+if (setjmp(env) == 0)
+/* get here on direct call */
+else
+/* get here by calling longjmp */
+#+end_src
+
++ void longjmp(jmp_buf env, int val)
+
+longjmp restores the state saved by the most recent call to setjmp, using the
+information saved in env, and execution resumes as if the setjmp function had just
+executed and returned the non-zero value val. The function containing the setjmp
+must not have terminated. Accessible objects have the values they had at the time
+longjmp was called, except that non-volatile automatic variables in the function
+calling setjmp become undefined if they were changed after the setjmp call.
+
+** B.9 Signals: <signal.h>
+The header <signal.h> provides facilities for handling exceptional conditions that arise
+during execution, such as an interrupt signal from an external source
+or an error in execution.
+
+=void (*signal(int sig, void (*handler)(int)))(int)=
+
+signal determines how subsequent signals will be handled. If handler is SIG_DFL, the
+implementation-defined default behavior is used, if it is SIG_IGN, the signal is ignored;
+otherwise, the function pointed to by handler will be called, with the argument of the type of
+signal. Valid signals include
+#+begin_verse
+SIGABRT abnormal termination, e.g., from abort
+SIGFPE arithmetic error, e.g., zero divide or overflow
+SIGILL illegal function image, e.g., illegal instruction
+SIGINT interactive attention, e.g., interrupt
+SIGSEGV illegal storage access, e.g., access outside memory limits
+SIGTERM termination request sent to this program
+#+end_verse
+signal returns the previous value of handler for the specific signal, or SIG_ERR if an error
+occurs.
+
+The initial state of signals is implementation-defined.
+=int raise(int sig)=
+raise sends the signal sig to the program; it returns non-zero if unsuccessful.
+** B.11 Implementation-defined Limits: <limits.h> and <float.h>
+The header <limits.h> defines constants for the sizes of integral types.
+The values below are acceptable minimum magnitudes; larger values may be
+used.
+#+begin_verse
+CHAR_BIT 8 bits in a char
+CHAR_MAX UCHAR_MAX or SCHAR_MAX maximum value of char
+CHAR_MIN 0 or SCHAR_MIN maximum value of char
+INT_MAX 32767 maximum value of int
+INT_MIN -32767 minimum value of int
+LONG_MAX 2147483647 maximum value of long
+LONG_MIN -2147483647 minimum value of long
+SCHAR_MAX +127 maximum value of signed char
+SCHAR_MIN -127 minimum value of signed char
+SHRT_MAX +32767 maximum value of short
+SHRT_MIN -32767 minimum value of short
+UCHAR_MAX 255 maximum value of unsigned char
+UINT_MAX 65535 maximum value of unsigned int
+ULONG_MAX 4294967295 maximum value of unsigned long
+USHRT_MAX 65535 maximum value of unsigned short
+#+end_verse
+The names in the table below, a subset of <float.h>, are constants related
+to floating-point arithmetic. When a value is given, it represents the
+minimum magnitude for the corresponding quantity. Each implementation
+defines appropriate values.
+#+begin_verse
+FLT_RADIX  2  radix of exponent, representation, e.g., 2, 16
+FLT_ROUNDS    floating-point rounding mode for addition
+FLT_DIG    6  decimal digits of precision
+FLT_EPSILON 1E-5 smallest number x such that 1.0+x != 1.0 
+FLT_MANT_DIG   number of base FLT_RADIX in mantissa
+FLT_MAX 1E+37 maximum floating-point number 
+FLT_MAX_EXP  maximum n such that FLT_RADIX(n-1) is representable
+FLT_MIN 1E-37 minimum normalized floating-point number
+FLT_MIN_EXP  minimum n such that 10(n) is a normalized number
+DBL_DIG 10 decimal digits of precision
+DBL_EPSILON 1E-9 smallest number x such that 1.0+x != 1.0
+DBL_MANT_DIG  number of base FLT_RADIX in mantissa
+DBL_MAX  1E+37  maximum double floating-point number
+DBL_MAX_EXP  maximum n such that FLT_RADIX(n-1) is representable
+DBL_MIN  1E-37  minimum normalized double floating-point number
+DBL_MIN_EXP minimum normalized double floating-point number
+#+end_verse
