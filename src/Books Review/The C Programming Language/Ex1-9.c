@@ -1,6 +1,5 @@
 #include <stdio.h>
 int main(void)
-{
   int c;
   int flag;
   while((c = getchar()) != EOF){
