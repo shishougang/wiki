@@ -1,4 +1,4 @@
-/* a horizontal histrogram */
+/* a vertical histrogram */
 #include <stdio.h>
 #define MAXWORDLEN 10
 int main()
@@ -8,6 +8,8 @@ int main()
 	int inword = 0;
 	int nlength[MAXWORDLEN + 1];
 	int nword = 0;
+	int Maxlength;
+	Maxlength = 0;
 
 	for(i = 0; i <= MAXWORDLEN; i++)
 	{
@@ -21,9 +23,16 @@ int main()
 			if(inword == 1)
 			{
 				if(nword < 10)
+				{
 					nlength[nword]++;
+					Maxlength = nlength[nword] > Maxlength? nlength[nword] : Maxlength;
+				}
 				else
+				{
 					nlength[MAXWORDLEN]++;
+					Maxlength = nlength[MAXWORDLEN] > Maxlength? nlength[MAXWORDLEN] : Maxlength;
+				}
+
 			}
 				
 			inword = 0;
@@ -35,12 +44,10 @@ int main()
 			inword = 1;
 		}
 	}
-	for(i = 1; i <= MAXWORDLEN; i++)
+	for(i = Maxlength; i >= 1; i--)
 	{
-		printf("| %d| ", i);
-		for(j = 0; j < nlength[i]; j++)
-			printf("*");
-		printf("\n");
+		printf("%4d | ");
+		
 	}
 
 	return 0;

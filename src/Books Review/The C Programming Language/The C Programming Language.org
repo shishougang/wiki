@@ -202,12 +202,25 @@ parameter declaration in the function must include the number of
 columns; the number of rows i irrelevant, since what is passed is, as
 before, a pointer to an array of rows, where each row is an array of
 13 ints.
+** page 120
+The generic pointer type void * is used for the pointer
+arguments. Any pointer can be cast to void * and back again without
+loss of information, so we can call qsort by casting arguments to void
+*.
 * Chapter 6
 ** page 135
 =sizeof= returns the size counted in bytes, where the C definition of
 ``byte'' is ``the size of a char.'' In other words, =sizeof(char)= is
 always 1. (It turns out that it's not necessarily the case, though,
 that a byte or a char is 8 bits.) 
+
+Strictly, =sizeof= produces an unsigned integer value whose type,
+=size_t=, is defined in the header =<stddef.h>=.
+
+A =sizeof= can not be used in a =#if= line, because the preprocessor
+does not parse type names. But the expression in the =#define= is not
+evaluated by the preprocessor.
+
 ** page 138
 #+begin_verse
 Don't assume, however, that the size of a structure is the sum of the sizes of its members.
@@ -257,6 +270,20 @@ sizeof(str); /*2*/
 strlen(str); /*1*/
 #+end_src
 
+** page 146
+In effect, =typedef= is like =#define=, except that since it is
+interpreted by the computer, it can cope with textual substitutions
+that are beyond the capabilities of the preprocessor. For example,
+ 
+ =typedef int (*PFI)(char *, char *);=
+
+creates the type PFI, for "pointer to function (of two char *
+arguments) returning int," which can be used in contexts like
+
+=PFI strcmp, numcmp;=
+
+in the sort program.
+
 * Chapter 7
 ** page 152
 Note that the stdio library generally does newline translation for
@@ -265,6 +292,16 @@ carriage return on the Macintosh and a carriage-return/linefeed
 combination on MS-DOS, you don't have to worry about these things in
 C, because the line termination will always appear to a C program to
 be a single '\n'.
+
+** page 154
+A width or precision may be specified as *, in which case the value is
+computed by converting the next argument (which must be an int). For
+example, to print at most max characters from a string s,
+
+=prinf("%.*s", max, s);=
+
+** page 164
+Confusingly, =gets= deletes the terminals '\n', and =puts= adds it.
 
 ** page 166
 strstr(s,t)	return pointer to first t in s, or NULL if not present
@@ -298,7 +335,15 @@ This looks like it ought to work, but it turns out that on some systems rand isn
 based on the other frand() examples above.
 
 * Chapter 8
+
+** page 172
+=open= is rather like the =fopen= discussed in Chapter 7, except that
+instead of returning a file pointer, it returns a file descriptor,
+which is just an =int=.
 * Appendix A: Reference Manual
+** A2.1 Tokens
+There are six classes of tokens: identifiers, keywords, constants,
+string literals, operators, and other separators.
 ** A.2.5.2 Character Constants
 | Name            | Abstract | character | Name          | Abstract | Character |
 |-----------------+----------+-----------+---------------+----------+-----------|
@@ -398,7 +443,6 @@ redefined.
 + __TIME__ A string literal containing the time of compilation, in the form "hh:mm:ss"
 + __STDC__ The constant 1. It is intended that this identifier be
   defined to be 1 only in standard-conforming implementations.
-
 
 
 
