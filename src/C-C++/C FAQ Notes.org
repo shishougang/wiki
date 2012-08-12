@@ -1,0 +1,507 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: C FAQ Notes
+#+OPTIONS: num:nil H:2
+Offical Site: http://c-faq.com/
+
+* 1. Declarations and Initializations
+** Q1.1 How should I decide which integer type to use?
+ Under ANSI C, the maximum and minimum values for a particular machine
+ can be found in the header file <limits.h>; here is a summary:
+#+begin_src c
+Base type	Minimum size (bits)	Minimum value (signed)	Maximum value (signed)	Maximum value (unsigned)
+char	8	-127	127	255
+short	16	-32,767	32,767	65,535
+int	16	-32,767	32,767	65,535
+long	32	-2,147,483,647	2,147,483,647	4,294,967,295
+
+sizeof(char) <= sizeof(short) <= sizeof(int) <= sizeof(long) <= sizeof(long long)
+#+end_src
+
+** Q1.3 You no longer have to define your own typedefs, because the Standard header <inttypes.h> contains a complete set.
+The file path: =/usr/include/inttypes.h=.
+
+The =inttypes.h= file is a C header file that is part of the C standard
+library and API. It was added with the 1999 version of the ISO C
+standard (known as C99). It includes the stdint.h header and defines a
+number of macros for using it with the =printf= and =scanf= family of
+functions, as well as functions for working with the intmax_t type.[fn:1]
+
+*** Naming Convention and format specifiers for Macros
+The macros defined in inttypes.h follow a regular pattern to simplify
+usage. The pattern followed is as follows:
+
++ First three characters
+ - PRI for output format (printf, fwprintf, wprintf, etc.)
+ - SCN for input format (scanf, fwscanf, etc.)
++ Fourth character
+ - d for decimal formatting
+ - x for hexadecimal formatting
+ - o for octal formatting
+ - u for unsigned int formatting
+ - i for integer formatting
++ Remaining Characters
+ - N for N bit size assignment to the data type (Eg. 32 for 32-bit size for integer, 16 for 16-bit size for unsigned int and so on)
+ - PTR for pointer
+ - MAX for maximum supported bit size
+ - FAST, whose meaning is not clearly defined and is left to the implementation to decide what is meant by a "fast" integer data type.
+
+
+
+
+
+
+Question 2.25
+bit-fields; 
+http://publications.gbdirect.co.uk/c_book/chapter6/bitfields.html
+http://www.linuxforu.com/2012/01/joy-of-programming-understanding-bit-fields-c/
+http://en.wikipedia.org/wiki/Single_precision
+
+** Q1.10 Do all declarations for the same static function or variable have to include the storage class static?
+Additional links: An [[http://c-faq.com/decl/static.jd.html][article by Jutta Degener]] explaining the subtly
+different rules for static variables versus static functions.
+
+Example:
+#+begin_src c
+/* object */	  /* function */
+
+int o1;		  int f1();		/* external linkage */
+static int o2;	  static int f2();	/* internal linkage */
+static int o3;	  static int f3();	/* internal linkage */
+
+static int o1;	  static int f1();	/* ERROR, both have external linkage */
+int o2;					/* ERROR, o2 has internal linkage */
+		  int f2();		/* OK, picks up internal linkage */
+extern int o3;	  extern int f3();	/* OK, both pick up internal linkage */
+#+end_src
+The difference is case (2); where functions do pick up a previous
+linkage even without "extern", objects don't.
+ 
+** Q1.20b What does it mean for a function parameter to be const? What do the two const's in
+=int f(const * const p)= mean?
+
+The first of the two const's is perfectly appropriate and quite
+useful; many functions declare parameters which are pointers to const
+data, and doing so documents (and tends to enforce) the function's
+promise that it won't modify the pointed-to data in the caller. The
+second const, on the other hand, is almost useless; all it says is
+that the function won't alter its own copy of the pointer, even though
+it wouldn't cause the caller or the function any problems if it did,
+nor is this anything the caller should care about in any case. The
+situation is the same as if a function declared an ordinary
+(non-pointer) parameter as const:
+
+	=int f2(const int x)=
+This says that nowhere in the body of f2() will the function assign a
+different value to x. 
+** Q1.21  How do I construct declarations of complicated types such as ``array of N pointers to functions returning pointers to functions returning pointers to char'', or figure out what similarly complicated declarations mean?
+
+1. =char *(*(*a[N])())();=
+Build the declaration up incrementally, using =typedefs=:
+#+begin_src c 
+	typedef char *pc;       /* pointer to char */
+	typedef pc fpc();	/* function returning pointer to char */
+	typedef fpc *pfpc;	/* pointer to above */
+	typedef pfpc fpfpc();	/* function returning... */
+	typedef fpfpc *pfpfpc;	/* pointer to... */
+	pfpfpc a[N];		/* array of... */
+#+end_src
+Use the *cdecl* program, which turns English into C and vice versa.
+You provide a longhand description of the type you want, and cdecl
+responds with the equivalent C declaration:
+#+begin_src sh
+	cdecl> declare a as array of pointer to function returning
+		pointer to function returning pointer to char
+
+	char *(*(*a[])())()
+#+end_src
+ *cdecl* can also explain complicated declarations (you give it a
+complicated declaration and it responds with an English description),
+help with casts, and indicate which set of parentheses the parameters
+go in (for complicated function definitions, like the one above).
+
+One way to make sense of complicated C declarations is by reading them
+``inside out,'' remembering that [] and () bind more tightly than *.
+For example, given
+
+	=char *(*pfpc)();=
+
+we can see that pfpc is a pointer (the inner *) to a function (the ())
+to a pointer (the outer *) to char. When we later use pfpc, the
+expression *(*pfpc)() (the value pointed to by the return value of a
+function pointed to by pfpc) will be a char.
+
+Another way of analyzing these declarations is to decompose the
+declarator while composing the description, maintaining the
+``declaration mimics use'' relationship: 
+#+begin_src c
+	*(*pfpc)()	is a	char
+	(*pfpc)()	is a	pointer to char
+	(*pfpc)	is a	function returning pointer to char
+	pfpc	is a	pointer to function returning pointer to char
+#+end_src
+If you'd like to make things clearer when declaring complicated types
+	like these, you can make the analysis explicit by using a
+	chain of typedefs as in option 2 above.
+ *Additional links:*
+David Anderson's [[http://c-faq.com/decl/spiral.anderson.html][``Clockwise/Spiral Rule'']]
+
+There is a technique known as the ``Clockwise/Spiral Rule'' which
+enables any C programmer to parse in their head any C declaration!
+
+There are three simple steps to follow:
+
+1. Starting with the unknown element, move in a spiral/clockwise direction; when ecountering the following elements replace them with the corresponding english statements:
+[X] or []
+=> Array X size of... or Array undefined size of...
+(type1, type2)
+=> function passing type1 and type2 returning...
+=*=
+=> pointer(s) to...
+2. Keep doing this in a spiral/clockwise direction until all tokens have been covered.
+3. Always resolve anything in parenthesis first!
+ *Example #1: Simple declaration*
+#+begin_src sh
+                     +-------+
+                     | +-+   |
+                     | ^ |   |
+                char *str[10];
+                 ^   ^   |   |
+                 |   +---+   |
+                 +-----------+
+#+end_src
+Question we ask ourselves: What is str?
+
+``str is an...
++ We move in a spiral clockwise direction starting with `str' and the first character we see is a `[' so, that means we have an array, so...
+``str is an array 10 of...
++ Continue in a spiral clockwise direction, and the next thing we encounter is the `*' so, that means we have pointers, so...
+``str is an array 10 of pointers to...
++ Continue in a spiral direction and we see the end of the line (the `;'), so keep going and we get to the type `char', so...
+``str is an array 10 of pointers to char''
++ We have now ``visited'' every token; therefore we are done!
+ *Example #2: Pointer to Function declaration*
+#+begin_src c
+                     +--------------------+
+                     | +---+              |
+                     | |+-+|              |
+                     | |^ ||              |
+                char *(*fp)( int, float *);
+                 ^   ^ ^  ||              |
+                 |   | +--+|              |
+                 |   +-----+              |
+                 +------------------------+
+#+end_src 
+Question we ask ourselves: What is fp?
+
+``fp is a...
++ Moving in a spiral clockwise direction, the first thing we see is a `)'; therefore, fp is inside parenthesis, so we continue the spiral inside the parenthesis and the next character seen is the `*', so...
+``fp is a pointer to...
++ We are now out of the parenthesis and continuing in a spiral clockwise direction, we see the `('; therefore, we have a function, so...
+``fp is a pointer to a function passing an int and a pointer to float returning...
++ Continuing in a spiral fashion, we then see the `*' character, so...
+``fp is a pointer to a function passing an int and a pointer to float returning a pointer to...
++ Continuing in a spiral fashion we see the `;', but we haven't visited all tokens, so we continue and finally get to the type `char', so...
+``fp is a pointer to a function passing an int and a pointer to float returning a pointer to a char''
+ *Example #3: The ``Ultimate''*
+#+begin_src c
+                      +-----------------------------+
+                      |                  +---+      |
+                      |  +---+           |+-+|      |
+                      |  ^   |           |^ ||      |
+                void (*signal(int, void (*fp)(int)))(int);
+                 ^    ^      |      ^    ^  ||      |
+                 |    +------+      |    +--+|      |
+                 |                  +--------+      |
+                 +----------------------------------+
+#+end_src
+Question we ask ourselves: What is `signal'?
+
+Notice that signal is inside parenthesis, so we must resolve this first!
+
++ Moving in a clockwise direction we see `(' so we have...
+ ``signal is a function passing an int and a...
++ Hmmm, we can use this same rule on `fp', so... What is fp? fp is also inside parenthesis so continuing we see an `*', so...
+ fp is a pointer to...
++ Continue in a spiral clockwise direction and we get to `(', so...
+ ``fp is a pointer to a function passing int returning...''
++ Now we continue out of the function parenthesis and we see void, so...
+ ``fp is a pointer to a function passing int returning nothing (void)''
++ We have finished with fp so let's catch up with `signal', we now have...
+ ``signal is a function passing an int and a pointer to a function passing an int returning nothing (void) returning...
++ We are still inside parenthesis so the next character seen is a `*', so...
+ ``signal is a function passing an int and a pointer to a function passing an int returning nothing (void) returning a pointer to...
++ We have now resolved the items within parenthesis, so continuing clockwise, we then see another `(', so...
+ ``signal is a function passing an int and a pointer to a function passing an int returning nothing (void) returning a pointer to a function passing an int returning...
++ Finally we continue and the only thing left is the word `void', so the final complete definition for signal is:
+ ``signal is a function passing an int and a pointer to a function passing an int returning nothing (void) returning a pointer to a function passing an int returning nothing (void)''
+
+The same rule is applied for const and volatile. For Example:
+
+	=const char *chptr;=
++ Now, what is chptr??
+``chptr is a pointer to a char constant''
+
+How about this one:
+
+	char * const chptr;
++ Now, what is chptr??
+``chptr is a constant pointer to char''
+
+Finally:
+
+	volatile char * const chptr;
++ Now, what is chptr??
+``chptr is a constant pointer to a char volatile.''
+** Q1.29 How can I determine which identifiers are safe for me to use and which are reserved?
+What do the above rules really mean? If you want to be on the safe side:
+
+1,2. Don't give anything a name with a leading underscore.
+3. Don't give anything a name which is already a standard macro (including the ``future directions'' patterns).
+4. Don't give any functions or global variables names which are already taken by functions or variables in the standard library, or which match any of the ``future directions'' patterns. (Strictly speaking, ``matching'' means matching in the first six characters, without regard to case; see question 11.27.)
+5. Don't redefine standard typedef or tag names.
+
+In fact, the preceding subparagraphs are overly conservative. If you wish, you may remember the following exceptions:
+
+1,2. You may use identifiers consisting of an underscore followed by a digit or lower case letter for labels and structure/union members.
+1,2. You may use identifiers consisting of an underscore followed by a digit or lower case letter at function, block, or prototype scope.
+3. You may use names matching standard macro names if you don't #include any header files which #define them.
+4. You may use names of standard library routines as static or local variables (strictly speaking, as identifiers with internal or no linkage).
+5. You may use standard typedef and tag names if you don't #include any header files which declare them.
+
+However, before making use of any of these exceptions, recognize that
+some of them are pretty risky (especially exceptions 3 and 5, since
+you could accidentally #include the relevant header file at a later
+time, perhaps through a chain of nested #include files), and others
+(especially the ones labeled 1,2) represent sort of a ``no man's
+land'' between the user namespaces and the namespaces reserved to the
+implementation.
+* 2. Structures, Unions, and Enumerations
+** Q2.6  I came across some code that declared a structure like this:
+#+begin_src c
+struct name {
+	int namelen;
+	char namestr[1];
+};
+#+end_src
+and then did some tricky allocation to make the =namestr= array act like
+	it had several elements, with the number recorded by namelen.
+	How does this work? Is it legal or portable?
+
+An implementation of the technique might look something like this:
+#+begin_src c
+#include <stdlib.h>
+#include <string.h>
+
+struct name *makename(char *newname)
+{
+	struct name *ret =
+		malloc(sizeof(struct name)-1 + strlen(newname)+1);
+				/* -1 for initial [1]; +1 for \0 */
+	if(ret != NULL) {
+		ret->namelen = strlen(newname);
+		strcpy(ret->namestr, newname);
+	}
+
+	return ret;
+}
+#+end_src
+This function allocates an instance of the name structure with the
+size adjusted so that the namestr field can hold the requested name
+(not just one character, as the structure declaration would suggest).
+
+Another possibility is to declare the variable-size element very
+large, rather than very small. The above example could be rewritten
+like this:
+
+#+begin_src c
+#include <stdlib.h>
+#include <string.h>
+
+#define MAXSIZE 100
+
+struct name {
+	int namelen;
+	char namestr[MAXSIZE];
+};
+
+struct name *makename(char *newname)
+{
+	struct name *ret =
+		malloc(sizeof(struct name)-MAXSIZE+strlen(newname)+1);
+								/* +1 for \0 */
+	if(ret != NULL) {
+		ret->namelen = strlen(newname);
+		strcpy(ret->namestr, newname);
+	}
+
+	return ret;
+}
+#+end_src
+where MAXSIZE is larger than any name which will be stored. 
+
+Of course, to be truly safe, the right thing to do is use a character
+pointer instead of an array:
+#+begin_src c
+#include <stdlib.h>
+#include <string.h>
+
+struct name {
+	int namelen;
+	char *namep;
+};
+
+struct name *makename(char *newname)
+{
+	struct name *ret = malloc(sizeof(struct name));
+	if(ret != NULL) {
+		ret->namelen = strlen(newname);
+		ret->namep = malloc(ret->namelen + 1);
+		if(ret->namep == NULL) {
+			free(ret);
+			return NULL;
+		}
+		strcpy(ret->namep, newname);
+	}
+
+	return ret;
+}
+#+end_src 
+(Obviously, the ``convenience'' of having the length and the string
+stored in the same block of memory has now been lost, and freeing
+instances of this structure will require two calls to free; see
+question 7.23.)
+** Q2.10 How can I pass constant values to functions which accept structure arguments? How can I create nameless, immediate, constant structure values?
+C99 introduces ``compound literals'', one form of which provides for structure constants. For example, to pass a constant coordinate pair to a hypothetical plotpoint function which expects a struct point, you can call
+
+	=plotpoint((struct point){1, 2});=
+Combined with ``designated initializers'' (another C99 feature), it is also possible to specify member values by name:
+	=plotpoint((struct point){.x=1, .y=2});=
+** Q2.11 How can I read/write structures from/to data files?
+It is relatively straightforward to write a structure out using fwrite:
+
+	=fwrite(&somestruct, sizeof somestruct, 1, fp);=
+and a corresponding =fread= invocation can read it back in. What happens
+here is that =fwrite= receives a pointer to the structure, and writes
+(or =fread= correspondingly reads) the memory image of the structure as
+a stream of bytes. The sizeof operator determines how many bytes the
+structure occupies.
+
+However, data files written as memory images in this way will not be
+portable, particularly if they contain floating-point fields or
+pointers. The memory layout of structures is machine and compiler
+dependent. Different compilers may use different amounts of padding
+(see question 2.12), and the sizes and byte orders of fundamental
+types vary across machines.
+** Q2.12 Why is my compiler leaving holes in structures, wasting space and preventing ``binary'' I/O to external data files? Can I turn this off, or otherwise control the alignment of structure fields?
+Additional [[http://c-faq.com/struct/align.esr.html][ideas on working with alignment and padding]] by Eric Raymond, couched in the form of six new FAQ list questions 
+
+Corrections to the above from [[http://c-faq.com/struct/align.esr2.html][Norm Diamond]] and [[http://c-faq.com/struct/align.esr3.html][Clive Feather]]
+** Q2.14 How can I determine the byte offset of a field within a structure?
+ ANSI C defines the =offsetof()= macro in =<stddef.h>=, which lets you
+ compute the offset of field f in struct s as offsetof(struct s, f).
+ If for some reason you have to code this sort of thing yourself, one
+ possibility is
+#+begin_src c
+	#define offsetof(type, f) ((size_t) \
+		((char *)&((type *)0)->f - (char *)(type *)0))
+#+end_src
+This implementation is not 100% portable; some compilers may
+legitimately refuse to accept it.
+** Q2.21 Is there an automatic way to keep track of which field of a union is in use?
+No. You can implement an explicitly ``tagged'' union yourself:
+#+begin_src c 
+struct taggedunion {
+	enum {UNKNOWN, INT, LONG, DOUBLE, POINTER} code;
+	union {
+		int i;
+		long l;
+		double d;
+		void *p;
+	} u;
+};
+#+end_src 
+** Q2.25 I came across some structure declarations with colons and numbers next to certain fields, like this:
+#+begin_src c
+struct record {
+	char *name;
+	int refcount : 4;
+	unsigned dirty : 1;
+};
+#+end_src
+What gives?
+
+ Those are bit-fields; the number gives the exact size of the field,
+ in bits.
+
+*** Example 1
+Consider the example of reading the components of a floating-point number. A 4-byte floating-point number in the IEEE 754 standard consists of the following:
+
+= The first bit is reserved for the sign bit — it is 1 if the number is negative and 0 if it is positive.
++ The next 8 bits are used to store the exponent in the unsigned form. When treated as a signed exponent, this exponent value ranges from -127 to +128. When treated as an unsigned value, its value ranges from 0 to 255.
++ The remaining 23 bits are used to store the mantissa.
+
+Here is a program to print the value of a floating-point number into
+its constituents:
+#+begin_src c
+struct FP {
+// the order of the members depends on the
+// endian scheme of the underlying machine
+      unsigned int mantissa : 23;
+     unsigned int exponent : 8;
+      unsigned int sign : 1;
+} *fp;
+ 
+int main() {
+       float f = -1.0f;
+       fp = (struct FP *)&f;
+ 
+printf(" sign = %s, biased exponent = %u,
+mantissa = %u ", fp->sign ? "negative" : "positive",
+fp->exponent, fp->mantissa);
+}
+#+end_src 
+For the floating-point number -1.0, this program prints:
+
+=sign = negative, biased exponent = 127, mantissa = 0=
+
+Since the sign of the floating-point number is negative, the value of
+the sign bit is 1. Since the exponent is actual 0, in unsigned
+exponent format, it is represented as 127, and hence that value is
+printed. The mantissa in this case is 0, and hence it is printed as it
+is.
+
+To understand how floating-point arithmetic works, see this [[http://en.wikipedia.org/wiki/Single_precision][Wikipedia article]].
+*** Example 2
+#+begin_src c
+struct bitfield {
+    int bit : 1;
+} BIT;
+int main() {
+   BIT.bit = 1;
+   printf(" sizeof BIT is = %d\n", sizeof(BIT));
+   printf(" value of bit is = %d ", BIT.bit);
+ 
+}
+#+end_src
+It prints:
+#+begin_src c
+ sizeof BIT is = 4
+ value of bit is = -1
+#+end_src
+Note that we declared bit as int bit : 1; where the compiler treated the bit to be a signed integer of one bit size. Now, what is the range of a 1-bit signed integer?
+
+It is from 0 to -1 (not 0 and 1, which is a common mistake). Remember
+the formula for finding out the range of signed integers: 2^(n-1) to
+2^(n-1)-1 where N is the number of bits. For example, if N is 8 (number
+of bits in a byte), i.e., the range of a signed integer of size 8 is
+-2^(8-1) to 2^(8-1)-1, which is -128 to +127. Now, when N is 1, i.e.,
+the range of a signed integer of size 1, it is -2^(1-1) to 2^(1-1)-1,
+which is -1 to 0!
+
+* 3. Expressions
+** Q
+* Footnotes
+
+[fn:1] http://en.wikibooks.org/wiki/C_Programming/C_Reference/inttypes.h#cite_note-2
+
+
