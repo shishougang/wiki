@@ -39,7 +39,7 @@
           :base-extension "org"
           :publishing-directory "~/Dropbox/Blog/octopress/source/_posts/"
           :sub-superscript ""
-          :recursive t
+          :recursive nil
           :publishing-function org-publish-org-to-html
           :headline-levels 4
           :html-extension "markdown"

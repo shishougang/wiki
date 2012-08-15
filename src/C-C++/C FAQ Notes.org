@@ -499,7 +499,613 @@ the range of a signed integer of size 1, it is -2^(1-1) to 2^(1-1)-1,
 which is -1 to 0!
 
 * 3. Expressions
-** Q
+** Q3.4 Can I use explicit parentheses to force the order of evaluation I want, and control these side effects? Even if I don't, doesn't precedence dictate it?
+Not in general.
+
+Operator precedence and explicit parentheses impose only a partial ordering on the evaluation of an expression. In the expression
+
+	=f() + g() * h()=
+
+although we know that the multiplication will happen before the addition, there is no telling which of the three functions will be called first. In other words, precedence only partially specifies order of evaluation, where ``partially'' emphatically does not cover evaluation of operands.
+Parentheses tell the compiler which operands go with which operators; they do not force the compiler to evaluate everything within the parentheses first. Adding explicit parentheses to the above expression to make it
+
+	=f() + (g() * h())=
+
+would make no difference in the order of the function calls.
+** Q3.14 Why doesn't the code
+#+begin_src c
+int a = 1000, b = 1000;
+long int c = a * b;
+#+end_src
+work?
+
+Under C's integral promotion rules, the multiplication is carried out
+using int arithmetic, and the result may overflow or be truncated
+before being promoted and assigned to the long int left-hand side. Use
+an explicit cast on at least one of the operands to force long
+arithmetic:
+
+	=long int c = (long int)a * b;=
+
+or perhaps
+
+	=long int c = (long int)a * (long int)b;=
+
+(both forms are equivalent).
+Notice that the expression =(long int)(a * b)= would not have the
+desired effect. An explicit cast of this form (i.e. applied to the
+result of the multiplication) is equivalent to the implicit conversion
+which would occur anyway when the value is assigned to the long int
+left-hand side, and like the implicit conversion, it happens too late,
+after the damage has been done.
+
+** Q3.16 I have a complicated expression which I have to assign to one of two variables, depending on a condition. Can I use code like this?
+
+	=((condition) ? a : b) = complicated_expression;=
+
+ No. The ?: operator, like most operators, yields a value, and you can't assign to a value. (In other words, ?: does not yield an lvalue.) If you really want to, you can try something like
+
+	=*((condition) ? &a : &b) = complicated_expression;=
+
+although this is admittedly not as pretty.
+** Q3.19 What's the difference between the ``unsigned preserving'' and ``value preserving'' rules?
+These rules concern the behavior when an unsigned type must be
+promoted to a ``larger'' type. Should it be promoted to a larger
+signed or unsigned type? (To foreshadow the answer, it may depend on
+whether the larger type is truly larger.)
+
+Under the unsigned preserving (also called ``sign preserving'') rules,
+the promoted type is always unsigned. This rule has the virtue of
+simplicity, but it can lead to surprises (see the first example
+below).
+
+Under the value preserving rules, the conversion depends on the actual
+sizes of the original and promoted types. If the promoted type is
+truly larger--which means that it can represent all the values of the
+original, unsigned type as signed values--then the promoted type is
+signed. If the two types are actually the same size, then the promoted
+type is unsigned (as for the unsigned preserving rules).
+
+Since the actual sizes of the types are used in making the
+determination, the results will vary from machine to machine. On some
+machines, short int is smaller than int, but on some machines, they're
+the same size. On some machines, int is smaller than long int, but on
+some machines, they're the same size.
+
+In practice, the difference between the unsigned and value preserving
+rules matters most often when one operand of a binary operator is (or
+promotes to) int and the other one might, depending on the promotion
+rules, be either int or unsigned int. If one operand is unsigned int,
+the other will be converted to that type--almost certainly causing an
+undesired result if its value was negative (again, see the first
+example below). When the ANSI C Standard was established, the value
+preserving rules were chosen, to reduce the number of cases where
+these surprising results occur. (On the other hand, the value
+preserving rules also reduce the number of predictable cases, because
+portable programs cannot depend on a machine's type sizes and hence
+cannot know which way the value preserving rules will fall.)
+
+Here is a contrived example showing the sort of surprise that can
+occur under the unsigned preserving rules:
+
+#+begin_src c
+	unsigned short us = 10;
+	int i = -5;
+	if(i > us)
+		printf("whoops!\n");
+#+end_src 
+The important issue is how the expression =i > us= is evaluated. Under
+	the unsigned preserving rules (and under the value preserving
+	rules on a machine where short integers and plain integers are
+	the same size), us is promoted to unsigned int. The usual
+	integral conversions say that when types unsigned int and int
+	meet across a binary operator, both operands are converted to
+	unsigned, so i is converted to unsigned int, as well. The old
+	value of i, -5, is converted to some large unsigned value
+	(65,531 on a 16-bit machine). This converted value is greater
+	than 10, so the code prints ``whoops!''
+
+Under the value preserving rules, on a machine where plain integers
+are larger than short integers, us is converted to a plain int (and
+retains its value, 10), and i remains a plain int. The expression is
+not true, and the code prints nothing. (To see why the values can be
+preserved only when the signed type is larger, remember that a value
+like 40,000 can be represented as an unsigned 16-bit integer but not
+as a signed one.)
+
+
+Unfortunately, the value preserving rules do not prevent all
+surprises. The example just presented still prints ``whoops'' on a
+machine where short and plain integers are the same size. The value
+preserving rules may also inject a few surprises of their
+own--consider the code:
+
+#+begin_src c
+	unsigned char uc = 0x80;
+	unsigned long ul = 0;
+	ul |= uc << 8;
+	printf("0x%lx\n", ul);
+#+end_src
+Before being left-shifted, uc is promoted. Under the unsigned
+	preserving rules, it is promoted to an unsigned int, and the
+	code goes on to print 0x8000, as expected. Under the value
+	preserving rules, however, uc is promoted to a signed int (as
+	long as int's are larger than char's, which is usually the
+	case). The intermediate result uc << 8 goes on to meet ul,
+	which is unsigned long. The signed, intermediate result must
+	therefore be promoted as well, and if int is smaller than
+	long, the intermediate result is sign-extended, becoming
+	0xffff8000 on a machine with 32-bit longs. On such a machine,
+	the code prints 0xffff8000, which is probably not what was
+	expected. (On machines where int and long are the same size,
+	the code prints 0x8000 under either set of rules.)
+
+To avoid surprises (under either set of rules, or due to an unexpected
+	change of rules), it's best to avoid mixing signed and
+	unsigned types in the same expression, although as the second
+	example shows, this rule is not always sufficient. You can
+	always use explicit casts to indicate, unambiguously, exactly
+	where and how you want conversions performed; see questions
+	12.42 and 16.7 for examples. (Some compilers attempt to warn
+	you when they detect ambiguous cases or expressions which
+	would have behaved differently under the unsigned preserving
+	rules, although sometimes these warnings fire too often; see
+	also question 3.18.)
+* 4. Pointers
+** Q4.5 I have a char * pointer that happens to point to some ints, and I want to step it over them. Why doesn't
+
+=((int *)p)++;=
+
+work?
+
+ In C, a cast operator does not mean ``pretend these bits have a
+ different type, and treat them accordingly''; it is a conversion
+ operator, and by definition it yields an rvalue, which cannot be
+ assigned to, or incremented with ++. (It is either an accident or a
+ deliberate but nonstandard extension if a particular compiler accepts
+ expressions such as the above.) Say what you mean: use
+
+	=p = (char *)((int *)p + 1);=
+
+or (since p is a char *) simply
+
+	~p += sizeof(int);~
+
+or (to be really explicit)
+
+	~int *ip = (int *)p;~
+
+	~p = (char *)(ip + 1);~ 
+
+When possible, however, you should choose appropriate pointer types in
+the first place, rather than trying to treat one type as another.
+** Q4.9 Suppose I want to write a function that takes a generic pointer as an argument and I want to simulate passing it by reference. 
+Can I give the formal parameter type =void **=, and do something like this?
+#+begin_src c
+	void f(void **);
+	double *dp;
+	f((void **)&dp);
+#+end_src
+
+Not portably. Code like this may work and is sometimes recommended,
+but it relies on all pointer types having the same internal
+representation (which is common, but not universal; see question
+5.17).
+
+There is no generic pointer-to-pointer type in C. =void *= acts as a
+generic pointer only because conversions (if necessary) are applied
+automatically when other pointer types are assigned to and from =void=
+*'s; these conversions cannot be performed if an attempt is made to
+indirect upon a =void **= value which points at a pointer type other
+than =void *=. When you make use of a =void **= pointer value (for
+instance, when you use the * operator to access the =void *= value to
+which the void ** points), the compiler has no way of knowing whether
+that void * value was once converted from some other pointer type. It
+must assume that it is nothing more than a =void *=; it cannot perform
+any implicit conversions.
+
+In other words, any =void **= value you play with must be the address of
+an actual =void *= value somewhere; casts like =(void **)&dp=, though they
+may shut the compiler up, are nonportable (and may not even do what
+you want; see also question 13.9). If the pointer that the =void **=
+points to is not a =void *=, and if it has a different size or
+representation than a =void *=, then the compiler isn't going to be able
+to access it correctly.
+
+To make the code fragment above work, you'd have to use an
+intermediate =void *= variable:
+#+begin_src c
+	double *dp;
+	void *vp = dp;
+	f(&vp);
+	dp = vp;
+#+end_src
+The assignments to and from vp give the compiler the opportunity to
+perform any conversions, if necessary.
+
+Again, the discussion so far assumes that different pointer types
+might have different sizes or representations, which is rare today,
+but not unheard of. To appreciate the problem with void ** more
+clearly, compare the situation to an analogous one involving, say,
+types int and double, which probably have different sizes and
+certainly have different representations. If we have a function
+#+begin_src c
+	void incme(double *p)
+	{
+		*p += 1;
+	}
+#+end_src
+then we can do something like
+#+begin_src c
+	int i = 1;
+	double d = i;
+	incme(&d);
+	i = d;
+#+end_src
+and =i= will be incremented by 1. (This is analogous to the correct
+void ** code involving the auxiliary vp.) If, on the other hand, we
+were to attempt something like
+#+begin_src c
+	int i = 1;
+	incme((double *)&i);	/* WRONG */
+#+end_src
+(this code is analogous to the fragment in the question), it would be
+highly unlikely to work.
+** Q4.10 I have a function
+	=extern int f(int *);=
+which accepts a pointer to an int. How can I pass a constant by reference? A call like
+	=f(&5);=
+doesn't seem to work.
+
+In C99, you can use a ``compound literal'':
+
+	=f((int[]){5});=
+** Q4.12 I've seen different syntax used for calling functions via pointers. What's the story?
+Originally, a pointer to a function had to be ``turned into'' a
+``real'' function, with the * operator, before calling:
+
+#+begin_src c 
+	int r, (*fp)(), func();
+	fp = func;
+	r = (*fp)();
+#+end_src
+The interpretation of the last line is clear: fp is a pointer to
+	function, so *fp is the function; append an argument list in
+	parentheses (and extra parentheses around *fp to get the
+	precedence right), and you've got a function call.
+
+It can also be argued that functions are always called via pointers,
+and that ``real'' function names always decay implicitly into pointers.
+This reasoning means that
+
+
+	=r = fp();=
+is legal and works correctly, whether fp is the name of a function or
+a pointer to one. 
+
+* 5. Null Pointers
+** Q5.2 How do I get a null pointer in my programs?
+With a null pointer constant.
+
+null pointer constant
+
+n. An integral constant expression with value 0 (or such an expression
+cast to void *), used to request a null pointer.
+
+According to the language definition, an ``integral constant
+expression with the value 0'' in a pointer context is converted into a
+null pointer at compile time. That is, in an initialization,
+assignment, or comparison when one side is a variable or expression of
+pointer type, the compiler can tell that a constant 0 on the other
+side requests a null pointer, and generate the correctly-typed null
+pointer value. Therefore, the following fragments are perfectly legal:
+
+#+begin_src c
+	char *p = 0;
+	if(p != 0)
+#+end_src
+** Q5.3 Is the abbreviated pointer comparison ``if(p)'' to test for non-null pointers valid? What if the internal representation for null pointers is nonzero?
+ It is always valid.
+
+When C requires the Boolean value of an expression, a false value is
+inferred when the expression compares equal to zero, and a true value
+otherwise. That is, whenever one writes
+
+
+	=if(expr)=
+where ``expr'' is any expression at all, the compiler essentially acts
+as if it had been written as
+
+	~if((expr) != 0)~
+Substituting the trivial pointer expression ``p'' for ``expr'', we have
+	~if(p)	is equivalent to	if(p != 0)~
+and this is a comparison context, so the compiler can tell that the
+(implicit) 0 is actually a null pointer constant, and use the correct
+null pointer value. There is no trickery involved here; compilers do
+work this way, and generate identical code for both constructs. The
+internal representation of a null pointer does not matter.
+** Q5.5  How should NULL be defined on a machine which uses a nonzero bit pattern as the internal representation of a null pointer?
+The same as on any other machine: as 0 (or some version of 0; see
+question 5.4).
+
+Whenever a programmer requests a null pointer, either by writing ``0''
+or ``NULL'', it is the compiler's responsibility to generate whatever
+bit pattern the machine uses for that null pointer. (Again, the
+compiler can tell that an unadorned 0 requests a null pointer when the
+0 is in a pointer context; see question 5.2.) Therefore, #defining
+=NULL= as 0 on a machine for which internal null pointers are nonzero is
+as valid as on any other: the compiler must always be able to generate
+the machine's correct null pointers in response to unadorned 0's seen
+in pointer contexts. A constant 0 is a null pointer constant; NULL is
+just a convenient name for it (see also question 5.13).
+** Q5.15 I'm confused. I just can't understand all this null pointer stuff.
+Here are two simple rules you can follow:
+
+1. When you want a null pointer constant in source code, use ``0'' or ``NULL''.
+2. If the usage of ``0'' or ``NULL'' is an argument in a function
+   call, cast it to the pointer type expected by the function being
+   called. Strictly speaking, casts on pointer arguments are only
+   required in function calls without prototypes in scope, and in the
+   variable-length part of variable-length argument lists.
+** Q5.18 Is a run-time integral value of 0, cast to a pointer, guaranteed to be a null pointer?
+No. Only /constant/ integral expressions with value 0 are guaranteed to
+indicate null pointers. 
+
+
+
+* 6. Arrays and Pointers
+** Q6.5 Why can't I do something like this?
+#+begin_src c
+	extern char *getpass();
+	char str[10];
+	str = getpass("Enter password: ");
+#+end_src
+
+Arrays are ``second-class citizens'' in C; one upshot of this
+prejudice is that you cannot assign to them . When you need to copy
+the contents of one array to another, you must do so explicitly. In
+the case of char arrays, the strcpy routine is usually appropriate:
+
+	=strcpy(str, getpass("Enter password: "));=
+
+** Q6.7 How can an array be an lvalue, if you can't assign to it?
+ The term ``lvalue'' doesn't quite mean ``something you can assign
+ to''; a better definition is ``something that has a location (in
+ memory).'' The ANSI/ISO C Standard goes on to define a
+ ``modifiable lvalue''; an array is not a modifiable lvalue
+** Q6.8 Practically speaking, what is the difference between arrays and pointers?
+An array is a single, preallocated chunk of contiguous elements (all
+of the same type), fixed in size and location. A pointer is a
+reference to any data element (of a particular type) anywhere. A
+pointer must be assigned to point to space allocated elsewhere, but it
+can be reassigned (and the space, if derived from malloc, can be
+resized) at any time. A pointer can point to an array, and can
+simulate (along with malloc) a dynamically allocated array, but a
+pointer is a much more general data structure.
+
+Due to the so-called equivalence of arrays and pointers, arrays and
+pointers often seem interchangeable, and in particular a pointer to a
+block of memory assigned by malloc is frequently treated (and can be
+referenced using []) exactly as if it were a true array. 
+
+** Q6.11 I came across some ``joke'' code containing the ``expression'' 5["abcdef"] . How can this be legal C?
+   Yes, Virginia, array subscripting is commutative in C.  This curious
+   fact follows from the pointer definition of array subscripting, namely
+   that =a[e]= is identical to =*((a)+(e))=, for any two expressions a and e,
+   as long as one of them is a pointer expression and one is integral.
+   The ``proof'' looks like
+#+begin_src c
+	a[e]
+	*((a) + (e))	(by definition)
+	*((e) + (a))	(by commutativity of addition)
+	e[a]		(by definition)
+#+end_src
+This unsuspected commutativity is often mentioned in C texts as if it
+were something to be proud of, but it finds no useful application
+outside of the Obfuscated C Contest.
+
+Since strings in C are arrays of char, the expression "abcdef"[ 5] is
+perfectly legal, and evaluates to the character 'f'. You can think of
+it as a shorthand for 
+#+begin_src c
+	char *tmpptr = "abcdef";
+	... tmpptr[5] ...
+#+end_src
+** Q6.13 How do I declare a pointer to an array?
+If you really need to declare a pointer to an entire array, use
+something like ``int (*ap)[N];'' where N is the size of the array.
+If the size of the array is unknown, N can in principle be omitted,
+but the resulting type, ``pointer to array of unknown size,'' is
+useless.
+
+Here is an example showing the difference between simple pointers and
+pointers to arrays. Given the declarations
+
+#+begin_src c
+int a1[3] = {0, 1, 2};
+int a2[2][3] = {{3, 4, 5}, {6, 7, 8}};
+int *ip;		/* pointer to int */
+int (*ap)[3];		/* pointer to array [3] of int */
+#+end_src
+you could use the simple pointer-to-int, ip, to access the one-dimensional array a1:
+#+begin_src c
+	ip = a1;
+	printf("%d ", *ip);
+	ip++;
+	printf("%d\n", *ip);
+
+This fragment would print
+	0 1
+#+end_src
+An attempt to use a pointer-to-array, ap, on a1:
+#+begin_src c
+	ap = &a1;
+	printf("%d\n", **ap);
+	ap++;				/* WRONG */
+	printf("%d\n", **ap);		/* undefined */
+#+end_src
+would print 0 on the first line and something undefined on the second
+(and might crash). The pointer-to-array would only be at all useful in
+accessing an array of arrays, such as a2:
+
+#+begin_src c
+	ap = a2;
+	printf("%d %d\n", (*ap)[0], (*ap)[1]);
+	ap++;		/* steps over entire (sub)array */
+	printf("%d %d\n", (*ap)[0], (*ap)[1]);
+
+This last fragment would print
+	3 4
+	6 7
+#+end_src
+
+** Q6.16 How can I dynamically allocate a multidimensional array?
+The traditional solution is to allocate an array [footnote] of
+pointers to pointers, and then initialize each pointer to a
+dynamically-allocated ``row.'' Here is a two-dimensional example:
+#+begin_src c
+	#include <stdlib.h>
+
+	int **array1 = malloc(nrows * sizeof(int *));
+	for(i = 0; i < nrows; i++)
+		array1[i] = malloc(ncolumns * sizeof(int));
+#+end_src
+(In real code, of course, all of malloc's return values would be
+	checked. You can also use =sizeof(*array1)= and =sizeof(**array1)=
+	instead of =sizeof(int *)= and =sizeof(int)=;)
+
+You can keep the array's contents contiguous, at the cost of making
+later reallocation of individual rows more difficult, with a bit of
+explicit pointer arithmetic:
+
+#+begin_src c
+	int **array2 = malloc(nrows * sizeof(int *));
+	array2[0] = malloc(nrows * ncolumns * sizeof(int));
+	for(i = 1; i < nrows; i++)
+		array2[i] = array2[0] + i * ncolumns;
+#+end_src
+In either case (i.e for array1 or array2), the elements of the dynamic
+	array can be accessed with normal-looking array subscripts:
+	=arrayx[i][j]= (for 0 <= i < nrows and 0 <= j < ncolumns). Here
+	is a schematic illustration of the layout of array1 and
+	array2: 
+[[pic][array1.gif]]
+[[pic][array2.gif]]
+
+If the double indirection implied by the above schemes is for some
+reason unacceptable,[footnote] you can simulate a two-dimensional
+array with a single, dynamically-allocated one-dimensional array:
+
+	=int *array3 = malloc(nrows * ncolumns * sizeof(int));=
+
+However, you must now perform subscript calculations manually, accessing the i,jth element with the expression
+
+=array3[i * ncolumns + j]=
+and this array cannot necessarily be passed to functions which expect
+multidimensional arrays. (A macro such as
+
+	=#define Arrayaccess(a, i, j) ((a)[(i) * ncolumns + (j)])=
+
+could hide the explicit calculation, but invoking it would require
+parentheses and commas which wouldn't look exactly like conventional C
+multidimensional array syntax, and the macro would need access to at
+least one of the dimensions, as well.)
+
+Yet another option is to use pointers to arrays:
+
+	=int (*array4)[NCOLUMNS] = malloc(nrows * sizeof(*array4));=
+
+or even
+	=int (*array5)[NROWS][NCOLUMNS] = malloc(sizeof(*array5));=
+
+but the syntax starts getting horrific (accesses to array5 look like
+=(*array5)[i][j])=, and at most one dimension may be specified at run
+time.
+
+With all of these techniques, you may of course need to remember to
+free the arrays when they are no longer needed; in the case of array1
+and array2 this takes several steps:
+#+begin_src c
+	for(i = 0; i < nrows; i++)
+		free((void *)array1[i]);
+	free((void *)array1);
+
+	free((void *)array2[0]);
+	free((void *)array2);
+#+end_src
+
+** Q6.20 How can I use statically- and dynamically-allocated multidimensional arrays interchangeably when passing them to functions?
+ There is no single perfect method. Given the declarations
+#+begin_src c
+	int array[NROWS][NCOLUMNS];
+	int **array1;			/* ragged */
+	int **array2;			/* contiguous */
+	int *array3;			/* "flattened" */
+	int (*array4)[NCOLUMNS];
+
+	int (*array5)[NROWS][NCOLUMNS];
+#+end_src
+with the pointers initialized as in the code fragments in question
+6.16, and functions declared as
+#+begin_src c
+	void f1a(int a[][NCOLUMNS], int nrows, int ncolumns);
+	void f1b(int (*a)[NCOLUMNS], int nrows, int ncolumns);
+	void f2(int *aryp, int nrows, int ncolumns);
+	void f3(int **pp, int nrows, int ncolumns);
+#+end_src
+where f1a and f1b accept conventional two-dimensional arrays, f2
+accepts a ``flattened'' two-dimensional array, and f3 accepts a
+pointer-to-pointer, simulated array, the following calls should work
+as expected:
+#+begin_src c
+	f1a(array, NROWS, NCOLUMNS);
+	f1b(array, NROWS, NCOLUMNS);
+	f1a(array4, nrows, NCOLUMNS);
+	f1b(array4, nrows, NCOLUMNS);
+
+	f1(*array5, NROWS, NCOLUMNS);
+
+	f2(&array[0][0], NROWS, NCOLUMNS);
+	f2(*array, NROWS, NCOLUMNS);
+	f2(*array2, nrows, ncolumns);
+	f2(array3, nrows, ncolumns);
+	f2(*array4, nrows, NCOLUMNS);
+
+	f2(**array5, NROWS, NCOLUMNS);
+
+	f3(array1, nrows, ncolumns);
+	f3(array2, nrows, ncolumns);
+#+end_src
+The following calls would probably work on most systems, but involve
+	questionable casts, and work only if the dynamic ncolumns
+	matches the static NCOLUMNS:
+#+begin_src c
+	f1a((int (*)[NCOLUMNS])(*array2), nrows, ncolumns);
+	f1a((int (*)[NCOLUMNS])(*array2), nrows, ncolumns);
+	f1b((int (*)[NCOLUMNS])array3, nrows, ncolumns);
+	f1b((int (*)[NCOLUMNS])array3, nrows, ncolumns);
+#+end_src 
+It will be noticed that only f2 can conveniently be made to work with
+	both statically- and dynamically-allocated arrays, though it
+	will not work with the traditional ``ragged'' array
+	implementation, array1. However, it must also be noted that
+	passing =&array[0][0]= (or, equivalently, *array) to f2 is not
+	strictly conforming; see question 6.19.
+
+If you can understand why all of the above calls work and are written
+as they are, and if you understand why the combinations that are not
+listed would not work, then you have a very good understanding of
+arrays and pointers in C.
+
+** Q6.23 I want to know how many elements are in an array, but sizeof yields the size in bytes.
+ Simply divide the size of the entire array by the size of one element:
+#+begin_src c
+	int array[] = {1, 2, 3};
+	int narray = sizeof(array) / sizeof(array[0]);
+#+end_src
+* 7. Memory Allocation
+** Q7.
+
 * Footnotes
 
 [fn:1] http://en.wikibooks.org/wiki/C_Programming/C_Reference/inttypes.h#cite_note-2

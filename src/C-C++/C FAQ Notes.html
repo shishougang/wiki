@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="C FAQ Notes"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-08-12 12:34:52 HKT"/>
+<meta name="generated" content="2012-08-15 14:58:45 HKT"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -129,7 +129,37 @@
 </li>
 <li><a href="#sec-3">3. Expressions</a>
 <ul>
-<li><a href="#sec-3-1">Q</a></li>
+<li><a href="#sec-3-1">Q3.4 Can I use explicit parentheses to force the order of evaluation I want, and control these side effects? Even if I don't, doesn't precedence dictate it?</a></li>
+<li><a href="#sec-3-2">Q3.14 Why doesn't the code</a></li>
+<li><a href="#sec-3-3">Q3.16 I have a complicated expression which I have to assign to one of two variables, depending on a condition. Can I use code like this?</a></li>
+<li><a href="#sec-3-4">Q3.19 What's the difference between the ``unsigned preserving'' and ``value preserving'' rules?</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">4. Pointers</a>
+<ul>
+<li><a href="#sec-4-1">Q4.5 I have a char * pointer that happens to point to some ints, and I want to step it over them. Why doesn't</a></li>
+<li><a href="#sec-4-2">Q4.9 Suppose I want to write a function that takes a generic pointer as an argument and I want to simulate passing it by reference.</a></li>
+<li><a href="#sec-4-3">Q4.10 I have a function</a></li>
+<li><a href="#sec-4-4">Q4.12 I've seen different syntax used for calling functions via pointers. What's the story?</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">5. Null Pointers</a>
+<ul>
+<li><a href="#sec-5-1">Q5.2 How do I get a null pointer in my programs?</a></li>
+<li><a href="#sec-5-2">Q5.3 Is the abbreviated pointer comparison ``if(p)'' to test for non-null pointers valid? What if the internal representation for null pointers is nonzero?</a></li>
+<li><a href="#sec-5-3">Q5.5  How should NULL be defined on a machine which uses a nonzero bit pattern as the internal representation of a null pointer?</a></li>
+<li><a href="#sec-5-4">Q5.15 I'm confused. I just can't understand all this null pointer stuff.</a></li>
+<li><a href="#sec-5-5">Q5.18 Is a run-time integral value of 0, cast to a pointer, guaranteed to be a null pointer?</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">6. Arrays and Pointers</a>
+<ul>
+<li><a href="#sec-6-1">Q6.5 Why can't I do something like this?</a></li>
+<li><a href="#sec-6-2">Q6.7 How can an array be an lvalue, if you can't assign to it?</a></li>
+<li><a href="#sec-6-3">Q6.8 Practically speaking, what is the difference between arrays and pointers?</a></li>
+<li><a href="#sec-6-4">Q6.11 I came across some ``joke'' code containing the ``expression'' 5["abcdef"] . How can this be legal C?</a></li>
+<li><a href="#sec-6-5">Q6.13 How do I declare a pointer to an array?</a></li>
+<li><a href="#sec-6-6">Q6.16 How can I dynamically allocate a multidimensional array?</a></li>
 </ul>
 </li>
 </ul>
@@ -952,12 +982,10 @@ It is from 0 to -1 (not 0 and 1, which is a common mistake). Remember
 the formula for finding out the range of signed integers: 2<sup>(n-1)</sup> to
 2<sup>(n-1)</sup>-1 where N is the number of bits. For example, if N is 8 (number
 of bits in a byte), i.e., the range of a signed integer of size 8 is
--2(8-1) to 2(8-1)-1, which is -128 to +127. Now, when N is 1, i.e.,
-the range of a signed integer of size 1, it is -2(1-1) to 2(1-1)-1,
+-2<sup>(8-1)</sup> to 2<sup>(8-1)</sup>-1, which is -128 to +127. Now, when N is 1, i.e.,
+the range of a signed integer of size 1, it is -2<sup>(1-1)</sup> to 2<sup>(1-1)</sup>-1,
 which is -1 to 0!
 </p>
-
-
 </li>
 </ul>
 </div>
@@ -973,15 +1001,785 @@ which is -1 to 0!
 </div>
 
 <div id="outline-container-3-1" class="outline-3">
-<h3 id="sec-3-1">Q</h3>
+<h3 id="sec-3-1">Q3.4 Can I use explicit parentheses to force the order of evaluation I want, and control these side effects? Even if I don't, doesn't precedence dictate it?</h3>
 <div class="outline-text-3" id="text-3-1">
 
+<p>Not in general.
+</p>
+<p>
+Operator precedence and explicit parentheses impose only a partial ordering on the evaluation of an expression. In the expression
+</p>
+<p>
+        <code>f() + g() * h()</code>
+</p>
+<p>
+although we know that the multiplication will happen before the addition, there is no telling which of the three functions will be called first. In other words, precedence only partially specifies order of evaluation, where ``partially'' emphatically does not cover evaluation of operands.
+Parentheses tell the compiler which operands go with which operators; they do not force the compiler to evaluate everything within the parentheses first. Adding explicit parentheses to the above expression to make it
+</p>
+<p>
+        <code>f() + (g() * h())</code>
+</p>
+<p>
+would make no difference in the order of the function calls.
+</p></div>
 
+</div>
+
+<div id="outline-container-3-2" class="outline-3">
+<h3 id="sec-3-2">Q3.14 Why doesn't the code</h3>
+<div class="outline-text-3" id="text-3-2">
+
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span> = 1000, <span style="color: #eedd82;">b</span> = 1000;
+<span style="color: #98fb98;">long</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">c</span> = a * b;
+</pre>
+
+<p>
+work?
+</p>
+<p>
+Under C's integral promotion rules, the multiplication is carried out
+using int arithmetic, and the result may overflow or be truncated
+before being promoted and assigned to the long int left-hand side. Use
+an explicit cast on at least one of the operands to force long
+arithmetic:
+</p>
+<p>
+        <code>long int c = (long int)a * b;</code>
+</p>
+<p>
+or perhaps
+</p>
+<p>
+        <code>long int c = (long int)a * (long int)b;</code>
+</p>
+<p>
+(both forms are equivalent).
+Notice that the expression <code>(long int)(a * b)</code> would not have the
+desired effect. An explicit cast of this form (i.e. applied to the
+result of the multiplication) is equivalent to the implicit conversion
+which would occur anyway when the value is assigned to the long int
+left-hand side, and like the implicit conversion, it happens too late,
+after the damage has been done.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-3-3" class="outline-3">
+<h3 id="sec-3-3">Q3.16 I have a complicated expression which I have to assign to one of two variables, depending on a condition. Can I use code like this?</h3>
+<div class="outline-text-3" id="text-3-3">
+
+
+<p>
+        <code>((condition) ? a : b) = complicated_expression;</code>
+</p>
+<p>
+ No. The ?: operator, like most operators, yields a value, and you can't assign to a value. (In other words, ?: does not yield an lvalue.) If you really want to, you can try something like
+</p>
+<p>
+        <code>*((condition) ? &amp;a : &amp;b) = complicated_expression;</code>
+</p>
+<p>
+although this is admittedly not as pretty.
+</p></div>
+
+</div>
+
+<div id="outline-container-3-4" class="outline-3">
+<h3 id="sec-3-4">Q3.19 What's the difference between the ``unsigned preserving'' and ``value preserving'' rules?</h3>
+<div class="outline-text-3" id="text-3-4">
+
+<p>These rules concern the behavior when an unsigned type must be
+promoted to a ``larger'' type. Should it be promoted to a larger
+signed or unsigned type? (To foreshadow the answer, it may depend on
+whether the larger type is truly larger.)
+</p>
+<p>
+Under the unsigned preserving (also called ``sign preserving'') rules,
+the promoted type is always unsigned. This rule has the virtue of
+simplicity, but it can lead to surprises (see the first example
+below).
+</p>
+<p>
+Under the value preserving rules, the conversion depends on the actual
+sizes of the original and promoted types. If the promoted type is
+truly larger&ndash;which means that it can represent all the values of the
+original, unsigned type as signed values&ndash;then the promoted type is
+signed. If the two types are actually the same size, then the promoted
+type is unsigned (as for the unsigned preserving rules).
+</p>
+<p>
+Since the actual sizes of the types are used in making the
+determination, the results will vary from machine to machine. On some
+machines, short int is smaller than int, but on some machines, they're
+the same size. On some machines, int is smaller than long int, but on
+some machines, they're the same size.
+</p>
+<p>
+In practice, the difference between the unsigned and value preserving
+rules matters most often when one operand of a binary operator is (or
+promotes to) int and the other one might, depending on the promotion
+rules, be either int or unsigned int. If one operand is unsigned int,
+the other will be converted to that type&ndash;almost certainly causing an
+undesired result if its value was negative (again, see the first
+example below). When the ANSI C Standard was established, the value
+preserving rules were chosen, to reduce the number of cases where
+these surprising results occur. (On the other hand, the value
+preserving rules also reduce the number of predictable cases, because
+portable programs cannot depend on a machine's type sizes and hence
+cannot know which way the value preserving rules will fall.)
+</p>
+<p>
+Here is a contrived example showing the sort of surprise that can
+occur under the unsigned preserving rules:
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span> <span style="color: #eedd82;">us</span> = 10;
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = -5;
+<span style="color: #00ffff;">if</span>(i &gt; us)
+        printf(<span style="color: #ffa07a;">"whoops!\n"</span>);
+</pre>
+
+<p>
+The important issue is how the expression <code>i &gt; us</code> is evaluated. Under
+        the unsigned preserving rules (and under the value preserving
+        rules on a machine where short integers and plain integers are
+        the same size), us is promoted to unsigned int. The usual
+        integral conversions say that when types unsigned int and int
+        meet across a binary operator, both operands are converted to
+        unsigned, so i is converted to unsigned int, as well. The old
+        value of i, -5, is converted to some large unsigned value
+        (65,531 on a 16-bit machine). This converted value is greater
+        than 10, so the code prints ``whoops!''
+</p>
+<p>
+Under the value preserving rules, on a machine where plain integers
+are larger than short integers, us is converted to a plain int (and
+retains its value, 10), and i remains a plain int. The expression is
+not true, and the code prints nothing. (To see why the values can be
+preserved only when the signed type is larger, remember that a value
+like 40,000 can be represented as an unsigned 16-bit integer but not
+as a signed one.)
+</p>
+
+<p>
+Unfortunately, the value preserving rules do not prevent all
+surprises. The example just presented still prints ``whoops'' on a
+machine where short and plain integers are the same size. The value
+preserving rules may also inject a few surprises of their
+own&ndash;consider the code:
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">uc</span> = 0x80;
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">ul</span> = 0;
+ul |= uc &lt;&lt; 8;
+printf(<span style="color: #ffa07a;">"0x%lx\n"</span>, ul);
+</pre>
+
+<p>
+Before being left-shifted, uc is promoted. Under the unsigned
+        preserving rules, it is promoted to an unsigned int, and the
+        code goes on to print 0x8000, as expected. Under the value
+        preserving rules, however, uc is promoted to a signed int (as
+        long as int's are larger than char's, which is usually the
+        case). The intermediate result uc &lt;&lt; 8 goes on to meet ul,
+        which is unsigned long. The signed, intermediate result must
+        therefore be promoted as well, and if int is smaller than
+        long, the intermediate result is sign-extended, becoming
+        0xffff8000 on a machine with 32-bit longs. On such a machine,
+        the code prints 0xffff8000, which is probably not what was
+        expected. (On machines where int and long are the same size,
+        the code prints 0x8000 under either set of rules.)
+</p>
+<p>
+To avoid surprises (under either set of rules, or due to an unexpected
+        change of rules), it's best to avoid mixing signed and
+        unsigned types in the same expression, although as the second
+        example shows, this rule is not always sufficient. You can
+        always use explicit casts to indicate, unambiguously, exactly
+        where and how you want conversions performed; see questions
+        12.42 and 16.7 for examples. (Some compilers attempt to warn
+        you when they detect ambiguous cases or expressions which
+        would have behaved differently under the unsigned preserving
+        rules, although sometimes these warnings fire too often; see
+        also question 3.18.)
+</p></div>
+</div>
+
+</div>
+
+<div id="outline-container-4" class="outline-2">
+<h2 id="sec-4">4. Pointers</h2>
+<div class="outline-text-2" id="text-4">
+
+
+</div>
+
+<div id="outline-container-4-1" class="outline-3">
+<h3 id="sec-4-1">Q4.5 I have a char * pointer that happens to point to some ints, and I want to step it over them. Why doesn't</h3>
+<div class="outline-text-3" id="text-4-1">
+
+
+<p>
+<code>((int *)p)++;</code>
+</p>
+<p>
+work?
+</p>
+<p>
+ In C, a cast operator does not mean ``pretend these bits have a
+ different type, and treat them accordingly''; it is a conversion
+ operator, and by definition it yields an rvalue, which cannot be
+ assigned to, or incremented with ++. (It is either an accident or a
+ deliberate but nonstandard extension if a particular compiler accepts
+ expressions such as the above.) Say what you mean: use
+</p>
+<p>
+        <code>p = (char *)((int *)p + 1);</code>
+</p>
+<p>
+or (since p is a char *) simply
+</p>
+<p>
+        <code>p += sizeof(int);</code>
+</p>
+<p>
+or (to be really explicit)
+</p>
+<p>
+        <code>int *ip = (int *)p;</code>
+</p>
+<p>
+        <code>p = (char *)(ip + 1);</code> 
+</p>
+<p>
+When possible, however, you should choose appropriate pointer types in
+the first place, rather than trying to treat one type as another.
+</p></div>
+
+</div>
+
+<div id="outline-container-4-2" class="outline-3">
+<h3 id="sec-4-2">Q4.9 Suppose I want to write a function that takes a generic pointer as an argument and I want to simulate passing it by reference.</h3>
+<div class="outline-text-3" id="text-4-2">
+
+<p>Can I give the formal parameter type <code>void **</code>, and do something like this?
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">f</span>(<span style="color: #98fb98;">void</span> **);
+<span style="color: #98fb98;">double</span> *<span style="color: #eedd82;">dp</span>;
+f((<span style="color: #98fb98;">void</span> **)&amp;dp);
+</pre>
+
+
+<p>
+Not portably. Code like this may work and is sometimes recommended,
+but it relies on all pointer types having the same internal
+representation (which is common, but not universal; see question
+5.17).
+</p>
+<p>
+There is no generic pointer-to-pointer type in C. <code>void *</code> acts as a
+generic pointer only because conversions (if necessary) are applied
+automatically when other pointer types are assigned to and from <code>void</code>
+*'s; these conversions cannot be performed if an attempt is made to
+indirect upon a <code>void **</code> value which points at a pointer type other
+than <code>void *</code>. When you make use of a <code>void **</code> pointer value (for
+instance, when you use the * operator to access the <code>void *</code> value to
+which the void ** points), the compiler has no way of knowing whether
+that void * value was once converted from some other pointer type. It
+must assume that it is nothing more than a <code>void *</code>; it cannot perform
+any implicit conversions.
+</p>
+<p>
+In other words, any <code>void **</code> value you play with must be the address of
+an actual <code>void *</code> value somewhere; casts like <code>(void **)&amp;dp</code>, though they
+may shut the compiler up, are nonportable (and may not even do what
+you want; see also question 13.9). If the pointer that the <code>void **</code>
+points to is not a <code>void *</code>, and if it has a different size or
+representation than a <code>void *</code>, then the compiler isn't going to be able
+to access it correctly.
+</p>
+<p>
+To make the code fragment above work, you'd have to use an
+intermediate <code>void *</code> variable:
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">double</span> *<span style="color: #eedd82;">dp</span>;
+<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">vp</span> = dp;
+f(&amp;vp);
+dp = vp;
+</pre>
+
+<p>
+The assignments to and from vp give the compiler the opportunity to
+perform any conversions, if necessary.
+</p>
+<p>
+Again, the discussion so far assumes that different pointer types
+might have different sizes or representations, which is rare today,
+but not unheard of. To appreciate the problem with void ** more
+clearly, compare the situation to an analogous one involving, say,
+types int and double, which probably have different sizes and
+certainly have different representations. If we have a function
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">incme</span>(<span style="color: #98fb98;">double</span> *<span style="color: #eedd82;">p</span>)
+{
+        *p += 1;
+}
+</pre>
+
+<p>
+then we can do something like
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 1;
+<span style="color: #98fb98;">double</span> <span style="color: #eedd82;">d</span> = i;
+incme(&amp;d);
+i = d;
+</pre>
+
+<p>
+and <code>i</code> will be incremented by 1. (This is analogous to the correct
+void ** code involving the auxiliary vp.) If, on the other hand, we
+were to attempt something like
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 1;
+incme((<span style="color: #98fb98;">double</span> *)&amp;i);    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">WRONG </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+<p>
+(this code is analogous to the fragment in the question), it would be
+highly unlikely to work.
+</p></div>
+
+</div>
+
+<div id="outline-container-4-3" class="outline-3">
+<h3 id="sec-4-3">Q4.10 I have a function</h3>
+<div class="outline-text-3" id="text-4-3">
+
+<p>        <code>extern int f(int *);</code>
+which accepts a pointer to an int. How can I pass a constant by reference? A call like
+        <code>f(&amp;5);</code>
+doesn't seem to work.
+</p>
+<p>
+In C99, you can use a ``compound literal'':
+</p>
+<p>
+        <code>f((int[]){5});</code>
+</p></div>
+
+</div>
+
+<div id="outline-container-4-4" class="outline-3">
+<h3 id="sec-4-4">Q4.12 I've seen different syntax used for calling functions via pointers. What's the story?</h3>
+<div class="outline-text-3" id="text-4-4">
+
+<p>Originally, a pointer to a function had to be ``turned into'' a
+``real'' function, with the * operator, before calling:
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r</span>, (*<span style="color: #87cefa;">fp</span>)(), <span style="color: #87cefa;">func</span>();
+fp = func;
+r = (*fp)();
+</pre>
+
+<p>
+The interpretation of the last line is clear: fp is a pointer to
+        function, so *fp is the function; append an argument list in
+        parentheses (and extra parentheses around *fp to get the
+        precedence right), and you've got a function call.
+</p>
+<p>
+It can also be argued that functions are always called via pointers,
+and that ``real'' function names always decay implicitly into pointers.
+This reasoning means that
+</p>
+
+<p>
+        <code>r = fp();</code>
+is legal and works correctly, whether fp is the name of a function or
+a pointer to one. 
+</p>
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-5" class="outline-2">
+<h2 id="sec-5">5. Null Pointers</h2>
+<div class="outline-text-2" id="text-5">
+
+
+</div>
+
+<div id="outline-container-5-1" class="outline-3">
+<h3 id="sec-5-1">Q5.2 How do I get a null pointer in my programs?</h3>
+<div class="outline-text-3" id="text-5-1">
+
+<p>With a null pointer constant.
+</p>
+<p>
+null pointer constant
+</p>
+<p>
+n. An integral constant expression with value 0 (or such an expression
+cast to void *), used to request a null pointer.
+</p>
+<p>
+According to the language definition, an ``integral constant
+expression with the value 0'' in a pointer context is converted into a
+null pointer at compile time. That is, in an initialization,
+assignment, or comparison when one side is a variable or expression of
+pointer type, the compiler can tell that a constant 0 on the other
+side requests a null pointer, and generate the correctly-typed null
+pointer value. Therefore, the following fragments are perfectly legal:
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">p</span> = 0;
+<span style="color: #00ffff;">if</span>(p != 0)
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-5-2" class="outline-3">
+<h3 id="sec-5-2">Q5.3 Is the abbreviated pointer comparison ``if(p)'' to test for non-null pointers valid? What if the internal representation for null pointers is nonzero?</h3>
+<div class="outline-text-3" id="text-5-2">
+
+<p> It is always valid.
+</p>
+<p>
+When C requires the Boolean value of an expression, a false value is
+inferred when the expression compares equal to zero, and a true value
+otherwise. That is, whenever one writes
+</p>
+
+<p>
+        <code>if(expr)</code>
+where ``expr'' is any expression at all, the compiler essentially acts
+as if it had been written as
+</p>
+<p>
+        <code>if((expr) != 0)</code>
+Substituting the trivial pointer expression ``p'' for ``expr'', we have
+        <code>if(p)  is equivalent to        if(p != 0)</code>
+and this is a comparison context, so the compiler can tell that the
+(implicit) 0 is actually a null pointer constant, and use the correct
+null pointer value. There is no trickery involved here; compilers do
+work this way, and generate identical code for both constructs. The
+internal representation of a null pointer does not matter.
+</p></div>
+
+</div>
+
+<div id="outline-container-5-3" class="outline-3">
+<h3 id="sec-5-3">Q5.5  How should NULL be defined on a machine which uses a nonzero bit pattern as the internal representation of a null pointer?</h3>
+<div class="outline-text-3" id="text-5-3">
+
+<p>The same as on any other machine: as 0 (or some version of 0; see
+question 5.4).
+</p>
+<p>
+Whenever a programmer requests a null pointer, either by writing ``0''
+or ``NULL'', it is the compiler's responsibility to generate whatever
+bit pattern the machine uses for that null pointer. (Again, the
+compiler can tell that an unadorned 0 requests a null pointer when the
+0 is in a pointer context; see question 5.2.) Therefore, #defining
+<code>NULL</code> as 0 on a machine for which internal null pointers are nonzero is
+as valid as on any other: the compiler must always be able to generate
+the machine's correct null pointers in response to unadorned 0's seen
+in pointer contexts. A constant 0 is a null pointer constant; NULL is
+just a convenient name for it (see also question 5.13).
+</p></div>
+
+</div>
+
+<div id="outline-container-5-4" class="outline-3">
+<h3 id="sec-5-4">Q5.15 I'm confused. I just can't understand all this null pointer stuff.</h3>
+<div class="outline-text-3" id="text-5-4">
+
+<p>Here are two simple rules you can follow:
+</p>
+<ol>
+<li>When you want a null pointer constant in source code, use ``0'' or ``NULL''.
+</li>
+<li>If the usage of ``0'' or ``NULL'' is an argument in a function
+   call, cast it to the pointer type expected by the function being
+   called. Strictly speaking, casts on pointer arguments are only
+   required in function calls without prototypes in scope, and in the
+   variable-length part of variable-length argument lists.
+</li>
+</ol>
+
+</div>
+
+</div>
+
+<div id="outline-container-5-5" class="outline-3">
+<h3 id="sec-5-5">Q5.18 Is a run-time integral value of 0, cast to a pointer, guaranteed to be a null pointer?</h3>
+<div class="outline-text-3" id="text-5-5">
+
+<p>No. Only <i>constant</i> integral expressions with value 0 are guaranteed to
+indicate null pointers. 
+</p>
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-6" class="outline-2">
+<h2 id="sec-6">6. Arrays and Pointers</h2>
+<div class="outline-text-2" id="text-6">
+
+
+</div>
+
+<div id="outline-container-6-1" class="outline-3">
+<h3 id="sec-6-1">Q6.5 Why can't I do something like this?</h3>
+<div class="outline-text-3" id="text-6-1">
+
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">getpass</span>();
+<span style="color: #98fb98;">char</span> <span style="color: #eedd82;">str</span>[10];
+str = getpass(<span style="color: #ffa07a;">"Enter password: "</span>);
+</pre>
+
+
+<p>
+Arrays are ``second-class citizens'' in C; one upshot of this
+prejudice is that you cannot assign to them . When you need to copy
+the contents of one array to another, you must do so explicitly. In
+the case of char arrays, the strcpy routine is usually appropriate:
+</p>
+<p>
+        <code>strcpy(str, getpass("Enter password: "));</code>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-6-2" class="outline-3">
+<h3 id="sec-6-2">Q6.7 How can an array be an lvalue, if you can't assign to it?</h3>
+<div class="outline-text-3" id="text-6-2">
+
+<p> The term ``lvalue'' doesn't quite mean ``something you can assign
+ to''; a better definition is ``something that has a location (in
+ memory).'' The ANSI/ISO C Standard goes on to define a
+ ``modifiable lvalue''; an array is not a modifiable lvalue
+</p></div>
+
+</div>
+
+<div id="outline-container-6-3" class="outline-3">
+<h3 id="sec-6-3">Q6.8 Practically speaking, what is the difference between arrays and pointers?</h3>
+<div class="outline-text-3" id="text-6-3">
+
+<p>An array is a single, preallocated chunk of contiguous elements (all
+of the same type), fixed in size and location. A pointer is a
+reference to any data element (of a particular type) anywhere. A
+pointer must be assigned to point to space allocated elsewhere, but it
+can be reassigned (and the space, if derived from malloc, can be
+resized) at any time. A pointer can point to an array, and can
+simulate (along with malloc) a dynamically allocated array, but a
+pointer is a much more general data structure.
+</p>
+<p>
+Due to the so-called equivalence of arrays and pointers, arrays and
+pointers often seem interchangeable, and in particular a pointer to a
+block of memory assigned by malloc is frequently treated (and can be
+referenced using []) exactly as if it were a true array. 
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-6-4" class="outline-3">
+<h3 id="sec-6-4">Q6.11 I came across some ``joke'' code containing the ``expression'' 5["abcdef"] . How can this be legal C?</h3>
+<div class="outline-text-3" id="text-6-4">
+
+<p>   Yes, Virginia, array subscripting is commutative in C.  This curious
+   fact follows from the pointer definition of array subscripting, namely
+   that <code>a[e]</code> is identical to <code>*((a)+(e))</code>, for any two expressions a and e,
+   as long as one of them is a pointer expression and one is integral.
+   The ``proof'' looks like
+</p>
+
+
+<pre class="src src-c">a[e]
+*((a) + (e))    (<span style="color: #98fb98;">by</span> <span style="color: #eedd82;">definition</span>)
+*((e) + (a))    (<span style="color: #98fb98;">by</span> commutativity <span style="color: #98fb98;">of</span> <span style="color: #eedd82;">addition</span>)
+e[a]            (<span style="color: #98fb98;">by</span> <span style="color: #eedd82;">definition</span>)
+</pre>
+
+<p>
+This unsuspected commutativity is often mentioned in C texts as if it
+were something to be proud of, but it finds no useful application
+outside of the Obfuscated C Contest.
+</p>
+<p>
+Since strings in C are arrays of char, the expression "abcdef"[ 5] is
+perfectly legal, and evaluates to the character 'f'. You can think of
+it as a shorthand for 
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">tmpptr</span> = <span style="color: #ffa07a;">"abcdef"</span>;
+... tmpptr[5] ...
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-6-5" class="outline-3">
+<h3 id="sec-6-5">Q6.13 How do I declare a pointer to an array?</h3>
+<div class="outline-text-3" id="text-6-5">
+
+<p>If you really need to declare a pointer to an entire array, use
+something like ``int (*ap)[N];'' where N is the size of the array.
+If the size of the array is unknown, N can in principle be omitted,
+but the resulting type, ``pointer to array of unknown size,'' is
+useless.
+</p>
+<p>
+Here is an example showing the difference between simple pointers and
+pointers to arrays. Given the declarations
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a1</span>[3] = {0, 1, 2};
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a2</span>[2][3] = {{3, 4, 5}, {6, 7, 8}};
+<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">ip</span>;                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">pointer to int </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">int</span> (*<span style="color: #eedd82;">ap</span>)[3];           <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">pointer to array [3] of int </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+<p>
+you could use the simple pointer-to-int, ip, to access the one-dimensional array a1:
+</p>
+
+
+<pre class="src src-c">        ip = a1;
+        printf(<span style="color: #ffa07a;">"%d "</span>, *ip);
+        ip++;
+        printf(<span style="color: #ffa07a;">"%d\n"</span>, *ip);
+
+This fragment <span style="color: #98fb98;">would</span> <span style="color: #eedd82;">print</span>
+        0 1
+</pre>
+
+<p>
+An attempt to use a pointer-to-array, ap, on a1:
+</p>
+
+
+<pre class="src src-c">ap = &amp;a1;
+printf(<span style="color: #ffa07a;">"%d\n"</span>, **ap);
+ap++;                           <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">WRONG </span><span style="color: #ff7f24;">*/</span>
+printf(<span style="color: #ffa07a;">"%d\n"</span>, **ap);           <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">undefined </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+<p>
+would print 0 on the first line and something undefined on the second
+(and might crash). The pointer-to-array would only be at all useful in
+accessing an array of arrays, such as a2:
+</p>
+
+
+
+<pre class="src src-c">        ap = a2;
+        printf(<span style="color: #ffa07a;">"%d %d\n"</span>, (*ap)[0], (*ap)[1]);
+        ap++;           <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">steps over entire (sub)array </span><span style="color: #ff7f24;">*/</span>
+        printf(<span style="color: #ffa07a;">"%d %d\n"</span>, (*ap)[0], (*ap)[1]);
+
+This last fragment <span style="color: #98fb98;">would</span> <span style="color: #eedd82;">print</span>
+        3 4
+        6 7
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-6-6" class="outline-3">
+<h3 id="sec-6-6">Q6.16 How can I dynamically allocate a multidimensional array?</h3>
+<div class="outline-text-3" id="text-6-6">
+
+<p>The traditional solution is to allocate an array [footnote] of
+pointers to pointers, and then initialize each pointer to a
+dynamically-allocated ``row.'' Here is a two-dimensional example:
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+
+<span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">array1</span> = malloc(nrows * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span> *));
+<span style="color: #00ffff;">for</span>(i = 0; i &lt; nrows; i++)
+        array1[i] = malloc(ncolumns * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>));
+</pre>
+
+<p>
+(In real code, of course, all of malloc's return values would be
+        checked. You can also use <code>sizeof(*array1)</code> and <code>sizeof(**array1)</code>
+        instead of <code>sizeof(int *)</code> and <code>sizeof(int)</code>;)
+</p>
+<p>
+You can keep the array's contents contiguous, at the cost of making
+later reallocation of individual rows more difficult, with a bit of
+explicit pointer arithmetic:
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">array2</span> = malloc(nrows * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span> *));
+array2[0] = malloc(nrows * ncolumns * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>));
+<span style="color: #00ffff;">for</span>(i = 1; i &lt; nrows; i++)
+        array2[i] = array2[0] + i * ncolumns;
+</pre>
+
+<p>
+In either case (i.e for array1 or array2), the elements of the dynamic
+        array can be accessed with normal-looking array subscripts:
+        <code>arrayx[i][j]</code> (for 0 &lt;= i &lt; nrows and 0 &lt;= j &lt; ncolumns). Here
+        is a schematic illustration of the layout of array1 and
+        array2: 
+<a href="#pic"><img src="array1.gif" alt="array1.gif"/></a>
+</p>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
 <p class="footnote"><sup><a class="footnum" name="fn.1" href="#fnr.1">1</a></sup> <a href="http://en.wikibooks.org/wiki/C_Programming/C_Reference/inttypes.h#cite_note-2">http://en.wikibooks.org/wiki/C_Programming/C_Reference/inttypes.h#cite_note-2</a>
-</p></div>
+</p>
+
+
+</div>
 </div>
 </div>
 
@@ -990,7 +1788,7 @@ which is -1 to 0!
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-08-12 12:34:52 HKT</p>
+<p class="date">Date: 2012-08-15 14:58:45 HKT</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.09 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

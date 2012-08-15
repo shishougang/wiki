@@ -46,9 +46,26 @@ int main()
 	}
 	for(i = Maxlength; i >= 1; i--)
 	{
-		printf("%4d | ");
-		
-	}
+          printf("%4d | ", i);
+          for(j = 1; j  <= MAXWORDLEN; j++){
+            if(nlength[j] >= i)
+              printf("* ");
+            else
+              printf("  ");
+          }
+            printf("\n");
+  	}
+          printf("     +");
+          for(i = 0; i < MAXWORDLEN; i++)
+            printf("--");
+          printf("\n");
+          printf("       ");
+          for (i = 1; i < MAXWORDLEN; i++)
+            printf("%d ", i);
+          printf(">9 \n");
+          
+          
+
 
 	return 0;
 }
