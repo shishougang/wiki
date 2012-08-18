@@ -1,0 +1,165 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: GEL File
+#+OPTIONS: num:nil H:2
+
+[[./Creating Device Initialization GEL Files.pdf][TI Creating Device Initialization GEL Files PDF]]
+
+Startup GEL files are used to automate device initialization when Code Composer Studio
+starts up.
+
+* StartUp() Function
+The StartUp() GEL function is *called* by CCStudio whenever the GEL
+file containing it is loaded.
+
+If you are using a version of CCStudio that supports Connect/Disconnect, no actions that attempt to
+access the target can be placed here since CCStudio starts disconnected from the target. Place
+target initialization actions in the OnTargetConnect() callback.
+
+ *Recommended:*
++ Setting up basic CCStudio memory map (that does not need target access to accomplish).
++ Any basic initialization step that does not attempt to access the
+  target.
+ *Not Recommended:*
++ GEL_Reset()
++ Setting Breakpoints via GEL_BreakPtAdd(). (This also tries to access the target.)
++ GEL_TextOut() and GEL_OpenWindow(). Since StartUp() executes before
+  any CCStudio control window is open, this may cause an error
+  depending on the version of CCStudio.
++ Basically any action that attempts to access the target
+
+** Example in evm816x.gel
+#+begin_src c
+/*--------------------------------------------------------------*/
+/* The StartUp() function is called each time CCS is started. */
+/* Customize this function to perform desired initialization */
+/* that will not access the target. */
+/*--------------------------------------------------------------*/
+StartUp( )
+{
+    Setup_Memory_Map( );
+}
+#+end_src
+
+
+
+
+
+* OnTargetConnect() Function
+the OnTargetConnect()
+callback was created with the intention that it perform the minimum target initialization needed to
+access the target regularly (for example, to set PLLs and disable watchdog timers). Its execution
+finishes before anything else occurs.
+
+ *Recommended:*
++ Absolute minimum target initialization actions to get the target in
+  a reliable state for CCStudio. For example, disabling watchdog
+  timers and pulling the DSP out of reset in heterogeneous
+  environments
+ *Not Recommended:*
++ Non-critical actions that should not be repeatedly called each time
+  there is a target disconnect and connect.
++ "Custom" non-essential target initialization steps.
+In summary, the default OnTargetConnect() function should only call what is necessary. Give
+users a baseline initialization.
+** Example in evm816x.gel
+#+begin_src c
+/*--------------------------------------------------------------*/
+/* OnTargetConnect() is called every time a target is connected.*/
+/* Its execution finishes before anything else occurs. Customize*/
+/* this function to perform essential target initialization. */
+/*--------------------------------------------------------------*/
+OnTargetConnect( )
+{
+    GEL_TextOut( "\EVM816x Startup Sequence\n\n" );
+
+    Setup_PRCM();
+    Setup_Power();
+    Setup_PADCTRL();
+    Setup_MainPLL();
+    Setup_DDR();
+
+    GEL_TextOut( "Startup Complete.\n\n" );
+}
+#+end_src
+* OnPreFileLoaded() Function
+This callback function is called before a program/symbol (.out) file is loaded. This is a good place
+to perform additional target initialization that needs to be done before the program can be loaded
+and debugging done.
+** Example
+#+begin_src c
+/*--------------------------------------------------------------*/
+/* OnPreFileLoaded() */
+/* This function is called automatically when the 'Load Program'*/
+/* Menu item is selected. */
+/*--------------------------------------------------------------*/
+OnPreFileLoaded( )
+{
+    /*
+     *  GEL_Reset() is used to deal with the worst case senario of
+     *  unknown target state.  If for some reason a reset is not desired
+     *  upon target connection, GEL_Reset() may be removed and replaced
+     *  with something "less brutal" like a cache initialization
+     *  function.
+     */
+    GEL_Reset( );
+    GEL_TextOut( "GEL Reset\n" );
+}
+#+end_src
+
+* OnFileLoaded() Function
+This callback function is called after a program/symbol file has been loaded. Actions such as
+setting up the debug source search path (if no CCStudio project file exists), setting breakpoints
+and probepoints, performing a software reset and restart, and loading a saved profile
+configuration can be done here
+* OnReset() Function
+This callback function is called after the target processor has been reset. If you need to restart
+the program each time you do a software reset, the GEL_Restart() call
+can be made here.
+
+* OnRestart() Function
+This callback function is called after the program is restarted.
+** Example 
+#+begin_src c
+/* ------------------------------------------------------------------------ *
+ *  OnRestart( )                                                            *
+ *      This function is called by CCS when you do Debug->Restart.          *
+ * ------------------------------------------------------------------------ */
+OnRestart( int nErrorCode )
+{
+}
+#+end_src
+* Memory Mapping
+The CCStudio memory map tells the debugger which areas of target memory it can and cannot
+access.
+
+** GEL_MapAdd() Function
+This
+function adds a section of memory to the memory map. You can specify the starting address,
+length, memory page (program/data/IO), and readable/writeable flags.
+** GEL_MapAddStr() Function
+GEL_MapAddStr() is a superset of the GEL_MapAdd() function. It provides the same
+readable/writable attributes that can be specified in GEL_MapAdd(). However, it also supports
+additional parameters for memory access size, a “shared memory” tag, and specification of
+memory wait states. With the addition of GEL_MapAddStr(), there is really no reason to use
+GEL_MapAdd(). GEL_MapAdd() is maintained for compatibility purposes.
+*** Example
+#+begin_src c
+ /* L3 Memory Map */
+    GEL_MapAddStr( 0x00000000, 0, 0x20000000, "R|W|AS4", 0 );  // GPMC
+    GEL_MapAddStr( 0x20000000, 0, 0x10000000, "R|W|AS4", 0 );  // PCIe Gen2
+#+end_src
+** GEL_MapDelete() Function
+GEL_MapDelete() allows a portion of the memory map to be removed. This can be useful if it is
+necessary to have a “dynamic” memory map.
+
+GEL_MapDelete() accepts only two parameters: address and page. If
+** GEL_MapOn() and GEL_MapOff() Functions
+If at some point you need to turn on or off the memory mapping feature, you can do so with the
+GEL_MapOn() or GEL_MapOff() functions.
+
+** GEL_MapReset() Function
+GEL_MapReset() can be used to clear all of the settings in the memory
+map configuration.
+
+
+
