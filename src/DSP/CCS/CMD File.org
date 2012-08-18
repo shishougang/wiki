@@ -2,7 +2,376 @@
 #+TITLE: CMD File
 #+OPTIONS: num:nil H:2
 
-Linker CMD Files for CCS
-http://processors.wiki.ti.com/index.php/Linker_CMD_Files_for_CCS
++ Linker CMD Files for CCS
+  http://processors.wiki.ti.com/index.php/Linker_CMD_Files_for_CCS
 
-* 
++ TMS320C6000 Assembly Language Tools
+  Chapter5: Linking C/C++ Code
+
+  pdf: [[./spru186v.pdf][TMS320C6000 Assembly Language Tools]]
++ TMS320C6000 Optimizing Compiler v 7.3
+  Chapter7: Linker Description
+
+  pdf: [[./spru187t.pdf][TMS320C6000 Optimizing Compiler v 7.3]]
+* Linker Overview
+Two powerful directives, MEMORY and SECTIONS, allow you to:
+
+• Allocate sections into specific areas of memory
+• Combine object file sections
+• Define or redefine global symbols at link time
+* Linker Options
++ =--heap_size= 
+ =-heap= Sets heap size (for the dynamic memory allocation in C) to
+ size bytes and defines a global symbol that specifies the
+ heap size. Default = 1K bytes. Section 7.4.11[fn:1] 
++ =--stack_size=
+ =-stack= Sets C system stack size to size bytes and defines
+  a global symbol that specifies the stack size.
+  Default = 1K bytes. Section 7.4.26[fn:1]
+** Wild Cards in File, Section, and Symbol Patterns
+The linker allows file, section, and symbol names to be specified using the asterisk (*) and question mark
+(?) wild cards. Using * matches any number of characters and using ?
+matches a single character.
+*** Example
+#+begin_src c
+SECTIONS
+{
+.fast_code: { *.obj(*fast*) } > FAST_MEM
+.vectors : { vectors.obj(.vector:part1:*) > 0xFFFFFF00
+.str_code : { rts*.lib<str*.obj>(.text) } > S1ROM
+}
+#+end_src
+
+** Define Heap Size (=--heap_size= Option)
+The C/C++ compiler uses an uninitialized section called =.sysmem= for
+the C run-time memory pool used by =malloc()=. You can set the size of
+this memory pool at link time by using the --heap_size option. The
+syntax for the --heap_size option is:
+
+~--heap_size= size~
+
+The size must be a constant. This example defines a 4K byte heap:
+#+begin_src c
+cl6x --run_linker --heap_size=0x1000 /* defines a 4k heap (.sysmem section)*/
+#+end_src
+The linker creates the =.sysmem= section only if there is a .sysmem section in an input file.
+The linker also creates a global symbol __SYSMEM_SIZE and assigns it a
+value equal to the size of the heap. The *default* size is 1K bytes.
+
+** Define Stack Size (=--stack_size= Option)
+The TMS320C6000 C/C++ compiler uses an uninitialized section,
+=.stack=, to allocate space for the run-time stack. The syntax for the
+=--stack_size= option is:
+
+~--stack_size= size~
+The size must be a constant and is in bytes. This example defines a 4K byte stack:
+#+begin_src c
+cl6x --run_linker --stack_size=0x1000 /* defines a 4K heap (.stack section)*/
+#+end_src
+
+When the linker defines the .stack section, it also defines a global
+symbol, =__STACK_SIZE=, and assigns it a value equal to the size of the
+section. The *default* software stack size is 1K bytes.
+
+** Constants in Linker Command Files
+*** Examples
+#+begin_src c
+Format            Decimal    Octal    Hexadecimal
+Assembler format  32         40q      020h
+C format          32         040      0x20
+#+end_src
+
+** The MEMORY Directive
+The linker determines where output sections are allocated into memory; it must have a model of target
+memory to accomplish this. The MEMORY directive allows you to specify a model of target memory so
+that you can define the types of memory your system contains and the
+address ranges they occupy.
+
+After you use MEMORY to define a
+memory model, you can use the SECTIONS directive to allocate output
+sections into defined memory.
+*** MEMORY Directive Syntax
+The MEMORY directive in Example defines a
+system that has 4K bytes of fast external memory at address 0x0000 0000, 2K bytes of slow external
+memory at address 0x0000 1000 and 4K bytes of slow external memory at address 0x1000 0000. It also
+demonstrates the use of memory range expressions as well as
+start/end/size address operators
+
+ *Example*
+#+begin_src c
+/********************************************************/
+/* Sample command file with MEMORY directive */
+/********************************************************/
+file1.obj file2.obj /* Input files */
+--output_file=prog.out /* Options */
+#define BUFFER 0
+MEMORY
+{
+FAST_MEM (RX): origin = 0x00000000 length = 0x00001000 + BUFFER
+SLOW_MEM (RW): origin = end(FAST_MEM) length = 0x00001800 - size(FAST_MEM)
+EXT_MEM (RX): origin = 0x10000000 length = size(FAST_MEM)
+}
+#+end_src
+
+The general syntax for the MEMORY directive is:
+#+begin_src c
+MEMORY
+{
+name 1 [( attr )] : origin = expression , length = expression [, fill = constant]
+.
+.
+name n [( attr )] : origin = expression , length = expression [, fill = constant]
+}
+#+end_src
+
++ attr 
+  *R* specifies that the memory can be read.
+  *W* specifies that the memory can be written to.
+  *X* specifies that the memory can contain executable code.
+  *I* specifies that the memory can be initialized.
++ origin
+  specifies the starting address of a memory range; enter as origin,
+  org, or o. The value, specified in bytes, is an expression of 32-bit
+  constants, which can be decimal, octal, or hexadecimal.
++ length
+  specifies the length of a memory range; enter as length, len, or l.
+  The value, specified in bytes, is an expression of 32-bit constants,
++ fill
+  specifies a fill character for the memory range; enter as fill or f.
+  Fills are optional. The value is a integer constant and can be
+  decimal, octal, or hexadecimal. The fill value is used to fill areas
+  of the memory range that are not allocated to a section
+#+begin_html
+<p class="info">Filling Memory Ranges: If you specify fill values for large memory ranges, your output file will be very large because
+filling a memory range (even with 0s) causes raw data to be generated for all unallocated
+blocks of memory in the range.  </p>
+#+end_html
+ *Example*
+The following example specifies a memory range with the R and W
+attributes and a fill constant of 0FFFFFFFFh
+#+begin_src c
+MEMORY
+{
+RFILE (RW) : o = 0x00000020, l = 0x00001000, f = 0xFFFFFFFF
+}
+#+end_src
+*** Expressions and Address Operators
+Three new address operators have been added for referencing memory range properties from prior
+memory range entries:
+
++ START(MR) Returns start address for previously defined memory range MR.
++ SIZE(MR) Returns size of previously defined memory range MR.
++ END(MR) Returns end address for previously defined memory range MR.
+ *Example*
+#+begin_src c
+/********************************************************/
+/* Sample command file with MEMORY directive */
+/********************************************************/
+file1.obj file2.obj /* Input files */
+--output_file=prog.out /* Options */
+#define ORIGIN 0x00000000
+#define BUFFER 0x00000200
+#define CACHE 0x0001000
+MEMORY
+{
+FAST_MEM (RX): origin = ORIGIN + CACHE length = 0x00001000 + BUFFER
+SLOW_MEM (RW): origin = end(FAST_MEM) length = 0x00001800 - size(FAST_MEM)
+EXT_MEM (RX): origin = 0x10000000 length = size(FAST_MEM) - CACHE
+}
+#+end_src
+** The SECTIONS Directive
+*** SECTIONS Directive Syntax
+#+begin_src c
+SECTIONS
+{
+name : [property [, property] [, property] . . . ]
+name : [property [, property] [, property] . . . ]
+name : [property [, property] [, property] . . . ]
+}
+#+end_src
+Possible properties for a section are as follows:
++ Load allocation defines where in memory the section is to be loaded.
+  Syntax: load = allocation  or allocation  or > allocation
+
++ Run allocation defines where in memory the section is to be run.
+  Syntax: run = allocation or run > allocation
++ Input sections defines the input sections (object files) that constitute the output section.
+  Syntax: { input_sections }
++ Section type defines flags for special section types. 
+  Syntax: type = COPY or type = DSECT or type = NOLOAD
++ Fill value defines the value used to fill uninitialized holes. 
+  Syntax: fill = value or name : [properties = value]
+
+*** Allocation
++ Binding allocates a section at a specific address.
+  =.text: load = 0x1000=
++ Named memory allocates the section into a range defined in the MEMORY directive with the specified
+  name (like SLOW_MEM) or attributes.
+  =.text: load > SLOW_MEM=
++ Alignment uses the align or palign keyword to specify that the
+  section must start on an address boundary.
+  =.text: align = 0x100=
++ Blocking uses the block keyword to specify that the section must fit
+  between two address boundaries: if the section is too big, it starts on an address boundary.
+  =.text: block(0x100)=
+
+*** Symbols Defined by the Linker
++ .text is assigned the first address of the .text output section.
+  (It marks the beginning of executable code.)
++ etext is assigned the first address following the .text output section.
+  (It marks the end of executable code.)
++ .data is assigned the first address of the .data output section.
+  (It marks the beginning of initialized data tables.)
++ edata is assigned the first address following the .data output section.
+  (It marks the end of initialized data tables.)
++ .bss is assigned the first address of the .bss output section.
+  (It marks the beginning of uninitialized data.)
++ end is assigned the first address following the .bss output section.
+  (It marks the end of uninitialized data.)
+
+
+** Default Allocation Algorithm
+If you do not use the MEMORY and SECTIONS directives, the linker allocates output sections as though
+the definitions in Example were specified.
+ *Example Default Allocation for TMS320C6000 Devices*
+#+begin_src c
+MEMORY
+{
+RAM : origin = 0x00000001, length = 0xFFFFFFFE
+}
+SECTIONS
+{
+.text : ALIGN(32) {} > RAM
+.const : ALIGN(8) {} > RAM
+.data : ALIGN(8) {} > RAM
+.bss : ALIGN(8) {} > RAM
+.cinit : ALIGN(4) {} > RAM ; cflag option only
+.pinit : ALIGN(4) {} > RAM ; cflag option only
+.stack : ALIGN(8) {} > RAM ; cflag option only
+.far : ALIGN(8) {} > RAM ; cflag option only
+.sysmem: ALIGN(8) {} > RAM ; cflag option only
+.switch: ALIGN(4) {} > RAM ; cflag option only
+.cio : ALIGN(4) {} > RAM ; cflag option only
+}
+#+end_src
+
+* Linking C/C++ Code
+** Run-Time Initialization
+C/C++ programs require initialization of the run-time environment before execution of the program itself
+may begin. This initialization is performed by a bootstrap routine. This routine is responsible for creating
+the stack, initializing global variables, and calling main(). The bootstrap routine should be the entry point
+for the program, and it typically should be the RESET interrupt handler. The bootstrap routine is
+responsible for the following tasks:
+
+1. Set up the stack by initializing SP
+2. Set up the data page pointer DP (for architectures that have one)
+3. Set configuration registers
+4. Process the .cinit table to autoinitialize global variables (when using the --rom_model option)
+5. Process the .pinit table to construct global C++ objects.
+6. Call main with appropriate arguments
+7. Call exit when main returns
+
+** Specifying Where to Allocate Sections in Memory
+Table 5-1 summarizes the
+initialized sections created under the COFF ABI mode. Table 5-2 summarizes the initialized sections
+created under the EABI mode. Table 5-3 summarizes the uninitialized sections. Be aware that the COFF
+ABI .cinit and .pinit (.init_array in EABI) tables have different
+formats in EABI.
+
+ *Table 5-1. Initialized Sections Created by the Compiler for COFFABI*
+Name      Contents
++ =.args= Command argument for host-based loader; read-only (see the --arg_size option)
++ =.cinit= Tables for explicitly initialized global and static variables
++ .const Global and static const variables that are explicitly initialized and contain string literals
++ .pinit Table of constructors to be called at startup
++ .ppdata Data tables for compiler-based profiling (see the --gen_profile_info option)
++ .ppinfo Correlation tables for compiler-based profiling ( see the --gen_profile_info option)
++ .switch Jump tables for large switch statements
++ .text Executable code and constants
+
+ *Table 5-2. Initialized Sections Created by the Compiler for EABI*
+Name   Contents
++ .args Command argument for host-based loader; read-only (see the --arg_size option)
++ .binit Boot time copy tables (See the TMS320C6000 Assembly Language
+  Tools User's Guide for information on BINIT in linker command files.)
++ .cinit In EABI mode, the compiler does not generate a .cinit
+  section. However, when the --rom_mode linker option is specified, the linker creates this
+  section, which contains tables for explicitly initialized global and static variables.
++ .const Far, const global and static variables, and string constants
++ .c6xabi.exidx Index table for exception handling; read-only (see --exceptions option)
++ .c6xabi.extab Unwinded instructions for exception handling; read-only (see --exceptions option)
++ .fardata Far non-const global and static variables that are explicitly initialized
++ .init_array Table of constructors to be called at startup
++ .name.load Compressed image of section name; read-only (See the
+  TMS320C6000 Assembly Language Tools User's Guide for information on copy tables.)
++ .neardata Near non-const global and static variables that are explicitly initialized
++ .ppdata Data tables for compiler-based profiling (see the --gen_profile_info option)
++ .ppinfo Correlation tables for compiler-based profiling (see the --gen_profile_info option)
++ .rodata Global and static variables that have near and const qualifiers
++ .switch Jump tables for large switch statements
++ .text Executable code and constants
+
+ *Table 5-3. Uninitialized Sections Created by the Compiler for Both ABIs*
+Name   Contents
++ .bss Global and static variables
++ .far Global and static variables declared far
++ .stack Stack
++ .sysmem Memory for malloc functions (heap)
+
+When you link your program, you must specify where to allocate the sections in memory. In general,
+initialized sections are linked into ROM or RAM; uninitialized sections are linked into RAM. With the
+exception of code sections, the initialized and uninitialized sections created by the compiler cannot be
+allocated into internal program memory
+
+** A Sample Linker Command File
+Example 5-2 shows a typical linker command file that links a C program. The command file in this
+example is named lnk.cmd and lists several linker options:
+
++ --rom_model Tells the linker to use autoinitialization at run time.
++ --heap_size Tells the linker to set the C heap size at 0x2000 bytes.
++ --stack_size Tells the linker to set the stack size to 0x0100 bytes.
++ --library Tells the linker to use an archive library file, rts6200.lib, for input.
+ *Example 5-2. Linker Command File*
+#+begin_src c
+--rom_model
+--heap_size=0x2000
+--stack_size=0x0100
+--library=rts6200.lib
+MEMORY
+{
+VECS: o = 0x00000000 l = 0x000000400 /* reset & interrupt vectors */
+PMEM: o = 0x00000400 l = 0x00000FC00 /* intended for initialization */
+BMEM: o = 0x80000000 l = 0x000010000 /* .bss, .sysmem, .stack, .cinit */
+}
+SECTIONS
+{
+vectors > VECS
+.text > PMEM
+.data > BMEM
+.stack > BMEM
+.bss > BMEM
+.sysmem > BMEM
+.cinit > BMEM
+.const > BMEM
+.cio > BMEM
+.far > BMEM
+}
+#+end_src
+
+* More example for reference 
+** Exmaple 1
+#+begin_src c
+
+#+end_src
+** Exmaple 2
+#+begin_src c
+
+#+end_src
+** Exmaple 3
+#+begin_src c
+
+#+end_src
+* Footnotes
+
+[fn:1] TMS320C6000 Assembly Language Tools
+
