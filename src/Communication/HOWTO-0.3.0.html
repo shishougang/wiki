@@ -1,0 +1,272 @@
+This page explains how to set up a mesh network using open80211s and a "supported driver":http://o11s.org/trac/wiki#[[DriverStatus]].
+
+*Note:* at this time, this HOWTO assumes that you are not running a <code>[[WiFi]]</code> manager such as <code>[[NetworkManager]]</code>.  Please kill or otherwise stop <code>[[NetworkManager]]</code> or similar software before setting up your mesh interfaces or tell it to ignore the device that you plan to use for mesh.
+
+*Note:* open80211s is disabled in the 2.6.31 kernel, however it is enabled in subsequent kernels.  Please use 2.6.32 or above or consider using the "wireless-testing":http://git.kernel.org/?p=linux/kernel/git/linville/wireless-testing.git;a=summary; kernel or the "compat-wireless":http://linuxwireless.org/en/users/Download package.
+
+h3. Index
+  * "Software Requirements":/cozybit/open80211s/wiki/#pieces
+     - "For Open Mesh":/cozybit/open80211s/wiki/#openpieces
+     - "For Authenticated Mesh":/cozybit/open80211s/wiki/#secpieces
+  * "Open Mesh":/cozybit/open80211s/wiki/#openmesh
+  * "Authenticated Mesh":/cozybit/open80211s/wiki/#authmesh
+  * "Advanced Tinkering":/cozybit/open80211s/wiki/#advancedmesh
+  * "Mesh Portal (MPP)":/cozybit/open80211s/wiki/#meshportal
+
+h2. Software Requirements #pieces
+
+In order to set up a mesh you'll need the following tools: 
+
+h3. For Open Mesh #openpieces
+
+An open mesh is one where all peers with compatible configuration are allowed to join the mesh.  Essentially this means that just the Mesh ID and the channel must match.
+
+h4. The kernel
+Get the wireless-testing kernel:
+<pre><code>
+$ git://git.kernel.org/pub/scm/linux/kernel/git/linville/wireless-testing.git
+</code></pre>
+
+Configure the kernel including the <code>mac80211</code> stack with mesh capabilities (<code>CONFIG_MAC80211</code>, <code>CONFIG_MAC80211_MESH</code>) and enable the driver(s) that you need, for example the <code>zd1211-rw</code> driver (<code>CONFIG_ZD1211RW</code>). Compile and install on your target.  Here are "instructions for Ubuntu":/cozybit/open80211s/wiki/wiki:Ubuntu.  
+
+You also have the option of using "compat-wireless":http://linuxwireless.org/en/users/Download instead of building the kernel or you may also use the "2.6.26":http://git.kernel.org/?p=linux%2Fkernel%2Fgit%2Ftorvalds%2Flinux-2.6.git;a=summary or later mainline kernel.  Using wireless-testing is strongly recommended as it represents the latest development and driver support.
+
+h4. iw
+
+Follow the instructions at "iw documentation page":http://linuxwireless.org/en/users/Documentation/iw/ to build the latest version of <code>iw</code> from source or use a recent released version of <code>iw</code>.
+
+h3. For Authenticated Mesh #secpieces
+
+In an authenticated mesh, all peers must share a secret password.  Authentication is established via the Simultaneous Authentication of Equals protocol, which is specified in the 802.11s amendment.
+
+In addition to the basement requirements above you will need the following: 
+
+h4. Kernel
+
+Until our patches are merged upstream, download and build the open80211s kernel:
+<pre><code>
+$ git clone git://o11s.org/open80211s
+</code></pre>
+
+h4. wpa_supplicant
+
+We have extended wpa_supplicant to support mesh authentication over SAE (see section 8.2a.1 in the "11s standard":http://grouper.ieee.org/groups/802/11/Reports/tgs_update.htm ). Until our changes are merged upstream, check out our fork:
+<pre><code>
+$ git clone git@github.com:cozybit/hostap-sae.git
+$ cd hostap-sae
+$ cp defconfig .config
+</code></pre>
+now edit .config and uncomment / add the following lines:
+<pre><code>
+CONFIG_LIBNL20=y
+CONFIG_DRIVER_NL80211=y
+CONFIG_MESH_RSN=y
+</code></pre>
+then
+<pre><code>
+$ make 
+$ make install
+</code></pre>
+
+h2. Open Mesh Setup #openmesh
+
+Each mesh node needs to be configured as follows:
+
+* Boot several nodes with the compiled kernel and with <code>iw</code> properly installed.
+
+* Choose a mesh id.  The mesh id is a string that will be used in the mesh node beacons.  Only mesh points with the same mesh id will be able to communicate with each other. The mesh id is a maximum of 32 bytes long.  In this document, we refer to the mesh id as $MESH_ID.
+
+* Add a new mesh interface for the _wlanN_ device on each node.  You can choose the name of the mesh interface.  "mesh" is a popular choice.  In this document, we refer to the mesh interface as $MESH_IFACE.
+
+<pre><code>
+# iw dev wlan0 interface add $MESH_IFACE type mp mesh_id $MESH_ID
+</code></pre>
+
+ A new interface will be created:
+
+<pre><code>
+# ifconfig -a | grep mesh
+mesh      Link encap:Ethernet  HWaddr 00:18:39:14:48:B5  
+</code></pre>
+
+*Note:* depending on your Linux distribution, you may see "a slightly different name":http://linuxwireless.org/en/users/Download#Knownissues for the mesh interface.
+
+ Bring up your $MESH_IFACE interface:
+
+<pre><code>
+# ifconfig $MESH_IFACE up
+</code></pre>
+
+* All mesh interfaces start by default in channel 1. The channel can be
+   changed with 
+
+<pre><code>
+# iw dev $MESH_IFACE set channel <channel>
+</code></pre>
+
+or
+
+<pre><code>
+# iwconfig $MESH_IFACE channel <channel>
+</code></pre>
+
+* Assign a same-subnet IP to the mesh interface in each node.
+
+<pre><code>
+# ifconfig $MESH_IFACE <ip_addr>
+</code></pre>
+
+ For this tutorial, let's assume that our mesh nodes are assigned addresses in the <code>192.168.3.80/28</code> subnet.
+
+<pre><code>
+# ifconfig $MESH_IFACE 192.168.3.80
+</code></pre>
+
+* In the default configuration, mesh points will automatically attempt to create peer links will all other mesh nodes with the same mesh ID.  You can examine which peer links have been established with the _iw dev $MESH_IFACE station dump_ command:
+
+<pre><code>
+# iw dev $MESH_IFACE station dump
+Station 00:15:6d:84:14:10 (on mesh)
+	inactive time:	1320 ms
+	rx bytes:	352
+	rx packets:	4
+	tx bytes:	174
+	tx packets:	2
+	signal:  	-61 dBm
+	tx bitrate:	1.0 MBit/s
+	mesh llid:	32577
+	mesh plid:	15969
+	mesh plink:	ESTAB
+Station 00:15:6d:84:14:09 (on mesh)
+	inactive time:	3370 ms
+	rx bytes:	1064
+	rx packets:	12
+	tx bytes:	545
+	tx packets:	7
+	signal:  	-53 dBm
+	tx bitrate:	1.0 MBit/s
+	mesh llid:	41036
+	mesh plid:	24435
+	mesh plink:	ESTAB
+</code></pre>
+
+ Each _Station'' stanza in the station dump output represents a mesh node with whom we have a peer link.  The first line shows the MAC address of the mesh node.  The ''mesh plink_ field reports the state of the peer link with this mesh node.  When this value is ESTAB, direct communication with this mesh node is possible.
+
+* You should now be able to ping any node in the mesh.  After doing that you can use _arp'' and ''iw_ to inspect the arp table and path table.  This will reveal where the packet was actually sent in order to get to its destination.
+
+<pre><code>
+192-168-3-80:~# ping -c 2 192.168.3.83
+PING 192.168.3.83 (192.168.3.83) 56(84) bytes of data.
+64 bytes from 192.168.3.83: icmp_seq=1 ttl=64 time=8.85 ms
+64 bytes from 192.168.3.83: icmp_seq=2 ttl=64 time=3.42 ms
+
+192-168-3-80:~# arp
+? (192.168.3.83) at 00:15:6d:84:14:0e [ether]  on mesh
+
+192-168-3-80:~# iw dev $MESH_IFACE mpath dump
+00:15:6d:84:14:10 00:15:6d:84:14:10 mesh	0	228 	0	2196731904	0	0	0x10
+00:15:6d:84:14:0e 00:15:6d:84:14:10 mesh	2	456 	0	2196731904	360	0	0x4
+00:15:6d:84:14:09 00:15:6d:84:14:09 mesh	1	8193	0	2196731904	0	0	0x10
+</code></pre>
+
+ The arp table shows the hardware address of the destination node.  This is useful for interpreting the output of the _mpath dump'' command.  The ''mpath dump_ shows the table that the mesh stack uses to route packets.  This table is constructed as the mesh stack successfully establishes paths to destinations in the mesh.  Each output line shows the destination address in the first column and the next hop address in the second column.  Look up the destination address of our ping packet (00:15:6d:84:14:0e) in this table.  You can see that the next hop is 00:15:6d:84:14:10, revealing that the packet will not be sent directly to the destination.  Instead, it will be sent to 00:15:6d:84:14:10 who will presumably forward it on appropriately.  In contrast, if the destination of the packet were 00:15:6d:84:14:09, the packet would be sent directly to that node.  This is because the path table reports the same address for the destination and next hop.
+
+Each entry in the _mpath dump_ has several trailing fields after the destination and next hop addresses.  For more information on the meaning of these fields, see the "mpath page":/cozybit/open80211s/wiki/wiki:mpath.  Also, be sure to check the "the driver status page ":http://o11s.org/trac/wiki#[[DriverStatus]] for any known issues related to your driver.
+
+Et voilà!
+
+h2. Authenticated Mesh Setup #authmesh
+
+Everything you need to create an authenticated mesh is listed in "Requirements":/cozybit/open80211s/wiki/#secpieces. wpa_supplicant will handle all authentication and peering for us. 
+Create a mesh.conf that looks something like:
+<pre><code>
+# Mesh network with SAE authentication
+network={
+        ssid="test mesh"
+        mode=5
+        frequency=2412
+        proto=RSN
+        key_mgmt=SAE
+        pairwise=CCMP
+        group=CCMP
+        psk="This is a secret place"
+        sae_group_list=19 26 21 25 20
+}
+</code></pre>
+Then on each node:
+<pre><code>
+$ wpa_supplicant -Dnl80211 -i$MESH_IFACE -cmesh.conf
+</code></pre>
+add -B to daemonize, or -d(d) for (more) debug output. To check if your nodes are associated do:
+<pre><code>
+$ iw $MESH_IFACE station dump 
+</code></pre>
+
+h2. Advanced Tinkering #advancedmesh
+
+* You can modify the mesh path table with these commands:
+  * _iw dev $MESH_IFACE mpath del $DST_ADDR_: to delete a mesh path entry.
+  * _iw dev $MESH_IFACE mpath new $DST_ADDR next_hop $NEXTHOP_ADDR_ to force a specific network topology.
+* You can modify the mesh peer links table with these commands:
+  * _iw dev $MESH_IFACE station dump_: list all the plinks.
+  * _iw dev $MESH_IFACE station $HW_ADDR set plink_action [open|block]_: trigers a specific peer link stablishment process or blocks a specific peer link.
+  * _iw dev $MESH_IFACE station del $HW_ADDR_: deletes a peer link from the peer table.
+
+* You can get and set mesh parameters using the "mesh_param" command in _iw_.  For example, to change the mesh TTL value (which defaults to 5), one would:
+<pre><code>
+# iw dev $MESH_IFACE get mesh_param mesh_ttl
+5
+# iw dev $MESH_IFACE set mesh_param mesh_ttl 3
+</code></pre>
+
+The following mesh parameters can be inspected and set:
+* mesh_retry_timeout
+* mesh_confirm_timeout
+* mesh_holding_timeout
+* mesh_max_peer_links
+* mesh_max_retries
+* mesh_ttl
+* mesh_auto_open_plinks
+* mesh_hwmp_max_preq_retries
+* mesh_path_refresh_time
+* mesh_min_discovery_timeout
+* mesh_hwmp_active_path_timeout
+* mesh_hwmp_preq_min_interval
+* mesh_hwmp_net_diameter_traversal_time
+
+h2. Wireshark
+
+"Patch":http://o11s.org/patches/wireshark/wireshark-1.3.2-mesh-support.patch "wireshark":http://www.wireshark.org/download/src/all-versions/wireshark-1.3.1.tar.gz and start analyzing traffic. ,,_Thanks to Steve Brown for porting this patch from an older version of wireshark_,,
+
+||[[Image(HOWTO:preq-wireshark.png,100%)]]||[[Image(HOWTO:prep-wireshark.png,100%)]]||
+||[[Image(HOWTO:beacon-wireshark.png,100%)]]||[[Image(HOWTO:data-wireshark.png,100%)]]||
+
+h2. Mesh Portal (MPP) #meshportal
+
+A Mesh Portal (MPP) provides the ability to bridge networks over a mesh.  Although the implementation of the full MPP specification detailed in the 802.11s draft has not yet been finished, an interesting intermediate step has been contributed that will be outlined here.
+
+*Note:* At this time, mesh points will not be able to ping outside the mesh and vice versa. This is because support for proxied entities in the forwarding table have not been implemented. However, this implementation will allow an MPP to use the 6 address frame format and therefore be able to propagate traffic though the mesh successfully.,,_Thanks to [[YanBo]] for submitting this functionality._,,
+
+To bring up an MPP we need to setup up a bridge between a mesh interface and, for example, an Ethernet interface.
+
+1. Bring up a mesh interface as described in the "Testing" section above.
+<pre><code>
+mpp$ iw dev wlan0 interface add $MESH_IFACE type mp mesh_id ${MESH_ID}
+mpp$ ifconfig $MESH_IFACE up
+</code></pre>
+2. Add this new interface and your ethN interface to a new bridge:
+<pre><code>
+mpp$ brctl addbr br0
+mpp$ brctl stp br0 off
+mpp$ brctl addif br0 eth1
+mpp$ brctl addif br0 mesh
+mpp$ ifconfig $MESH_IFACE down
+mpp$ ifconfig eth1 down
+mpp$ ifconfig $MESH_IFACE 0.0.0.0 up
+mpp$ ifconfig eth1 0.0.0.0 up
+mpp$ ifconfig br0 ${MESH_IP}
+</code></pre>
+If you are having problem setting up the bridge, here is a great howto: "Ethernet Bridge + netfilter HOWTO":http://www.faqs.org/docs/Linux-HOWTO/Ethernet-Bridge-netfilter-HOWTO.html
+
+
+"Comments?  Questions?  Praise?  Flames?":http://o11s.org/mailman/listinfo/devel
