@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+               "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>ti816x u-boot</title>
+<meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
+<meta name="title" content="ti816x u-boot"/>
+<meta name="generator" content="Org-mode"/>
+<meta name="generated" content="2012-08-21 22:53:52 HKT"/>
+<meta name="author" content="Shi Shougang"/>
+<meta name="description" content=""/>
+<meta name="keywords" content=""/>
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  html { font-family: Times, serif; font-size: 12pt; }
+  .title  { text-align: center; }
+  .todo   { color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #add8e6; font-weight:normal }
+  .target { }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  {margin-left:auto; margin-right:0px;  text-align:right;}
+  .left   {margin-left:0px;  margin-right:auto; text-align:left;}
+  .center {margin-left:auto; margin-right:auto; text-align:center;}
+  p.verse { margin-left: 3% }
+  pre {
+	border: 1pt solid #AEBDCC;
+	background-color: #F3F5F7;
+	padding: 5pt;
+	font-family: courier, monospace;
+        font-size: 90%;
+        overflow:auto;
+  }
+  table { border-collapse: collapse; }
+  td, th { vertical-align: top;  }
+  th.right  { text-align:center;  }
+  th.left   { text-align:center;   }
+  th.center { text-align:center; }
+  td.right  { text-align:right;  }
+  td.left   { text-align:left;   }
+  td.center { text-align:center; }
+  dt { font-weight: bold; }
+  div.figure { padding: 0.5em; }
+  div.figure p { text-align: center; }
+  div.inlinetask {
+    padding:10px;
+    border:2px solid gray;
+    margin:10px;
+    background: #ffffcc;
+  }
+  textarea { overflow-x: auto; }
+  .linenr { font-size:smaller }
+  .code-highlighted {background-color:#ffff00;}
+  .org-info-js_info-navigation { border-style:none; }
+  #org-info-js_console-label { font-size:10px; font-weight:bold;
+                               white-space:nowrap; }
+  .org-info-js_search-highlight {background-color:#ffff00; color:#000000;
+                                 font-weight:bold; }
+  /*]]>*/-->
+</style><link rel="stylesheet" href="./assets/stylesheet.css" type="text/css"/>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+
+</head>
+<body>
+<div id="org-div-home-and-up" style="text-align:right;font-size:70%;white-space:nowrap;">
+ <a accesskey="h" href="../../index.html"> UP </a>
+ |
+ <a accesskey="H" href="../../index.html"> HOME </a>
+</div>
+
+<div id="preamble">
+
+</div>
+
+<div id="content">
+<h1 class="title">ti816x u-boot</h1>
+
+
+
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Modify DDR3 Frequency</a>
+<ul>
+<li><a href="#sec-1-1">step 1</a></li>
+<li><a href="#sec-1-2">step 2</a></li>
+<li><a href="#sec-1-3">step 3</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">Modify serial console UART port</a></li>
+<li><a href="#sec-3">Files</a>
+<ul>
+<li><a href="#sec-3-1"><code>/board/ti/ti8168</code></a></li>
+<li><a href="#sec-3-2"><code>arch/arm/include/asm/arch-ti81xx/</code></a></li>
+<li><a href="#sec-3-3"><code>include/configs/ti8168_evm.h</code></a></li>
+<li><a href="#sec-3-4"><code>arch/arm/cpu/arm_cortexa8/ti81xx</code></a></li>
+</ul>
+</li>
+<li><a href="#sec-4">Make</a>
+<ul>
+<li><a href="#sec-4-1">step1: make the mini u-boot</a></li>
+<li><a href="#sec-4-2">step2: make the normal u-boot</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">Boot from SD Card</a></li>
+<li><a href="#sec-6">U-boot command</a>
+<ul>
+<li><a href="#sec-6-1">List files on a FAT32 formated SD card</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-1" class="outline-2">
+<h2 id="sec-1">Modify DDR3 Frequency</h2>
+<div class="outline-text-2" id="text-1">
+
+
+</div>
+
+<div id="outline-container-1-1" class="outline-3">
+<h3 id="sec-1-1">step 1</h3>
+<div class="outline-text-3" id="text-1-1">
+
+<p><code>arch/arm/include/asm/arch-ti81xx/ddr_defs_ti816x.h</code>
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">CONFIG_TI816X_DDR3_796</span> <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Values supported 400,531,675,796 </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-1-2" class="outline-3">
+<h3 id="sec-1-2">step 2</h3>
+<div class="outline-text-3" id="text-1-2">
+
+<p><code>arch/arm/include/asm/arch-ti81xx/clocks_ti816x.h</code>
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">DDR_PLL_796</span>     <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Values supported 400,531,675,796 </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-1-3" class="outline-3">
+<h3 id="sec-1-3">step 3</h3>
+<div class="outline-text-3" id="text-1-3">
+
+<p>Open the file <code>include/configs/ti8168_evm.h</code> and make sure that the
+config option for DDR3 is not commented and that for DDR2 is commented
+out as shown below
+</p>
+
+
+<pre class="src src-c">[...]
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">#define CONFIG_TI816X_EVM_DDR3                  /* Configure DDR3 in U-Boot */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">CONFIG_TI816X_EVM_DDR2</span>                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Configure DDR2 in U-Boot </span><span style="color: #ff7f24;">*/</span>
+[...]
+</pre>
+
+
+
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2">Modify serial console UART port</h2>
+<div class="outline-text-2" id="text-2">
+
+<p><code>include/configs/ti8168_evm.h</code>
+</p>
+
+
+<pre class="src src-c"><span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * NS16550 Configuration</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">define CONFIG_SYS_NS16550_COM1                0x48024000      /* Base EVM has UART2 */</span>
+<span style="color: #98fb98;">define</span> <span style="color: #eedd82;">CONFIG_SYS_NS16550_COM1</span>          0x48020000      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Base EVM has UART0 </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">Files</h2>
+<div class="outline-text-2" id="text-3">
+
+
+</div>
+
+<div id="outline-container-3-1" class="outline-3">
+<h3 id="sec-3-1"><code>/board/ti/ti8168</code></h3>
+<div class="outline-text-3" id="text-3-1">
+
+
+
+
+<pre class="src src-sh">|-- config.mk
+|-- evm.c
+|-- Makefile
+<span style="color: #fa8072;">`-- u-boot.lds</span>
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-3-2" class="outline-3">
+<h3 id="sec-3-2"><code>arch/arm/include/asm/arch-ti81xx/</code></h3>
+<div class="outline-text-3" id="text-3-2">
+
+
+
+
+<pre class="src src-sh">|-- clock.h
+|-- clocks_ti816x.h
+|-- cpu.h
+|-- ddr_defs.h
+|-- ddr_defs_ti816x.h
+|-- emac_defs.h
+|-- hardware.h
+|-- i2c.h
+|-- mem.h
+|-- mmc.h
+|-- mmc_host_def.h
+|-- nand.h
+<span style="color: #fa8072;">`-- sys_proto.h</span>
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-3-3" class="outline-3">
+<h3 id="sec-3-3"><code>include/configs/ti8168_evm.h</code></h3>
+<div class="outline-text-3" id="text-3-3">
+
+</div>
+
+</div>
+
+<div id="outline-container-3-4" class="outline-3">
+<h3 id="sec-3-4"><code>arch/arm/cpu/arm_cortexa8/ti81xx</code></h3>
+<div class="outline-text-3" id="text-3-4">
+
+
+
+
+<pre class="src src-sh">|-- cache.S
+|-- elm.c
+|-- lowlevel_init.S
+|-- Makefile
+|-- mem.c
+|-- sys_info.c
+|-- syslib.c
+<span style="color: #fa8072;">`-- timer.c</span>
+</pre>
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-4" class="outline-2">
+<h2 id="sec-4">Make</h2>
+<div class="outline-text-2" id="text-4">
+
+
+</div>
+
+<div id="outline-container-4-1" class="outline-3">
+<h3 id="sec-4-1">step1: make the mini u-boot</h3>
+<div class="outline-text-3" id="text-4-1">
+
+<p><a href="./build_min.sh">build_min.sh</a>
+</p>
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/bin/</span><span style="color: #00ffff;">sh</span>
+rm MLO
+make <span style="color: #eedd82;">CROSS_COMPILE</span>=arm-none-linux-gnueabi- <span style="color: #eedd82;">ARCH</span>=arm distclean
+make <span style="color: #eedd82;">CROSS_COMPILE</span>=arm-none-linux-gnueabi- <span style="color: #eedd82;">ARCH</span>=arm ti8168_evm_min_sd
+make <span style="color: #eedd82;">CROSS_COMPILE</span>=arm-none-linux-gnueabi- <span style="color: #eedd82;">ARCH</span>=arm u-boot.ti
+mv u-boot.min.sd MLO
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-4-2" class="outline-3">
+<h3 id="sec-4-2">step2: make the normal u-boot</h3>
+<div class="outline-text-3" id="text-4-2">
+
+<p><a href="./build_sd.sh">build_sd</a>
+</p>
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/bin/</span><span style="color: #00ffff;">sh</span>
+make <span style="color: #eedd82;">CROSS_COMPILE</span>=arm-none-linux-gnueabi- <span style="color: #eedd82;">ARCH</span>=arm distclean
+make <span style="color: #eedd82;">CROSS_COMPILE</span>=arm-none-linux-gnueabi- <span style="color: #eedd82;">ARCH</span>=arm ti8168_evm_config
+make <span style="color: #eedd82;">CROSS_COMPILE</span>=arm-none-linux-gnueabi- <span style="color: #eedd82;">ARCH</span>=arm u-boot.ti
+</pre>
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-5" class="outline-2">
+<h2 id="sec-5">Boot from SD Card</h2>
+<div class="outline-text-2" id="text-5">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-6" class="outline-2">
+<h2 id="sec-6">U-boot command</h2>
+<div class="outline-text-2" id="text-6">
+
+
+</div>
+
+<div id="outline-container-6-1" class="outline-3">
+<h3 id="sec-6-1">List files on a FAT32 formated SD card</h3>
+<div class="outline-text-3" id="text-6-1">
+
+
+
+
+<pre class="src src-sh">TI8168_EVM# mmc rescan 0
+TI8168_EVM# fatls mmc 0
+</pre>
+
+
+</div>
+</div>
+</div>
+</div>
+
+<div id="postamble">
+<p class="date">Date: 2012-08-21 22:53:52 HKT</p>
+<p class="author">Author: Shi Shougang</p>
+<p class="creator">Org version 7.8.09 with Emacs version 24</p>
+<a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
+
+</div>
+</body>
+</html>
