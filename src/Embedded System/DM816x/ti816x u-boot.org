@@ -4,6 +4,11 @@
 
 
 * Modify DDR3 Frequency 
+Currently the following are the supported frequencies on the DM816x EVM.
++ 400MHz
++ 531MHz
++ 675MHz
++ 796MHz
 ** step 1
 =arch/arm/include/asm/arch-ti81xx/ddr_defs_ti816x.h=
 #+begin_src c
@@ -30,8 +35,6 @@ out as shown below
 
 
 
-
-
 * Modify serial console UART port 
 =include/configs/ti8168_evm.h=
 #+begin_src c
@@ -40,6 +43,17 @@ out as shown below
  */
 //define CONFIG_SYS_NS16550_COM1		0x48024000	/* Base EVM has UART2 */
 define CONFIG_SYS_NS16550_COM1		0x48020000	/* Base EVM has UART0 */
+#+end_src
+
+* BOOT Mode
+** SPI boot mode
+#+begin_src sh
+ SW3---->BTM[4:0] ==> 10110   (other pins should be 0 i.e. OFF)
+ SW4---->SPI ON
+#+end_src
+** SD boot mode
+#+begin_src sh
+ SW3---BTM[4:0] ==> 10111 (other pins should be 0 i.e. OFF)
 #+end_src
 
 * Files
@@ -90,4 +104,139 @@ define CONFIG_SYS_NS16550_COM1		0x48020000	/* Base EVM has UART0 */
 [[./build_sd.sh][build\_sd]]
 #+include: "./build_sd.sh" src sh
 
-* Boot from SD Card
+* Result Files
+** 1st stage u-boot configurations
+| Boot Modes | Output File     | TI816x            |
+|------------+-----------------+-------------------|
+| NAND       | u-boot.min.nand | single stage*     |
+| SPI        | u-boot.min.spi  | single stage*     |
+| NOR        | NA              | single stage*     |
+| SD         | u-boot.min.sd   | ti8168_evm_min_sd |
+| UART       | u-boot.min.uart | Not supported     |
+| EMAC       | u-boot.min.eth  | single            |
+
+** 2nd stage u-boot configurations
+Boot Modes    Output File                TI816x
+NAND          u-boot.bin.noxip (TI816x)  ti8168_evm_config_nand
+              u-boot.bin (TI814x/Ti813x)
+SPI           u-boot.bin.noxip.spi       ti8168_evm_config_spi
+NOR           u-boot.bin                 ti8168_evm_config_nor 
+SD**          u-boot.bin                 ti8168_evm_config_sd 
+UART          NA                         Not supported 
+EMAC          u-boot.in                  use NAND/SPI/SD
+
+* Boot Linux Kernel
+** Boot from SD Card
+#+begin_src sh
+TI8168_EVM# mmc rescan 0
+TI8168_EVM# fatload mmc 0 0x81000000 uImage
+TI8168_EVM# setenv bootargs 'console=ttyO0,115200n8 root=/dev/mmcblk0p2 mem=128M rootwait'
+TI8168_EVM# bootm 0x81000000
+#+end_src
+** Boot over Network (Ethernet)
+When kernel image and ramdisk image are fetched from a tftp server:
+1. Ensure that the EVM is connected to network with DHCP and TFTP server set up
+2. Set 'ethaddr' U-Boot environment variable with proper ethernet address in format 'xx:xx:xx:xx:xx:xx' (replace 'xx'
+   with proper hexadecimal values)
+3. Copy kernel image and ramdisk to TFTP server's root directory.
+4. Execute follwing commands at U-Boot prompt. We assume kernel image name as 'uImage' and ramdisk file name
+   as 'ramdisk.gz'
+
+*** Method1 (DHCP) for ramdisk,gz
+#+begin_src sh
+TI8168_EVM# setenv autoload no
+TI8168_EVM# dhcp
+TI8168_EVM# setenv serverip <Server IP Address>
+TI8168_EVM# tftp 0x81000000 uImage
+TI8168_EVM# tftp 0x82000000 ramdisk.gz
+TI8168_EVM# setenv bootargs 'mem=200M console=ttyO0,115200n8 root=/dev/ram0 initrd=0x82000000,40M ramdisk_size=45000 ip=dhcp'
+TI8168_EVM# bootm 0x81000000
+#+end_src
+
+*** Method 2 for NFS Filesystem
+**** static IP
+Alternatively, kernel can be made to use the same IP address as
+assigned to U-Boot instead of doing DHCP request again by setting
+U-Boot parameters as follows:
+
+#+begin_src sh
+TI8168_EVM# print ethaddr <-- Check if MAC address is assigned and is unique
+TI8168_EVM# setenv ethaddr <unique-MAC-address> <-- Set only if not present already, format xx:yy:zz:aa:bb:cc
+TI8168_EVM# setenv bootcmd 'dhcp;run addip; tftp 81000000 uImage;bootm'
+TI8168_EVM# setenv hostname <unique-hostname>
+TI8168_EVM# setenv addip 'setenv bootargs ${bootargs} ip=${ipaddr}:${nfsserver}:${gatewayip}:${netmask}:${hostname}:eth0:off'
+TI8168_EVM# setenv autoload no
+TI8168_EVM# setenv nfsserver <nfs-server-ip> <-- Make sure the same NFS server IP is used below
+TI8168_EVM# setenv bootargs 'console=ttyO0,115200n8 root=/dev/nfs nfsroot=<nfs-server-ip>:<path-to-nfs-share>,nolock rw mem=128M'
+TI8168_EVM# setenv serverip <tftp-server-ip>
+TI8168_EVM# saveenv
+TI8168_EVM# boot
+#+end_src
+
+**** DHCP 
+#+begin_src sh
+TI8168_EVM# print ethaddr <-- Check if MAC address is assigned and is unique
+TI8168_EVM# setenv ethaddr <unique-MAC-address> <-- Set only if not present already, format uv:yy:zz:aa:bb:cc
+TI8168_EVM# setenv bootcmd 'dhcp;tftp 81000000 uImage;bootm'
+TI8168_EVM# setenv autoload no
+TI8168_EVM# setenv nfsserver <NFS server-ip> <-- Make sure the same NFS server IP is used below
+TI8168_EVM# setenv bootargs 'console=ttyO2,115200n8 root=/dev/nfs nfsroot=<NFS server-ip>:<NFS share>,nolock rw mem=128M ip=dhcp'
+TI8168_EVM# setenv serverip <tftp-server-ip>
+TI8168_EVM# saveenv
+TI8168_EVM# boot
+#+end_src
+
+
+*** Example 1
+#+begin_src sh
+setenv bootdelay 4
+setenv baudrate 115200
+setenv bootargs console=ttyO0,115200n8 rootwait rw mem=364M@0x80000000 mem=324M@0x9F900000 vmalloc=500M notifyk.vpssm3_sva=0xBF900000 root=/dev/nfs nfsroot=143.89.147.79:/home/testbed/targetfs ip=dhcp
+setenv bootcmd 'dhcp;setenv serverip 143.89.147.79;tftpboot;bootm'
+setenv autoload no
+setenv serverip 143.89.147.79
+setenv bootfile uImage
+#+end_src
+
+
+
+
+
+* ENV on SD card using a script
+** Example (boot.txt)
+#+begin_src sh
+setenv bootargs 'console=ttyO0,115200n8 root=/dev/mmcblk0p2 mem=128M rootwait'
+setenv bootcmd 'mmc rescan 0; fatload mmc 0 0x81000000 uImage; bootm 0x81000000'
+boot
+#+end_src
+
+Now use the following command to generate the script named boot.scr
+#+begin_src sh
+mkimage -A arm -O linux -T script -C none -n TI_script -d boot.txt boot.scr
+#+end_src
+
+** TFTP
+#+begin_src sh
+TI8168_EVM# tftp 0x81000000 boot.scr
+TI8168_EVM# source 0x81000000
+#+end_src
+
+
+* U-boot command
+** List files on a FAT32 formated SD card
+#+begin_src sh
+TI8168_EVM# mmc rescan 0
+TI8168_EVM# fatls mmc 0
+#+end_src
+** Booting application (ex. u-boot.bin)image from the SD card
+#+begin_src sh
+TI8168_EVM# mmc rescan 0
+TI8168_EVM# fatload mmc 0 0x81000000 u-boot.bin
+TI8168_EVM# go 0x81000000
+#+end_src
+
+
+** Set static ip
+#+begin_src sh
+TI8168_EVM# setenv ipaddr <your static ip>
+#+end_src

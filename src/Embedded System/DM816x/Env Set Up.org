@@ -1,0 +1,93 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Env Set up
+#+OPTIONS: num:nil H:2
+
+* Toolchain
+CodeSourcery ARM tool chain version 2009-q1 https://sourcery.mentor.com/sgpp/portal/release858
+
+** Environment Setup
+#+begin_src sh
+$ export PATH=/opt/toolchain/2009-q1/bin:$PATH
+$ export PATH=/opt/u-boot/tools:$PATH
+#+end_src
+   
+* TFTP
+** step 1
+find the directory
+#+begin_src sh
+tftproot="/tftpboot"
+sudo mkdir -p $tftproot
+sudo chmod 777 $tftproot
+sudo chown nobody $tftproot
+#+end_src
+
+** step 2
+copy the uimage to the folder
+#+begin_src sh
+sudo cp uimage $tftproot
+#+end_src
+
+** step 3
+create the file /etc/xinetd.d/tftp
+#+begin_src sh
+tftp() {
+    echo "
+service tftp
+{
+protocol = udp
+port = 69
+socket_type = dgram
+wait = yes
+user = nobody
+server = /usr/sbin/in.tftpd
+server_args = $tftproot
+disable = no
+}
+" | sudo tee $tftpcfg > /dev/null
+}
+#+end_src
+
+** step 4
+start and stop the tftp server
+#+begin_src sh
+sudo /etc/init.d/xinetd stop
+
+sudo /etc/init.d/xinetd start
+#+end_src
+
+
+* NFS
+** step 1
+find the location
+
+#+begin_src sh
+dst="${HOME}/targetfs"
+mkdir -p $dst
+#+end_src
+** step 2
+extract the filesystem
+
+#+begin_src sh
+me='whoami'
+#if exist the old filesystem, then sudo rm -rf $dst
+sudo tar xzf xxx.tar.gz -C $dst
+
+sudo chown $me:$me $dst
+sudo chown -R $me:$me $dst/home $dst/usr $dst/etc $dst/lib $dst/opt $dst/boot
+#+end_src
+
+** step 3
+export the target filesystem for NFS access
+#+begin_src sh
+    sudo chmod 666 /etc/exports
+    sudo echo "$dst *(rw,nohide,insecure,no_subtree_check,async,no_root_squash)" >> /etc/exports
+    sudo chmod 644 /etc/exports
+#+end_src
+
+** step 4
+start and stop the NFS server
+#+begin_src sh
+sudo /etc/init.d/nfs-kernel-server stop
+
+sudo /etc/init.d/nfs-kernel-server start
+#+end_src

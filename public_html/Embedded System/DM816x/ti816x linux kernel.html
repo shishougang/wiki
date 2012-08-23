@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="title" content="ti816x Linux Kernel"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-08-21 22:53:52 HKT"/>
+<meta name="generated" content="2012-08-22 11:36:58 HKT"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -105,21 +105,145 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1"></a></li>
+<li><a href="#sec-1">Make kernel</a>
+<ul>
+<li><a href="#sec-1-1">clean</a></li>
+<li><a href="#sec-1-2">make</a></li>
+<li><a href="#sec-1-3">Auto detection of Kernel Load Address and Run Time RAM Base Determination</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">filesystem</a>
+<ul>
+<li><a href="#sec-2-1">Using The Correct Console Device</a></li>
+</ul>
+</li>
 </ul>
 </div>
 </div>
 
 <div id="outline-container-1" class="outline-2">
-<h2 id="sec-1"></h2>
+<h2 id="sec-1">Make kernel</h2>
 <div class="outline-text-2" id="text-1">
 
+
+</div>
+
+<div id="outline-container-1-1" class="outline-3">
+<h3 id="sec-1-1">clean</h3>
+<div class="outline-text-3" id="text-1-1">
+
+
+
+
+<pre class="src src-sh">make mrproper
+make clean
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-1-2" class="outline-3">
+<h3 id="sec-1-2">make</h3>
+<div class="outline-text-3" id="text-1-2">
+
+
+
+
+<pre class="src src-sh">make <span style="color: #eedd82;">CROSS_COMPILE</span>=arm-none-linux-gnueabi- <span style="color: #eedd82;">ARCH</span>=arm ti8168_evm_defconfig
+To view configuration interactively:
+ make <span style="color: #eedd82;">CROSS_COMPILE</span>=arm-none-linux-gnueabi- <span style="color: #eedd82;">ARCH</span>=arm menuconfig
+ make <span style="color: #eedd82;">CROSS_COMPILE</span>=arm-none-linux-gnueabi- <span style="color: #eedd82;">ARCH</span>=arm uImage
+ make <span style="color: #eedd82;">CROSS_COMPILE</span>=arm-none-linux-gnueabi- <span style="color: #eedd82;">ARCH</span>=arm modules
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-1-3" class="outline-3">
+<h3 id="sec-1-3">Auto detection of Kernel Load Address and Run Time RAM Base Determination</h3>
+<div class="outline-text-3" id="text-1-3">
+
+<p>By default, the DM81xx kernel is built to be loaded at physical
+address 0x80008000 in RAM and take start of RAM as 0x80000000.
+</p>
+<p>
+It is possible to load the kernel at a different location in RAM with kernel automatically determining RAM base
+depending upon the load address.
+This is achieved by the combination of two features added the kernel:
+</p><ol>
+<li>Run time PHYS<sub>OFFSET</sub> determination: This feature enables determining physical to virtual translations
+</li>
+</ol>
+
+<p>dynamically depending upon the position of kernel in system memory.
+</p><ol>
+<li>Auto calculation of address for uncompressed kernel: This feature enables the compressed kernel entry code (part
+</li>
+</ol>
+
+<p>of kernel zImage) to determine the address to uncompress the kernel depending upon the location it is loaded
+(started from).
+</p>
+<ul>
+<li id="sec-1-3-1">Method 1<br/>
+
+
+
+<pre class="src src-sh">BUILDHOST$ make <span style="color: #eedd82;">ARCH</span>=arm ti8168_evm_defconfig
+BUILDHOST$ make <span style="color: #eedd82;">ARCH</span>=arm zImage
+Here we use 0x90008000 as the kernel load address and entry point
+BUILDHOST$ mkimage -A arm -O linux -T kernel -C none -a 0x90008000 -e 0x90008000 -n <span style="color: #ffa07a;">'Linux-2.6.37'</span> -d arch/arm/boot/zImage uImage
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-1-3-2">Alternate Method: Single Step Build<br/>
+
+
+
+<pre class="src src-sh">zreladdr-y=&lt;desired-load-address&gt; to make when building the uImage.
+BUILDHOST$ make <span style="color: #eedd82;">ARCH</span>=arm zreladdr-y=0x90008000 uImage
+</pre>
+
+
+</li>
+</ul>
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2">filesystem</h2>
+<div class="outline-text-2" id="text-2">
+
+
+</div>
+
+<div id="outline-container-2-1" class="outline-3">
+<h3 id="sec-2-1">Using The Correct Console Device</h3>
+<div class="outline-text-3" id="text-2-1">
+
+<p> update the <code>/etc/inittab</code> file in the filesystem used for kernel 
+</p>
+
+
+<pre class="src src-sh">S:2345:respawn:/sbin/getty 115200 ttyS2
+by,
+S:2345:respawn:/sbin/getty 115200 ttyO2
+</pre>
+
+</div>
 </div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-08-21 22:53:52 HKT</p>
+<p class="date">Date: 2012-08-22 11:36:58 HKT</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.09 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
