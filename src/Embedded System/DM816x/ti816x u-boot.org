@@ -34,7 +34,6 @@ out as shown below
 
 
 
-
 * Modify serial console UART port 
 =include/configs/ti8168_evm.h=
 #+begin_src c
@@ -134,6 +133,7 @@ TI8168_EVM# setenv bootargs 'console=ttyO0,115200n8 root=/dev/mmcblk0p2 mem=128M
 TI8168_EVM# bootm 0x81000000
 #+end_src
 ** Boot over Network (Ethernet)
+*** Overview
 When kernel image and ramdisk image are fetched from a tftp server:
 1. Ensure that the EVM is connected to network with DHCP and TFTP server set up
 2. Set 'ethaddr' U-Boot environment variable with proper ethernet address in format 'xx:xx:xx:xx:xx:xx' (replace 'xx'
@@ -187,7 +187,7 @@ TI8168_EVM# boot
 #+end_src
 
 
-*** Example 1
+*** Example 1 (dhcp)
 #+begin_src sh
 setenv bootdelay 4
 setenv baudrate 115200
@@ -198,7 +198,24 @@ setenv serverip 143.89.147.79
 setenv bootfile uImage
 #+end_src
 
-
+*** Example 2 (static ip)
++ host PC
+#+begin_src sh
+sudo  ifconfig eth0 10.2.1.10 netmask 255.255.255.0 up
+#+end_src
++ ti816x board
+#+begin_src sh
+setenv ipaddr 10.2.1.9
+setenv serverip 10.2.1.10
+setenv bootcmd 'tftpboot 0x81000000 uImage; bootm 0x81000000'
+setenv autoload no
+setenv bootargs 'mem=128M console=ttyO0,115200n8 root=/dev/nfs rw  nfsroot=10.2.1.10:/home/testbed/targetfs  ip=10.2.1.9:10.2.1.10:10.2.1.1:255.255.255.0::eth0:off'
+boot
+#+end_src
+or
+#+begin_src sh
+setenv bootargs 'console=ttyO0,115200n8 rootwait rw  mem=364M@0x80000000 mem=324M@0x9F900000 vmalloc=500M notifyk.vpssm3_sva=0xBF900000 root=/dev/nfs  nfsroot=10.2.1.10:/home/testbed/targetfs  ip=10.2.1.9:10.2.1.10:10.2.1.1:255.255.255.0::eth0:off'
+#+end_src
 
 
 
