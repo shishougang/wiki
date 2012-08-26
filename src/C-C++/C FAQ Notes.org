@@ -851,7 +851,6 @@ Here are two simple rules you can follow:
 No. Only /constant/ integral expressions with value 0 are guaranteed to
 indicate null pointers. 
 
-
 * 6. Arrays and Pointers
 ** Q6.5 Why can't I do something like this?
 #+begin_src c
@@ -1103,16 +1102,265 @@ arrays and pointers in C.
 	int narray = sizeof(array) / sizeof(array[0]);
 #+end_src
 * 7. Memory Allocation
-** Q7.
+** Q7.5a and Q7.5b 
+The difference between:
+
+#+begin_src c
+	char *itoa(int n)
+	{
+		char retbuf[20];		/* WRONG */
+		sprintf(retbuf, "%d", n);
+		return retbuf;			/* WRONG */
+	}
+#+end_src
+and
+#+begin_src c
+	char *itoa(int n)
+	{
+		char *retbuf = malloc(20);
+		if(retbuf != NULL)
+			sprintf(retbuf, "%d", n);
+		return retbuf;
+	}
+...
+	char *str = itoa(123);
+#+end_src
+   
+** Q7.14 I've heard that some operating systems don't actually allocate malloc'ed memory until the program tries to use it. Is this legal?
+ Lazy initialization
+
+Allocate-on-flush (also called delayed allocation) is a computer file
+system feature implemented in the HFS+, XFS, Reiser4, ZFS, Btrfs
+and ext4 file systems. The feature also closely resembles an older
+technique that Berkeley's UFS called "block reallocation".[fn:2]
+
+This has the effect of batching together allocations into larger runs.
+Such delayed processing reduces CPU usage, and tends to reduce disk
+fragmentation, especially for files which grow slowly. It can also
+help in keeping allocations contiguous when there are several files
+growing at the same time. When used in conjunction with copy on write
+as it is in ZFS, it can convert slow random writes into fast
+sequential writes.
+
+** Q7.28 Why doesn't sizeof tell me the size of the block of memory pointed to by a pointer?
+sizeof tells you the size of the pointer. There is no portable way to
+find out the size of a malloc'ed block. (Remember, too, that sizeof
+operates at compile time).
+** Q7.29 Having dynamically allocated an array (as in question 6.14), can I change its size?
+If =realloc= cannot find enough space at all, it returns a null pointer,
+and leaves the previous region allocated. [footnote] Therefore, you
+usually don't want to immediately assign the new pointer to the old
+variable. Instead, use a temporary pointer:
+#+begin_src c
+	#include <stdio.h>
+	#include <stdlib.h>
+
+	int *newarray = (int *)realloc((void *)dynarray, 20 * sizeof(int));
+	if(newarray != NULL)
+		dynarray = newarray;
+	else {
+		fprintf(stderr, "Can't reallocate memory\n");
+		/* dynarray remains allocated */
+	}
+#+end_src
+
+* 8. Characters and Strings
+** Q8.1 Why doesn't
+=strcat(string, '!');=
+work?
+
+There is a very real difference between characters and strings, and
+strcat concatenates strings
+
+=strcat(string, "!");=
+** Q8.8 I'm reading strings typed by the user into an array, and then printing them out later. When the user types a sequence like \n, why isn't it being handled properly?
+Character sequences like \n are interpreted at compile time. When a
+backslash and an adjacent n appear in a character constant or string
+literal, they are translated immediately into a single newline
+character. (Analogous translations occur, of course, for the other
+character escape sequences.) When you're reading strings from the user
+or a file, however, no interpretation like this is performed: a
+backslash is read and printed just like any other character, with no
+particular interpretation.
+** Q8.9 I think something's wrong with my compiler: I just noticed that =sizeof('a')= is 2, not 1 (i.e. not =sizeof(char)=).
+ Perhaps surprisingly, character constants in C are of type int, so
+ =sizeof('a')= is =sizeof(int)= (though this is another area where C++
+ differs).
+
+The point is that character constants are not of type char!
+sizeof(char) is 1, while sizeof(int) is 2 or 4 on most machines. Now,
+a constant like 'a', even though it looks like a character, is
+actually an integer as far as the compiler is concerned, so
+sizeof('a') == sizeof(int). 
+
+It's only confusing if you assume that character constants are chars.
+It makes perfect sense if you know the rule that ``character constants
+are of type int'', even if that rule doesn't seem to make much sense
+in itself.
+* 9. Boolean Expressions and Variables
+** Q9.
 
 
 
-** Lazy initialization
-http://en.wikipedia.org/wiki/Lazy_initialization
-http://en.wikipedia.org/wiki/XFS#Delayed_allocation
-http://en.wikipedia.org/wiki/Delayed_allocation
 
-http://h30097.www3.hp.com/docs/base_doc/DOCUMENTATION/V40F_HTML/AQTLLATE/DOCU_012.HTM
+* 18. Tools and Resources
+** C development tools
++ a C cross-reference generator
+  cflow, cxref, calls, cscope, xscope, or ixfw
++ a C beautifier/pretty-printer
+  cb, indent, GNU indent, or vgrind
++ a revision control or configuration management tool
+  CVS, RCS, or SCCS
++ a C source obfuscator (shrouder)
+  obfus, shroud, or opqcp
++ a ``make'' dependency generator
+  makedepend, or try cc -M or cpp -M
++ tools to compute code metrics
+  ccount, Metre, lcount, or csize; there is also a package sold by McCabe and Associates
++ a C lines-of-source counter
+  this can be done very crudely with the standard Unix utility wc, and somewhat better with grep -c ";"
++ a C declaration aid (cdecl)
+  check volume 14 of comp.sources.unix (see question 18.16) and K&R2
++ a prototype generator
+  see question 11.31
++ a tool to track down malloc problems
+  see question 18.2
++ a ``selective'' C preprocessor
+  see question 10.18
++ language translation tools
+  see questions 11.31 and 20.26
++ C verifiers (lint)
+  see question 18.7
++ a C compiler!
+  see question 18.3
+** track down malloc problems tools
+one popular one is Conor P. Cahill's ``dbmalloc'', posted to
+comp.sources.misc in 1992, volume 32. Others are ``leak'', available
+in volume 27 of the comp.sources.unix archives; JMalloc.c and
+JMalloc.h in the ``Snippets'' collection; MEMDEBUG from ftp.crpht.lu
+in pub/sources/memdebug ; and Electric Fence.
+** C tutorials 
++ Tom Torfs has a nice tutorial at http://cprog.tomsweb.net.
+
++ ``Notes for C programmers,'' by Christopher Sawtell, are available
+  by ftp from svr-ftp.eng.cam.ac.uk and garbo.uwasa.fi, or on the web
+  at www.fi.uib.no .
+
++ Tim Love's ``C for Programmers'' is available by ftp from
+  svr-ftp.eng.cam.ac.uk in the misc directory. An html version is at
+  http://www-h.eng.cam.ac.uk/help/tpl/languages/C/teaching_C/teaching_C.html.
+
++ The Coronado Enterprises C tutorials are available on Simtel mirrors
+  in pub/msdos/c or on the web at
+  http://www.coronadoenterprises.com/tutorials/c/index.html.
+
++ There is a web-based course by Steve Holmes at http://www.strath.ac.uk/IT/Docs/Ccourse/.
+
++ Martin Brown has C course material on the web at http://www-isis.ecs.soton.ac.uk/computing/c/Welcome.html.
+
++ On some Unix machines you can try typing ``learn c'' at the shell prompt (but the lessons may be quite dated).
+
++ Finally, the author of this FAQ list once taught a couple of C
+  classes and has placed their notes on the web; they are at
+  http://www.eskimo.com/~scs/cclass/cclass.html.
+
++ Several of these tutorials, plus a great deal of other information
+  about C, are accessible via the web at http://www.quut.com/c/.
+
++ Vinit Carpenter maintains a list of resources for learning C and
+  C++; it is posted to comp.lang.c and comp.lang.c++, and archived
+  where this FAQ list is (see question 20.40), or on the web at http://www.cyberdiem.com/vin/learn.html.
+
++ a list:  http://www.cyberdiem.com/vin/tutorials/
+** some good code examples to study
++ http://www.eskimo.com/~scs/src/
+
+** Numerical Recipes 
+http://www.numerical-recipes.com/public-domain.html
+** The GNU C Library (glibc)
+http://www.gnu.org/software/libc/
+** parse and evaluate expressions(packages are ``defunc,'')
+available from sunsite.unc.edu in
+pub/packages/development/libraries/defunc-1.3.tar.Z
+
+ftp://sunsite.unc.edu/pub/packages/development/libraries/
+** Ian Hay's recommended book list[fn:3]
+GENERAL INTRODUCTION/TUTORIAL: 
+
+1) For real beginners looking for a solid introduction: 
+
+C Programming: A Modern Approach. 
+K.N.King. 
+W.W.Norton & Company, 1996. 
+ISBN 0-393-96945-2 
+
+2) For somewhat more experienced users looking for a solid introduction: 
+
+The C Programming Language, 2nd Ed. 
+Kernigan & Ritchie. 
+Prentice Hall, 1988. 
+ISBN 0-13-110362-8 
+
+3) Other recommended introductory books: 
+
+C: How to Program, 2nd Ed. 
+Deitel, H.M. & Deitel, P.J. 
+Prentice Hall, 1994. 
+ISBN: 0-13-226119-7 
+
+
+REFERENCES: 
+
+C : A Reference Manual, 4th Ed. 
+Harbison & Steele. 
+Prentice Hall, 1995. 
+ISBN 0-13-326224-3 
+
+The Standard C Library. 
+P.J.Plauger. 
+Prentice Hall, 1992. 
+ISBN 0-13-131509-9 
+
+C Programming FAQs 
+Steve Summit 
+Addison-Wesley, 1996. 
+ISBN 0-201-84519-9 
+
+
+
+ADVANCED TOPICS / FUTHER EXPLORATION: 
+
+C Traps and Pitfalls. 
+Andrew Koenig. 
+Addison-Wesley, 1989. 
+ISBN 0-201-17928-8 
+
+Expert C Programming: Deep C Secrets 
+Peter Van Der Linden 
+Prentice Hall, 1994. 
+ISBN 0-13-177429-8 
+
+Practical C Programming. 
+Steve Oualline. 
+O'Reilly & Associates, 1993. 
+ISBN 1-56592-035-X 
+
+Problem Solving And Program Design In C, 2nd Ed. 
+Hanly & Koffman. 
+Addison-Wesley, 1996. 
+ISBN 0-201-59063-8 
+
+Algorithms in C, 3rd Ed. 
+Robert Sedgewick 
+Addison-Wesley, 1998. 
+ISBN 0-201-31452-5
+** code fragments and examples
+Bob Stout's popular ``SNIPPETS'' collection is available from
+ftp.brokersys.com in directory pub/snippets or on the web at
+http://www.brokersys.com/snippets/.
+
+Lars Wirzenius's ``publib'' library is available from ftp.funet.fi in
+directory pub/languages/C/Publib/.
 
 * strok
 http://www.cplusplus.com/reference/clibrary/cstring/strtok/
@@ -1128,5 +1376,7 @@ http://pubs.opengroup.org/onlinepubs/009695399/functions/qsort.html
 * Footnotes
 
 [fn:1] http://en.wikibooks.org/wiki/C_Programming/C_Reference/inttypes.h#cite_note-2
+
+[fn:2] http://en.wikipedia.org/wiki/Delayed_allocation
 
 
