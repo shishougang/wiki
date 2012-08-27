@@ -1197,11 +1197,154 @@ It's only confusing if you assume that character constants are chars.
 It makes perfect sense if you know the rule that ``character constants
 are of type int'', even if that rule doesn't seem to make much sense
 in itself.
-* 9. Boolean Expressions and Variables
-** Q9.
+* 10. C Preprocessor
+** Q10.3 How can I write a generic macro to swap two values?
+If you believe you have found a better solution to this problem, ask yourself:
++ Will it work on operands which are variables stored in registers? (That is, does it attempt to take the address of either of its operands?)
++ If it uses a temporary variable, what if the name of the temporary variable matches the name of one of the operands (or matches in the first 32 characters)?
++ Will it work if the operands are lvalue expressions (e.g. a[i])?
++ If it works on operands of only one type (or if it requires the caller to specify the type) is it truly generic?
++ Will it work in the limiting case of trying to swap something with itself?
+
+** Q10.4 What's the best way to write a multi-statement macro?
+The traditional solution, therefore, is to use
+#+begin_src c
+	#define MACRO(arg1, arg2) do {	\
+		/* declarations */	\
+		stmt1;			\
+		stmt2;			\
+		/* ... */		\
+		} while(0)	/* (no trailing ; ) */
+#+end_src
+When the caller appends a semicolon, this expansion becomes a single
+statement regardless of context.
+
+** Q10.5b What's the difference between
+	~const MAXSIZE = 100;~
+and
+	~#define MAXSIZE 100~
+
+A preprocessor =#define= gives you a true compile-time constant. In C,
+const gives you a run-time object which you're not supposed to try to
+modify; ``const'' really means ``readonly''.
+
+** Q10.7 Is it acceptable for one header file to #include another?
+ a popular trick along the lines of:
+#+begin_src c
+	#ifndef HFILENAME_USED
+	#define HFILENAME_USED
+	...header file contents...
+	#endif
+#+end_src
+(where a different bracketing macro name is used for each header file)
+makes a header file ``idempotent'' so that it can safely be #included
+multiple times; 
 
 
 
+
+
+
+** Q10.12 How can I construct preprocessor #if expressions which compare strings?
+ You can't do it directly; *preprocessor #if arithmetic uses only
+ integers*. An alternative is to #define several macros with symbolic
+ names and distinct integer values, and implement conditionals on
+ those:
+#+begin_src c
+	#define RED	1
+	#define BLUE	2
+	#define GREEN	3
+
+	#if COLOR == RED
+	/* red case */
+	#else
+	#if COLOR == BLUE
+	/* blue case */
+	#else
+	#if COLOR == GREEN
+	/* green case */
+	#else
+	/* default case */
+	#endif
+	#endif
+	#endif
+#+end_src
+(Standard C specifies a new #elif directive which makes if/else chains
+like these a bit cleaner.)
+
+** Q10.13 Does the sizeof operator work in preprocessor #if directives?
+   No. Preprocessing happens during an earlier phase of compilation,
+before type names have been parsed. Instead of sizeof, consider using
+the predefined constants in ANSI's =<limits.h>=, if applicable, or
+perhaps a ``configure'' script.
+
+The C89 standard divides translation into eight ``phases''. C99 keeps
+the same phases and just adds Unicode and the like. I will quote an
+old C99 draft below (with some small edits for text representation).
+Read [[phases][footnote]] carefully, and then consider the fact that ``#if''
+happens in phase 4, but pp-tokens are not converted to regular tokens
+until phase 7. Since the ``sizeof'' keyword is a regular token rather
+than a pp-token, that makes it impossible for ``#if'' to recognize it.
+In fact, the line:
+
+	~# if ((sizeof aszColors / sizeof *aszColors) != COLOR_NB)~
+
+must (in the absence of various #defines) behave as if it read:
+
+	~# if ((0 0 / 0 *0) != 0)~
+
+so a diagnostic is required (because ``0 0'' is a syntax error).
+
+#<<phases>> 
+The precedence among the syntax rules of translation is specified by
+the following phases.
+
+1.
+Physical source file multibyte characters are mapped to the source
+character set (introducing new-line characters for end-of-line
+indicators) if necessary. Any multibyte source file character not in
+the basic source character set is replaced by the
+universal-character-name that designates that multibyte character.[6]
+Then, trigraph sequences are replaced by corresponding
+single-character internal representations.
+
+2.
+Each instance of a backslash character immediately followed by a newline character is deleted, splicing physical source lines to form logical source lines. Only the last backslash on any physical source line shall be eligible for being part of such a splice. A source file that is not empty shall end in a new-line character, which shall not be immediately preceded by a backslash character before any such splicing takes place.
+
+3.
+The source file is decomposed into preprocessing tokens[7] and sequences of white-space characters (including comments). A source file shall not end in a partial preprocessing token or comment. Each comment is replaced by one space character. New-line characters are retained. Whether each nonempty sequence of white-space characters other than new-line is retained or replaced by one space character is implementation-defined.
+
+4.
+Preprocessing directives are executed, macro invocations are expanded, and pragma unary operator expressions are executed. If a character sequence that matches the syntax of a universal-character-name is produced by token concatenation (6.8.3.3), the behavior is undefined. A #include preprocessing directive causes the named header or source file to be processed from phase 1 through phase 4, recursively. All preprocessing directives are then deleted.
+
+5.
+Each source character set member, escape sequence, and universal-character-name in character constants and string literals is converted to a member of the execution character set.
+
+6.
+Adjacent character string literal tokens are concatenated and adjacent wide string literal tokens are concatenated.
+
+7.
+White-space characters separating tokens are no longer significant. Each preprocessing token is converted into a token. The resulting tokens are syntactically and semantically analyzed and translated as a translation unit.
+
+9.
+All external object and function references are resolved. Library components are linked to satisfy external references to functions and objects not defined in the current translation. All such translator output is collected into a program image which contains information needed for execution in its execution environment.
+
+__________[footnotes 5 through 7]
+
+5.
+Implementations must behave as if these separate phases occur, even though many are typically folded together in practice.
+
+6.
+The process of handling extended characters is specified in terms of mapping to an encoding that uses only the basic source character set, and, in the case of character literals and strings, further mapping to the execution character set. In practical terms, however, any internal encoding may be used, so long as an actual extended character encountered in the input, and the same extended character expressed in the input as a universal-character-name (i.e., using the \U or \u notation), are handled equivalently.
+
+7.
+As described in 6.1, the process of dividing a source file's
+characters into preprocessing tokens is context-dependent. For
+example, see the handling of < within a #include preprocessing
+directive.
+
+
+** 
 
 * 18. Tools and Resources
 ** C development tools

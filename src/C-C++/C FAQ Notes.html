@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="C FAQ Notes"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-08-15 14:58:45 HKT"/>
+<meta name="generated" content="2012-08-27 14:51:59 HKT"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -160,8 +160,51 @@
 <li><a href="#sec-6-4">Q6.11 I came across some ``joke'' code containing the ``expression'' 5["abcdef"] . How can this be legal C?</a></li>
 <li><a href="#sec-6-5">Q6.13 How do I declare a pointer to an array?</a></li>
 <li><a href="#sec-6-6">Q6.16 How can I dynamically allocate a multidimensional array?</a></li>
+<li><a href="#sec-6-7">Q6.20 How can I use statically- and dynamically-allocated multidimensional arrays interchangeably when passing them to functions?</a></li>
+<li><a href="#sec-6-8">Q6.23 I want to know how many elements are in an array, but sizeof yields the size in bytes.</a></li>
 </ul>
 </li>
+<li><a href="#sec-7">7. Memory Allocation</a>
+<ul>
+<li><a href="#sec-7-1">Q7.5a and Q7.5b</a></li>
+<li><a href="#sec-7-2">Q7.14 I've heard that some operating systems don't actually allocate malloc'ed memory until the program tries to use it. Is this legal?</a></li>
+<li><a href="#sec-7-3">Q7.28 Why doesn't sizeof tell me the size of the block of memory pointed to by a pointer?</a></li>
+<li><a href="#sec-7-4">Q7.29 Having dynamically allocated an array (as in question 6.14), can I change its size?</a></li>
+</ul>
+</li>
+<li><a href="#sec-8">8. Characters and Strings</a>
+<ul>
+<li><a href="#sec-8-1">Q8.1 Why doesn't</a></li>
+<li><a href="#sec-8-2">Q8.8 I'm reading strings typed by the user into an array, and then printing them out later. When the user types a sequence like \n, why isn't it being handled properly?</a></li>
+<li><a href="#sec-8-3">Q8.9 I think something's wrong with my compiler: I just noticed that <code>sizeof('a')</code> is 2, not 1 (i.e. not <code>sizeof(char)</code>).</a></li>
+</ul>
+</li>
+<li><a href="#sec-9">10. C Preprocessor</a>
+<ul>
+<li><a href="#sec-9-1">Q10.3 How can I write a generic macro to swap two values?</a></li>
+<li><a href="#sec-9-2">Q10.4 What's the best way to write a multi-statement macro?</a></li>
+<li><a href="#sec-9-3">Q10.5b What's the difference between</a></li>
+<li><a href="#sec-9-4">Q10.7 Is it acceptable for one header file to #include another?</a></li>
+<li><a href="#sec-9-5">Q10.12 How can I construct preprocessor #if expressions which compare strings?</a></li>
+<li><a href="#sec-9-6">Q10.13 Does the sizeof operator work in preprocessor #if directives?</a></li>
+</ul>
+</li>
+<li><a href="#sec-10">18. Tools and Resources</a>
+<ul>
+<li><a href="#sec-10-1">C development tools</a></li>
+<li><a href="#sec-10-2">track down malloc problems tools</a></li>
+<li><a href="#sec-10-3">C tutorials</a></li>
+<li><a href="#sec-10-4">some good code examples to study</a></li>
+<li><a href="#sec-10-5">Numerical Recipes</a></li>
+<li><a href="#sec-10-6">The GNU C Library (glibc)</a></li>
+<li><a href="#sec-10-7">parse and evaluate expressions(packages are ``defunc,'')</a></li>
+<li><a href="#sec-10-8">Ian Hay's recommended book list</a></li>
+<li><a href="#sec-10-9">code fragments and examples</a></li>
+</ul>
+</li>
+<li><a href="#sec-11">strok</a></li>
+<li><a href="#sec-12">strchr</a></li>
+<li><a href="#sec-13">qsort</a></li>
 </ul>
 </div>
 </div>
@@ -1544,8 +1587,6 @@ just a convenient name for it (see also question 5.13).
 <p>No. Only <i>constant</i> integral expressions with value 0 are guaranteed to
 indicate null pointers. 
 </p>
-
-
 </div>
 </div>
 
@@ -1771,6 +1812,914 @@ In either case (i.e for array1 or array2), the elements of the dynamic
         is a schematic illustration of the layout of array1 and
         array2: 
 <a href="#pic"><img src="array1.gif" alt="array1.gif"/></a>
+<a href="#pic"><img src="array2.gif" alt="array2.gif"/></a>
+</p>
+<p>
+If the double indirection implied by the above schemes is for some
+reason unacceptable,[footnote] you can simulate a two-dimensional
+array with a single, dynamically-allocated one-dimensional array:
+</p>
+<p>
+        <code>int *array3 = malloc(nrows * ncolumns * sizeof(int));</code>
+</p>
+<p>
+However, you must now perform subscript calculations manually, accessing the i,jth element with the expression
+</p>
+<p>
+<code>array3[i * ncolumns + j]</code>
+and this array cannot necessarily be passed to functions which expect
+multidimensional arrays. (A macro such as
+</p>
+<p>
+        <code>#define Arrayaccess(a, i, j) ((a)[(i) * ncolumns + (j)])</code>
+</p>
+<p>
+could hide the explicit calculation, but invoking it would require
+parentheses and commas which wouldn't look exactly like conventional C
+multidimensional array syntax, and the macro would need access to at
+least one of the dimensions, as well.)
+</p>
+<p>
+Yet another option is to use pointers to arrays:
+</p>
+<p>
+        <code>int (*array4)[NCOLUMNS] = malloc(nrows * sizeof(*array4));</code>
+</p>
+<p>
+or even
+        <code>int (*array5)[NROWS][NCOLUMNS] = malloc(sizeof(*array5));</code>
+</p>
+<p>
+but the syntax starts getting horrific (accesses to array5 look like
+<code>(*array5)[i][j])</code>, and at most one dimension may be specified at run
+time.
+</p>
+<p>
+With all of these techniques, you may of course need to remember to
+free the arrays when they are no longer needed; in the case of array1
+and array2 this takes several steps:
+</p>
+
+
+<pre class="src src-c"><span style="color: #00ffff;">for</span>(i = 0; i &lt; nrows; i++)
+        free((<span style="color: #98fb98;">void</span> *)array1[i]);
+free((<span style="color: #98fb98;">void</span> *)array1);
+
+free((<span style="color: #98fb98;">void</span> *)array2[0]);
+free((<span style="color: #98fb98;">void</span> *)array2);
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-6-7" class="outline-3">
+<h3 id="sec-6-7">Q6.20 How can I use statically- and dynamically-allocated multidimensional arrays interchangeably when passing them to functions?</h3>
+<div class="outline-text-3" id="text-6-7">
+
+<p> There is no single perfect method. Given the declarations
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">array</span>[NROWS][NCOLUMNS];
+<span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">array1</span>;                   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ragged </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">array2</span>;                   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">contiguous </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">array3</span>;                    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">"flattened" </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">int</span> (*<span style="color: #eedd82;">array4</span>)[NCOLUMNS];
+
+<span style="color: #98fb98;">int</span> (*<span style="color: #eedd82;">array5</span>)[NROWS][NCOLUMNS];
+</pre>
+
+<p>
+with the pointers initialized as in the code fragments in question
+6.16, and functions declared as
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">f1a</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>[][NCOLUMNS], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nrows</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ncolumns</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">f1b</span>(<span style="color: #98fb98;">int</span> (*<span style="color: #eedd82;">a</span>)[NCOLUMNS], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nrows</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ncolumns</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">f2</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">aryp</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nrows</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ncolumns</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">f3</span>(<span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">pp</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nrows</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ncolumns</span>);
+</pre>
+
+<p>
+where f1a and f1b accept conventional two-dimensional arrays, f2
+accepts a ``flattened'' two-dimensional array, and f3 accepts a
+pointer-to-pointer, simulated array, the following calls should work
+as expected:
+</p>
+
+
+<pre class="src src-c">f1a(array, NROWS, NCOLUMNS);
+f1b(array, NROWS, NCOLUMNS);
+f1a(array4, nrows, NCOLUMNS);
+f1b(array4, nrows, NCOLUMNS);
+
+f1(*array5, NROWS, NCOLUMNS);
+
+f2(&amp;array[0][0], NROWS, NCOLUMNS);
+f2(*array, NROWS, NCOLUMNS);
+f2(*array2, nrows, ncolumns);
+f2(array3, nrows, ncolumns);
+f2(*array4, nrows, NCOLUMNS);
+
+f2(**array5, NROWS, NCOLUMNS);
+
+f3(array1, nrows, ncolumns);
+f3(array2, nrows, ncolumns);
+</pre>
+
+<p>
+The following calls would probably work on most systems, but involve
+        questionable casts, and work only if the dynamic ncolumns
+        matches the static NCOLUMNS:
+</p>
+
+
+<pre class="src src-c">f1a((<span style="color: #98fb98;">int</span> (*)[NCOLUMNS])(*array2), nrows, ncolumns);
+f1a((<span style="color: #98fb98;">int</span> (*)[NCOLUMNS])(*array2), nrows, ncolumns);
+f1b((<span style="color: #98fb98;">int</span> (*)[NCOLUMNS])array3, nrows, ncolumns);
+f1b((<span style="color: #98fb98;">int</span> (*)[NCOLUMNS])array3, nrows, ncolumns);
+</pre>
+
+<p>
+It will be noticed that only f2 can conveniently be made to work with
+        both statically- and dynamically-allocated arrays, though it
+        will not work with the traditional ``ragged'' array
+        implementation, array1. However, it must also be noted that
+        passing <code>&amp;array[0][0]</code> (or, equivalently, *array) to f2 is not
+        strictly conforming; see question 6.19.
+</p>
+<p>
+If you can understand why all of the above calls work and are written
+as they are, and if you understand why the combinations that are not
+listed would not work, then you have a very good understanding of
+arrays and pointers in C.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-6-8" class="outline-3">
+<h3 id="sec-6-8">Q6.23 I want to know how many elements are in an array, but sizeof yields the size in bytes.</h3>
+<div class="outline-text-3" id="text-6-8">
+
+<p> Simply divide the size of the entire array by the size of one element:
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">array</span>[] = {1, 2, 3};
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">narray</span> = <span style="color: #00ffff;">sizeof</span>(array) / <span style="color: #00ffff;">sizeof</span>(array[0]);
+</pre>
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-7" class="outline-2">
+<h2 id="sec-7">7. Memory Allocation</h2>
+<div class="outline-text-2" id="text-7">
+
+
+</div>
+
+<div id="outline-container-7-1" class="outline-3">
+<h3 id="sec-7-1">Q7.5a and Q7.5b</h3>
+<div class="outline-text-3" id="text-7-1">
+
+<p>The difference between:
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">itoa</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>)
+{
+        <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">retbuf</span>[20];                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">WRONG </span><span style="color: #ff7f24;">*/</span>
+        sprintf(retbuf, <span style="color: #ffa07a;">"%d"</span>, n);
+        <span style="color: #00ffff;">return</span> retbuf;                  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">WRONG </span><span style="color: #ff7f24;">*/</span>
+}
+</pre>
+
+<p>
+and
+</p>
+
+
+<pre class="src src-c">        <span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">itoa</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>)
+        {
+                <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">retbuf</span> = malloc(20);
+                <span style="color: #00ffff;">if</span>(retbuf != <span style="color: #7fffd4;">NULL</span>)
+                        sprintf(retbuf, <span style="color: #ffa07a;">"%d"</span>, n);
+                <span style="color: #00ffff;">return</span> retbuf;
+        }
+...
+        <span style="color: #98fb98;">char</span> *str = itoa(123);
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-7-2" class="outline-3">
+<h3 id="sec-7-2">Q7.14 I've heard that some operating systems don't actually allocate malloc'ed memory until the program tries to use it. Is this legal?</h3>
+<div class="outline-text-3" id="text-7-2">
+
+<p> Lazy initialization
+</p>
+<p>
+Allocate-on-flush (also called delayed allocation) is a computer file
+system feature implemented in the HFS+, XFS, Reiser4, ZFS, Btrfs
+and ext4 file systems. The feature also closely resembles an older
+technique that Berkeley's UFS called "block reallocation".<sup><a class="footref" name="fnr.2" href="#fn.2">2</a></sup>
+</p>
+<p>
+This has the effect of batching together allocations into larger runs.
+Such delayed processing reduces CPU usage, and tends to reduce disk
+fragmentation, especially for files which grow slowly. It can also
+help in keeping allocations contiguous when there are several files
+growing at the same time. When used in conjunction with copy on write
+as it is in ZFS, it can convert slow random writes into fast
+sequential writes.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-7-3" class="outline-3">
+<h3 id="sec-7-3">Q7.28 Why doesn't sizeof tell me the size of the block of memory pointed to by a pointer?</h3>
+<div class="outline-text-3" id="text-7-3">
+
+<p>sizeof tells you the size of the pointer. There is no portable way to
+find out the size of a malloc'ed block. (Remember, too, that sizeof
+operates at compile time).
+</p></div>
+
+</div>
+
+<div id="outline-container-7-4" class="outline-3">
+<h3 id="sec-7-4">Q7.29 Having dynamically allocated an array (as in question 6.14), can I change its size?</h3>
+<div class="outline-text-3" id="text-7-4">
+
+<p>If <code>realloc</code> cannot find enough space at all, it returns a null pointer,
+and leaves the previous region allocated. [footnote] Therefore, you
+usually don't want to immediately assign the new pointer to the old
+variable. Instead, use a temporary pointer:
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+
+<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">newarray</span> = (<span style="color: #98fb98;">int</span> *)realloc((<span style="color: #98fb98;">void</span> *)dynarray, 20 * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>));
+<span style="color: #00ffff;">if</span>(newarray != <span style="color: #7fffd4;">NULL</span>)
+        dynarray = newarray;
+<span style="color: #00ffff;">else</span> {
+        fprintf(stderr, <span style="color: #ffa07a;">"Can't reallocate memory\n"</span>);
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">dynarray remains allocated </span><span style="color: #ff7f24;">*/</span>
+}
+</pre>
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-8" class="outline-2">
+<h2 id="sec-8">8. Characters and Strings</h2>
+<div class="outline-text-2" id="text-8">
+
+
+</div>
+
+<div id="outline-container-8-1" class="outline-3">
+<h3 id="sec-8-1">Q8.1 Why doesn't</h3>
+<div class="outline-text-3" id="text-8-1">
+
+<p><code>strcat(string, '!');</code>
+work?
+</p>
+<p>
+There is a very real difference between characters and strings, and
+strcat concatenates strings
+</p>
+<p>
+<code>strcat(string, "!");</code>
+</p></div>
+
+</div>
+
+<div id="outline-container-8-2" class="outline-3">
+<h3 id="sec-8-2">Q8.8 I'm reading strings typed by the user into an array, and then printing them out later. When the user types a sequence like \n, why isn't it being handled properly?</h3>
+<div class="outline-text-3" id="text-8-2">
+
+<p>Character sequences like \n are interpreted at compile time. When a
+backslash and an adjacent n appear in a character constant or string
+literal, they are translated immediately into a single newline
+character. (Analogous translations occur, of course, for the other
+character escape sequences.) When you're reading strings from the user
+or a file, however, no interpretation like this is performed: a
+backslash is read and printed just like any other character, with no
+particular interpretation.
+</p></div>
+
+</div>
+
+<div id="outline-container-8-3" class="outline-3">
+<h3 id="sec-8-3">Q8.9 I think something's wrong with my compiler: I just noticed that <code>sizeof('a')</code> is 2, not 1 (i.e. not <code>sizeof(char)</code>).</h3>
+<div class="outline-text-3" id="text-8-3">
+
+<p> Perhaps surprisingly, character constants in C are of type int, so
+ <code>sizeof('a')</code> is <code>sizeof(int)</code> (though this is another area where C++
+ differs).
+</p>
+<p>
+The point is that character constants are not of type char!
+sizeof(char) is 1, while sizeof(int) is 2 or 4 on most machines. Now,
+a constant like 'a', even though it looks like a character, is
+actually an integer as far as the compiler is concerned, so
+sizeof('a') == sizeof(int). 
+</p>
+<p>
+It's only confusing if you assume that character constants are chars.
+It makes perfect sense if you know the rule that ``character constants
+are of type int'', even if that rule doesn't seem to make much sense
+in itself.
+</p></div>
+</div>
+
+</div>
+
+<div id="outline-container-9" class="outline-2">
+<h2 id="sec-9">10. C Preprocessor</h2>
+<div class="outline-text-2" id="text-9">
+
+
+</div>
+
+<div id="outline-container-9-1" class="outline-3">
+<h3 id="sec-9-1">Q10.3 How can I write a generic macro to swap two values?</h3>
+<div class="outline-text-3" id="text-9-1">
+
+<p>If you believe you have found a better solution to this problem, ask yourself:
+</p><ul>
+<li>Will it work on operands which are variables stored in registers? (That is, does it attempt to take the address of either of its operands?)
+</li>
+<li>If it uses a temporary variable, what if the name of the temporary variable matches the name of one of the operands (or matches in the first 32 characters)?
+</li>
+<li>Will it work if the operands are lvalue expressions (e.g. a[i])?
+</li>
+<li>If it works on operands of only one type (or if it requires the caller to specify the type) is it truly generic?
+</li>
+<li>Will it work in the limiting case of trying to swap something with itself?
+</li>
+</ul>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-9-2" class="outline-3">
+<h3 id="sec-9-2">Q10.4 What's the best way to write a multi-statement macro?</h3>
+<div class="outline-text-3" id="text-9-2">
+
+<p>The traditional solution, therefore, is to use
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">MACRO</span>(<span style="color: #eedd82;">arg1</span>, <span style="color: #eedd82;">arg2</span>) <span style="color: #00ffff;">do</span> {  \
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">declarations </span><span style="color: #ff7f24;">*/</span>      \
+        stmt1;                  \
+        stmt2;                  \
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">... </span><span style="color: #ff7f24;">*/</span>               \
+        } <span style="color: #00ffff;">while</span>(0)      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">(no trailing ; ) </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+<p>
+When the caller appends a semicolon, this expansion becomes a single
+statement regardless of context.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-9-3" class="outline-3">
+<h3 id="sec-9-3">Q10.5b What's the difference between</h3>
+<div class="outline-text-3" id="text-9-3">
+
+<p>        <code>const MAXSIZE = 100;</code>
+and
+        <code>#define MAXSIZE 100</code>
+</p>
+<p>
+A preprocessor <code>#define</code> gives you a true compile-time constant. In C,
+const gives you a run-time object which you're not supposed to try to
+modify; ``const'' really means ``readonly''.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-9-4" class="outline-3">
+<h3 id="sec-9-4">Q10.7 Is it acceptable for one header file to #include another?</h3>
+<div class="outline-text-3" id="text-9-4">
+
+<p> a popular trick along the lines of:
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#if</span><span style="color: #b0c4de;">n</span><span style="color: #b0c4de;">def</span> HFILENAME_USED
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HFILENAME_USED</span>
+...header file contents...
+<span style="color: #b0c4de;">#endif</span>
+</pre>
+
+<p>
+(where a different bracketing macro name is used for each header file)
+makes a header file ``idempotent'' so that it can safely be #included
+multiple times; 
+</p>
+
+
+
+
+
+</div>
+
+</div>
+
+<div id="outline-container-9-5" class="outline-3">
+<h3 id="sec-9-5">Q10.12 How can I construct preprocessor #if expressions which compare strings?</h3>
+<div class="outline-text-3" id="text-9-5">
+
+<p> You can't do it directly; <b>preprocessor #if arithmetic uses only  integers</b>. An alternative is to #define several macros with symbolic
+ names and distinct integer values, and implement conditionals on
+ those:
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">RED</span>     1
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">BLUE</span>    2
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">GREEN</span>   3
+
+<span style="color: #b0c4de;">#if</span> COLOR == RED
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">red case </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #b0c4de;">#if</span> COLOR == BLUE
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">blue case </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #b0c4de;">#if</span> COLOR == GREEN
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">green case </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">default case </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#endif</span>
+<span style="color: #b0c4de;">#endif</span>
+<span style="color: #b0c4de;">#endif</span>
+</pre>
+
+<p>
+(Standard C specifies a new #elif directive which makes if/else chains
+like these a bit cleaner.)
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-9-6" class="outline-3">
+<h3 id="sec-9-6">Q10.13 Does the sizeof operator work in preprocessor #if directives?</h3>
+<div class="outline-text-3" id="text-9-6">
+
+<p>No. Preprocessing happens during an earlier phase of compilation,
+before type names have been parsed. Instead of sizeof, consider using
+the predefined constants in ANSI's <code>&lt;limits.h&gt;</code>, if applicable, or
+perhaps a ``configure'' script.
+</p>
+<p>
+The C89 standard divides translation into eight ``phases''. C99 keeps
+the same phases and just adds Unicode and the like. I will quote an
+old C99 draft below (with some small edits for text representation).
+Read <a href="#phases">footnote</a> carefully, and then consider the fact that ``#if''
+happens in phase 4, but pp-tokens are not converted to regular tokens
+until phase 7. Since the ``sizeof'' keyword is a regular token rather
+than a pp-token, that makes it impossible for ``#if'' to recognize it.
+In fact, the line:
+</p>
+<p>
+        <code># if ((sizeof aszColors / sizeof *aszColors) != COLOR_NB)</code>
+</p>
+<p>
+must (in the absence of various #defines) behave as if it read:
+</p>
+<p>
+        <code># if ((0 0 / 0 *0) != 0)</code>
+</p>
+<p>
+so a diagnostic is required (because ``0 0'' is a syntax error).
+</p>
+<p>
+<a name="phases" id="phases"></a>
+The precedence among the syntax rules of translation is specified by the following phases.[footnote 5]
+</p>
+<ol>
+<li>
+</li>
+</ol>
+
+<p>Physical source file multibyte characters are mapped to the source character set (introducing new-line characters for end-of-line indicators) if necessary. Any multibyte source file character not in the basic source character set is replaced by the universal-character-name that designates that multibyte character.<sup><a class="footref" name="fnr.3" href="#fn.3">3</a></sup> Then, trigraph sequences are replaced by corresponding single-character internal representations.
+</p><ol>
+<li>
+</li>
+</ol>
+
+<p>Each instance of a backslash character immediately followed by a newline character is deleted, splicing physical source lines to form logical source lines. Only the last backslash on any physical source line shall be eligible for being part of such a splice. A source file that is not empty shall end in a new-line character, which shall not be immediately preceded by a backslash character before any such splicing takes place.
+</p><ol>
+<li>
+</li>
+</ol>
+
+<p>The source file is decomposed into preprocessing tokens<sup><a class="footref" name="fnr.4" href="#fn.4">4</a></sup> and sequences of white-space characters (including comments). A source file shall not end in a partial preprocessing token or comment. Each comment is replaced by one space character. New-line characters are retained. Whether each nonempty sequence of white-space characters other than new-line is retained or replaced by one space character is implementation-defined.
+</p><ol>
+<li>
+</li>
+</ol>
+
+<p>Preprocessing directives are executed, macro invocations are expanded, and pragma unary operator expressions are executed. If a character sequence that matches the syntax of a universal-character-name is produced by token concatenation (6.8.3.3), the behavior is undefined. A #include preprocessing directive causes the named header or source file to be processed from phase 1 through phase 4, recursively. All preprocessing directives are then deleted.
+</p><ol>
+<li>
+</li>
+</ol>
+
+<p>Each source character set member, escape sequence, and universal-character-name in character constants and string literals is converted to a member of the execution character set.
+</p><ol>
+<li>
+</li>
+</ol>
+
+<p>Adjacent character string literal tokens are concatenated and adjacent wide string literal tokens are concatenated.
+</p><ol>
+<li>
+</li>
+</ol>
+
+<p>White-space characters separating tokens are no longer significant. Each preprocessing token is converted into a token. The resulting tokens are syntactically and semantically analyzed and translated as a translation unit.
+</p><ol>
+<li>
+</li>
+</ol>
+
+<p>All external object and function references are resolved. Library components are linked to satisfy external references to functions and objects not defined in the current translation. All such translator output is collected into a program image which contains information needed for execution in its execution environment.
+_________<sub>[footnotes</sub> 5 through 7]
+</p>
+<ol>
+<li>
+</li>
+</ol>
+
+<p>Implementations must behave as if these separate phases occur, even though many are typically folded together in practice.
+</p><ol>
+<li>
+</li>
+</ol>
+
+<p>The process of handling extended characters is specified in terms of mapping to an encoding that uses only the basic source character set, and, in the case of character literals and strings, further mapping to the execution character set. In practical terms, however, any internal encoding may be used, so long as an actual extended character encountered in the input, and the same extended character expressed in the input as a universal-character-name (i.e., using the \U or \u notation), are handled equivalently.
+</p><ol>
+<li>
+</li>
+</ol>
+
+<p>As described in 6.1, the process of dividing a source file's
+characters into preprocessing tokens is context-dependent. For
+example, see the handling of &lt; within a #include preprocessing
+directive.
+</p>
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-10" class="outline-2">
+<h2 id="sec-10">18. Tools and Resources</h2>
+<div class="outline-text-2" id="text-10">
+
+
+</div>
+
+<div id="outline-container-10-1" class="outline-3">
+<h3 id="sec-10-1">C development tools</h3>
+<div class="outline-text-3" id="text-10-1">
+
+<ul>
+<li>a C cross-reference generator
+  cflow, cxref, calls, cscope, xscope, or ixfw
+</li>
+<li>a C beautifier/pretty-printer
+  cb, indent, GNU indent, or vgrind
+</li>
+<li>a revision control or configuration management tool
+  CVS, RCS, or SCCS
+</li>
+<li>a C source obfuscator (shrouder)
+  obfus, shroud, or opqcp
+</li>
+<li>a ``make'' dependency generator
+  makedepend, or try cc -M or cpp -M
+</li>
+<li>tools to compute code metrics
+  ccount, Metre, lcount, or csize; there is also a package sold by McCabe and Associates
+</li>
+<li>a C lines-of-source counter
+  this can be done very crudely with the standard Unix utility wc, and somewhat better with grep -c ";"
+</li>
+<li>a C declaration aid (cdecl)
+  check volume 14 of comp.sources.unix (see question 18.16) and K&amp;R2
+</li>
+<li>a prototype generator
+  see question 11.31
+</li>
+<li>a tool to track down malloc problems
+  see question 18.2
+</li>
+<li>a ``selective'' C preprocessor
+  see question 10.18
+</li>
+<li>language translation tools
+  see questions 11.31 and 20.26
+</li>
+<li>C verifiers (lint)
+  see question 18.7
+</li>
+<li>a C compiler!
+  see question 18.3
+</li>
+</ul>
+
+</div>
+
+</div>
+
+<div id="outline-container-10-2" class="outline-3">
+<h3 id="sec-10-2">track down malloc problems tools</h3>
+<div class="outline-text-3" id="text-10-2">
+
+<p>one popular one is Conor P. Cahill's ``dbmalloc'', posted to
+comp.sources.misc in 1992, volume 32. Others are ``leak'', available
+in volume 27 of the comp.sources.unix archives; JMalloc.c and
+JMalloc.h in the ``Snippets'' collection; MEMDEBUG from ftp.crpht.lu
+in pub/sources/memdebug ; and Electric Fence.
+</p></div>
+
+</div>
+
+<div id="outline-container-10-3" class="outline-3">
+<h3 id="sec-10-3">C tutorials</h3>
+<div class="outline-text-3" id="text-10-3">
+
+<ul>
+<li>Tom Torfs has a nice tutorial at <a href="http://cprog.tomsweb.net">http://cprog.tomsweb.net</a>.
+
+</li>
+<li>``Notes for C programmers,'' by Christopher Sawtell, are available
+  by ftp from svr-ftp.eng.cam.ac.uk and garbo.uwasa.fi, or on the web
+  at www.fi.uib.no .
+
+</li>
+<li>Tim Love's ``C for Programmers'' is available by ftp from
+  svr-ftp.eng.cam.ac.uk in the misc directory. An html version is at
+  <a href="http://www-h.eng.cam.ac.uk/help/tpl/languages/C/teaching_C/teaching_C.html">http://www-h.eng.cam.ac.uk/help/tpl/languages/C/teaching_C/teaching_C.html</a>.
+
+</li>
+<li>The Coronado Enterprises C tutorials are available on Simtel mirrors
+  in pub/msdos/c or on the web at
+  <a href="http://www.coronadoenterprises.com/tutorials/c/index.html">http://www.coronadoenterprises.com/tutorials/c/index.html</a>.
+
+</li>
+<li>There is a web-based course by Steve Holmes at <a href="http://www.strath.ac.uk/IT/Docs/Ccourse/">http://www.strath.ac.uk/IT/Docs/Ccourse/</a>.
+
+</li>
+<li>Martin Brown has C course material on the web at <a href="http://www-isis.ecs.soton.ac.uk/computing/c/Welcome.html">http://www-isis.ecs.soton.ac.uk/computing/c/Welcome.html</a>.
+
+</li>
+<li>On some Unix machines you can try typing ``learn c'' at the shell prompt (but the lessons may be quite dated).
+
+</li>
+<li>Finally, the author of this FAQ list once taught a couple of C
+  classes and has placed their notes on the web; they are at
+  <a href="http://www.eskimo.com/~scs/cclass/cclass.html">http://www.eskimo.com/~scs/cclass/cclass.html</a>.
+
+</li>
+<li>Several of these tutorials, plus a great deal of other information
+  about C, are accessible via the web at <a href="http://www.quut.com/c/">http://www.quut.com/c/</a>.
+
+</li>
+<li>Vinit Carpenter maintains a list of resources for learning C and
+  C++; it is posted to comp.lang.c and comp.lang.c++, and archived
+  where this FAQ list is (see question 20.40), or on the web at <a href="http://www.cyberdiem.com/vin/learn.html">http://www.cyberdiem.com/vin/learn.html</a>.
+
+</li>
+<li>a list:  <a href="http://www.cyberdiem.com/vin/tutorials/">http://www.cyberdiem.com/vin/tutorials/</a>
+</li>
+</ul>
+
+</div>
+
+</div>
+
+<div id="outline-container-10-4" class="outline-3">
+<h3 id="sec-10-4">some good code examples to study</h3>
+<div class="outline-text-3" id="text-10-4">
+
+<ul>
+<li><a href="http://www.eskimo.com/~scs/src/">http://www.eskimo.com/~scs/src/</a>
+</li>
+</ul>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-10-5" class="outline-3">
+<h3 id="sec-10-5">Numerical Recipes</h3>
+<div class="outline-text-3" id="text-10-5">
+
+<p><a href="http://www.numerical-recipes.com/public-domain.html">http://www.numerical-recipes.com/public-domain.html</a>
+</p></div>
+
+</div>
+
+<div id="outline-container-10-6" class="outline-3">
+<h3 id="sec-10-6">The GNU C Library (glibc)</h3>
+<div class="outline-text-3" id="text-10-6">
+
+<p><a href="http://www.gnu.org/software/libc/">http://www.gnu.org/software/libc/</a>
+</p></div>
+
+</div>
+
+<div id="outline-container-10-7" class="outline-3">
+<h3 id="sec-10-7">parse and evaluate expressions(packages are ``defunc,'')</h3>
+<div class="outline-text-3" id="text-10-7">
+
+<p>available from sunsite.unc.edu in
+pub/packages/development/libraries/defunc-1.3.tar.Z
+</p>
+<p>
+<a href="ftp://sunsite.unc.edu/pub/packages/development/libraries/">ftp://sunsite.unc.edu/pub/packages/development/libraries/</a>
+</p></div>
+
+</div>
+
+<div id="outline-container-10-8" class="outline-3">
+<h3 id="sec-10-8">Ian Hay's recommended book list<sup><a class="footref" name="fnr.5" href="#fn.5">5</a></sup></h3>
+<div class="outline-text-3" id="text-10-8">
+
+<p>GENERAL INTRODUCTION/TUTORIAL: 
+</p>
+<ol>
+<li>For real beginners looking for a solid introduction: 
+</li>
+</ol>
+
+
+<p>
+C Programming: A Modern Approach. 
+K.N.King. 
+W.W.Norton &amp; Company, 1996. 
+ISBN 0-393-96945-2 
+</p>
+<ol>
+<li>For somewhat more experienced users looking for a solid introduction: 
+</li>
+</ol>
+
+
+<p>
+The C Programming Language, 2nd Ed. 
+Kernigan &amp; Ritchie. 
+Prentice Hall, 1988. 
+ISBN 0-13-110362-8 
+</p>
+<ol>
+<li>Other recommended introductory books: 
+</li>
+</ol>
+
+
+<p>
+C: How to Program, 2nd Ed. 
+Deitel, H.M. &amp; Deitel, P.J. 
+Prentice Hall, 1994. 
+ISBN: 0-13-226119-7 
+</p>
+
+<p>
+REFERENCES: 
+</p>
+<p>
+C : A Reference Manual, 4th Ed. 
+Harbison &amp; Steele. 
+Prentice Hall, 1995. 
+ISBN 0-13-326224-3 
+</p>
+<p>
+The Standard C Library. 
+P.J.Plauger. 
+Prentice Hall, 1992. 
+ISBN 0-13-131509-9 
+</p>
+<p>
+C Programming FAQs 
+Steve Summit 
+Addison-Wesley, 1996. 
+ISBN 0-201-84519-9 
+</p>
+
+
+<p>
+ADVANCED TOPICS / FUTHER EXPLORATION: 
+</p>
+<p>
+C Traps and Pitfalls. 
+Andrew Koenig. 
+Addison-Wesley, 1989. 
+ISBN 0-201-17928-8 
+</p>
+<p>
+Expert C Programming: Deep C Secrets 
+Peter Van Der Linden 
+Prentice Hall, 1994. 
+ISBN 0-13-177429-8 
+</p>
+<p>
+Practical C Programming. 
+Steve Oualline. 
+O'Reilly &amp; Associates, 1993. 
+ISBN 1-56592-035-X 
+</p>
+<p>
+Problem Solving And Program Design In C, 2nd Ed. 
+Hanly &amp; Koffman. 
+Addison-Wesley, 1996. 
+ISBN 0-201-59063-8 
+</p>
+<p>
+Algorithms in C, 3rd Ed. 
+Robert Sedgewick 
+Addison-Wesley, 1998. 
+ISBN 0-201-31452-5
+</p></div>
+
+</div>
+
+<div id="outline-container-10-9" class="outline-3">
+<h3 id="sec-10-9">code fragments and examples</h3>
+<div class="outline-text-3" id="text-10-9">
+
+<p>Bob Stout's popular ``SNIPPETS'' collection is available from
+ftp.brokersys.com in directory pub/snippets or on the web at
+<a href="http://www.brokersys.com/snippets/">http://www.brokersys.com/snippets/</a>.
+</p>
+<p>
+Lars Wirzenius's ``publib'' library is available from ftp.funet.fi in
+directory pub/languages/C/Publib/.
+</p>
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-11" class="outline-2">
+<h2 id="sec-11">strok</h2>
+<div class="outline-text-2" id="text-11">
+
+<p><a href="http://www.cplusplus.com/reference/clibrary/cstring/strtok/">http://www.cplusplus.com/reference/clibrary/cstring/strtok/</a>
+<a href="http://www.cnblogs.com/oomusou/archive/2009/05/10/c_strtok.html">http://www.cnblogs.com/oomusou/archive/2009/05/10/c_strtok.html</a>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-12" class="outline-2">
+<h2 id="sec-12">strchr</h2>
+<div class="outline-text-2" id="text-12">
+
+<p><a href="http://www.cplusplus.com/reference/clibrary/cstring/strchr/">http://www.cplusplus.com/reference/clibrary/cstring/strchr/</a>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-13" class="outline-2">
+<h2 id="sec-13">qsort</h2>
+<div class="outline-text-2" id="text-13">
+
+<p><a href="http://www.cplusplus.com/reference/clibrary/cstdlib/qsort/">http://www.cplusplus.com/reference/clibrary/cstdlib/qsort/</a>
+<a href="http://pubs.opengroup.org/onlinepubs/009695399/functions/qsort.html">http://pubs.opengroup.org/onlinepubs/009695399/functions/qsort.html</a>
 </p>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
@@ -1779,7 +2728,19 @@ In either case (i.e for array1 or array2), the elements of the dynamic
 </p>
 
 
-</div>
+<p class="footnote"><sup><a class="footnum" name="fn.2" href="#fnr.2">2</a></sup> <a href="http://en.wikipedia.org/wiki/Delayed_allocation">http://en.wikipedia.org/wiki/Delayed_allocation</a>
+</p>
+
+
+<p class="footnote"><sup><a class="footnum" name="fn.3" href="#fnr.3">3</a></sup> DEFINITION NOT FOUND: 6
+</p>
+
+<p class="footnote"><sup><a class="footnum" name="fn.4" href="#fnr.4">4</a></sup> DEFINITION NOT FOUND: 7
+</p>
+
+<p class="footnote"><sup><a class="footnum" name="fn.5" href="#fnr.5">5</a></sup> DEFINITION NOT FOUND: fn:3
+</p>
+
 </div>
 </div>
 
@@ -1788,7 +2749,7 @@ In either case (i.e for array1 or array2), the elements of the dynamic
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-08-15 14:58:45 HKT</p>
+<p class="date">Date: 2012-08-27 14:51:59 HKT</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.09 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
