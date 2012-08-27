@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="C FAQ Notes"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-08-27 14:51:59 HKT"/>
+<meta name="generated" content="2012-08-27 15:01:39 HKT"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -187,6 +187,7 @@
 <li><a href="#sec-9-4">Q10.7 Is it acceptable for one header file to #include another?</a></li>
 <li><a href="#sec-9-5">Q10.12 How can I construct preprocessor #if expressions which compare strings?</a></li>
 <li><a href="#sec-9-6">Q10.13 Does the sizeof operator work in preprocessor #if directives?</a></li>
+<li><a href="#sec-9-7"></a></li>
 </ul>
 </li>
 <li><a href="#sec-10">18. Tools and Resources</a>
@@ -2293,7 +2294,7 @@ like these a bit cleaner.)
 <h3 id="sec-9-6">Q10.13 Does the sizeof operator work in preprocessor #if directives?</h3>
 <div class="outline-text-3" id="text-9-6">
 
-<p>No. Preprocessing happens during an earlier phase of compilation,
+<p>   No. Preprocessing happens during an earlier phase of compilation,
 before type names have been parsed. Instead of sizeof, consider using
 the predefined constants in ANSI's <code>&lt;limits.h&gt;</code>, if applicable, or
 perhaps a ``configure'' script.
@@ -2322,56 +2323,66 @@ so a diagnostic is required (because ``0 0'' is a syntax error).
 </p>
 <p>
 <a name="phases" id="phases"></a>
-The precedence among the syntax rules of translation is specified by the following phases.[footnote 5]
+The precedence among the syntax rules of translation is specified by
+the following phases.
+</p>
+<p>
+<code>1.</code>
+Physical source file multibyte characters are mapped to the source
+character set (introducing new-line characters for end-of-line
+indicators) if necessary. Any multibyte source file character not in
+the basic source character set is replaced by the
+universal-character-name that designates that multibyte character.<sup><a class="footref" name="fnr.3" href="#fn.3">3</a></sup>
+Then, trigraph sequences are replaced by corresponding
+single-character internal representations.
+</p>
+<p>
+<code>2.</code>
+Each instance of a backslash character immediately followed by a newline character is deleted, splicing physical source lines to form logical source lines. Only the last backslash on any physical source line shall be eligible for being part of such a splice. A source file that is not empty shall end in a new-line character, which shall not be immediately preceded by a backslash character before any such splicing takes place.
 </p>
 <ol>
 <li>
 </li>
 </ol>
 
-<p>Physical source file multibyte characters are mapped to the source character set (introducing new-line characters for end-of-line indicators) if necessary. Any multibyte source file character not in the basic source character set is replaced by the universal-character-name that designates that multibyte character.<sup><a class="footref" name="fnr.3" href="#fn.3">3</a></sup> Then, trigraph sequences are replaced by corresponding single-character internal representations.
-</p><ol>
-<li>
-</li>
-</ol>
-
-<p>Each instance of a backslash character immediately followed by a newline character is deleted, splicing physical source lines to form logical source lines. Only the last backslash on any physical source line shall be eligible for being part of such a splice. A source file that is not empty shall end in a new-line character, which shall not be immediately preceded by a backslash character before any such splicing takes place.
-</p><ol>
-<li>
-</li>
-</ol>
-
 <p>The source file is decomposed into preprocessing tokens<sup><a class="footref" name="fnr.4" href="#fn.4">4</a></sup> and sequences of white-space characters (including comments). A source file shall not end in a partial preprocessing token or comment. Each comment is replaced by one space character. New-line characters are retained. Whether each nonempty sequence of white-space characters other than new-line is retained or replaced by one space character is implementation-defined.
-</p><ol>
+</p>
+<ol>
 <li>
 </li>
 </ol>
 
 <p>Preprocessing directives are executed, macro invocations are expanded, and pragma unary operator expressions are executed. If a character sequence that matches the syntax of a universal-character-name is produced by token concatenation (6.8.3.3), the behavior is undefined. A #include preprocessing directive causes the named header or source file to be processed from phase 1 through phase 4, recursively. All preprocessing directives are then deleted.
-</p><ol>
+</p>
+<ol>
 <li>
 </li>
 </ol>
 
 <p>Each source character set member, escape sequence, and universal-character-name in character constants and string literals is converted to a member of the execution character set.
-</p><ol>
+</p>
+<ol>
 <li>
 </li>
 </ol>
 
 <p>Adjacent character string literal tokens are concatenated and adjacent wide string literal tokens are concatenated.
-</p><ol>
+</p>
+<ol>
 <li>
 </li>
 </ol>
 
 <p>White-space characters separating tokens are no longer significant. Each preprocessing token is converted into a token. The resulting tokens are syntactically and semantically analyzed and translated as a translation unit.
-</p><ol>
+</p>
+<ol>
 <li>
 </li>
 </ol>
 
 <p>All external object and function references are resolved. Library components are linked to satisfy external references to functions and objects not defined in the current translation. All such translator output is collected into a program image which contains information needed for execution in its execution environment.
+</p>
+<p>
 _________<sub>[footnotes</sub> 5 through 7]
 </p>
 <ol>
@@ -2380,13 +2391,15 @@ _________<sub>[footnotes</sub> 5 through 7]
 </ol>
 
 <p>Implementations must behave as if these separate phases occur, even though many are typically folded together in practice.
-</p><ol>
+</p>
+<ol>
 <li>
 </li>
 </ol>
 
 <p>The process of handling extended characters is specified in terms of mapping to an encoding that uses only the basic source character set, and, in the case of character literals and strings, further mapping to the execution character set. In practical terms, however, any internal encoding may be used, so long as an actual extended character encountered in the input, and the same extended character expressed in the input as a universal-character-name (i.e., using the \U or \u notation), are handled equivalently.
-</p><ol>
+</p>
+<ol>
 <li>
 </li>
 </ol>
@@ -2396,6 +2409,15 @@ characters into preprocessing tokens is context-dependent. For
 example, see the handling of &lt; within a #include preprocessing
 directive.
 </p>
+
+</div>
+
+</div>
+
+<div id="outline-container-9-7" class="outline-3">
+<h3 id="sec-9-7"></h3>
+<div class="outline-text-3" id="text-9-7">
+
 
 </div>
 </div>
@@ -2749,7 +2771,7 @@ directory pub/languages/C/Publib/.
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-08-27 14:51:59 HKT</p>
+<p class="date">Date: 2012-08-27 15:01:39 HKT</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.09 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

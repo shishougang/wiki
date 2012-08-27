@@ -1299,7 +1299,7 @@ so a diagnostic is required (because ``0 0'' is a syntax error).
 The precedence among the syntax rules of translation is specified by
 the following phases.
 
-1.
+=1.=
 Physical source file multibyte characters are mapped to the source
 character set (introducing new-line characters for end-of-line
 indicators) if necessary. Any multibyte source file character not in
@@ -1308,44 +1308,355 @@ universal-character-name that designates that multibyte character.[6]
 Then, trigraph sequences are replaced by corresponding
 single-character internal representations.
 
-2.
+=2.=
 Each instance of a backslash character immediately followed by a newline character is deleted, splicing physical source lines to form logical source lines. Only the last backslash on any physical source line shall be eligible for being part of such a splice. A source file that is not empty shall end in a new-line character, which shall not be immediately preceded by a backslash character before any such splicing takes place.
 
-3.
+=3.= 
 The source file is decomposed into preprocessing tokens[7] and sequences of white-space characters (including comments). A source file shall not end in a partial preprocessing token or comment. Each comment is replaced by one space character. New-line characters are retained. Whether each nonempty sequence of white-space characters other than new-line is retained or replaced by one space character is implementation-defined.
 
-4.
+=4.=
 Preprocessing directives are executed, macro invocations are expanded, and pragma unary operator expressions are executed. If a character sequence that matches the syntax of a universal-character-name is produced by token concatenation (6.8.3.3), the behavior is undefined. A #include preprocessing directive causes the named header or source file to be processed from phase 1 through phase 4, recursively. All preprocessing directives are then deleted.
 
-5.
+=5.=
 Each source character set member, escape sequence, and universal-character-name in character constants and string literals is converted to a member of the execution character set.
 
-6.
+=6.=
 Adjacent character string literal tokens are concatenated and adjacent wide string literal tokens are concatenated.
 
-7.
+=7.=
 White-space characters separating tokens are no longer significant. Each preprocessing token is converted into a token. The resulting tokens are syntactically and semantically analyzed and translated as a translation unit.
 
-9.
+=9.=
 All external object and function references are resolved. Library components are linked to satisfy external references to functions and objects not defined in the current translation. All such translator output is collected into a program image which contains information needed for execution in its execution environment.
 
 __________[footnotes 5 through 7]
 
-5.
+=5.=
 Implementations must behave as if these separate phases occur, even though many are typically folded together in practice.
 
-6.
+=6.=
 The process of handling extended characters is specified in terms of mapping to an encoding that uses only the basic source character set, and, in the case of character literals and strings, further mapping to the execution character set. In practical terms, however, any internal encoding may be used, so long as an actual extended character encountered in the input, and the same extended character expressed in the input as a universal-character-name (i.e., using the \U or \u notation), are handled equivalently.
 
-7.
+=7.=
 As described in 6.1, the process of dividing a source file's
 characters into preprocessing tokens is context-dependent. For
 example, see the handling of < within a #include preprocessing
 directive.
 
+** Q10.15 Is there anything like an #ifdef for typedefs?
+Unfortunately, no. (There can't be, because types and typedefs haven't
+been parsed at preprocessing time.) You may have to keep sets of
+preprocessor macros (e.g. MY_TYPE_DEFINED) recording whether certain
+typedefs have been declared.
+** Q10.16 How can I use a preprocessor #if expression to tell whether a machine's byte order is big-endian or little-endian?
+You probably can't. The usual techniques for detecting endianness
+involve pointers or arrays of char, or maybe unions, but preprocessor
+arithmetic uses only long integers, and there is no concept of
+addressing. Another tempting possibility is something like
 
-** 
+	~#if 'ABCD' == 0x41424344~
 
+but this isn't reliable, either. At any rate, the integer formats used
+in preprocessor #if expressions are not necessarily the same as those
+that will be used at run time.
+** Q10.19 How can I list all of the predefined identifiers?
+There's no standard way, although it is a common need. =gcc= provides a
+=-dM= option which works with =-E=.
+
+Here is what I believe is what Gisbert Selke described as ``Cave
+Newt's shell script `defines' which undertakes a valiant approach at
+finding out.
+
+[[./what-defs.sh][what-defs.sh]]
+** Q10.20 I have some old code that tries to construct identifiers with a macro like
+~#define Paste(a, b) a/**/b~
+but it doesn't work any more.
+
+However, since the need for pasting tokens was demonstrated and real, ANSI introduced a well-defined token-pasting operator, ##, which can be used like this:
+
+	~#define Paste(a, b) a##b~
+** Q10.27 How can I include expansions of the __FILE__ and __LINE__ macros in a general-purpose debugging macro?
+One solution involves writing your debug macro in terms of a varargs
+function, and an auxiliary function which stashes the values of
+__FILE__ and __LINE__ away in static variables, as in:
+
+#+begin_src c
+#include <stdio.h>
+#include <stdarg.h>
+
+void debug(const char *, ...);
+void dbginfo(int, const char *);
+#define DEBUG dbginfo(__LINE__, __FILE__), debug
+
+static const char *dbgfile;
+static int dbgline;
+
+void dbginfo(int line, const char *file)
+{
+	dbgfile = file;
+	dbgline = line;
+}
+
+void debug(const char *fmt, ...)
+{
+	va_list argp;
+	fprintf(stderr, "DEBUG: \"%s\", line %d: ", dbgfile, dbgline);
+	va_start(argp, fmt);
+	vfprintf(stderr, fmt, argp);
+	va_end(argp);
+	fprintf(stderr, "\n");
+}
+#+end_src
+With this machinery in place, a call to
+#+begin_src c
+	DEBUG("i is %d", i);
+#+end_src
+expands to
+#+begin_src c
+	dbginfo(__LINE__, __FILE__), debug("i is %d", i);
+#+end_src
+and prints something like
+#+begin_src sh
+	DEBUG: "x.c", line 10: i is 42
+#+end_src
+A cunning improvement is the idea of having the stashing function
+return a pointer to the bona-fide varargs function:
+
+#+begin_src c
+void debug(const char *, ...);
+void (*dbginfo(int, const char *))(const char *, ...);
+#define DEBUG (*dbginfo(__LINE__, __FILE__))
+
+void (*dbginfo(int line, const char *file))(const char *, ...)
+{
+	dbgfile = file;
+	dbgline = line;
+	return debug;
+}
+#+end_src
+With these definitions,
+#+begin_src c
+	DEBUG("i is %d", i);
+#+end_src
+gets expanded to
+#+begin_src c
+	(*dbginfo(__LINE__, __FILE__))("i is %d", i);
+#+end_src
+Another, perhaps easier way might simply be to
+#+begin_src c
+	#define DEBUG printf("DEBUG: \"%s\", line %d: ", \
+		__FILE__,__LINE__),printf
+#+end_src
+Now,
+	=DEBUG("i is %d", i);=
+simply expands to
+#+begin_src c
+	printf("DEBUG: \"%s\", line %d: ",
+		__FILE__,__LINE__),printf("i is %d", i);
+#+end_src
+* 11. ANSI/ISO Standard C
+** Q11.8 I don't understand why I can't use const values in initializers and array dimensions, as in
+#+begin_src c
+	const int n = 5;
+	int a[n];
+#+end_src
+
+The =const= qualifier really means ``read-only''; an object so qualified
+is a run-time object which cannot (normally) be assigned to. The value
+of a const-qualified object is therefore not a constant expression in
+the full sense of the term, and cannot be used for array dimensions,
+case labels, and the like. (C is unlike C++ in this regard.) When you
+need a true compile-time constant, use a preprocessor #define (or
+perhaps an enum).
+** Q11.9 What's the difference between const char *p, char const *p, and char * const p?
+ The first two are interchangeable; they declare a pointer to a
+ constant character (you can't change any pointed-to characters).
+ ~char * const p~ declares a constant pointer to a (variable) character
+ (i.e. you can't change the pointer).
+** Q11.10 Why can't I pass a char ** to a function which expects a const char **?
+ You can use a pointer-to-T (for any type T) where a
+ pointer-to-const-T is expected. However, the rule (an explicit
+ exception) which permits slight mismatches in qualified pointer types
+ is not applied recursively, but only at the top level. (const char **
+ is pointer-to-pointer-to-const-char, and the exception therefore does
+ not apply.)
+
+The reason that you cannot assign a char ** value to a const char **
+pointer is somewhat obscure. Given that the const qualifier exists at
+all, the compiler would like to help you keep your promises not to
+modify const values. That's why you can assign a char * to a const
+char *, but not the other way around: it's clearly safe to ``add''
+const-ness to a simple pointer, but it would be dangerous to take it
+away. However, suppose you performed the following more complicated
+series of assignments:
+
+#+begin_src c
+	const char c = 'x';		/* 1 */
+	char *p1;			/* 2 */
+	const char **p2 = &p1;		/* 3 */
+	*p2 = &c;			/* 4 */
+	*p1 = 'X';			/* 5 */
+#+end_src
+In line 3, we assign a =char **= to a =const char **=. (The compiler
+should complain.) In line 4, we assign a =const char *= to a =const
+char *=; this is clearly legal. In line 5, we modify what a =char *= points
+to--this is supposed to be legal. However, p1 ends up pointing to c,
+which is const. This came about in line 4, because =*p2= was really =p1=.
+This was set up in line 3, which is an assignment of a form that is
+disallowed, and this is exactly why line 3 is disallowed.
+
+Assigning a =char **= to a =const char **= (as in line 3, and in the
+original question) is not immediately dangerous. But it sets up a
+situation in which p2's promise--that the ultimately-pointed-to value
+won't be modified--cannot be kept.
+
+(C++ has more complicated rules for assigning const-qualified pointers
+which let you make more kinds of assignments without incurring
+warnings, but still protect against inadvertent attempts to modify
+const values. C++ would still not allow assigning a char ** to a const
+char **, but it would let you get away with assigning a char ** to a
+const char * const *.)
+
+In C, if you must assign or pass pointers which have qualifier
+mismatches at other than the first level of indirection, you must use
+explicit casts (e.g. (const char **) in this case), although as
+always, the need for such a cast may indicate a deeper problem which
+the cast doesn't really fix.
+
+** Q11.11 I've got the declarations
+#+begin_src c
+	typedef char *charp;
+	const charp p;
+#+end_src
+Why is p turning out const, instead of the characters pointed to?
+
+typedef substitutions are not purely textual. (This is one of the
+advantages of typedefs; see question 1.13.) In the declaration
+
+	=const charp p;=
+
+p is const for the same reason that =const int i= declares i as const.
+The typedef'ed declaration of p does not ``look inside'' the typedef
+to see that there is a pointer involved.
+
+** Q11.16  Is exit(status) truly equivalent to returning the same status from main?
+ Yes and no. The Standard says that a return from the initial call to
+ main is equivalent to calling exit. However, a return from main
+ cannot be expected to work if data local to main might be needed
+ during cleanup. A few very old, nonconforming
+ systems may once have had problems with one or the other form.
+ (Finally, the two forms are obviously not equivalent in a recursive
+ call to main.)
+** Q11.17 I'm trying to use the ANSI ``stringizing'' preprocessing operator `#' to insert the value of a symbolic constant into a message, but it keeps stringizing the macro's name rather than its value.
+It turns out that the definition of # says that it's supposed to stringize a macro argument immediately, without further expanding it (if the argument happens to be the name of another macro). You can use something like the following two-step procedure to force a macro to be expanded as well as stringized:
+#+begin_src c
+#define Str(x) #x
+#define Xstr(x) Str(x)
+#define OP plus
+char *opname = Xstr(OP);
+#+end_src
+This code sets opname to "plus" rather than "OP". (It works because
+the Xstr() macro expands its argument, and then Str() stringizes it.)
+
+An equivalent circumlocution is necessary with the token-pasting
+operator ## when the values (rather than the names) of two macros are
+to be concatenated.
+
+Note that both # and ## operate only during preprocessor macro
+expansion. You cannot use them in normal source code, but only in
+macro definitions.
+** Q11.18 What does the message ``warning: macro replacement within a string literal'' mean?
+When you do want to turn macro arguments into strings, you can use the
+new # preprocessing operator, along with string literal concatenation
+(another new ANSI feature):
+#+begin_src c
+	#define TRACE(var, fmt) \
+		printf("TRACE: " #var " = " #fmt "\n", var)
+#+end_src
+** Q11.20 What are #pragmas and what are they good for?
+The #pragma directive provides a single, well-defined ``escape hatch''
+which can be used for all sorts of (nonportable)
+implementation-specific controls and extensions: source listing
+control, structure packing, warning suppression (like lint's old /*
+NOTREACHED */ comments), etc.
+** Q11.25 What's the difference between =memcpy= and =memmove=?
+ memmove offers guaranteed behavior if the memory regions pointed to
+ by the source and destination arguments overlap. memcpy makes no such
+ guarantee, and may therefore be more efficiently implementable. When
+ in doubt, it's safer to use memmove.
+
+It seems simple enough to implement memmove; the overlap guarantee
+apparently requires only an additional test:
+
+#+begin_src c
+void *memmove(void *dest, void const *src, size_t n)
+{
+	register char *dp = dest;
+	register char const *sp = src;
+	if(dp < sp) {
+		while(n-- > 0)
+			*dp++ = *sp++;
+	} else {
+		dp += n;
+		sp += n;
+		while(n-- > 0)
+			*--dp = *--sp;
+	}
+
+	return dest;
+}
+#+end_src
+The problem with this code is in that additional test: the comparison
+(dp < sp) is not quite portable (it compares two pointers which do not
+necessarily point within the same object) and may not be as cheap as
+it looks. On some machines (particularly segmented architectures), it
+may be tricky and significantly less efficient [footnote] to
+implement.
+
+** Q11.26 What should malloc(0) do? Return a null pointer or a pointer to 0 bytes?
+ The ANSI/ISO Standard says that it may do either; the behavior is
+ implementation-defined . Portable code must
+ either take care not to call malloc(0), or be prepared for the
+ possibility of a null return.
+** Q11.33 People seem to make a point of distinguishing between implementation-defined, unspecified, and undefined behavior. What do these mean?
+ First of all, all three of these represent areas in which the C
+ Standard does not specify exactly what a particular construct, or a
+ program which uses it, must do. This looseness in C's definition is
+ traditional and deliberate: it permits compiler writers to (a) make
+ choices which allow efficient code to be generated by arranging that
+ various constructs are implemented as ``however the hardware does
+ them'', and (b) ignore (that is, avoid
+ worrying about generating correct code for) certain marginal
+ constructs which are too difficult to define precisely and which
+ probably aren't useful to well-written programs anyway.
+
+These three variations on ``not precisely defined by the standard'' are defined as:
+
+ *implementation-defined:* The implementation must pick some behavior; it may not fail to compile the program. (The program using the construct is not incorrect.) The choice must be documented. The Standard may specify a set of allowable behaviors from which to choose, or it may impose no particular requirements.
+
+ *unspecified:* Like implementation-defined, except that the choice need not be documented.
+
+ *undefined:* Anything at all can happen; the Standard imposes no
+requirements. The program may fail to compile, or it may execute
+incorrectly (either crashing or silently generating incorrect
+results), or it may fortuitously do exactly what the programmer
+intended.
+
+** Q11.33b  What does it really mean for a program to be ``legal'' or ``valid'' or ``conforming''?
+ Simply stated, the Standard talks about three kinds of conformance: conforming programs, strictly conforming programs, and conforming implementations.
+
+A =conforming program= is one that is accepted by a conforming implementation.
+
+A =strictly conforming program= is one that does not depend on any implementation-defined, unspecified, or undefined behavior, that does not exceed any implementation limits, and that otherwise uses only the features of the language and library as specified in the Standard.
+
+A =conforming implementation= is one that does everything the Standard says it's supposed to. (The way the Standard says this is that a conforming implementation ``shall accept any strictly conforming program''.) There are two kinds of conforming implementation: hosted and freestanding. A hosted implementation is intended for use with conventional application programs; a freestanding implementation is intended for use with embedded systems and the like, and is not required to supply all of the standard library functions.
+
+Unfortunately, neither of the definitions relating to conforming programs are as practically useful as one might wish. There are very few realistic, useful, strictly conforming programs. On the other hand, a merely conforming program can make use of any compiler-specific extension it wants to.
+
+Other words you may hear are ``compliant'' and ``conformant'' which
+are basically just synonyms for ``conforming''.
+* 12. Stdio
+** Q
 * 18. Tools and Resources
 ** C development tools
 + a C cross-reference generator
