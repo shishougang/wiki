@@ -30,7 +30,7 @@
          :base-directory ,note-root-dir
          :publishing-directory ,note-publish-dir
          :recursive t
-         :base-extension "css\\|js\\|png\\|jpg\\|gif\\|pdf\\|mp3\\|swf\\|zip\\|gz\\|txt\\|el"
+         :base-extension "css\\|js\\|png\\|jpg\\|gif\\|pdf\\|mp3\\|swf\\|zip\\|gz\\|txt\\|el\\|sh\\|bz2"
          :publishing-function org-publish-attachment)
 
 
