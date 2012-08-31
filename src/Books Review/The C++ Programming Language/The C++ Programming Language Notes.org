@@ -94,12 +94,338 @@ called a container class, or simply a container.
 /Templates/ are a *compile-time mechanism* so that their use incurs no
 run-time overhead compared to ‘‘handwritten code.’’
 
-
 * Chapter 3 A Tour of the Standard Library
+** 3.5.1 CStyle Strings
+To call functions that take C-style strings, we need to be able to
+extract the value of a =string= in the form of a C-style string. The
+=c_str()= function does that.
+** 3.7 Containers
+A class with the main purpose of holding objects is commonly called a /container/.
+*** 3.7.3 List
+Every standard library container provides the functions =begin()=
+and =end()=, which return an iterator to the first and to
+one-past-the-last element, respectively (§16.3.2).
+
+When we don’t need to modify an element of the container,
+=const_iterator= is the type we want. Otherwise, we use the plain =iterator= type (§16.3.1).
+
+*** 3.7.5 Standard Containers
+#+begin_verse
+ *Standard Container Summary*
+=vecotr<T>=           A variable-sized vector (§16.3)
+=list<T>=             A doubly-linked list (§17.2.2)
+=queue<T>=            A queue (§17.3.2)
+=stack<T>=            A stack (§17.3.1)
+=deque<T>=            A double-ended queue (§17.2.3)
+=priority queue<T>=   A queue sorted by value (§17.3.3)
+=set<T>=              A set (§17.4.3)
+=multiset<T>=         A set in which a value can occur many times (§17.4.4)
+=map<key,val>=        An associative array (§17.4.1)
+=multimap<key,val>=    A map in which a key can occur many times (§17.4.2)
+#+end_verse
+
+** 3.8
+*** 3.8.2 Iterator Types
+Any particular iterator is an object of some type. There are, however,
+many different iterator types because an iterator needs to hold the information necessary for doing
+its job for a particular container type. These iterator types can be as different as the containers and
+the specialized needs they serve.
+
+In fact, any object that obeys a few simple rules like these is an iterator (§19.2.1).
+*** 3.8.4 Traversals and Predicates
+#+begin_src c++
+  bool gt_42(const pair<const string, int>& r)
+  {
+    return r.second > 42;
+  }
+  
+  void g(const map<string, int>& m)
+  {
+    int c42 = conunt_if(m.begin(), m.end(), gt_42);
+  }
+#+end_src
+A function, such as gt_42(), that is used to control the algorithm is
+called a /predicate/. A /predicate/ is called for each element and
+returns a Boolean value, which the algorithm uses to perform its
+intended action.
+
+#+begin_src c++
+  void g(list<Shape *>& sh)
+  {
+    for_each(sh.begin(), sh.end(), mem_fun(&Shape::draw));
+  }
+#+end_src
+The standard library mem_fun() template (§18.4.4.2) takes a pointer to a member function (§15.5)
+as its argument and produces something that can be called for a pointer to the member’s class. The
+result of mem_fun (&Shape::draw) takes a Shape * argument and returns
+whatever Shape::draw() returns.
+*** 3.8.6 Standard Library Algorithms
+The algorithms are defined in namespace std and presented in the
+<algorithm> header. Here are a few I have found particularly useful:
+#+begin_verse
+ *Selected Standard Algorithms*
+for_each()         Invoke function for each element (§18.5.1)
+find()             Find first occurrence of arguments (§18.5.2)
+find_if()          Find first match of predicate (§18.5.2)
+count()            Count occurrences of element (§18.5.3)
+count_if()         Count matches of predicate (§18.5.3)
+replace()          Replace element with new value (§18.6.4)
+replace_if()       Replace element that matches predicate with new value (§18.6.4)
+copy()             Copy elements (§18.6.1)
+unique_copy()      Copy elements that are not duplicates (§18.6.1)
+sort()             Sort elements (§18.7.1)
+equal_range()      Find all elements with equivalent values (§18.7.2)
+merge()            Merge sorted sequences (§18.7.3)
+#+end_verse
+
+** 3.11 Advice
+#+begin_verse
+=[2]= Don’t believe in magic; understand what your libraries do, how
+they do it, and at what cost they do it.
+=[7]= Use string rather than char *; §3.5, §3.6.
+=[12]= Catch common exceptions in main(); §3.7.2.
+#+end_verse
+
+
 
 * Chapter 4 Types and Declarations
+** 4.2 Booleans
+A pointer can be implicitly converted to a *bool*. A nonzero pointer
+converts to *true*; zero valued pointers convert to *false*.
+
+** 4.3 Character Types 
+The possibility of converting a =char= to an integer raises the
+question: is a =char= signed or unsigned? 
+
+The 256 values represented by an 8bit byte can be interpreted as the
+values 0 to 255 or as the values 127 to 127. Unfortunately, which
+choice is made for a plain =char= is implementation-defined (§C.1,
+§C.3.4).
+
+A type =wchar_t= is provided to hold characters of a larger
+character set such as Unicode.
+*** 4.3.1 Character Literals
+Wide character literals are of the form =L´ab´=, where the number of
+characters between the quotes and their meanings is implementation-defined
+to match the =wchar_t= type.
+
+** 4.4 Integer Types
+Unlike plain =char= s, plain =int= s are always signed.
+
+*** 4.4.1 Integer Literals
+The suffix U can be used to write explicitly =unsigned= literals.
+Similarly, the suffix L can be used to write explicitly =long=
+literals. For example, =3= is an =int= , =3U= is an =unsigned int=
+, and =3L= is a =long int=.
+
+*** 4.5.1 Floating-Point Literals
+By default, a floating-point literal is of type =double=. 
+
+If you want a floating-point literal of type =float=, you can define
+one using the suffix f or F :
+
+=3.14f  2.0f 1.99F=
+** 4.6 Sizes
+When needed, implementation-dependent aspects about an implementation
+can be found in =<limits>=
+
+#+begin_src c++
+  #include <limits>
+  
+  int main()
+  {
+    cout << "largest float == " << numeric_limits<float>::max()
+         << ", char is signed == " << numeric_limits<char>::is_signed << '\n';
+  }
+#+end_src
+** 4.8 Enumerations
+The
+range of an enumeration holds all the enumeration’s enumerator values
+rounded up to the nearest larger binary power minus 1 . The range goes
+down to 0 if the smallest enumerator is non-negative
+
+#+begin_src c++
+  enum e1 { dark, light };          //range 0:1
+  enum e2 { a = 3, b = 9 };         //range 0:15
+  enum e3 { min = -10, max = 1000000 }; //range: -1048576:1048575
+#+end_src
+
+A value of integral type may be explicitly converted to an enumeration
+type. The result of such a conversion is undefined unless the value is
+within the range of the enumeration.
+
+#+begin_src c++
+  enum flag { x = 1, y = 2, z = 4, e = 8 }; //range 0:15
+  flag f1 = 5;   //type error: 5 is not of type flag
+  flag f2 = flag(5); //ok: flag(5) is of type flag and within the range of flag
+#+end_src
+
+By default, enumerations are converted to integers for arithmetic
+operations (§6.2). An enumeration is a user-defined type, so users can
+define their own operations, such as ++ and << for an enumeration (§11.2.3).
+
+** 4.9
+*** 4.9.1 The Structure of a Declaration
+The postfix declarator operators bind tighter than the prefix ones.
+Consequently, =*kings[]= is a vector of pointers to something, and
+we have to use parentheses to express types such as ‘‘pointer to function;’’
+*** 4.9.4 Scope
+A hidden global name can be referred to using the scope resolution
+operator =::=.
+#+begin_src c++
+  int x;
+  
+  void f2()
+  {
+    int x = 1; //hide global x
+    ::x = 2;  //assign to globlal x
+    x = 2;   //assign to local x
+  }
+#+end_src
+
+*** 4.9.5 Initialization
+If no initializer is specified, a global (§4.9.4), namespace (§8.2), or
+local static object (§7.1.2, §10.2.4) (collectively called static
+objects) is initialized to 0 of the appropriate type.
+*** 4.9.6 Objects and Lvalues
+That is, an /object/ is a contiguous region of storage; an /lvalue/ is an
+expression that refers to an object.
+** 4.10 Advice
+#+begin_verse
+=[4]= Keep common and local names short, and keep uncommon and nonlocal names longer; §4.9.3.
+=[5]= Avoid similar-looking names; §4.9.3.
+=[6]= Maintain a consistent naming style; §4.9.3.
+=[9]= Use =typedef= s to define synonyms for types; use enumerations and classes to define new types;
+=[18]= Avoid unsigned arithmetic; §4.4.
+=[19]= View signed to unsigned and unsigned to signed conversions with suspicion; §C.6.2.6.
+=[20]= View floatin-gpoint to integer conversions with suspicion; §C.6.2.6.
+=[21]= View conversions to a smaller type, such as int to char , with suspicion; §C.6.2.6.
+#+end_verse
+
+
+
+
+
 
 * Chapter 5 Pointers, Arrays, and Structures
+** 5.1 Pointers
+The fundamental operation on a pointer is /dereferencing/, that is,
+referring to the object pointed to by the pointer. This operation is
+also called /indirection/.
+*** 5.1.1 Zero
+ *Zero (0)* is an =int=. Because of standard conversions (§C.6.2.3), 0
+  can be used as a constant of any integral (§4.1.1), floating-point,
+  pointer, or pointer-to-member type. The type of zero will be
+  determined by context.
+
+In C, it has been popular to define a macro =NULL= to represent the
+zero pointer. Because of C++’s tighter type checking, the use of plain
+0 , rather than any suggested =NULL= macro, leads to fewer problems.
+
+** 5.2 Arrays
+The number of elements of the array, the array bound, must be a
+*constant expression*. If you need variable bounds, use a =vector=.
+
+#+begin_src c++
+  void f(int i)
+  {
+    int v1[i];     //error: array size not a constant expression
+    vector<int> v2[i]; // ok
+  }
+#+end_src
+
+*** 5.2.1 Array Initializers
+If the initializer supplies too few elements, 0 is assumed for the
+remaining array elements. For example:
+#+begin_src c++
+  char v5[8] = { 1, 2, 3, 4};
+  is equivalent to
+  char v5[8] = { 1, 2, 3, 4, 0, 0, 0, 0};
+#+end_src
+*** 5.2.2 String Literals
+Whether two identical character literals are allocated as one is
+implementation-defined. For example:
+#+begin_src c++
+  const char* p = "Heraclitus";
+  const char* q = "Heraclitus";
+  
+  void g()
+  {
+    if(p == q) cout<< "one \n"; //result is implementation-defined
+    //..
+  }
+#+end_src
+
+The empty string is written as a pair of adjacent double quotes, "",
+(and has the type =const char[1]=).
+
+A string with the prefix =L=, such as L"angst" , is a string of wide
+characters (§4.3, §C.3.3). Its type is =wchar_t[]=.
+** 5.3 Pointers into Arrays
+The implicit conversion of the array argument to a pointer means that
+the size of the array is lost to the called function.
+*** 5.3.1 Navigating Arrays
+This implies that the integer value of =p+1= will be =sizeof(T)= larger than the integer value of p .
+
+** 5.4 Constants
+=const int c1 = 1;=
+
+The simple and common case is the one in which the value of the constant
+is known at compile time and no storage needs to be allocated; c1 is an example of that.
+
+*** 5.4.1 Pointers and Constants
+‘‘Prefixing’’ a declaration of a pointer with =const= makes the
+object, but not the pointer, a constant. To declare a pointer itself,
+rather than the object pointed to, to be a constant, we use the
+declarator operator =*const= instead of plain *.
+
+The declarator operator that makes a pointer constant is =*const=.
+There is no =const *= declarator operator, so a =const= appearing
+before the * is taken to be part of the base type. For example:
+#+begin_src c++
+  char *const cp;     //const pointer to char
+  char const* pc;     //pointer to const char
+  const char* pc2;    //pointer to const char
+#+end_src
+Some people find it helpful to read such declarations right-to-left. For
+example, ‘‘cp is a =const= pointer to a =char= ’’ and ‘‘pc2 is a
+pointer to a =char const=.’’
+** 5.5 References
+The initializer for a ‘‘plain’’ T & must be an lvalue of type T .
+The initializer for a =const T&= need not be an lvalue or even of type T . In such cases,
++ =[1]= first, implicit type conversion to T is applied if necessary (see §C.6);
++ =[2]= then, the resulting value is placed in a temporary variable of type T ; and
++ =[3]= finally, this temporary variable is used as the value of the
+  initializer.
+
+#+begin_src c++
+  double& dr = 1;          //error: lvalue needed
+  const double& cdr = 1;   //ok
+  
+  The interpretation of this last initialization might be:
+  
+  double temp = double(1);  //first create a temporary with the right value
+  const double& cdr = temp; //then use the temporary as the intializer for cdr
+#+end_src
+
+** 5.7 Structures
+The name of a type becomes available for use immediately after it has been encountered and not
+just after the complete declaration has been seen. For example:
+#+begin_src c++
+  struct Link{
+    Link* previous;
+    Link* successor;
+  };
+#+end_src
+It is not possible to declare new objects of a structure type until the complete declaration has been
+seen. For example:
+#+begin_src c++
+  struct No_good{
+    No_good member;  //error: recursive definition
+  };
+#+end_src
+This is an error because the compiler is not able to determine the size of N o _ g o o d .
+
 
 * Chapter 6 Expressions and Statements
 
