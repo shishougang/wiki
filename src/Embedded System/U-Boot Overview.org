@@ -6,6 +6,112 @@
 http://www.denx.de/wiki/U-Boot/WebHome
 
 * Boot Linux Kernel
+** Boot from SD Card
+#+begin_src sh
+TI8168_EVM# mmc rescan 0
+TI8168_EVM# fatload mmc 0 0x81000000 uImage
+TI8168_EVM# setenv bootargs 'console=ttyO0,115200n8 root=/dev/mmcblk0p2 mem=128M rootwait'
+TI8168_EVM# bootm 0x81000000
+#+end_src
+** Boot over Network (Ethernet)
+*** Overview
+When kernel image and ramdisk image are fetched from a tftp server:
+1. Ensure that the EVM is connected to network with DHCP and TFTP server set up
+2. Set 'ethaddr' U-Boot environment variable with proper ethernet address in format 'xx:xx:xx:xx:xx:xx' (replace 'xx'
+   with proper hexadecimal values)
+3. Copy kernel image and ramdisk to TFTP server's root directory.
+4. Execute follwing commands at U-Boot prompt. We assume kernel image name as 'uImage' and ramdisk file name
+   as 'ramdisk.gz'
+
+*** Method1 (DHCP) for ramdisk,gz
+#+begin_src sh
+TI8168_EVM# setenv autoload no
+TI8168_EVM# dhcp
+TI8168_EVM# setenv serverip <Server IP Address>
+TI8168_EVM# tftp 0x81000000 uImage
+TI8168_EVM# tftp 0x82000000 ramdisk.gz
+TI8168_EVM# setenv bootargs 'mem=200M console=ttyO0,115200n8 root=/dev/ram0 initrd=0x82000000,40M ramdisk_size=45000 ip=dhcp'
+TI8168_EVM# bootm 0x81000000
+#+end_src
+
+*** Method 2 for NFS Filesystem
+
++ =root=/dev/nfs rw=: the root filesystem will be mounted using NFS,
+  and it will be writable.
++ =nfsroot=192.168.1.1:/opt/eldk-4.2/ppc_4xx=: the NFS server has the IP
+  address 192.168.1.1, and exports the directory /opt/eldk-4.2/ppc_4xx
+  for our system to use as root filesystem.
++ =ip=192.168.100.6:192.168.1.1:192.168.1.1:255.255.0.0:canyonlands::off=: 
+  the target has the IP address =192.168.100.6=; the NFS server is
+  =192.168.1.1=; there is a gateway at IP address =192.168.1.1=; the
+  netmask is =255.255.0.0= and our =hostname= is =canyonlands=. The first
+  ethernet interface (eth0) will be used, and the Linux kernel will
+  immediately use this network configuration and not try to
+  re-negotiate it (IP autoconfiguration is off).
+
+**** static IP
+Alternatively, kernel can be made to use the same IP address as
+assigned to U-Boot instead of doing DHCP request again by setting
+U-Boot parameters as follows:
+
+#+begin_src sh
+TI8168_EVM# print ethaddr <-- Check if MAC address is assigned and is unique
+TI8168_EVM# setenv ethaddr <unique-MAC-address> <-- Set only if not present already, format xx:yy:zz:aa:bb:cc
+TI8168_EVM# setenv bootcmd 'dhcp;run addip; tftp 81000000 uImage;bootm'
+TI8168_EVM# setenv hostname <unique-hostname>
+TI8168_EVM# setenv addip 'setenv bootargs ${bootargs} ip=${ipaddr}:${nfsserver}:${gatewayip}:${netmask}:${hostname}:eth0:off'
+TI8168_EVM# setenv autoload no
+TI8168_EVM# setenv nfsserver <nfs-server-ip> <-- Make sure the same NFS server IP is used below
+TI8168_EVM# setenv bootargs 'console=ttyO0,115200n8 root=/dev/nfs nfsroot=<nfs-server-ip>:<path-to-nfs-share>,nolock rw mem=128M'
+TI8168_EVM# setenv serverip <tftp-server-ip>
+TI8168_EVM# saveenv
+TI8168_EVM# boot
+#+end_src
+
+**** DHCP 
+#+begin_src sh
+TI8168_EVM# print ethaddr <-- Check if MAC address is assigned and is unique
+TI8168_EVM# setenv ethaddr <unique-MAC-address> <-- Set only if not present already, format uv:yy:zz:aa:bb:cc
+TI8168_EVM# setenv bootcmd 'dhcp;tftp 81000000 uImage;bootm'
+TI8168_EVM# setenv autoload no
+TI8168_EVM# setenv nfsserver <NFS server-ip> <-- Make sure the same NFS server IP is used below
+TI8168_EVM# setenv bootargs 'console=ttyO2,115200n8 root=/dev/nfs nfsroot=<NFS server-ip>:<NFS share>,nolock rw mem=128M ip=dhcp'
+TI8168_EVM# setenv serverip <tftp-server-ip>
+TI8168_EVM# saveenv
+TI8168_EVM# boot
+#+end_src
+
+
+*** Example 1 (dhcp)
+#+begin_src sh
+setenv bootdelay 4
+setenv baudrate 115200
+setenv bootargs console=ttyO0,115200n8 rootwait rw mem=364M@0x80000000 mem=324M@0x9F900000 vmalloc=500M notifyk.vpssm3_sva=0xBF900000 root=/dev/nfs nfsroot=143.89.147.79:/home/testbed/targetfs ip=dhcp
+setenv bootcmd 'dhcp;setenv serverip 143.89.147.79;tftpboot;bootm'
+setenv autoload no
+setenv serverip 143.89.147.79
+setenv bootfile uImage
+#+end_src
+
+*** Example 2 (static ip)
++ host PC
+#+begin_src sh
+sudo  ifconfig eth0 10.2.1.10 netmask 255.255.255.0 up
+#+end_src
++ ti816x board
+#+begin_src sh
+setenv ipaddr 10.2.1.9
+setenv serverip 10.2.1.10
+setenv bootcmd 'tftpboot 0x81000000 uImage; bootm 0x81000000'
+setenv autoload no
+setenv bootargs 'mem=128M console=ttyO0,115200n8 root=/dev/nfs rw  nfsroot=10.2.1.10:/home/testbed/targetfs  ip=10.2.1.9:10.2.1.10:10.2.1.1:255.255.255.0::eth0:off'
+boot
+#+end_src
+or
+#+begin_src sh
+setenv bootargs 'console=ttyO0,115200n8 rootwait rw  mem=364M@0x80000000 mem=324M@0x9F900000 vmalloc=500M notifyk.vpssm3_sva=0xBF900000 root=/dev/nfs  nfsroot=10.2.1.10:/home/testbed/targetfs  ip=10.2.1.9:10.2.1.10:10.2.1.1:255.255.255.0::eth0:off'
+#+end_src
+
 * U-Boot Commands
 ** bdinfo - print Board Info structure
 The =bdinfo= command (short: =bdi=) prints the information that U-Boot

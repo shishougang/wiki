@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="title" content="U-Boot Overview"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-09-07 19:41:26 HKT"/>
+<meta name="generated" content="2012-09-08 15:56:06 HKT"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -105,7 +105,24 @@
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">Offical website</a></li>
-<li><a href="#sec-2">Boot Linux Kernel</a></li>
+<li><a href="#sec-2">Boot Linux Kernel</a>
+<ul>
+<li><a href="#sec-2-1">Boot from SD Card</a></li>
+<li><a href="#sec-2-2">Boot over Network (Ethernet)</a>
+<ul>
+<li><a href="#sec-2-2-1">Overview</a></li>
+<li><a href="#sec-2-2-2">Method1 (DHCP) for ramdisk,gz</a></li>
+<li><a href="#sec-2-2-3">Method 2 for NFS Filesystem</a>
+<ul>
+<li><a href="#sec-2-2-3-1">static IP</a></li>
+<li><a href="#sec-2-2-3-2">DHCP</a></li>
+</ul>
+</li>
+<li><a href="#sec-2-2-4">Example 1 (dhcp)</a></li>
+<li><a href="#sec-2-2-5">Example 2 (static ip)</a></li>
+</ul></li>
+</ul>
+</li>
 <li><a href="#sec-3">U-Boot Commands</a>
 <ul>
 <li><a href="#sec-3-1">bdinfo - print Board Info structure</a></li>
@@ -153,6 +170,221 @@
 <h2 id="sec-2">Boot Linux Kernel</h2>
 <div class="outline-text-2" id="text-2">
 
+
+</div>
+
+<div id="outline-container-2-1" class="outline-3">
+<h3 id="sec-2-1">Boot from SD Card</h3>
+<div class="outline-text-3" id="text-2-1">
+
+
+
+
+<pre class="src src-sh">TI8168_EVM# mmc rescan 0
+TI8168_EVM# fatload mmc 0 0x81000000 uImage
+TI8168_EVM# setenv bootargs <span style="color: #ffa07a;">'console=ttyO0,115200n8 root=/dev/mmcblk0p2 mem=128M rootwait'</span>
+TI8168_EVM# bootm 0x81000000
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-2-2" class="outline-3">
+<h3 id="sec-2-2">Boot over Network (Ethernet)</h3>
+<div class="outline-text-3" id="text-2-2">
+
+
+</div>
+
+<div id="outline-container-2-2-1" class="outline-4">
+<h4 id="sec-2-2-1">Overview</h4>
+<div class="outline-text-4" id="text-2-2-1">
+
+<p>When kernel image and ramdisk image are fetched from a tftp server:
+</p><ol>
+<li>Ensure that the EVM is connected to network with DHCP and TFTP server set up
+</li>
+<li>Set 'ethaddr' U-Boot environment variable with proper ethernet address in format 'xx:xx:xx:xx:xx:xx' (replace 'xx'
+   with proper hexadecimal values)
+</li>
+<li>Copy kernel image and ramdisk to TFTP server's root directory.
+</li>
+<li>Execute follwing commands at U-Boot prompt. We assume kernel image name as 'uImage' and ramdisk file name
+   as 'ramdisk.gz'
+</li>
+</ol>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2-2-2" class="outline-4">
+<h4 id="sec-2-2-2">Method1 (DHCP) for ramdisk,gz</h4>
+<div class="outline-text-4" id="text-2-2-2">
+
+
+
+
+<pre class="src src-sh">TI8168_EVM# setenv autoload no
+TI8168_EVM# dhcp
+TI8168_EVM# setenv serverip &lt;Server IP Address&gt;
+TI8168_EVM# tftp 0x81000000 uImage
+TI8168_EVM# tftp 0x82000000 ramdisk.gz
+TI8168_EVM# setenv bootargs <span style="color: #ffa07a;">'mem=200M console=ttyO0,115200n8 root=/dev/ram0 initrd=0x82000000,40M ramdisk_size=45000 ip=dhcp'</span>
+TI8168_EVM# bootm 0x81000000
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2-2-3" class="outline-4">
+<h4 id="sec-2-2-3">Method 2 for NFS Filesystem</h4>
+<div class="outline-text-4" id="text-2-2-3">
+
+
+<ul>
+<li><code>root=/dev/nfs rw</code>: the root filesystem will be mounted using NFS,
+  and it will be writable.
+</li>
+<li><code>nfsroot=192.168.1.1:/opt/eldk-4.2/ppc_4xx</code>: the NFS server has the IP
+  address 192.168.1.1, and exports the directory /opt/eldk-4.2/ppc<sub>4xx</sub>
+  for our system to use as root filesystem.
+</li>
+<li><code>ip=192.168.100.6:192.168.1.1:192.168.1.1:255.255.0.0:canyonlands::off</code>: 
+  the target has the IP address <code>192.168.100.6</code>; the NFS server is
+  <code>192.168.1.1</code>; there is a gateway at IP address <code>192.168.1.1</code>; the
+  netmask is <code>255.255.0.0</code> and our <code>hostname</code> is <code>canyonlands</code>. The first
+  ethernet interface (eth0) will be used, and the Linux kernel will
+  immediately use this network configuration and not try to
+  re-negotiate it (IP autoconfiguration is off).
+</li>
+</ul>
+
+
+
+</div>
+
+<div id="outline-container-2-2-3-1" class="outline-5">
+<h5 id="sec-2-2-3-1">static IP</h5>
+<div class="outline-text-5" id="text-2-2-3-1">
+
+<p>Alternatively, kernel can be made to use the same IP address as
+assigned to U-Boot instead of doing DHCP request again by setting
+U-Boot parameters as follows:
+</p>
+
+
+
+<pre class="src src-sh">TI8168_EVM# print ethaddr &lt;-- Check if MAC address is assigned and is unique
+TI8168_EVM# setenv ethaddr &lt;unique-MAC-address&gt; &lt;-- Set only if not present already, format xx:yy:zz:aa:bb:cc
+TI8168_EVM# setenv bootcmd <span style="color: #ffa07a;">'dhcp;run addip; tftp 81000000 uImage;bootm'</span>
+TI8168_EVM# setenv hostname &lt;unique-hostname&gt;
+TI8168_EVM# setenv addip <span style="color: #ffa07a;">'setenv bootargs ${bootargs} ip=${ipaddr}:${nfsserver}:${gatewayip}:${netmask}:${hostname}:eth0:off'</span>
+TI8168_EVM# setenv autoload no
+TI8168_EVM# setenv nfsserver &lt;nfs-server-ip&gt; &lt;-- Make sure the same NFS server IP is used below
+TI8168_EVM# setenv bootargs <span style="color: #ffa07a;">'console=ttyO0,115200n8 root=/dev/nfs nfsroot=&lt;nfs-server-ip&gt;:&lt;path-to-nfs-share&gt;,nolock rw mem=128M'</span>
+TI8168_EVM# setenv serverip &lt;tftp-server-ip&gt;
+TI8168_EVM# saveenv
+TI8168_EVM# boot
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2-2-3-2" class="outline-5">
+<h5 id="sec-2-2-3-2">DHCP</h5>
+<div class="outline-text-5" id="text-2-2-3-2">
+
+
+
+
+<pre class="src src-sh">TI8168_EVM# print ethaddr &lt;-- Check if MAC address is assigned and is unique
+TI8168_EVM# setenv ethaddr &lt;unique-MAC-address&gt; &lt;-- Set only if not present already, format uv:yy:zz:aa:bb:cc
+TI8168_EVM# setenv bootcmd <span style="color: #ffa07a;">'dhcp;tftp 81000000 uImage;bootm'</span>
+TI8168_EVM# setenv autoload no
+TI8168_EVM# setenv nfsserver &lt;NFS server-ip&gt; &lt;-- Make sure the same NFS server IP is used below
+TI8168_EVM# setenv bootargs <span style="color: #ffa07a;">'console=ttyO2,115200n8 root=/dev/nfs nfsroot=&lt;NFS server-ip&gt;:&lt;NFS share&gt;,nolock rw mem=128M ip=dhcp'</span>
+TI8168_EVM# setenv serverip &lt;tftp-server-ip&gt;
+TI8168_EVM# saveenv
+TI8168_EVM# boot
+</pre>
+
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-2-2-4" class="outline-4">
+<h4 id="sec-2-2-4">Example 1 (dhcp)</h4>
+<div class="outline-text-4" id="text-2-2-4">
+
+
+
+
+<pre class="src src-sh">setenv bootdelay 4
+setenv baudrate 115200
+setenv bootargs <span style="color: #eedd82;">console</span>=ttyO0,115200n8 rootwait rw <span style="color: #eedd82;">mem</span>=364M@0x80000000 <span style="color: #eedd82;">mem</span>=324M@0x9F900000 <span style="color: #eedd82;">vmalloc</span>=500M notifyk.vpssm3_sva=0xBF900000 <span style="color: #eedd82;">root</span>=/dev/nfs <span style="color: #eedd82;">nfsroot</span>=143.89.147.79:/home/testbed/targetfs <span style="color: #eedd82;">ip</span>=dhcp
+setenv bootcmd <span style="color: #ffa07a;">'dhcp;setenv serverip 143.89.147.79;tftpboot;bootm'</span>
+setenv autoload no
+setenv serverip 143.89.147.79
+setenv bootfile uImage
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2-2-5" class="outline-4">
+<h4 id="sec-2-2-5">Example 2 (static ip)</h4>
+<div class="outline-text-4" id="text-2-2-5">
+
+<ul>
+<li>host PC
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh">sudo  ifconfig eth0 10.2.1.10 netmask 255.255.255.0 up
+</pre>
+
+<ul>
+<li>ti816x board
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh">setenv ipaddr 10.2.1.9
+setenv serverip 10.2.1.10
+setenv bootcmd <span style="color: #ffa07a;">'tftpboot 0x81000000 uImage; bootm 0x81000000'</span>
+setenv autoload no
+setenv bootargs <span style="color: #ffa07a;">'mem=128M console=ttyO0,115200n8 root=/dev/nfs rw  nfsroot=10.2.1.10:/home/testbed/targetfs  ip=10.2.1.9:10.2.1.10:10.2.1.1:255.255.255.0::eth0:off'</span>
+boot
+</pre>
+
+<p>
+or
+</p>
+
+
+<pre class="src src-sh">setenv bootargs <span style="color: #ffa07a;">'console=ttyO0,115200n8 rootwait rw  mem=364M@0x80000000 mem=324M@0x9F900000 vmalloc=500M notifyk.vpssm3_sva=0xBF900000 root=/dev/nfs  nfsroot=10.2.1.10:/home/testbed/targetfs  ip=10.2.1.9:10.2.1.10:10.2.1.1:255.255.255.0::eth0:off'</span>
+</pre>
+
+
+</div>
+</div>
 </div>
 
 </div>
@@ -403,7 +635,7 @@ it has been set.
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-09-07 19:41:26 HKT</p>
+<p class="date">Date: 2012-09-08 15:56:06 HKT</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.09 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
