@@ -1,0 +1,365 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE:TI Filesystem OverView
+#+OPTIONS: num:nil H:3
+
+
+* General
+** arago main page
+http://arago-project.org/wiki/index.php/Main_Page
+** busybox
+http://www.busybox.net/
+** ubuntu
+https://wiki.ubuntu.com/ARM/RootfsFromScratch
+** Root File system solutions
+http://processors.wiki.ti.com/index.php/Linux_Toolchain#Root_File_System_solutions
+
+** Creating a Root File System for Linux on OMAP35x
+http://processors.wiki.ti.com/index.php/Creating_a_Root_File_System_for_Linux_on_OMAP35x
+* Modify
+** Using The Correct Console Device
+ update the =/etc/inittab= file in the filesystem used for kernel 
+#+begin_src sh
+S:2345:respawn:/sbin/getty 115200 ttyS2
+by,
+S:2345:respawn:/sbin/getty 115200 ttyO2
+#+end_src
+
+* Arago 
+#<<arago set up>>
+** Setting Up Build Environment and build
+*** ubuntu install dependency
+#+begin_src sh
+sudo apt-get install diffstat texi2html chrpath subversion python-psyco 
+#+end_src 
+*** Create the directory
+Create a new directory for the build environment:
+#+begin_src sh
+$ mkdir $HOME/oe
+$ cd $HOME/oe
+#+end_src
+*** Clone Arago repositories
+Now check out the following repositories:
+#+begin_src sh
+$ git clone git://arago-project.org/git/arago.git
+$ git clone git://arago-project.org/git/arago-oe-dev.git
+$ git clone git://arago-project.org/git/arago-bitbake.git
+#+end_src
+The directory should now be populated with 3 subdirectories – =arago=, =arago-oe-dev= and =arago-bitbake=.
+*** Copy setup/config files
+Arago repository comes with samples of arago/setenv and
+arago/conf/local.conf files, which you can use as a starting point, by
+copying them into their actual names (without .sample extension) and
+modifying to suit your needs:
+#+begin_src s
+$ cp arago/setenv.sample arago/setenv
+$ cp arago/conf/local.conf.sample arago/conf/local.conf
+#+end_src
+
++ File: =arago/setenv=
+  Edit =arago/setenv= file and make sure environment variables are set
+  properly. OEBASE should point to the directory you’ve created in the
+  beginning:
+#+begin_src sh
+export OEBASE=$HOME/oe
+#+end_src
++ File: =arago/setenv=
+  Also, in order to use a separate "scratch" area outside of home
+  directory, you may want to enable SCRATCH variable and point it
+  appropriately:
+#+begin_src sh
+export SCRATCH=/sim/scratch_AID
+#+end_src
+
+*** Set the environment variables
+#+begin_src sh
+$ . arago/seten
+#+end_src
+Or, 
+#+begin_src sh
+$ source arago/setenv
+#+end_src
+*** Point to CSL toolchain
+If not done before, set the PATH variable to point to the CodeSourcery
+toolchain (refer to [[http://www.mentor.com/embedded-software/codesourcery][Getting CodeSourcery Toolchain]]([[http://www.mentor.com/embedded-software/sourcery-tools/sourcery-codebench/lite/?cmpid=7108&lite=arm&target_os=GNU%2FLinux&target_arch=ARM&returnURL=https%253A%252F%252Fsourcery.mentor.com%252FGNUToolchain%252Frelease858%253Flite%253Darm%2526cmpid%253D7108][The binary
+distribution for 2009q1-203 version]]) for obtaining one):
+
+#+begin_src sh
+$ export PATH=/opt/arm-2009q1/bin:$PATH
+#+end_src
+
+*** Build a minimal base filesystem
+Now it should be ready to start a build of the minimal filesystem
+image:
+#+begin_src sh
+$ bitbake arago-base-image
+#+end_src
+*** Build a "demo" filesystem for OMAP3 EVM
+#+begin_src sh
+$ MACHINE=omap3evm bitbake arago-console-image
+#+end_src
+*** Build different kernels for supported platforms
+#+begin_src sh
+$ MACHINE=omap3evm bitbake virtual/kernel
+$ MACHINE=beagleboard bitbake virtual/kernel
+$ MACHINE=dm6446-evm bitbake virtual/kernel
+$ MACHINE=dm355-evm bitbake virtual/kernel
+#+end_src
+*** High-level hierarchy of arago-deploy directory
+Resulting images and packages will be placed under =arago-deploy=
+directory - =images= for the filesystem, kernel and bootloader; and =ipk=
+for binary IPK packages, respectively.
+
+#+begin_src sh
+arago-deploy
+|-- images
+|   |-- arago
+|   |-- dm355-evm
+|   |-- dm6446-evm
+|   `-- omap3evm
+|-- ipk
+|   |-- all
+|   |-- arago
+|   |-- armv5te
+|   |-- armv7a
+|   |-- dm355-evm
+|   |-- dm6446-evm
+|   |-- i686
+|   |-- i686-armv5te-sdk
+|   |-- i686-armv7a-sdk
+|   `-- omap3evm
+`-- sdk
+#+end_src
+
+*** Build individual package recipes
+You can also look in =oe/arago/recipes= for individual package recipes
+that you can bitbake. For example:
+#+begin_src sh
+bitbake curl
+bitbake thhtpd
+#+end_src
+
+*** build a native compiler (on dm8168) using
+#+begin_src sh
+MACHINE=c6a816x-evm ./arago-bitbake/bin/bitbake gcc-4.3.3(since codesourcery is using 4.3.3) or
+MACHINE=c6a816x-evm ./arago-bitbake/bin/bitbake task-sdk-native
+#+end_src
+* Build a File system 
+** Setting up the build environment 
+setting up the build environment as [[arago set up][Setting Up Build Environment]]
+** Configure the File system
+File: =/home/testbed/oe/arago/recipes/images=
+
+Use a existing file for a template 
+#+begin_src sh
+cp arago-base-tisdk-image.bb arago-base-sdr-image.bb
+#+end_src
+And modify it to:
+#+begin_src sh
+#File: arago-base-sdr-image.bb
+require arago-image.inc
+#inherit tisdk-image
+
+COMPATIBLE_MACHINE = "omap3|ti816x|dm365|omapl138|ti814x|omap4|ti33x"
+
+IMAGE_INSTALL += "\
+    task-arago-base \
+    task-arago-extras \
+    task-arago-console \
+    task-arago-toolchain-base-tisdk-target \
+    task-arago-toolchain-target \
+    task-proper-tools \
+    task-base \
+    task-gnuradio-toolchain-target \
+    task-usrp-embedded \
+    "
+
+export IMAGE_BASENAME = "arago-base-sdr-image"
+#+end_src
+
+** Create the tasks =task-gnuradio-toolchain-target= and =task-usrp-embedded=
++ File: =/home/testbed/oe/arago/recipes/tasks/task-gnuradio-toolchain-target=
+#+begin_src sh
+DESCRIPTION = "Target packages for GNURadio SDK"
+LICENSE = "MIT"
+ALLOW_EMPTY = "1"
+
+DEPENDS = "task-sdk-bare"
+
+RDEPENDS_${PN} += " \
+    task-sdk-bare \
+    glibc \
+    virtual-libc-dev \
+    libgcc \
+    alsa-dev \
+    audiofile-dev \
+    bluez-libs-dev \
+    dbus-dev \
+    expat-dev \
+    glib-2.0-dev \
+    libice-dev \
+    jpeg-dev \
+    libapm-dev \
+    alsa-lib-dev \
+    libetpan-dev \
+    libgcrypt-dev \
+    gnutls-dev \
+    libidl-dev \
+    libiw-dev \
+    libmimedir-dev \
+    libpcap-dev \
+    libpng-dev \
+    libschedule-dev \
+    libsm-dev \
+    libsoundgen-dev \
+    libsoup-dev \
+    libsvg-dev \
+    libtododb-dev \
+    libts-dev \
+    libxml2-dev \
+    ncurses-dev \
+    popt-dev \
+    readline-dev \
+    zlib-dev \
+    ${GNURADIO_PKGS} \
+"
+
+GNURADIO_PKGS = " \
+    libusb1-dev \
+    guile-dev \
+    fftwf-dev \
+    alsa-dev \
+    alsa-lib-dev \
+    jack-dev \
+    cppunit-dev \
+    python-dev \
+    python-numpy-dev \
+    boost-dev \
+    gsl-dev \
+"
+#+end_src 
+
++ File: =/home/testbed/oe/arago/recipes/tasks/task-usrp-embedded=
+#+begin_src sh
+DESCRIPTION = "Base software to install on USRP Embedded"
+
+PR = "r8"
+
+inherit task
+
+RDEPENDS_${PN} = "\
+  cpufrequtils \
+  ethtool \
+  kernel-modules \
+  oprofile \
+  screen \
+  htop \
+  powertop \
+  orc \
+  python-lxml \
+  python-subprocess \
+  python-ctypes \
+  gdb \
+  vim-vimrc \
+"
+#+end_src
+** Build the dm816x
+#+begin_src sh
+source ~/oe/arago/setenv
+MACHINE=dm816x-evm bitbake arago-base-sdr-image
+#+end_src
+** Debug the error
+*** Guild
++ error
+  #+begin_src sh
+| checking whether a program can dlopen itself... cross
+| checking whether stripping libraries is possible... yes
+| checking if libtool supports shared libraries... yes
+| checking whether to build shared libraries... yes
+| checking whether to build static libraries... yes
+| checking for lt_dlinit in -lltdl... no
+| configure: error: libltdl not found.  See README.
+| ERROR: Function do_configure failed
+NOTE: package guile-1.8.7-r1: task do_configure: Failed
+ERROR: TaskFailed event exception, aborting
+ERROR: Build of /home/testbed/oe/arago-oe-dev/recipes/guile/guile_1.8.7.bb do_configure failed
+ERROR: Task 2556 (/home/testbed/oe/arago-oe-dev/recipes/guile/guile_1.8.7.bb, do_configure) failed with exit code 1
+ERROR: '/home/testbed/oe/arago-oe-dev/recipes/guile/guile_1.8.7.bb' failed
+#+end_src
+
++ how to
+
+  If one manually compiles libtool (bitbake libtool), then runs
+  "bitbake  guile", it compiles fine. 
+  #+begin_src sh
+ MACHINE=dm816x-evm bitbake libtool
+ MACHINE=dm816x-evm bitbake guile
+ MACHINE=dm816x-evm bitbake arago-base-sdr-image
+#+end_src
+
+#+begin_html
+<p class="info">FIXME: Modify the DEPENDS section 
+of guile-native.inc </p>
+#+end_html
+#+begin_src sh
+From
+DEPENDS = "gmp-native" 
+
+to something like 
+
+DEPENDS = "gmp-native libtool" ? 
+#+end_src
+
+*** net-tools
++ error
+  #+begin_src sh
+tmp/sysroots/armv7a-none-linux-gnueabi -Wl,-O1 -Wl,--hash-style=gnu -Llib -o nameif nameif.o
+| arm-none-linux-gnueabi-gcc -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=softfp -mthumb-interwork -mno-thumb --sysroot=/home/testbed/oe/arago-tmp/sysroots/armv7a-none-linux-gnueabi -fexpensive-optimizations -frename-registers -fomit-frame-pointer -O2 -ggdb2 -I. -idirafter ./include/ -Ilib   -c -o iptunnel.o iptunnel.c
+| In file included from /home/testbed/oe/arago-tmp/sysroots/armv7a-none-linux-gnueabi/usr/include/linux/if_tunnel.h:5,
+|                  from iptunnel.c:39:
+| /home/testbed/oe/arago-tmp/sysroots/armv7a-none-linux-gnueabi/usr/include/linux/ip.h:85: error: redefinition of 'struct iphdr'
+| make: *** [iptunnel.o] Error 1
+| FATAL: oe_runmake failed
+| ERROR: Function do_compile failed
+NOTE: package net-tools-1.60-r3: task do_compile: Failed
+ERROR: TaskFailed event exception, aborting
+ERROR: Build of /home/testbed/oe/arago-oe-dev/recipes/net-tools/net-tools_1.60.bb do_compile failed
+ERROR: Task 1838 (/home/testbed/oe/arago-oe-dev/recipes/net-tools/net-tools_1.60.bb, do_compile) failed with exit code 1
+ERROR: '/home/testbed/oe/arago-oe-dev/recipes/net-tools/net-tools_1.60.bb' failed
+ERROR: '/home/testbed/oe/arago-oe-dev/recipes/net-tools/net-tools_1.60.bb' failed
+#+end_src
++ how to
+  #+begin_src sh
+diff --git a/include/linux/if_tunnel.h b/include/linux/if_tunnel.h 
+index aeab2cb..82c4362 100644 
+--- a/include/linux/if_tunnel.h 
++++ b/include/linux/if_tunnel.h 
+@@ -2,7 +2,10 @@ 
+#define _IF_TUNNEL_H_ 
+
+#include <linux/types.h> 
++ 
++#ifdef __KERNEL__ 
+#include <linux/ip.h> 
++#endif 
+
+#define SIOCGETTUNNEL (SIOCDEVPRIVATE + 0) 
+#define SIOCADDTUNNEL (SIOCDEVPRIVATE + 1) 
+#+end_src
+
+* Host and Target
+After setting up opkg respository and pointing it to apache webserver
+with my vmware, now allows me easy install of python, dropbear, perl,
+etc cross-complied using code sourcery.
+#+begin_verse
+On Host:
+Install Apache sudo apt-get install apache2
+After you finish building packages on host, refresh the package index on the host: > bitbake package-index
+add a symlink to the arago deploy/ipk directory to apache's home page =/var/www/oe-repo=
+
+On EVM:
+Determine your host IP address, and then add a src/gz  line to =/etc/opkg/opkg.conf=
+On the device, re-fetch the package list : opkg update
+On the device, search for packages or install them
+=opkg list '*strace*'=
+=opkg install strace=
+#+end_verse

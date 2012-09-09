@@ -1,0 +1,777 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: Filesystem OverView
+#+OPTIONS: num:nil H:3
+
+
+* General
+** arago main page
+http://arago-project.org/wiki/index.php/Main_Page
+** busybox
+http://www.busybox.net/
+** ubuntu
+https://wiki.ubuntu.com/ARM/RootfsFromScratch
+** OpenEmbedded
+http://www.openembedded.org/wiki/Main_Page
+** Poky Linux
+http://www.pokylinux.org/
+** Root File system solutions
+http://processors.wiki.ti.com/index.php/Linux_Toolchain#Root_File_System_solutions
+
+** Creating a Root File System for Linux on OMAP35x
+http://processors.wiki.ti.com/index.php/Creating_a_Root_File_System_for_Linux_on_OMAP35x
+** Initrd
+http://processors.wiki.ti.com/index.php/Initrd
+
+* Modify
+** Using The Correct Console Device
+ update the =/etc/inittab= file in the filesystem used for kernel 
+#+begin_src sh
+S:2345:respawn:/sbin/getty 115200 ttyS2
+by,
+S:2345:respawn:/sbin/getty 115200 ttyO2
+#+end_src
+ 
+* Arago
+** Setting Up Build Environment and build
+*** ubuntu install dependency
+#+begin_src sh
+sudo apt-get install diffstat texi2html chrpath subversion python-psyco 
+#+end_src 
+*** Create the directory
+Create a new directory for the build environment:
+#+begin_src sh
+$ mkdir $HOME/oe
+$ cd $HOME/oe
+#+end_src
+*** Clone Arago repositories
+Now check out the following repositories:
+#+begin_src sh
+$ git clone git://arago-project.org/git/arago.git
+$ git clone git://arago-project.org/git/arago-oe-dev.git
+$ git clone git://arago-project.org/git/arago-bitbake.git
+#+end_src
+The directory should now be populated with 3 subdirectories – =arago=, =arago-oe-dev= and =arago-bitbake=.
+*** Copy setup/config files
+Arago repository comes with samples of arago/setenv and
+arago/conf/local.conf files, which you can use as a starting point, by
+copying them into their actual names (without .sample extension) and
+modifying to suit your needs:
+#+begin_src s
+$ cp arago/setenv.sample arago/setenv
+$ cp arago/conf/local.conf.sample arago/conf/local.conf
+#+end_src
+
++ File: =arago/setenv=
+  Edit =arago/setenv= file and make sure environment variables are set
+  properly. OEBASE should point to the directory you’ve created in the
+  beginning:
+#+begin_src sh
+export OEBASE=$HOME/oe
+#+end_src
++ File: =arago/setenv=
+  Also, in order to use a separate "scratch" area outside of home
+  directory, you may want to enable SCRATCH variable and point it
+  appropriately:
+#+begin_src sh
+export SCRATCH=/sim/scratch_AID
+#+end_src
+
+*** Set the environment variables
+#+begin_src sh
+$ . arago/seten
+#+end_src
+Or, 
+#+begin_src sh
+$ source arago/setenv
+#+end_src
+*** Point to CSL toolchain
+If not done before, set the PATH variable to point to the CodeSourcery
+toolchain (refer to [[http://www.mentor.com/embedded-software/codesourcery][Getting CodeSourcery Toolchain]]([[http://www.mentor.com/embedded-software/sourcery-tools/sourcery-codebench/lite/?cmpid=7108&lite=arm&target_os=GNU%2FLinux&target_arch=ARM&returnURL=https%253A%252F%252Fsourcery.mentor.com%252FGNUToolchain%252Frelease858%253Flite%253Darm%2526cmpid%253D7108][The binary
+distribution for 2009q1-203 version]]) for obtaining one):
+
+#+begin_src sh
+$ export PATH=/opt/arm-2009q1/bin:$PATH
+#+end_src
+
+*** Build a minimal base filesystem
+Now it should be ready to start a build of the minimal filesystem
+image:
+#+begin_src sh
+$ bitbake arago-base-image
+#+end_src
+*** Build a "demo" filesystem for OMAP3 EVM
+#+begin_src sh
+$ MACHINE=omap3evm bitbake arago-console-image
+#+end_src
+*** Build different kernels for supported platforms
+#+begin_src sh
+$ MACHINE=omap3evm bitbake virtual/kernel
+$ MACHINE=beagleboard bitbake virtual/kernel
+$ MACHINE=dm6446-evm bitbake virtual/kernel
+$ MACHINE=dm355-evm bitbake virtual/kernel
+#+end_src
+*** High-level hierarchy of arago-deploy directory
+Resulting images and packages will be placed under =arago-deploy=
+directory - =images= for the filesystem, kernel and bootloader; and =ipk=
+for binary IPK packages, respectively.
+
+#+begin_src sh
+arago-deploy
+|-- images
+|   |-- arago
+|   |-- dm355-evm
+|   |-- dm6446-evm
+|   `-- omap3evm
+|-- ipk
+|   |-- all
+|   |-- arago
+|   |-- armv5te
+|   |-- armv7a
+|   |-- dm355-evm
+|   |-- dm6446-evm
+|   |-- i686
+|   |-- i686-armv5te-sdk
+|   |-- i686-armv7a-sdk
+|   `-- omap3evm
+`-- sdk
+#+end_src
+
+*** Build individual package recipes
+You can also look in =oe/arago/recipes= for individual package recipes
+that you can bitbake. For example:
+#+begin_src sh
+bitbake curl
+bitbake thhtpd
+#+end_src
+
+*** build a native compiler (on dm8168) using
+#+begin_src sh
+MACHINE=c6a816x-evm ./arago-bitbake/bin/bitbake gcc-4.3.3(since codesourcery is using 4.3.3) or
+MACHINE=c6a816x-evm ./arago-bitbake/bin/bitbake task-sdk-native
+#+end_src
+* Host and Target
+After setting up opkg respository and pointing it to apache webserver
+with my vmware, now allows me easy install of python, dropbear, perl,
+etc cross-complied using code sourcery.
+#+begin_verse
+On Host:
+Install Apache sudo apt-get install apache2
+After you finish building packages on host, refresh the package index on the host: > bitbake package-index
+add a symlink to the arago deploy/ipk directory to apache's home page =/var/www/oe-repo=
+
+On EVM:
+Determine your host IP address, and then add a src/gz  line to =/etc/opkg/opkg.conf=
+On the device, re-fetch the package list : opkg update
+On the device, search for packages or install them
+=opkg list '*strace*'=
+=opkg install strace=
+#+end_verse
+* Notes
+** Creating a Root File System for Linux on OMAP35x
+http://processors.wiki.ti.com/index.php/Creating_a_Root_File_System_for_Linux_on_OMAP35x
+
+*** create the directory
+For simplicity, this note will
+assume the user’s directory is “user”. The home directory is then
+=/home/user=
+
+All source code will be in the “src” directory, or
+=/home/user/src=
+
+Code will be built in the “build” directory, or
+=/home/user/build=
+
+The target root file system will be built in the “target” directory, or
+=/home/user/target=
+
+To create these directories, go to /home/user and enter
+#+begin_src sh
+[root@localhost user]# cd /home/user
+[root@localhost user]# mkdir src
+[root@localhost user]# mkdir build
+[root@localhost user]# mkdir target
+#+end_src
+
+*** Configure the Linux Kernel to Support File Systems
+The Linux kernel must be configured to support the file systems described in this note. To configure the kernel enter
+“make menuconfig” on the command line.
+
+**** Device Node Creation
+The v2.6.22.x releases default to enabling =hotplug=, =sysfs=, and =tmpfs=.
+To make sure hotplug is set, type in “make menuconfig” and from the
+“Main menu” use the down arrow key to scroll down to the “General
+setup” entry and press the Enter key to select it. Scroll down to
+“Configure standard kernel features (for small systems)” and press the
+Enter key. Scroll down to “Support for hot-pluggable devices” and make
+sure it is set. The Space Bar selects and de-selects options. A sample
+sub-menu is shown below:
+
+#+begin_src sh
+ ┌──────── Configure standard kernel features (for small systems) ─────────┐
+ │  Arrow keys navigate the menu.  <Enter> selects submenus --->.          │
+ │  Highlighted letters are hotkeys.  Pressing <Y> includes, <N> excludes, │
+ │  <M> modularizes features.  Press <Esc><Esc> to exit, <?> for Help, </> │
+ │  for Search.  Legend: [*] built-in  [ ] excluded  <M> module  < >       │
+ │ ┌─────────────────────────────────────────────────────────────────────┐ │
+ │ │    --- Configure standard kernel features (for small systems)       │ │
+ │ │    [*]   Enable 16-bit UID system calls                             │ │
+ │ │    [ ]   Sysctl syscall support                                     │ │
+ │ │    [*]   Load all symbols for debugging/ksymoops                    │ │
+ │ │    [ ]     Include all symbols in kallsyms                          │ │
+ │ │    [*]     Do an extra kallsyms pass                                │ │
+ │ │    [*]   Support for hot-pluggable devices                          │ │
+ │ │    [*]   Enable support for printk                                  │ │
+ │ │    [*]   BUG() support                                              │ │
+ │ │    [*]   Enable ELF core dumps                                      │ │
+ │ └────v(+)─────────────────────────────────────────────────────────────┘ │
+ ├─────────────────────────────────────────────────────────────────────────┤
+ │                    <Select>    < Exit >    < Help >                     │
+#+end_src
+
+To ensure sysfs and tmpfs are selected, start back at the “Main menu”
+and scroll down to the “File systems” option. Press Enter to select it
+and then scroll down to the “Pseudo filesystems” option and press
+Enter to select it. The file systems selected here should be: /proc,
+/proc/sys, sysfs, and “Virtual memory file system support.” That last
+one is also referred to as /tmpfs. A sample sub-menu is shown below.
+#+begin_src sh
+ ┌────────────────────────── Pseudo filesystems ───────────────────────────┐
+ │  Arrow keys navigate the menu.  <Enter> selects submenus --->.          │
+ │  Highlighted letters are hotkeys.  Pressing <Y> includes, <N> excludes, │
+ │  <M> modularizes features.  Press <Esc><Esc> to exit, <?> for Help, </> │
+ │  for Search.  Legend: [*] built-in  [ ] excluded  <M> module  < >       │
+ │ ┌─────────────────────────────────────────────────────────────────────┐ │
+ │ │    [*] /proc file system support                                    │ │
+ │ │    [*]   Sysctl support (/proc/sys)                                 │ │
+ │ │    [*] sysfs file system support                                    │ │
+ │ │    [*] Virtual memory file system support (former shm fs)           │ │
+ │ │    [ ]   Tmpfs POSIX Access Control Lists                           │ │
+ │ │    < > Userspace-driven configuration filesystem (EXPERIMENTAL)     │ │
+ │ │                                                                     │ │
+ │ │                                                                     │ │
+ │ │                                                                     │ │
+ │ │                                                                     │ │
+ │ └─────────────────────────────────────────────────────────────────────┘ │
+ ├─────────────────────────────────────────────────────────────────────────┤
+ │                    <Select>    < Exit >    < Help >                     │
+ └─────────────────────────────────────────────────────────────────────────┘
+#+end_src
+**** Configure the Linux Kernel for Root File System over NFS
+From the “Main Menu” use the down arrow to scroll down to “File
+systems” and select it by pressing the Enter key. Under “File Systems”
+scroll down to “Network file systems” and select it. On this page make
+sure that “NFS file system support”, “Provide NFSv3 client support”,
+“Provide NFSv4 client support,” and “Root file system on NFS” are
+selected. A sample sub-menu is shown below.
+
+#+begin_src sh
+┌───────────────────────── Network File Systems ──────────────────────────┐
+ │  Arrow keys navigate the menu.  <Enter> selects submenus --->.          │
+ │  Highlighted letters are hotkeys.  Pressing <Y> includes, <N> excludes, │
+ │  <M> modularizes features.  Press <Esc><Esc> to exit, <?> for Help, </> │
+ │  for Search.  Legend: [*] built-in  [ ] excluded  <M> module  < >       │
+ │ ┌─────────────────────────────────────────────────────────────────────┐ │
+ │ │    <*> NFS file system support                                      │ │
+ │ │    [*]   Provide NFSv3 client support                               │ │
+ │ │    [ ]     Provide client support for the NFSv3 ACL protocol extensi│ │
+ │ │    [*]   Provide NFSv4 client support (EXPERIMENTAL)                │ │
+ │ │    [ ]   Allow direct I/O on NFS files                              │ │
+ │ │    < > NFS server support                                           │ │
+ │ │    [*] Root file system on NFS                                      │ │
+ │ │    [ ] Support for rpcbind versions 3 & 4 (EXPERIMENTAL)            │ │
+ │ │    --- Secure RPC: Kerberos V mechanism (EXPERIMENTAL)              │ │
+ │ │    < > Secure RPC: SPKM3 mechanism (EXPERIMENTAL)                   │ │
+ │ └────v(+)─────────────────────────────────────────────────────────────┘ │
+ ├─────────────────────────────────────────────────────────────────────────┤
+ │                    <Select>    < Exit >    < Help >                     │
+ └─────────────────────────────────────────────────────────────────────────┘
+#+end_src
+**** Configure the Linux Kernel for RAMDISK support
+In this configuration the u-boot boot loader is used to download a
+binary image to RAM and pass parameters to the kernel telling it the
+root file system is on a ramdisk, where it is located, and its size.
+From the “Main menu” scroll down to “Device Drivers” and select it.
+Then scroll down to “Block devices” and select it. On this sub-menu
+make sure “RAM disk support” is selected. For the “Default RAM disk
+size” enter 16384. The RAM disk built in this note is 16M.
+#+begin_src sh
+ ┌───────────────────────────── Block devices ─────────────────────────────┐
+ │  Arrow keys navigate the menu.  <Enter> selects submenus --->.          │
+ │  Highlighted letters are hotkeys.  Pressing <Y> includes, <N> excludes, │
+ │  <M> modularizes features.  Press <Esc><Esc> to exit, <?> for Help, </> │
+ │  for Search.  Legend: [*] built-in  [ ] excluded  <M> module  < >       │
+ │ ┌─────────────────────────────────────────────────────────────────────┐ │
+ │ │    <*> Loopback device support                                      │ │
+ │ │    < >   Cryptoloop Support                                         │ │
+ │ │    < > Network block device support                                 │ │
+ │ │    < > Low Performance USB Block driver                             │ │
+ │ │    <*> RAM disk support                                             │ │
+ │ │    (16)  Default number of RAM disks                                │ │
+ │ │    (16384) Default RAM disk size (kbytes)                           │ │
+ │ │    (1024) Default RAM disk block size (bytes)                       │ │
+ │ │    < > Packet writing on CD/DVD media                               │ │
+ │ │    < > ATA over Ethernet support                                    │ │
+ │ └─────────────────────────────────────────────────────────────────────┘ │
+ ├─────────────────────────────────────────────────────────────────────────┤
+ │                    <Select>    < Exit >    < Help >                     │
+ └─────────────────────────────────────────────────────────────────────────┘
+#+end_src
+
+The step above configures the kernel for build in a ramdisk. Now go
+back to the “Main menu” and again select “General setup.” Scroll down
+and make sure “Initial RAM filesystem and RAM disk (initramfs/initrd)
+support” is selected. By default in the T.I. kernel it is.
+#+begin_src sh
+ ┌───────────────────────────── General setup ─────────────────────────────┐
+ │  Arrow keys navigate the menu.  <Enter> selects submenus --->.          │
+ │  Highlighted letters are hotkeys.  Pressing <Y> includes, <N> excludes, │
+ │  <M> modularizes features.  Press <Esc><Esc> to exit, <?> for Help, </> │
+ │  for Search.  Legend: [*] built-in  [ ] excluded  <M> module  < >       │
+ │ ┌────^(-)─────────────────────────────────────────────────────────────┐ │
+ │ │    [ ] Auditing support                                             │ │
+ │ │    <*> Kernel .config support                                       │ │
+ │ │    [*] Enable access to .config through /proc/config.gz             │ │
+ │ │    (14) Kernel log buffer size (16 => 64KB, 17 => 128KB)            │ │
+ │ │    [*] Create deprecated sysfs files                                │ │
+ │ │    [ ] Kernel->user space relay support (formerly relayfs)          │ │
+ │ │    [*] Initial RAM filesystem and RAM disk (initramfs/initrd) suppor│ │
+ │ │    ()    Initramfs source file(s)                                   │ │
+ │ │    [*] Optimize for size (Look out for broken compilers!)           │ │
+ │ │    [*] Configure standard kernel features (for small systems)  ---> │ │
+ │ │        Choose SLAB allocator (SLAB)  --->                           │ │
+ │ └─────────────────────────────────────────────────────────────────────┘ │
+ ├─────────────────────────────────────────────────────────────────────────┤
+ │                    <Select>    < Exit >    < Help >                     │
+ └──────────────────────────────────────────────────────── ────────────────┘
+#+end_src
+**** Configure the Linux Kernel for Memory Technology Devices (MTD)
+To use any of the flash file systems, such as JFFS2 or CRAMFS, the MTD
+layer must be configured. MTD are typically flash devices used for
+storage. Configuring the individual drivers can be tricky. If a device
+is CFI compliant then all that is needed is to select the CFI options.
+In this example, CFI is selected, as is Intel/Sharp just in case the
+part it not CFI compliant. Starting at the “Main menu” scroll down to
+“Device Drivers” and select it. Scroll down to “Memory Technology
+Devices (MTD) support” and select it. There are numerous options that
+can/should be selected. The screen captures below are length
+#+begin_src sh
+ ┌──────────────── Memory Technology Device (MTD) support ─────────────────┐
+ │  Arrow keys navigate the menu.  <Enter> selects submenus --->.          │
+ │  Highlighted letters are hotkeys.  Pressing <Y> includes, <N> excludes, │
+ │  <M> modularizes features.  Press <Esc><Esc> to exit, <?> for Help, </> │
+ │  for Search.  Legend: [*] built-in  [ ] excluded  <M> module  < >       │
+ │ ┌─────────────────────────────────────────────────────────────────────┐ │
+ │ │    --- Memory Technology Device (MTD) support                       │ │
+ │ │    [ ]   Debugging                                                  │ │
+ │ │    <*>   MTD concatenating support                                  │ │
+ │ │    [*]   MTD partitioning support                                   │ │
+ │ │    < >     RedBoot partition table parsing                          │ │
+ │ │    [*]     Command line partition table parsing                     │ │
+ │ │    < >     ARM Firmware Suite partition parsing                     │ │
+ │ │    ---   User Modules And Translation Layers                        │ │
+ │ │    <*>   Direct char device access to MTD devices                   │ │
+ │ │    ---   Common interface to block layer for MTD 'translation layers│ │
+ │ │    <*>   Caching block device access to MTD devices                 │ │
+ │ │    < >   FTL (Flash Translation Layer) support                      │ │
+ │ │    < >   NFTL (NAND Flash Translation Layer) support                │ │
+ │ │    < >   INFTL (Inverse NAND Flash Translation Layer) support       │ │
+ │ │    < >   Resident Flash Disk (Flash Translation Layer) support      │ │
+ │ │    < >   NAND SSFDC (SmartMedia) read only translation layer        │ │
+ │ │          RAM/ROM/Flash chip drivers  --->                           │ │
+ │ │          Mapping drivers for chip access  --->                      │ │
+ │ │          Self-contained MTD device drivers  --->                    │ │
+ │ │    <*>   NAND Device Support  --->                                  │ │
+ │ │    <*>   OneNAND Device Support  --->                               │ │
+ │ │          UBI - Unsorted block images  --->                          │ │
+ │ └─────────────────────────────────────────────────────────────────────┘ │
+ ├─────────────────────────────────────────────────────────────────────────┤
+ │                    <Select>    < Exit >    < Help >                     │
+ └─────────────────────────────────────────────────────────────────────────┘
+#+end_src
+Select the “RAM/ROM/Flash chip drivers” and ensure CFI and Intel/Sharp
+are selected.
+#+begin_src sh
+ ┌────────────────────── RAM/ROM/Flash chip drivers ───────────────────────┐
+ │  Arrow keys navigate the menu.  <Enter> selects submenus --->.          │
+ │  Highlighted letters are hotkeys.  Pressing <Y> includes, <N> excludes, │
+ │  <M> modularizes features.  Press <Esc><Esc> to exit, <?> for Help, </> │
+ │  for Search.  Legend: [*] built-in  [ ] excluded  <M> module  < >       │
+ │ ┌─────────────────────────────────────────────────────────────────────┐ │
+ │ │    <*> Detect flash chips by Common Flash Interface (CFI) probe     │ │
+ │ │    < > Detect non-CFI AMD/JEDEC-compatible flash chips              │ │
+ │ │    [ ] Flash chip driver advanced configuration options             │ │
+ │ │    <*> Support for Intel/Sharp flash chips                          │ │
+ │ │    < > Support for AMD/Fujitsu flash chips                          │ │
+ │ │    < > Support for ST (Advanced Architecture) flash chips           │ │
+ │ │    < > Support for RAM chips in bus mapping                         │ │
+ │ │    < > Support for ROM chips in bus mapping                         │ │
+ │ │    < > Support for absent chips in bus mapping                      │ │
+ │ │                                                                     │ │
+ │ │                                                                     │ │
+ │ └─────────────────────────────────────────────────────────────────────┘ │
+ ├─────────────────────────────────────────────────────────────────────────┤
+ │                    <Select>    < Exit >    < Help >                     │
+ └─────────────────────────────────────────────────────────────────────────┘
+#+end_src
+Finally, go back to the MTD menu and select the “Mapping drivers for
+chip access” option. This option enables the partitioning of the MTD
+into four partitions: u-boot, u-boot environment, kernel, and file
+system.
+#+begin_src sh
+ ┌──────────────────── Mapping drivers for chip access ────────────────────┐
+ │  Arrow keys navigate the menu.  <Enter> selects submenus --->.          │
+ │  Highlighted letters are hotkeys.  Pressing <Y> includes, <N> excludes, │
+ │  <M> modularizes features.  Press <Esc><Esc> to exit, <?> for Help, </> │
+ │  for Search.  Legend: [*] built-in  [ ] excluded  <M> module  < >       │
+ │ ┌─────────────────────────────────────────────────────────────────────┐ │
+ │ │    [ ] Support non-linear mappings of flash chips                   │ │
+ │ │    < > CFI Flash device in physical memory map                      │ │
+ │ │    < > CFI Flash device mapped on ARM Integrator/P720T              │ │
+ │ │    <*> TI OMAP board mappings                                       │ │
+ │ │    < > Map driver for platform device RAM (mtd-ram)                 │ │
+ │ │                                                                     │ │
+ │ │                                                                     │ │
+ │ └─────────────────────────────────────────────────────────────────────┘ │
+ ├─────────────────────────────────────────────────────────────────────────┤
+ │                    <Select>    < Exit >    < Help >                     │
+ └─────────────────────────────────────────────────────────────────────────┘
+#+end_src
+
+*** Download and Build BusyBox
+The source to BusyBox can be downloaded from
+http://www.busybox.net/downloads. Download =busybox-1.20.2.tar.bz2= to the /home/user/src
+directory. Change directory to the build directory and extract the
+source code with the tar utility. 
+
+#+begin_src sh
+[root@localhost src]# cd ../build
+[root@localhost build]# tar -xjvf ../src/busybox-1.20.2.tar.bz2
+#+end_src
+
+And then:
+#+begin_src sh
+[root@localhost build]# cd busybox-1.20.2
+[root@localhost busybox-1.2.2.1]# make menuconfig
+#+end_src
+
+To build BusyBox, simply type in make at the command line. After a few
+minutes the compile should be complete. When compilation is complete
+install BusyBox to the target directory. The make and install commands
+are show below:
+#+begin_src sh
+[root@localhost busybox-1.2.2.1]# make
+[root@localhost busybox-1.2.2.1]# make CONFIG_PREFIX=/home/user/target install
+#+end_src
+
+*** Configure the New Target Root File System
+Looking at the newly built root file system, there are only three
+subdirectories of binaries and a symbolic link of bin/busybox to
+linuxrc. More directories must be created before the file system can
+be used. Some device nodes should be created, too.
+#+begin_src sh
+[root@localhost bin]# cd /home/user/target/
+[root@localhost target]# dir
+total 28
+drwxr-xr-x  2 root root 4096 Nov 21 10:20 bin
+lrwxrwxrwx  1 root root   11 Nov 21 10:20 linuxrc -> bin/busybox
+drwxr-xr-x  2 root root 4096 Nov 21 10:20 sbin
+drwxr-xr-x  4 root root 4096 Nov 21 10:20 usr
+#+end_src
++ Create the dev, dev/pts, etc, etc/init.d, lib, mnt, opt, proc, root,
+  sys, tmp, var, and var/log directories. Also create the device node
+  for the initial console.
+  #+begin_src sh
+[root@localhost target]# mkdir dev
+[root@localhost target]# mknod dev/console c 5 1
+[root@localhost target]# mkdir dev/pts
+[root@localhost target]# mkdir etc
+[root@localhost target]# mkdir etc/init.d
+[root@localhost target]# mkdir lib
+[root@localhost target]# mkdir mnt
+[root@localhost target]# mkdir opt
+[root@localhost target]# mkdir proc
+[root@localhost target]# mkdir root
+[root@localhost target]# mkdir sys
+[root@localhost target]# mkdir tmp
+[root@localhost target]# mkdir var
+[root@localhost target]# mkdir var/log
+#+end_src
++ To have the /proc and /dev/pts file systems mounted at boot time,
+  the file etc/fstab must be created in the etc directory. 
+  #+begin_src sh
+[root@localhost target]# cd etc
+[root@localhost etc]# vi fstab
+proc            /proc           proc    defaults        0 0
+none            /dev/pts        devpts  mode=0622       0 0
+#+end_src
++ The login utilities use the files group, hosts, and passwd in the
+  etc directory for logging in. For now, only root needs to be defined
+  in group and passwd while hosts just needs to have localhost
+  defined. 
+  #+begin_src sh
+[root@localhost etc]# vi group
+root:x:0:root
+
+[root@localhost etc]# vi passwd
+root::0:0:root:/root:/bin/ash 
+
+[root@localhost etc]# vi hosts
+127.0.0.1       localhost
+#+end_src
++ The kernel starts “/sbin/init” after it boots.Init reads the
+  etc/inittab file to determine what to do at start up, shutdown, or
+  when a user logs in. These inittab files can get quite complicated.
+  A simple one is shown below:
+  #+begin_src sh
+[root@localhost etc]# vi inittab
+::sysinit:/etc/init.d/rcS 
+
+# /bin/ash
+#
+# Start an "askfirst" shell on the serial port
+console::askfirst:-/bin/ash
+
+# Stuff to do when restarting the init process
+::restart:/sbin/init
+
+# Stuff to do before rebooting
+::ctrlaltdel:/sbin/reboot
+::shutdown:/bin/umount -a -r
+::shutdown:/sbin/swapoff -a
+#+end_src
+  The “sysinit” line tells init to run the /etc/init.d/rcS script to set
+  up the system. 
+
+  A simple etc/init.d/rcS file could assume file systems existed in the
+  kernel and would simply mount the mount points as needed. A more
+  complicated one would test for the existence of file systems and if
+  found, mount them; if not found, find ways to still get the system
+  booted.
+
+  The author has taken the etc/init.d/rcS and mdev.conf files from the
+  V2.6.22.18-OMAP3 release for a simple example. The rcS script will
+  test for the existence of file systems and mount them accordingly.
+  #+begin_src sh
+[root@localhost etc]# vi init.d/rcS
+
+#!/bin/sh
+#   ---------------------------------------------
+#   Common settings
+#   ---------------------------------------------
+HOSTNAME=OMAP3EVM
+VERSION=1.0.0
+
+hostname $HOSTNAME
+
+#   ---------------------------------------------
+#   Prints execution status.
+#
+#   arg1 : Execution status
+#   arg2 : Continue (0) or Abort (1) on error
+#   ---------------------------------------------
+status ()
+{
+       if [ $1 -eq 0 ] ; then
+               echo "[SUCCESS]"
+       else
+               echo "[FAILED]"
+
+               if [ $2 -eq 1 ] ; then
+                       echo "... System init aborted."
+                       exit 1
+               fi
+       fi
+
+}
+
+#   ---------------------------------------------
+#   Get verbose
+#   ---------------------------------------------
+echo ""
+echo "    System initialization..."
+echo ""
+echo "    Hostname       : $HOSTNAME"
+echo "    Filesystem     : v$VERSION"
+echo ""
+echo ""
+echo "    Kernel release : `uname -s` `uname -r`"
+echo "    Kernel version : `uname -v`"
+echo ""
+
+
+#   ---------------------------------------------
+#   MDEV Support
+#   (Requires sysfs support in the kernel)
+#   ---------------------------------------------
+echo -n " Mounting /proc             : "
+mount -n -t proc /proc /proc
+status $? 1
+
+echo -n " Mounting /sys              : "
+mount -n -t sysfs sysfs /sys
+status $? 1
+
+echo -n " Mounting /dev              : "
+mount -n -t tmpfs mdev /dev
+status $? 1
+
+echo -n " Mounting /dev/pts          : "
+mkdir /dev/pts
+mount -t devpts devpts /dev/pts
+status $? 1
+
+echo -n " Enabling hot-plug          : "
+echo "/sbin/mdev" > /proc/sys/kernel/hotplug
+status $? 0
+
+echo -n " Populating /dev            : "
+mkdir /dev/input
+mkdir /dev/snd
+
+mdev -s
+status $? 0
+
+#   ---------------------------------------------
+#   Disable power management
+#   (Requires sysfs support in the kernel)
+#   ---------------------------------------------
+# echo -n " Disabling Power mgmt       : "
+# echo -n "1" > /sys/power/cpuidle_deepest_state
+# status $? 1
+
+#   ---------------------------------------------
+#   Turn off LCD after 1 hour of inactivity
+#   (Requires sysfs support in the kernel)
+#   ---------------------------------------------
+# echo -n " Turn off LCD after 1 hour  : "
+# echo -n "3600" > /sys/power/fb_timeout_value
+# status $? 1
+
+
+#   ---------------------------------------------
+#   Mount the default file systems
+#   ---------------------------------------------
+echo -n " Mounting other filesystems : "
+mount -a
+status $? 0
+
+
+#   ---------------------------------------------
+#   Set PATH
+#   ---------------------------------------------
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+
+
+#   ---------------------------------------------
+#   Start other daemons
+#   ---------------------------------------------
+echo -n " Starting syslogd           : "
+/sbin/syslogd
+status $? 0
+
+echo -n " Starting telnetd           : "
+/usr/sbin/telnetd
+status $? 0
+
+
+#   ---------------------------------------------
+#   Done!
+#   ---------------------------------------------
+echo ""
+echo "System initialization complete."
+
+
+#   ---------------------------------------------
+#   Start demo app
+#   ---------------------------------------------
+#if [[ -x /etc/init.d/demo_start ]]; then
+#       echo " Starting Demo Application..."
+#       /etc/init.d/demo_start &
+#       sleep 5
+#fi
+Please note that in more recent kernels (2.6.29 and newer) the sysfs entries shown above to disable power management and control the LCD inactivity timeout shown above have been removed. For latest details on using OMAP Power Management in Linux please refer to this article.
+
+To automatically mount the debugfs on start-up the following can be added to the above rcS file. Please note that the debugfs needs to be selected in the kernel configuration and built into the kernel before you can mount it. The below script checks to see if the debugfs is supported by the kernel before attempting to mount the file-system. To enable the debugfs run "make menuconfig" and go to "Kernel Hacking" and select "Debug Filesystem".
+
+cat /proc/filesystems | grep -q debugfs
+if [ $? -eq 0 ] ; then
+        echo -n " Mounting /debug             : "
+        mount -n -t debugfs none /debug
+        status $? 1
+fi
+#+end_src
+  
+  To automatically mount the debugfs on start-up the following can be
+  added to the above rcS file. Please note that the debugfs needs to
+  be selected in the kernel configuration and built into the kernel
+  before you can mount it. The below script checks to see if the
+  debugfs is supported by the kernel before attempting to mount the
+  file-system. To enable the debugfs run "make menuconfig" and go to
+  "Kernel Hacking" and select "Debug Filesystem".
+  #+begin_src sh
+cat /proc/filesystems | grep -q debugfs
+if [ $? -eq 0 ] ; then
+        echo -n " Mounting /debug             : "
+        mount -n -t debugfs none /debug
+        status $? 1
+fi
+#+end_src
+  After saving the file, change its access permissions so that it is executable for all.
+  #+begin_src sh
+[root@localhost etc]# vi mdev.conf
+
+audio       0:5 0666
+console     0:5 0600
+control.*   0:0 0660 @/bin/mv /dev/$MDEV /dev/snd/
+dsp         0:5 0666
+event.*     0:0 0600 @/bin/mv /dev/$MDEV /dev/input/
+fb          0:5 0666
+nfs         0:5 0770
+null        0:0 0777
+pcm.*       0:0 0660 @/bin/mv /dev/$MDEV /dev/snd/
+rtc         0:0 0666
+tty         0:5 0660
+tty0*       0:5 0660
+tty1*       0:5 0660
+tty2*       0:5 0660
+tty3*       0:5 0660
+tty4*       0:5 0660
+tty5*       0:5 0660
+tty6*       0:5 0660
+ttyS*       0:5 0640
+urandom     0:0 0444
+zero        0:0 0666
+#+end_src
+
+
+*** Add the Shared Libraries Applications will Require
+In the Code Sourcery tool chain, most of the libraries are found in
+the =/home/testbed/CodeSourcery/Sourcery_G++_Lite/arm-none-linux-gnueabi/libc/lib= directory. Simply
+copy these files to the root file system, maintaining symbolic links
+and then strip out unneeded debug information.
+
+#+begin_src sh
+[root@localhost user]# cd /home/user/target/lib
+[root@localhost lib]# cp –r /home/testbed/CodeSourcery/Sourcery_G++_Lite/arm-none-linux-gnueabi/libc/lib/* .
+[root@localhost lib]# arm-none-linux-gnueabi-strip *
+#+end_src
+Some libraries might be in other directories in the tool chain; those
+would have to be found on a “trial and error” basis when applications
+do not load because of a missing shared library.
+*** Mounting the Root File System over NFS
+*** Enhancing the Root File System
+Any drivers built as modules need to be added to the target root file
+system
+#+begin_src sh
+[root@localhost 2.6_kernel]# make modules
+[root@localhost 2.6_kernel]# make INSTALL_MOD_PATH=/home/user/target modules_install
+#+end_src
+
+One problem still exists – the modules still have debug information so
+they are larger than they need to be. When debug information is no
+longer needed, use the arm-none-linux-gnueabi-strip utility to remove
+it. 
+#+begin_src sh
+[root@localhost user]# cd /home/user/target/lib/modules
+[root@localhost modules]# arm-none-linux-gnueabi-strip `find . –name “*.ko”`
+#+end_src
