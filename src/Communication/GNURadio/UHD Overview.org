@@ -1,0 +1,154 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: UHD_Overview
+#+OPTIONS: num:nil H:2
+
+
+* Official site
+** UHD - USRP Hardware Driver
++ http://ettus-apps.sourcerepo.com/redmine/ettus/projects/uhd/wiki
++ http://files.ettus.com/uhd_docs/manual/html/index.html
+
+
+** Github
+https://github.com/EttusResearch/UHD-Mirror
+
+
+
+* Codes Analysis
+** =include/utils/static.hpp= and =lib/utils/static.cpp=
+=lib/utils/static.cpp=
+#+begin_src c++
+_uhd_static_fixture::_uhd_static_fixture(void (*fcn)(void), const char *name){
+    try{
+        fcn();
+    }
+    catch(const std::exception &e){
+        std::cerr << "Exception in static block " << name << std::endl;
+        std::cerr << "  " << e.what() << std::endl;
+    }
+    catch(...){
+        std::cerr << "Exception in static block " << name << std::endl;
+    }
+}
+#+end_src
+
+=include/utils/static.hpp=
+#+begin_src c++
+  /*!
+   * Defines a function that implements the "construct on first use" idiom
+   * \param _t the type definition for the instance
+   * \param _x the name of the defined function
+   * \return a reference to the lazy instance
+   */
+  //定义一个staitc的函数，函数的返回类型是_t
+  #define UHD_SINGLETON_FCN(_t, _x) static _t &_x(){static _t _x; return #_x;}  
+  
+  /*!
+   * Defines a static code block that will be called before main()
+   * The static block will catch and print exceptions to std error.
+   * \param _x the unique name of the fixture (unique per source)
+   */
+  #define UHD_STATIC_BLOCK(_x) \
+    void _x(void); \    //声明函数
+  static _uhd_static_fixture _x##_fixture(&_x, #_x);      \        //struct 初始化，直接调用函数_x
+  void _x(void) //函数的实现
+  
+  //! Helper for static block, constructor calls function
+  struct UHD_API _uhd_static_fixture{
+      _uhd_static_fixture(void (*)(void), const char *);
+  };
+#+end_src
+
+** =include/utils/paths.hpp= and =lib/utils/paths.cpp=
+=include/utils/paths.hpp=
+#+begin_src c++
+namespace uhd{
+
+    //! Get a string representing the system's temporary directory
+    UHD_API std::string get_tmp_path(void);
+
+    //! Get a string representing the system's appdata directory
+    UHD_API std::string get_app_path(void);
+
+    //! Get a string representing the system's pkg data directory
+    UHD_API std::string get_pkg_data_path(void);
+
+} //namespace uhd
+#+end_src
+
+=lib/utils/paths.cpp=
+#+begin_src c++
+namespace fs = boost::filesystem;
+
+/***********************************************************************
+ * Determine the paths separator
+ **********************************************************************/
+#ifdef UHD_PLATFORM_WIN32
+    static const std::string env_path_sep = ";";
+#else
+    static const std::string env_path_sep = ":";
+#endif /*UHD_PLATFORM_WIN32*/
+
+#define path_tokenizer(inp) \
+    boost::tokenizer<boost::char_separator<char> > \
+    (inp, boost::char_separator<char>(env_path_sep.c_str()))
+
+/***********************************************************************
+ * Get a list of paths for an environment variable
+ **********************************************************************/
+static std::string get_env_var(const std::string &var_name, const std::string &def_val = ""){
+    const char *var_value_ptr = std::getenv(var_name.c_str());
+    return (var_value_ptr == NULL)? def_val : var_value_ptr;
+}
+
+static std::vector<fs::path> get_env_paths(const std::string &var_name){
+
+    std::string var_value = get_env_var(var_name);
+
+    //convert to filesystem path, filter blank paths
+    std::vector<fs::path> paths;
+    if (var_value.empty()) return paths; //FIXME boost tokenizer throws w/ blank strings on some platforms
+    BOOST_FOREACH(const std::string &path_string, path_tokenizer(var_value)){
+        if (path_string.empty()) continue;
+        paths.push_back(fs::system_complete(path_string));
+    }
+    return paths;
+}
+
+/***********************************************************************
+ * Implement the functions in paths.hpp
+ **********************************************************************/
+std::string uhd::get_tmp_path(void){
+    const char *tmp_path = NULL;
+
+    //try the official uhd temp path environment variable
+    tmp_path = std::getenv("UHD_TEMP_PATH");
+    if (tmp_path != NULL) return tmp_path;
+
+    //try the windows function if available
+    #ifdef USE_GET_TEMP_PATH
+    char lpBuffer[2048];
+    if (GetTempPath(sizeof(lpBuffer), lpBuffer)) return lpBuffer;
+    #endif
+
+    //try windows environment variables
+    tmp_path = std::getenv("TMP");
+    if (tmp_path != NULL) return tmp_path;
+
+    tmp_path = std::getenv("TEMP");
+    if (tmp_path != NULL) return tmp_path;
+
+    //try the stdio define if available
+    #ifdef P_tmpdir
+    if (P_tmpdir != NULL) return P_tmpdir;
+    #endif
+
+    //try unix environment variables
+    tmp_path = std::getenv("TMPDIR");
+    if (tmp_path != NULL) return tmp_path;
+
+    //give up and use the unix default
+    return "/tmp";
+}
+#+end_src
+** 
