@@ -1,0 +1,121 @@
+#!/bin/sh
+# V0.1.0
+# Used to clean up OE package dependencies.
+# Note, that all recursive dependencies are cleaned.
+
+PAC=${1}
+DEPLIST=""
+DEPCNT="0"
+
+usage()
+{
+	echo "usage : ${0} path/to/xx.bb"
+	echo "        cleans all xx.bb dependend packages"
+}
+
+get_args()
+{
+	if [ "${PAC}" == "" ]; then
+		usage
+		exit 1;
+	fi
+	
+}
+
+get_deps()
+{
+	DEPLIST=`bbread ${PAC} | grep -E -i -e "^DEPENDS=" | sed -e 's/.*=\"//'`
+	DEPLIST=`echo ${DEPLIST} | sed -e 's/\"//'`
+	SELF=`echo ${PAC} | sed -e 's/\.bb$//'`
+	SELF=`echo ${SELF} | sed -e 's/.*\///'`
+	SELF=`echo ${SELF} | sed -e 's/_.*$//'`
+	DEPLIST="${DEPLIST} ${SELF}"
+	DEPCNT=`echo ${DEPLIST} | wc -w`
+	echo found ${DEPCNT} dependend packages.
+}
+
+askme()
+{
+	TMP=""
+	TR="1"
+
+	for r in ${DEPLIST}; do
+		if [ "${TR}" != "" ]; then
+			echo -n "Clean '${r}' Yes/(N)o/Rest ? : "
+			read aa
+		fi
+		case "${aa}" in
+			Y )
+			TMP="${TMP} ${r}"
+			;;
+			R )
+			TR=""
+			TMP="${TMP} ${r}"
+			;;
+		esac
+	done
+
+	DEPLIST=${TMP}
+	DEPCNT=`echo ${DEPLIST} | wc -w`
+}
+
+grepit()
+{
+	echo -n "Enter a : pattern to grep  "
+	read REGI
+
+	TMP=""
+	for r in ${DEPLIST}; do
+		s=`echo ${r} | grep -v ${REGI}`
+		TMP="${TMP} ${s}"
+	done
+
+	DEPLIST=${TMP}
+	DEPCNT=`echo ${DEPLIST} | wc -w`
+}
+
+ask_user()
+{
+	if [ "${DEPCNT}" == "0" ]; then
+		echo "Nothing to clean ;-)"
+		exit 0
+	fi
+
+	echo Really clean the following packages ?
+	echo "======================================================="
+	echo ${DEPLIST}
+	echo "======================================================="
+	echo -n "Yes/(N)o/Askme/Grep : "
+	read aa
+
+	case "${aa}" in
+		Y )
+			;;
+		G )
+			grepit
+			ask_user
+			;;
+		A )
+			askme
+			ask_user
+			;;
+		* )
+			echo "aborted :-("
+			exit 1
+			;;
+	esac
+}
+
+doit()
+{
+	echo
+	echo -n cleaning, please wait 
+	bitbake -c clean ${DEPLIST}
+}
+
+get_args
+get_deps
+ask_user
+doit
+
+

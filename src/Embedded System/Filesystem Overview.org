@@ -1,11 +1,13 @@
 #+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
 #+TITLE: Filesystem OverView
-#+OPTIONS: num:nil H:3
+#+OPTIONS: num:nil H:2
 
 
 * General
 ** arago main page
 http://arago-project.org/wiki/index.php/Main_Page
+** angstrom
+http://www.angstrom-distribution.org/
 ** busybox
 http://www.busybox.net/
 ** ubuntu
@@ -149,6 +151,415 @@ bitbake thhtpd
 MACHINE=c6a816x-evm ./arago-bitbake/bin/bitbake gcc-4.3.3(since codesourcery is using 4.3.3) or
 MACHINE=c6a816x-evm ./arago-bitbake/bin/bitbake task-sdk-native
 #+end_src
+** Crosscompiling Outside of Arago
+se the sound API of the ALSA (Advanced Linux Sound Architecture)
+project and call it =sndtest.c=:
+#+begin_src c++
+#include <stdio.h>
+#include <alsa/asoundlib.h>
+
+int main()
+{
+        printf("Using ALSA %s\n", snd_asoundlib_version());
+        return 0;
+}
+#+end_src
+We need to get the header files and libraries for ALSA on our host
+system in order to compile and link our sample application. Luckily,
+everything we need is provided by Arago in form of ipk packages. Some
+of the packages, like dynamic libraries, are installed to the Arago
+filesystem. But header files and static libraries are not installed
+and usually are part of the -dev packages.
+
+Our sample application using ALSA API would require the following ipk
+packages:
+#+begin_src sh
+alsa-dev_1.0.18-r0.1_armv5te.ipk
+libasound2_1.0.18-r0.1_armv5te.ipk
+alsa-lib-dev_1.0.18-r0.1_armv5te.ipk
+#+end_src
+
+=alsa-dev= provides all the header files. =libasound2= provides the
+dynamic library (which is also installed on the Arago filesystem for
+run-time operation). And =alsa-lib-dev= provides the necessary support
+to link our application against the dynamic library.
+
+But it is possible to extract package content without opkg using only
+standard Linux tools (ar and tar) and don't worry about the package
+database:
+#+begin_src sh
+$ ar -p alsa-dev_1.0.18-r0.1_armv5te.ipk data.tar.gz | tar -zx
+$ ar -p libasound2_1.0.18-r0.1_armv5te.ipk data.tar.gz | tar -zx
+$ ar -p alsa-lib-dev_1.0.18-r0.1_armv5te.ipk data.tar.gz | tar -zx
+#+end_src
+
+Above commands would extract the actual content of data.tar.gz inside
+each of the ipk packages to the current directory, re-creating the
+directory hierarchy of the target. Specifically, header files will be
+placed under ./usr/include and libraries under ./usr/lib
+
+The resulting command would look like:
+#+begin_src sh
+$ arm-none-linux-gnueabi-gcc -o sndtest sndtest.c -I./usr/include/ -L./usr/lib/ -lasound
+#+end_src
+
+** Creating recipes in Arago
+Notes from
+https://www.ridgerun.com/developer/wiki/index.php/Creating_recipes_in_Arago
+
+*** Brief review of Arago directory layout
+
+After setting up your build environment, your directory structure should look like this:
+#+begin_src sh
+   workspace
+   |-arago
+   |-arago-bitbake
+   |-arago-oe-dev
+   |-arago-custom
+   |-arago-tmp
+   `-dowloads
+#+end_src
+
++ arago-custom: You should place your custom recipes here and also any
+  overrides to recipes contained in 'arago' or 'arago-oe-dev'
+  directories. Bitbake gives highest preference to the recipes in this
+  directory, making it possible for you to override any functionality
+  without having to touch directories under Arago control.
++ arago-tmp:This is where the build system keeps its working files and also where it places the output of the build. There's a lot going on here, so let's look at the top layer of the directory structure under arago-tmp:
+  + cache: This is where bitbake caches information it obtains from parsing all available .bb files. You will not need to look in this directory.
+  + stamps: This directory contains zero length files that are used to track each phase of the build as it is completed. You will normally not need to look in this directory.
+  + cross: This directory contains the cross development tools for generating code for TI procesors.
+  + staging: Header files, libraries, and other items needed by the build system are stored in this directory.
+  + rootfs: After an image recipe build, this directory will contain the complete root file system for the image. This directory is suitable for nfs mounting.
+  + deploy: This directory contains the final output of the build process: a set of images and ipkg files.
+  + work:This appropriately named directory is where the real work gets done.  A subdirectory is created for each package that is built.There will typically be several subdirectories in each package working directory, let's look at the main ones:
+  + <packagename-dir>:This is where the downloaded source code is expanded and patched. It will typically contain the source code for the package as well as any associated makefiles and documentation.
+  + packages: This is where the build system places the files which will be packaged into ipkg files.The contents of each of these subdirectories is a root based tree of files exactly as they are to be installed in the target system.
+  + tmp: This directory contains the scripts used to build the package and also the log files generated during the build process for the package. This is an extremely valuable debugging resource when you need to see exactly what the build system is doing.
+  + image: There is normally no reason to look in this directory. It will contain the directory structure for the package installation, but without the actual files.
+#+begin_src sh
+  tmp
+  |-cache
+  |-stamps
+  |-cross
+  |-staging
+  |-work
+  |-rootfs
+  `-deploy
+#+end_src
+*** Recipe Contents
+    Besides descriptive information about the package, a recipe also includes:
+
++ The recipe's version
++ Dependent packages
++ Source code location
++ Patches if necessary
++ Instruction of how to configure and build the package files
++ Installation location on the target machine
+
+*** Writting a recipe
+**** Basic Variables
+Recipes usually use names of the form: packagename_versionnumber.bb We
+are going to use as example, sample-recipe_1.0.0.bb, its code is
+presented below:
+#+begin_src sh
+ DESCRIPTION = "Sample program"
+  PR = "r0"
+  DEPENDS = ""
+  
+  SRC_URI = " \
+  file://sample.c \
+  "
+  S = "${WORKDIR}"
+  
+  do_compile () {
+  ${CC} ${CFLAGS} ${LDFLAGS} -o sample sample.c
+  }
+  
+  do_install () {
+  install -d ${D}${bindir}/
+  install -m 0755 ${S}/sample ${D}${bindir}/
+  }
+  
+  FILES_${PN} = "${bindir}/sample"
+#+end_src
+#+begin_verse
+Variable          Description
+PN
+The package name. Determined from the recipe filename - everything up until the first underscore is considered to be the package name. For the sample-recipe_1.0.0.bb recipe the PN variable would be set to "sample-recipe".
+
+PV
+The package version. Determined from the recipe filename - everything between the first underscore and the final .bb is considered to be the package version. For the sample-recipe_1.0.0.bb recipe the PV variable would be set to "1.0.0". 
+
+P
+The package name and versions separated by a hyphen. For the sample-recipe_1.0.0.bb recipe the P variable would be set to "sample-recipe-1.0.0".
+
+PR
+The package release. This should be explicitly set in the recipe, if not set it defaults to "r0". 
+
+WORKDIR
+The working directory is where the source code is extracted, where files (other than patches) are copied, and where the logs and installation files are created. WORKDIR is initialized to PN-PV-PR, so for example recipe sample-recipe_1.0.0.bb, the value of WORKDIR would be set to "sample-recipe_1.0.0-r0" (assuming that the recipe set PR to "r0") 
+
+S
+This is the unpacked source directory.
+Bitbake expects to find the extracted source for a package in a directory called packagename-version in the WORKDIR directory. This is the directory which it will change to before patching, compiling and installing the package.
+
+For example, let's assume we have a package recipe called sample-recipe_1.0.0.bb and we are extracting the source from the sample-1.0.0.tar.gz file. Bitbake expects the source to end up in a directory called sample-1.0.0 within the WORKDIR.
+
+If the source does not end up in this directory, then bitbake needs to be told this by explicitly setting S. 
+
+D
+This is the destination directory. It specifies where your package should be installed. The packaging system takes the contents of this directory and packages it for installation on the target.
+The directory structure beneath D should reflect where the package files are to end up in the target system. For example, if a package file is intended to end up in /usr/bin on the target system, the recipe should install the files into ${D}/usr/bin.
+
+It is considered poor practice to directly specify /usr/bin. The build system provides a set of variables that you should use instead (see table in Appendix). So for the example above, the proper installation directory specification would be ${D}${bindir} 
+
+DESCRIPTION
+Specifies the text that will be displayed by the package management system to describe what the package is.
+
+MANTAINER   The name of the mantainer and usually an e-mail address
+
+LICENSE	   The package license name
+
+DEPENDS
+If there were dependencies on any other packages to build or run, we would list them here. 
+
+SRC_URI
+Tell the build system where to find source code for the package
+
+FILES_${PN}
+Describes the list of files to be installed
+
+RDEPENDS
+A list of recommended packages to be installed
+#+end_verse
+**** Local sources and remote sources
+specified the name of the source file "sample.c" with a file://
+prefix, this is the way you must do it, if the source code is located
+in the local file system.
+#+begin_src sh
+  SRC_URI = " \
+  file://sample.c \
+"
+#+end_src
+
+the case where the source code is fetched from a remote machine.
+#+begin_src sh
+ SRC_URI = " \
+  http//www.mysite.com/downloads/sample-${PV}.tgz 
+  "
+#+end_src
+
+A second change is possible because the build system sets the S
+variable to ${WORKDIR}${P} by default. If the tarball is constructed
+in the standard fashion, we are able to delete the line in our recipe
+that used to explicity set S for the location of our source files.
+**** Applying patches
+#+begin_src sh
+ SRC_URI = " \
+  http//www.mysite.com/downloads/sample-${PV}.tgz\
+  file://examplepatch.patch;patch=1 \
+  "
+#+end_src
+**** Adding md5sum information
+#+begin_src sh
+ SRC_URI = "http//downloads.sourceforge.net/media_files.tar.gz;name=mediafiles"
+  SRC_URI[mediafiles.md5sum] = "ffc705fc5581c584d88bd88a8b9caedf"
+#+end_src
+
+*** Possible command options
+Bitbake normally acts on all metafiles defined in local.conf. It
+resolves all dependencies and builds, what is needed. To be able to do
+this, it first scans all directories given by the BBFILES entry in
+local.conf and build a hash out of that.
+
+#+begin_src sh
+mrodriguez@optimus:~/devdirs/vaddio$ bitbake --help
+.
+
+Options:
+ --version             show program's version number and exit
+ -h, --help            show this help message and exit
+  .
+ .
+ .
+                       shell.
+ -c CMD, --cmd=CMD     Specify task to execute. Note that this only executes
+                       the specified task for the providee and the packages
+                       it depends on, i.e. 'compile' does not implicitly call
+                       stage for the dependencies (IOW: use only if you know
+                       what you are doing). Depending on the base.bbclass a
+                       listtasks tasks is defined and will show available
+                       tasks
+#+end_src
+The following list gives an overview over the bitbake commands:
+
++ clean: cleans the package (tmp/work). Does not touch deploy dir (this has to be done manually).
++ fetch: fetches the package source from the source tree.
++ patch: eventually patches the sources with the patches provided in the package.
++ configure: configures the package. Knows several configure methods like autoconf/automake, qmake.
++ compile: compiles the package.
++ build: builds the package.
++ install: install the package.
++ package: packages the package.
+
+In the sample-recipe code, there are specific instructions for the
+commands: compile and install. Whether is a Makefile, those might not
+be necessary.
+
+#+begin_src sh
+do_compile () {
+${CC} ${CFLAGS} ${LDFLAGS} -o sample sample.c
+}
+
+do_install () {
+install -d ${D}${bindir}/
+install -m 0755 ${S}/sample ${D}${bindir}/
+}
+#+end_src
+
+*** Appendix
+#+begin_html
+<table width="600" cellspacing="1" cellpadding="1" border="2" align="center">
+
+<tbody><tr>
+<th scope="col"> Variable name<br>
+</th><th scope="col"> Definition<br>
+</th><th scope="col"> Typical value<br>
+</th></tr>
+<tr>
+<td> prefix<br>
+</td><td> /usr <br>
+</td><td> /usr <br>
+</td></tr>
+<tr>
+<td> base_prefix<br>
+</td><td> (empty) <br>
+</td><td> (empty)<br>
+</td></tr>
+<tr>
+<td> exec_prefix<br>
+</td><td> ${base_prefix}<br>
+</td><td> (empty)<br>
+</td></tr>
+<tr>
+<td> base_bindir<br>
+</td><td> ${base_prefix}/bin<br>
+</td><td> /bin<br>
+</td></tr>
+<tr>
+<td> base_sbindir<br>
+</td><td> ${base_prefix}/sbin<br>
+</td><td> /sbin<br>
+</td></tr>
+<tr>
+<td> base_libdir<br>
+</td><td> ${base_prefix}/lib<br>
+</td><td> /lib<br>
+</td></tr>
+<tr>
+<td> datadir <br>
+</td><td> ${prefix}/share <br>
+</td><td> /usr/share<br>
+</td></tr>
+<tr>
+<td> sysconfdir <br>
+</td><td> /etc<br>
+</td><td> /etc<br>
+</td></tr>
+<tr>
+<td> localstatedir<br>
+</td><td> /var <br>
+</td><td> /var<br>
+</td></tr>
+<tr>
+<td> infodir <br>
+</td><td> ${datadir}/info<br>
+</td><td> /usr/share/info<br>
+</td></tr>
+<tr>
+<td> mandir<br>
+</td><td> ${datadir}/man<br>
+</td><td> /usr/share/man<br>
+</td></tr>
+<tr>
+<td> docdir <br>
+</td><td> ${datadir}/doc<br>
+</td><td> /usr/share/doc<br>
+</td></tr>
+<tr>
+<td> servicedir<br>
+</td><td> /srv <br>
+</td><td> /srv<br>
+</td></tr>
+<tr>
+<td> bindir<br>
+</td><td> ${exec_prefix}/bin<br>
+</td><td> /usr/bin<br>
+</td></tr>
+<tr>
+<td> sbindir <br>
+</td><td> ${exec_prefix}/sbin<br>
+</td><td> /usr/sbin<br>
+</td></tr>
+<tr>
+<td> libexecdir<br>
+</td><td> ${exec_prefix}/libexec<br>
+</td><td> /usr/libexec<br>
+</td></tr>
+<tr>
+<td> libdir <br>
+</td><td> ${exec_prefix}/lib<br>
+</td><td> /usr/lib<br>
+</td></tr>
+<tr>
+<td> includedir <br>
+</td><td> ${exec_prefix}/include<br>
+</td><td> /usr/include<br>
+</td></tr></tbody></table>
+#+end_html
+
+* Angstrom
+** Build
+*** =python-numpy_1.4.1=
+**** Error
+Miss the libblas and liblapack 
+**** Do
+#+include: "./Files/Don-t-use-host-version-of-libblas-and-liblapack-for-python-numpy.patch" src sh
+
+Then the result are:
+=python-numpy_1.4.1.bb=
+#+include: "./Files/python-numpy_1.4.1.bb" src sh
+=00-numpy-1.4.1-no-atlas.patch=
+#+include: "./Files/00-numpy-1.4.1-no-atlas.patch" src sh
+*** =libnet_1.1.2.1.bb=
+**** Error
+#+begin_src sh
+openembedded/recipes/libnet/libnet_1.1.2.1.bb md5sum error 
+
+or
+
+ERROR: Unable to unpack '/home/testbed/oe/sources/downloads/libnet_1.1.2.1.orig.tar.gz' to '/home/testbed/oe/build/tmp-angstrom_2010_x/work/armv7a-angstrom-linux-gnueabi/libnet-1.1.2.1-r4' (cmd: tar xz --no-same-owner -f /home/testbed/oe/sources/downloads/libnet_1.1.2.1.orig.tar.gz):
+Execution of 'tar xz --no-same-owner -f
+/home/testbed/oe/sources/downloads/libnet_1.1.2.1.orig.tar.gz' failed with exit code 2:
+
+#+end_src
+**** Do
++ delete the broken tar =downloads/libnet_1.1.2.1.orig.tar.gz=
++ download it from
+  http://us.archive.ubuntu.com/ubuntu/pool/universe/libn/libnet/libnet_1.1.2.1.orig.tar.gz
++ compute the md5sum and correct =libnet_1.1.2.1.orig.tar.gz.md5=
+
+*** =iproute2-2.6.38=
+    Download from
+=http://repository.timesys.com/buildsources/i/iproute2/iproute2-2.6.38/=
+
+*** =debianutils_2.30.tar.gz=
+Download from =http://www.openpandora.org/firmware/sources/=
+*** =base-passwd_3.5.20.tar.gz=
+from
+=http://ftp.acc.umu.se/mirror/cdimage/snapshot/Debian/pool/main/b/base-passwd/=
+
 * Host and Target
 After setting up opkg respository and pointing it to apache webserver
 with my vmware, now allows me easy install of python, dropbear, perl,

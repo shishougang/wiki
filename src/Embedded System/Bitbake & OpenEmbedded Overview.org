@@ -1,4 +1,4 @@
-#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
 #+TITLE: Bitbake & OpenEmbedded Overview
 #+OPTIONS: num:nil H:2
 
@@ -9,6 +9,12 @@ http://wiki.openembedded.org/index.php/Main_Page
 ** bitbake
 http://developer.berlios.de/projects/bitbake/
 
+obtained from git://git.openembedded.org/bitbake.git. Releases can be
+downloaded from http://downloads.yoctoproject.org/releases/bitbake/
+and the developer mailing list, bitbake-devel can be found at
+http://lists.linuxtogo.org/cgi-bin/mailman/listinfo/bitbake-devel.
+
+
 * Install and Tutorial
 ** Using OpenEmbedded on Linux systems
 http://wiki.openembedded.org/index.php/OEandYourDistro
@@ -18,4 +24,123 @@ http://gumstix.org/software-development/open-embedded/160-bitbake-tutorial.html
 http://gumstix.org/software-development/open-embedded/189-image-types-and-bitbake-targets.html
 ** OpenEmbedded Directory Layout
 http://gumstix.org/software-development/open-embedded/161-openembedded-directory-layout.html
+
+
+
+* Notes
+** =conf/documentation.conf=
+#+begin_verse
+PN[doc] = "PN holds the name of the package (Package Name). It is gathered from the bitbake-file filename"
+PV[doc] = "PV holds the version of the package (Package Version). The default value is 1.0, it is \
+retrieved from the bitbake-file filename but can be changed."
+PR[doc] = "PR is the revision of the package (Package Revision). By default it is set to r0."
+PF[doc] = "Package name - Package version - Package revision (PN-PV-PR)"
+P[doc]  = "Package name - Package version (PN-PF)"
+S[doc] = "Directory that holds the sources to build, WORKDIR/PN-PV by default. The 'make' or equivalent command is run from this directory."
+SECTION[doc]  = "Section of the packages e.g. console/networking"
+
+# dependencies
+GROUP_dependencies[doc] = "The keys in this group influence the dependency handling of BitBake \
+and the resulting packages."
+DEPENDS[doc]  = "Build time dependencies, things needed to build the package. @group dependencies"
+RDEPENDS[doc] = "Run time dependencies, things needed for a given package to run.  This is used to populate the ipkg:Depends field. @group dependencies"
+PROVIDES[doc] = "Names for additional build time dependencies that this package will provide. @group dependencies"
+RPROVIDES[doc] = "Names for additional run time dependencies that this
+package will provide.  This is used to populate the ipkg:Provides field. @group dependencies"
+
+DL_DIR[doc] = "The directory where tarballs will be stored. @group fetcher"
+
+#+end_verse
+
+** OpenEmbedded HowTo
+From: http://www.uv-ac.de/openembedded/openembedded.html#toc3
+*** Bitbake
+**** Examples
+
+A bitbake nano will parse all *.bb files defined in local.conf, build a hash and build everything, which nano depends on and last but not least nano itself.
+
+A bitbake -c clean nano will clean the nano package.
+
+A bitbake -b whereYourOEPackageDirIsbitbake/nano/nano_1.3.5.bb / will just build nano. All depends have already to be fullfilled for that. This does not execute the bb file parsing and spares time (e.g. during debugging).
+
+A bitbake -b whereYourOEPackageDirIsbitbake/nano/nano_1.3.5.bb -f -c clean / will force a clean on the already builded nano package.
+
+A bitbake -b whereYourOEPackageDirIsbitbake/nano/nano_1.3.5.bb -f -c fetch / will force a fetch on the already builded nano package. The package source is downloaded again independent of the cache status.
+
+A bitbake -b whereYourOEPackageDirIsbitbake/nano/nano_1.3.5.bb -f -c build / will force a build on the nano package. This will execute all stages "before" compile like fetch, patch, configure ... and compile itself.
+
+A bitbake -D -D -D nano will build the nano package and show you all files parsed.
+
+A bitbake virtual/kernel -c clean; bitbake virtual/kernel builds a new
+kernel for the opie-image and afterwards the related image.
+*** How the configuration works
+An example is described in the following list.
+
++ openembedded/conf/bitbake.conf
+  This is where all parsing starts.
++ YourBuildDir/conf/local.conf
+  Here you can do you local configuration. Most interesting options are MACHINE and DISTRO. A TARGET_OS or TARGET_ARCH are normally defined somewhere deeper in the conf tree.
++ openembedded/conf/machine/YourDefinedMachine.conf
+  And all included machine_xxx.conf files. Here the HW-dependend options (kernel, etc ...) are defined.
++ openembedded/conf/distro/YourDefinedDistro.conf
+  And all included YourDefinedDistro_xxx.conf files (mostly none). Here the Distro dependend options are defined.
++ All BBFILES defined .bb files
+  This is the final run.
+
+*** Cleaning
+For example a qte rebuild needs
+#+begin_src sh
+cd tmp/work
+rm -rf *opie*
+rm -rf libopie*
+rm -rf libq*
+rm -rf *qte*
+cd tmp/cache
+rm -rf *opie*
+rm -rf *libopie*
+rm -rf *libq*
+rm -rf *qte*
+cd tmp/stamps
+rm -rf *opie*
+rm -rf libopie*
+rm -rf libq*
+rm -rf *qte*
+#+end_src
+before rebuilding.
+
+
+
+
+*** Debugging
++ Debugging output (-D)
+  One option to get more information on the build process is to use
+  additionally the -D option. This option may occur multiple times and
+  thus increases the DebugLevel.
+#+begin_src sh
+bitbake -D -D -D nano
+#+end_src
++ Show environment -e
+  The option -e shows the environment variables set during a bitbake
+  run.
+#+begin_src sh
+bitbake -e nano 
+#+end_src
++ Show package versions -s
++ Dry run -n
+  The dry run can be used to check, whether all dependencies are
+  fullfilled. Also versioning, etc. can be checked.
+
+
+
+
+*** Using the tmp/deploy/ipk dir as your local repository
+#+include: "./Files/mkPackages.rc" src sh
+*** Clean Package Dependends
+[[./Files/do_clean.rc][do\_clean.rc]]
+#+include: "./Files/do_clean.rc" src sh
+
++ use
+#+begin_src sh
+$ do_clean.rc ../openembedded/packages/meta/opie-image.bb
+#+end_src
 

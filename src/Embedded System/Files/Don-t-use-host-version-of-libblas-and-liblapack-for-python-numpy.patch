@@ -1,0 +1,50 @@
+diff --git a/recipes/python/python-numpy/00-numpy-1.4.1-no-atlas.patch b/recipes/python/python-numpy/00-numpy-1.4.1-no-atlas.patch
+new file mode 100644
+index 0000000..925aeb6
+--- /dev/null
++++ b/recipes/python/python-numpy/00-numpy-1.4.1-no-atlas.patch
+@@ -0,0 +1,28 @@
++When trying to locate libblas and liblapack, numpy will use the host
++versions of those libraries if available. This breaks compilation when
++linking.
++
++diff -Naur numpy-1.4.1/numpy/core/setup.py numpy-1.4.1/numpy/core/setup.py
++--- numpy-1.4.1/numpy/core/setup.py	2010-04-22 11:35:23.000000000 +0200
+++++ numpy-1.4.1/numpy/core/setup.py	2011-11-16 17:11:22.000000000 +0100
++@@ -777,7 +777,7 @@
++ 
++     # Configure blasdot
++     blas_info = get_info('blas_opt',0)
++-    #blas_info = {}
+++    blas_info = {}
++     def get_dotblas_sources(ext, build_dir):
++         if blas_info:
++             if ('NO_ATLAS_INFO',1) in blas_info.get('define_macros',[]):
++diff -Naur numpy-1.4.1/numpy/linalg/setup.py numpy-1.4.1/numpy/linalg/setup.py
++--- numpy-1.4.1/numpy/linalg/setup.py	2010-04-18 12:06:18.000000000 +0200
+++++ numpy-1.4.1/numpy/linalg/setup.py	2011-11-16 17:11:35.000000000 +0100
++@@ -9,7 +9,7 @@
++     config.add_data_dir('tests')
++ 
++     # Configure lapack_lite
++-    lapack_info = get_info('lapack_opt',0) # and {}
+++    lapack_info = get_info('lapack_opt',0) and {}
++     def get_lapack_lite_sources(ext, build_dir):
++         if not lapack_info:
++             print "### Warning:  Using unoptimized lapack ###"
+diff --git a/recipes/python/python-numpy_1.4.1.bb b/recipes/python/python-numpy_1.4.1.bb
+index f4941cf..fbe9d8d 100644
+--- a/recipes/python/python-numpy_1.4.1.bb
++++ b/recipes/python/python-numpy_1.4.1.bb
+@@ -2,9 +2,10 @@ DESCRIPTION = "A sophisticated Numeric Processing Package for Python"
+ SECTION = "devel/python"
+ PRIORITY = "optional"
+ LICENSE = "PSF"
+-PR = "ml0"
++PR = "ml1"
+ 
+ SRC_URI = "${SOURCEFORGE_MIRROR}/numpy/numpy-${PV}.tar.gz \
++           file://00-numpy-1.4.1-no-atlas.patch \
+ 	   file://config.h \
+ 	   file://numpyconfig.h \
+ 	  "
