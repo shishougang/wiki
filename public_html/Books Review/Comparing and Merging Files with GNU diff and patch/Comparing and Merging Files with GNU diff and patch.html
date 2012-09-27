@@ -1,0 +1,735 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+               "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Comparing and Merging Files with GNU diff and patch Notes</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+<meta name="title" content="Comparing and Merging Files with GNU diff and patch Notes"/>
+<meta name="generator" content="Org-mode"/>
+<meta name="generated" content="2012-09-27 14:36:45 HKT"/>
+<meta name="author" content="Shi Shougang"/>
+<meta name="description" content=""/>
+<meta name="keywords" content=""/>
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  html { font-family: Times, serif; font-size: 12pt; }
+  .title  { text-align: center; }
+  .todo   { color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #add8e6; font-weight:normal }
+  .target { }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  {margin-left:auto; margin-right:0px;  text-align:right;}
+  .left   {margin-left:0px;  margin-right:auto; text-align:left;}
+  .center {margin-left:auto; margin-right:auto; text-align:center;}
+  p.verse { margin-left: 3% }
+  pre {
+	border: 1pt solid #AEBDCC;
+	background-color: #F3F5F7;
+	padding: 5pt;
+	font-family: courier, monospace;
+        font-size: 90%;
+        overflow:auto;
+  }
+  table { border-collapse: collapse; }
+  td, th { vertical-align: top;  }
+  th.right  { text-align:center;  }
+  th.left   { text-align:center;   }
+  th.center { text-align:center; }
+  td.right  { text-align:right;  }
+  td.left   { text-align:left;   }
+  td.center { text-align:center; }
+  dt { font-weight: bold; }
+  div.figure { padding: 0.5em; }
+  div.figure p { text-align: center; }
+  div.inlinetask {
+    padding:10px;
+    border:2px solid gray;
+    margin:10px;
+    background: #ffffcc;
+  }
+  textarea { overflow-x: auto; }
+  .linenr { font-size:smaller }
+  .code-highlighted {background-color:#ffff00;}
+  .org-info-js_info-navigation { border-style:none; }
+  #org-info-js_console-label { font-size:10px; font-weight:bold;
+                               white-space:nowrap; }
+  .org-info-js_search-highlight {background-color:#ffff00; color:#000000;
+                                 font-weight:bold; }
+  /*]]>*/-->
+</style><link rel="stylesheet" href="./assets/stylesheet.css" type="text/css"/>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+
+</head>
+<body>
+<div id="org-div-home-and-up" style="text-align:right;font-size:70%;white-space:nowrap;">
+ <a accesskey="h" href="../../index.html"> UP </a>
+ |
+ <a accesskey="H" href="../../index.html"> HOME </a>
+</div>
+
+<div id="preamble">
+
+</div>
+
+<div id="content">
+<h1 class="title">Comparing and Merging Files with GNU diff and patch Notes</h1>
+
+
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">Chapter 1: What Comparison Means</a>
+<ul>
+<li><a href="#sec-2-1">1.1 Hunks</a></li>
+<li><a href="#sec-2-2">1.2 Suppressing Differences in Blank and Tab Spacing</a></li>
+<li><a href="#sec-2-3">1.3 Suppressing Differences in Blank Lines</a></li>
+<li><a href="#sec-2-4">1.4 Suppressing Case Differences</a></li>
+<li><a href="#sec-2-5">1.5 Suppressing Lines Matching a Regular Expression</a></li>
+<li><a href="#sec-2-6">1.6 Summarizing Which Files Differ</a></li>
+<li><a href="#sec-2-7">1.7 Binary Files and Forcing Text Comparisons</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">Chapter 2: diff Output Formats</a>
+<ul>
+<li><a href="#sec-3-1">2.2.1 Detailed Description of Normal Format</a></li>
+<li><a href="#sec-3-2">2.3 Showing Differences in Their Context</a></li>
+<li><a href="#sec-3-3">2.3.1 Context Format</a></li>
+<li><a href="#sec-3-4">2.3.2 Unified Format</a></li>
+<li><a href="#sec-3-5">2.3.3.1 Showing Lines That Match Regular Expressions</a></li>
+<li><a href="#sec-3-6">2.3.3.2 Showing C Function Headings</a></li>
+<li><a href="#sec-3-7">2.3.4 Showing Alternate File Names</a></li>
+<li><a href="#sec-3-8">2.4 Showing Differences Side by Side</a></li>
+<li><a href="#sec-3-9">2.6 Merging Files with If-then-else</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">Chapter 3: Incomplete Lines</a></li>
+<li><a href="#sec-5">Chapter 4: Comparing Directories</a></li>
+<li><a href="#sec-6">seldom use</a>
+<ul>
+<li><a href="#sec-6-1">2.6.1 Line Group Formats</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-1" class="outline-2">
+<h2 id="sec-1">Overview</h2>
+<div class="outline-text-2" id="text-1">
+
+<p>gnu diff was written by Paul Eggert, Mike Haertel, David Hayes,
+Richard Stallman, and Len Tower. Wayne Davison designed and implemented
+the unified output format. The basic algorithm is described in
+“An O(ND) Difference Algorithm and its Variations”, Eugene W. Myers,
+Algorithmica Vol. 1 No. 2, 1986, pp. 251–266; and in “A File Comparison
+Program”, Webb Miller and Eugene W. Myers, Software—Practice
+and Experience Vol. 15 No. 11, 1985, pp. 1025–1040. The algorithm was
+independently discovered as described in “Algorithms for Approximate String Matching”, E. Ukkonen, Information and Control Vol. 64, 1985,
+pp. 100–118.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2">Chapter 1: What Comparison Means</h2>
+<div class="outline-text-2" id="text-2">
+
+
+</div>
+
+<div id="outline-container-2-1" class="outline-3">
+<h3 id="sec-2-1">1.1 Hunks</h3>
+<div class="outline-text-3" id="text-2-1">
+
+<p>When comparing two files, diff finds sequences of lines common to
+both files, interspersed with groups of differing lines called
+<i>hunks</i>.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-2-2" class="outline-3">
+<h3 id="sec-2-2">1.2 Suppressing Differences in Blank and Tab Spacing</h3>
+<div class="outline-text-3" id="text-2-2">
+
+<p>The ‘-E’ and ‘&ndash;ignore-tab-expansion’ options ignore the distinction
+between tabs and spaces on input. A tab is considered to be equivalent
+to the number of spaces to the next tab stop. diff assumes that tab
+stops are set every 8 print columns.
+</p>
+<p>
+The ‘-b’ and ‘&ndash;ignore-space-change’ options are stronger. They
+ignore white space at line end, and consider all other sequences of one or
+more white space characters to be equivalent.
+</p>
+<p>
+<code>diff</code> considers the following two lines to be equivalent, where ‘$’
+denotes the line end:
+</p>
+<p class="verse">
+Here lyeth muche rychnesse in lytell space. &ndash; John Heywood$<br/>
+Here lyeth muche rychnesse in lytell space. &ndash; John Heywood $<br/>
+</p>
+
+
+<p>
+The ‘-w’ and ‘&ndash;ignore-all-space’ options are stronger still. They
+ignore difference even if one line has white space where the other line has
+none.
+</p>
+<p>
+<code>diff</code> considers the following two lines to be equivalent, where ‘$’ denotes the line end and ‘<sup>M’</sup>
+denotes a carriage return:
+</p>
+<p class="verse">
+Here lyeth muche rychnesse in lytell space.&ndash; John Heywood$<br/>
+&nbsp;&nbsp; He relyeth much erychnes seinly tells pace. &ndash;John Heywood <sup>M</sup>$<br/>
+</p>
+
+
+
+
+
+
+
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2-3" class="outline-3">
+<h3 id="sec-2-3">1.3 Suppressing Differences in Blank Lines</h3>
+<div class="outline-text-3" id="text-2-3">
+
+<p>The ‘-B’ and ‘&ndash;ignore-blank-lines’ options ignore insertions or
+deletions of blank lines. These options affect only lines that are completely
+empty; they do not affect lines that look empty but contain space or tab
+characters.
+</p></div>
+
+</div>
+
+<div id="outline-container-2-4" class="outline-3">
+<h3 id="sec-2-4">1.4 Suppressing Case Differences</h3>
+<div class="outline-text-3" id="text-2-4">
+
+<p>To request this, use the ‘-i’ or ‘&ndash;ignore-case’ option.
+</p></div>
+
+</div>
+
+<div id="outline-container-2-5" class="outline-3">
+<h3 id="sec-2-5">1.5 Suppressing Lines Matching a Regular Expression</h3>
+<div class="outline-text-3" id="text-2-5">
+
+<p>To ignore insertions and deletions of lines that match a grep-style regular
+expression, use the ‘-I regexp’ or ‘&ndash;ignore-matching-lines=regexp’
+option. For example, ‘diff -I ’^<a href="#digit">:digit:</a>’’ ignores all changes to lines
+beginning with a digit.
+</p>
+<p>
+You can specify more than one regular expression for lines to ignore
+by using more than one ‘-I’ option. diff tries to match each line against
+each regular expression.
+</p></div>
+
+</div>
+
+<div id="outline-container-2-6" class="outline-3">
+<h3 id="sec-2-6">1.6 Summarizing Which Files Differ</h3>
+<div class="outline-text-3" id="text-2-6">
+
+<p>diff simply reports whether files differ. The ‘-q’ and ‘&ndash;brief’
+options select this output format.
+</p>
+<p>
+Unlike diff, cmp cannot compare directories; it can only compare two
+files.
+</p></div>
+
+</div>
+
+<div id="outline-container-2-7" class="outline-3">
+<h3 id="sec-2-7">1.7 Binary Files and Forcing Text Comparisons</h3>
+<div class="outline-text-3" id="text-2-7">
+
+<p>You can force diff to consider all files to be text files, and compare them
+line by line, by using the ‘-a’ or ‘&ndash;text’ option.
+</p>
+<p>
+You can also force diff to consider all files to be binary files, and
+report only whether they differ (but not how). Use the ‘-q’ or ‘&ndash;brief’
+option for this.
+</p>
+<p>
+Use the ‘&ndash;binary’ option to force diff to read and write binary data
+instead.
+</p>
+<p>
+The ‘&ndash;strip-trailing-cr’ causes diff to treat input lines that end
+in carriage return followed by newline as if they end in plain newline
+</p>
+
+
+
+
+
+
+
+
+
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">Chapter 2: diff Output Formats</h2>
+<div class="outline-text-2" id="text-3">
+
+
+</div>
+
+<div id="outline-container-3-1" class="outline-3">
+<h3 id="sec-3-1">2.2.1 Detailed Description of Normal Format</h3>
+<div class="outline-text-3" id="text-3-1">
+
+<p>All line numbers are the original line numbers in each file. The types
+of change commands are:
+</p>
+<ul>
+<li><b>‘lar’</b>: Add the lines in range r of the second file after line l of the
+  first file. For example, ‘8a12,15’ means append lines 12–15 of file 2
+  after line 8 of file 1; or, if changing file 2 into file 1, delete lines 12–15 of file 2.
+</li>
+<li><b>‘fct’</b>: Replace the lines in range f of the first file with lines
+  in range t of the second file. This is like a combined add and
+  delete, but more compact. For example, ‘5,7c8,10’ means change lines
+  5–7 of file 1 to read as lines 8–10 of file 2; or, if changing file
+  2 into file 1, change lines 8–10 of file 2 to read as lines 5–7 of file 1.
+</li>
+<li><b>‘rdl’</b> Delete the lines in range r from the first file; line l is
+  where they would have appeared in the second file had they not been
+  deleted. For example, ‘5,7d3’ means delete lines 5–7 of file 1; or,
+  if changing file 2 into file 1, append lines 5–7 of file 1 after
+  line 3 of file 2.
+</li>
+</ul>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-3-2" class="outline-3">
+<h3 id="sec-3-2">2.3 Showing Differences in Their Context</h3>
+<div class="outline-text-3" id="text-3-2">
+
+<p>you will
+also want to see the parts of the files near the lines that differ, to help you
+understand exactly what has changed. These nearby parts of the files are
+called the <i>context</i>.
+</p>
+<p>
+gnu diff provides two output formats that show context around the
+differing lines: context format and unified format.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-3-3" class="outline-3">
+<h3 id="sec-3-3">2.3.1 Context Format</h3>
+<div class="outline-text-3" id="text-3-3">
+
+<p>To select this output format, use the ‘-C lines’, ‘&ndash;context[=lines]’,
+or ‘-c’ option. The argument lines that some of these options take is
+the number of lines of context to show.
+</p><ul>
+<li id="sec-3-3-1">2.3.1.1 Detailed Description of Context Format<br/>
+The lines that differ between the two files start with one of
+the following indicator characters, followed by a space character:
+
+<ul>
+<li>‘!’: A line that is part of a group of one or more lines that
+  changed between the two files. There is a corresponding group of
+  lines marked with ‘!’ in the part of this hunk for the other file.
+
+</li>
+<li>‘+’ An “inserted” line in the second file that corresponds to
+  nothing in the first file. 
+
+</li>
+<li>‘-’ A “deleted” line in the first file that corresponds to nothing
+  in the second file.
+</li>
+</ul>
+
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-3-4" class="outline-3">
+<h3 id="sec-3-4">2.3.2 Unified Format</h3>
+<div class="outline-text-3" id="text-3-4">
+
+<p>To select this
+output format, use the ‘-U lines’, ‘&ndash;unified[=lines]’, or ‘-u’ option. The
+argument lines is the number of lines of context to show.
+</p>
+<ul>
+<li id="sec-3-4-1">2.3.2.1 Detailed Description of Unified Format<br/>
+Unified format hunks look like this:
+
+<p class="verse">
+@@ from-file-range to-file-range @@<br/>
+line-from-either-file<br/>
+line-from-either-file&hellip;<br/>
+</p>
+
+
+<p>
+The lines that actually differ between the two files have one of the
+following indicator characters in the left print column:
+</p><ul>
+<li>‘+’ A line was added here to the first file.
+</li>
+<li>‘-’ A line was removed here from the first file.
+</li>
+</ul>
+
+</li>
+</ul>
+<ul>
+<li id="sec-3-4-2">2.3.2.2 An Example of Unified Format<br/>
+
+
+
+<pre class="src src-sh">$ diff -u  test1 test2
+--- test1       2012-09-26 22:55:50.875392031 +0800
++++ test2       2012-09-26 23:09:39.927172792 +0800
+@@ -1,11 +1,13 @@
+-The Way that can be told of is not the eternal Way;
+-The name that can be named is not the eternal name.
+ The Nameless is the origin of Heaven and Earth;
+-The Named is the mother of all things.
++The named is the mother of all things.
++
+ Therefore let there always be non-being,
+ so we may see their subtlety,
+ And let there always be being,
+ so we may see their outcome.
+ The two are the same,
+ But after they are produced,
+-they have different names.
+<span style="color: #ffa07a;">\ </span>No newline at end of file
++they have different names.
++They both may be called deep and profound.
++Deeper and more profound,
++The door of all subtleties!
+<span style="color: #ffa07a;">\ </span>No newline at end of file
+
+</pre>
+
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-3-5" class="outline-3">
+<h3 id="sec-3-5">2.3.3.1 Showing Lines That Match Regular Expressions</h3>
+<div class="outline-text-3" id="text-3-5">
+
+<p>use the ‘-F regexp’ or ‘&ndash;show-function-line=regexp’ option.
+</p>
+<p>
+Here are suggested regular expressions for some
+common languages:
+</p>
+
+
+<pre class="src src-sh">&#8216;^[[:alpha:]$<span style="color: #eedd82;">_</span>]&#8217;
+   C, C++, Prolog
+&#8216;^(&#8217;   Lisp
+&#8216;^@node&#8217;    Texinfo
+</pre>
+
+
+<p>
+The ‘-F’ and ‘&ndash;show-function-line’ options find the nearest unchanged
+line that precedes each hunk of differences and matches the given
+regular expression.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-3-6" class="outline-3">
+<h3 id="sec-3-6">2.3.3.2 Showing C Function Headings</h3>
+<div class="outline-text-3" id="text-3-6">
+
+<p>To show in which functions differences occur for C and similar languages,
+you can use the ‘-p’ or ‘&ndash;show-c-function’ option.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-3-7" class="outline-3">
+<h3 id="sec-3-7">2.3.4 Showing Alternate File Names</h3>
+<div class="outline-text-3" id="text-3-7">
+
+<p>Here are the first two lines of the output from ‘diff -C 2
+&ndash;label=original &ndash;label=modified lao tzu’:
+</p>
+
+
+<pre class="src src-sh">*** original
+--- modified
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-3-8" class="outline-3">
+<h3 id="sec-3-8">2.4 Showing Differences Side by Side</h3>
+<div class="outline-text-3" id="text-3-8">
+
+<p>The gutter contains one of the following markers:
+</p>
+<p class="verse">
+white space<br/>
+The corresponding lines are in common. That is, either the<br/>
+lines are identical, or the difference is ignored because of one<br/>
+of the ‘&ndash;ignore’ options (see Section 1.2 [White Space],<br/>
+page 6).<br/>
+<br/>
+‘|’   The corresponding lines differ, and they are either both complete<br/>
+or both incomplete.<br/>
+<br/>
+‘&lt;’ The files differ and only the first file contains the line.<br/>
+‘&gt;’ The files differ and only the second file contains the line.<br/>
+‘(’ Only the first file contains the line, but the difference is<br/>
+ignored.<br/>
+‘)’ Only the second file contains the line, but the difference is<br/>
+ignored.<br/>
+‘\’ The corresponding lines differ, and only the first line is incomplete.<br/>
+‘/’ The corresponding lines differ, and only the second line is<br/>
+incomplete.<br/>
+</p>
+
+
+<ul>
+<li id="sec-3-8-1">2.4.1 Controlling Side by Side Format<br/>
+The ‘-y’ or ‘&ndash;side-by-side’ option selects side by side format.
+
+<p>
+You can set the width of the output with the ‘-W columns’
+or ‘&ndash;width=columns’ option.
+</p>
+<p>
+The ‘&ndash;left-column’ option prints only the left column of two common
+lines. The ‘&ndash;suppress-common-lines’ option suppresses common
+lines entirely
+</p>
+</li>
+</ul>
+<ul>
+<li id="sec-3-8-2">2.4.2 An Example of Side by Side Format<br/>
+Here is the output of the command <code>‘diff -y -W 65 lao tzu’</code>.
+
+
+
+
+<pre class="src src-sh">The Way that can be told of i &lt;
+The name that can be named is &lt;
+The Nameless is the origin of   The Nameless is the origin of
+The Named is the mother of al | The named is the mother of al
+                              &gt;
+Therefore let there always be   Therefore let there always be
+so we may see their subtlety,   so we may see their subtlety,
+And let there always be being   And let there always be being
+so we may see their outcome.    so we may see their outcome.
+The two are the same,           The two are the same,
+But after they are produced,    But after they are produced,
+they have different names.    <span style="color: #ffa07a;">\ </span>they have different names.
+                              &gt; They both may be called deep 
+                              &gt; Deeper and more profound,
+                              &gt; The door of all subtleties!%  
+</pre>
+
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-3-9" class="outline-3">
+<h3 id="sec-3-9">2.6 Merging Files with If-then-else</h3>
+<div class="outline-text-3" id="text-3-9">
+
+<p>To merge two files, use diff with the ‘-D name’ or ‘&ndash;ifdef=name’
+option. The argument name is the C preprocessor identifier to use in
+the #ifdef and #ifndef directives.
+</p>
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-4" class="outline-2">
+<h2 id="sec-4">Chapter 3: Incomplete Lines</h2>
+<div class="outline-text-2" id="text-4">
+
+<p>When an input file ends in a non-newline character, its last line is
+called an incomplete line because its last character is not a newline. All
+other lines are called full lines and end in a newline character. Incomplete
+lines do not match full lines unless differences in white space are
+ignored
+</p></div>
+
+</div>
+
+<div id="outline-container-5" class="outline-2">
+<h2 id="sec-5">Chapter 4: Comparing Directories</h2>
+<div class="outline-text-2" id="text-5">
+
+
+
+
+</div>
+
+</div>
+
+<div id="outline-container-6" class="outline-2">
+<h2 id="sec-6">seldom use</h2>
+<div class="outline-text-2" id="text-6">
+
+
+</div>
+
+<div id="outline-container-6-1" class="outline-3">
+<h3 id="sec-6-1">2.6.1 Line Group Formats</h3>
+<div class="outline-text-3" id="text-6-1">
+
+<p>You should quote format, because it typically contains shell
+metacharacters.
+‘&ndash;old-group-format=format’
+These line groups are hunks containing only lines from the
+first file. The default old group format is the same as the
+changed group format if it is specified; otherwise it is a format
+that outputs the line group as-is.
+</p>
+<p>
+‘&ndash;new-group-format=format’
+These line groups are hunks containing only lines from the
+second file. The default new group format is same as the
+changed group format if it is specified; otherwise it is a format
+that outputs the line group as-is.
+</p>
+<p>
+‘&ndash;changed-group-format=format’
+These line groups are hunks containing lines from both files.
+The default changed group format is the concatenation of
+the old and new group formats.
+</p>
+<p>
+‘&ndash;unchanged-group-format=format’
+These line groups contain lines common to both files. The
+default unchanged group format is a format that outputs the
+line group as-is.
+</p>
+<p>
+In a line group format, ordinary characters represent themselves; conversion
+specifications start with ‘%’ and have one of the following forms.
+‘%&lt;’ stands for the lines from the first file, including the trailing
+newline. Each line is formatted according to the old line
+format (see Section 2.6.2 [Line Formats], page 27).
+‘%&gt;’ stands for the lines from the second file, including the trailing
+newline. Each line is formatted according to the new line
+format.
+‘%=’ stands for the lines common to both files, including the trailing
+newline. Each line is formatted according to the unchanged
+line format.
+‘%%’ stands for ‘%’.
+‘%c’C’’ where C is a single character, stands for C. C may not be a
+backslash or an apostrophe. For example, ‘%c’:’’ stands for
+a colon, even inside the then-part of an if-then-else format,
+which a colon would normally terminate.
+‘%c’\O’’ where O is a string of 1, 2, or 3 octal digits, stands for the
+character with octal code O. For example, ‘%c’\0’’ stands
+for a null character.
+</p>
+<p>
+‘Fn’ where F is a printf conversion specification and n is one of
+the following letters, stands for n’s value formatted with F.
+‘e’ The line number of the line just before the
+group in the old file.
+‘f’ The line number of the first line in the group
+in the old file; equals e + 1.
+</p>
+<p>
+‘l’ The line number of the last line in the group in
+the old file.
+‘m’ The line number of the line just after the group
+in the old file; equals l + 1.
+‘n’ The number of lines in the group in the old file;
+equals l - f + 1.
+‘E,F,L,M,N ’
+Likewise, for lines in the new file.
+</p>
+
+</div>
+</div>
+</div>
+</div>
+
+<div id="postamble">
+<p class="date">Date: 2012-09-27 14:36:45 HKT</p>
+<p class="author">Author: Shi Shougang</p>
+<p class="creator">Org version 7.8.09 with Emacs version 24</p>
+<a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
+
+</div>
+</body>
+</html>

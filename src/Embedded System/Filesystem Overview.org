@@ -1186,3 +1186,65 @@ it.
 [root@localhost user]# cd /home/user/target/lib/modules
 [root@localhost modules]# arm-none-linux-gnueabi-strip `find . –name “*.ko”`
 #+end_src
+
+* Build FAQ
+** Openembedded build cmake: Error running link command: No such file or directory
++ The errors are:
+#+begin_src sh
+| Linking CXX static library libcmsys.a
+| cd /home/testbed/oe/arago-tmp/work/armv5te-none-linux-gnueabi/cmake-2.8.3-r2.1/cmake-2.8.3/Source/kwsys && /home/testbed/oe/arago-tmp/sysroots/i686-linux/usr/bin/cmake -P CMakeFiles/cmsys.dir/cmake_clean_target.cmake
+| cd /home/testbed/oe/arago-tmp/work/armv5te-none-linux-gnueabi/cmake-2.8.3-r2.1/cmake-2.8.3/Source/kwsys && /home/testbed/oe/arago-tmp/sysroots/i686-linux/usr/bin/cmake -E cmake_link_script CMakeFiles/cmsys.dir/link.txt --verbose=1
+| CMAKE_AR-NOTFOUND cr libcmsys.a  CMakeFiles/cmsys.dir/ProcessUNIX.o CMakeFiles/cmsys.dir/Base64.o CMakeFiles/cmsys.dir/MD5.o CMakeFiles/cmsys.dir/Terminal.o CMakeFiles/cmsys.dir/System.o CMakeFiles/cmsys.dir/String.o CMakeFiles/cmsys.dir/Directory.o CMakeFiles/cmsys.dir/DynamicLoader.o CMakeFiles/cmsys.dir/Glob.o CMakeFiles/cmsys.dir/RegularExpression.o CMakeFiles/cmsys.dir/SystemTools.o CMakeFiles/cmsys.dir/CommandLineArguments.o CMakeFiles/cmsys.dir/Registry.o CMakeFiles/cmsys.dir/IOStream.o CMakeFiles/cmsys.dir/SystemInformation.o
+| Error running link command: No such file or directory
+| make[2]: *** [Source/kwsys/libcmsys.a] Error 2
+| make[2]: Leaving directory `/home/testbed/oe/arago-tmp/work/armv5te-none-linux-gnueabi/cmake-2.8.3-r2.1/cmake-2.8.3'
+| make[1]: *** [Source/kwsys/CMakeFiles/cmsys.dir/all] Error 2
+| make[1]: Leaving directory `/home/testbed/oe/arago-tmp/work/armv5te-none-linux-gnueabi/cmake-2.8.3-r2.1/cmake-2.8.3'
+| make: *** [all] Error 2
+| FATAL: oe_runmake failed
+| ERROR: Function do_compile failed
+NOTE: package cmake-2.8.3-r2.1: task do_compile: Failed
+ERROR: TaskFailed event exception, aborting
+ERROR: Build of /home/testbed/oe/arago-oe-dev/recipes/cmake/cmake_2.8.3.bb do_compile failed
+ERROR: Task 15 (/home/testbed/oe/arago-oe-dev/recipes/cmake/cmake_2.8.3.bb, do_compile) failed with exit code 1
+ERROR: '/home/testbed/oe/arago-oe-dev/recipes/cmake/cmake_2.8.3.bb' failed
+ERROR: '/home/testbed/oe/arago-oe-dev/recipes/cmake/cmake_2.8.3.bb' failed
+#+end_src
++ To do
+  add the =arm-none-linux-gnueabi-ar= path to the =CMAKE_FIND_ROOT_PATH=
+  
+  In the file: =/home/testbed/oe/arago-oe-dev/classes/cmake.bbclass=
+#+begin_src sh
+  echo "set( CMAKE_FIND_ROOT_PATH ${STAGING_DIR_HOST} ${STAGING_DIR_NATIVE} ${STAGING_DIR_NATIVE}${prefix_native}/${BASE_PACKAGE_ARCH} "/home/testbed/CodeSourcery/Sourcery_G++_Lite" )" >> ${WORKDIR}/toolchain.cmake
+#+end_src
+
+** Openembedded build cmake: bin/ld: cannot find libncurses.so.5
++ The errors are like:
+#+begin_src sh
+oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libexpat.so when searching for -lexpat
+	/oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libexpat.a when searching for -lexpat
+	/oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libz.so when searching for -lz
+	/oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libz.a when searching for -lz
+	/oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libcurl.so when searching for -lcurl
+	/oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libcurl.a when searching for -lcurl
+	/oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libncurses.so.5 when searching for libncurses.so.5
+	/oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: cannot find libncurses.so.5
+#+end_src
++ To do
+  Miss the DEPENDS: =ncures=, add `ncurses` to `DEPENDS` 
+#+begin_src sh
+--- a/recipes/cmake/cmake_2.8.3.bb
++++ b/recipes/cmake/cmake_2.8.3.bb
+@@ -4,7 +4,7 @@ PR = "${INC_PR}.1"
+ 
+ inherit cmake
+ 
+-DEPENDS += "curl expat zlib libarchive"
++DEPENDS += "curl expat zlib libarchive ncurses"
+ 
+ SRC_URI[md5sum] = "a76a44b93acf5e3badda9de111385921"
+ SRC_URI[sha256sum] = "689ed02786b5cefa5515c7716784ee82a82e8ece6be5a3d629ac3cc0c05fc288"
+#+end_src
+
+
+** Ope

@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Filesystem OverView"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-09-25 19:46:38 HKT"/>
+<meta name="generated" content="2012-09-27 14:36:41 HKT"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -139,6 +139,13 @@
 <li><a href="#sec-6">Notes</a>
 <ul>
 <li><a href="#sec-6-1">Creating a Root File System for Linux on OMAP35x</a></li>
+</ul>
+</li>
+<li><a href="#sec-7">Build FAQ</a>
+<ul>
+<li><a href="#sec-7-1">Openembedded build cmake: Error running link command: No such file or directory</a></li>
+<li><a href="#sec-7-2">Openembedded build cmake: bin/ld: cannot find libncurses.so.5</a></li>
+<li><a href="#sec-7-3">Ope</a></li>
 </ul>
 </li>
 </ul>
@@ -1963,15 +1970,134 @@ it.
 [root@localhost modules]# arm-none-linux-gnueabi-strip <span style="color: #fa8072;">`find . &#8211;name &#8220;*.ko&#8221;`</span>
 </pre>
 
+
 </li>
 </ul>
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-7" class="outline-2">
+<h2 id="sec-7">Build FAQ</h2>
+<div class="outline-text-2" id="text-7">
+
+
+</div>
+
+<div id="outline-container-7-1" class="outline-3">
+<h3 id="sec-7-1">Openembedded build cmake: Error running link command: No such file or directory</h3>
+<div class="outline-text-3" id="text-7-1">
+
+<ul>
+<li>The errors are:
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh">| Linking CXX static library libcmsys.a
+| <span style="color: #b0c4de;">cd</span> /home/testbed/oe/arago-tmp/work/armv5te-none-linux-gnueabi/cmake-2.8.3-r2.1/cmake-2.8.3/Source/kwsys &amp;&amp; /home/testbed/oe/arago-tmp/sysroots/i686-linux/usr/bin/cmake -P CMakeFiles/cmsys.dir/cmake_clean_target.cmake
+| <span style="color: #b0c4de;">cd</span> /home/testbed/oe/arago-tmp/work/armv5te-none-linux-gnueabi/cmake-2.8.3-r2.1/cmake-2.8.3/Source/kwsys &amp;&amp; /home/testbed/oe/arago-tmp/sysroots/i686-linux/usr/bin/cmake -E cmake_link_script CMakeFiles/cmsys.dir/link.txt --verbose=1
+| CMAKE_AR-NOTFOUND cr libcmsys.a  CMakeFiles/cmsys.dir/ProcessUNIX.o CMakeFiles/cmsys.dir/Base64.o CMakeFiles/cmsys.dir/MD5.o CMakeFiles/cmsys.dir/Terminal.o CMakeFiles/cmsys.dir/System.o CMakeFiles/cmsys.dir/String.o CMakeFiles/cmsys.dir/Directory.o CMakeFiles/cmsys.dir/DynamicLoader.o CMakeFiles/cmsys.dir/Glob.o CMakeFiles/cmsys.dir/RegularExpression.o CMakeFiles/cmsys.dir/SystemTools.o CMakeFiles/cmsys.dir/CommandLineArguments.o CMakeFiles/cmsys.dir/Registry.o CMakeFiles/cmsys.dir/IOStream.o CMakeFiles/cmsys.dir/SystemInformation.o
+| Error running link command: No such file or directory
+| make[2]: *** [Source/kwsys/libcmsys.a] Error 2
+| make[2]: Leaving directory <span style="color: #fa8072;">`/home/testbed/oe/arago-tmp/work/armv5te-none-linux-gnueabi/cmake-2.8.3-r2.1/cmake-2.8.3'</span>
+<span style="color: #fa8072;">| make[1]: *** [Source/kwsys/CMakeFiles/cmsys.dir/all] Error 2</span>
+<span style="color: #fa8072;">| make[1]: Leaving directory `</span>/home/testbed/oe/arago-tmp/work/armv5te-none-linux-gnueabi/cmake-2.8.3-r2.1/cmake-2.8.3<span style="color: #ffa07a;">'</span>
+<span style="color: #ffa07a;">| make: *** [all] Error 2</span>
+<span style="color: #ffa07a;">| FATAL: oe_runmake failed</span>
+<span style="color: #ffa07a;">| ERROR: Function do_compile failed</span>
+<span style="color: #ffa07a;">NOTE: package cmake-2.8.3-r2.1: task do_compile: Failed</span>
+<span style="color: #ffa07a;">ERROR: TaskFailed event exception, aborting</span>
+<span style="color: #ffa07a;">ERROR: Build of /home/testbed/oe/arago-oe-dev/recipes/cmake/cmake_2.8.3.bb do_compile failed</span>
+<span style="color: #ffa07a;">ERROR: Task 15 (/home/testbed/oe/arago-oe-dev/recipes/cmake/cmake_2.8.3.bb, do_compile) failed with exit code 1</span>
+<span style="color: #ffa07a;">ERROR: '</span>/home/testbed/oe/arago-oe-dev/recipes/cmake/cmake_2.8.3.bb<span style="color: #ffa07a;">' failed</span>
+<span style="color: #ffa07a;">ERROR: '</span>/home/testbed/oe/arago-oe-dev/recipes/cmake/cmake_2.8.3.bb<span style="color: #ffa07a;">' failed</span>
+</pre>
+
+<ul>
+<li>To do
+  add the <code>arm-none-linux-gnueabi-ar</code> path to the <code>CMAKE_FIND_ROOT_PATH</code>
+
+<p>  
+  In the file: <code>/home/testbed/oe/arago-oe-dev/classes/cmake.bbclass</code>
+</p></li>
+</ul>
+
+
+
+
+<pre class="src src-sh"><span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"set( CMAKE_FIND_ROOT_PATH ${STAGING_DIR_HOST} ${STAGING_DIR_NATIVE} ${STAGING_DIR_NATIVE}${prefix_native}/${BASE_PACKAGE_ARCH} "</span>/home/testbed/CodeSourcery/Sourcery_G++_Lite<span style="color: #ffa07a;">" )"</span> &gt;&gt; ${<span style="color: #eedd82;">WORKDIR</span>}/toolchain.cmake
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-7-2" class="outline-3">
+<h3 id="sec-7-2">Openembedded build cmake: bin/ld: cannot find libncurses.so.5</h3>
+<div class="outline-text-3" id="text-7-2">
+
+<ul>
+<li>The errors are like:
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh">oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libexpat.so when searching for -lexpat
+        /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libexpat.a when searching for -lexpat
+        /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libz.so when searching for -lz
+        /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libz.a when searching for -lz
+        /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libcurl.so when searching for -lcurl
+        /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libcurl.a when searching for -lcurl
+        /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: skipping incompatible /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/lib/libncurses.so.5 when searching for libncurses.so.5
+        /oe/build-minimal-uclibc/minimal-uclibc-dev/sysroots/i686-linux/usr/armv7a/lib/gcc/arm-oe-linux-uclibceabi/4.5.3/../../../../arm-oe-linux-uclibceabi/bin/ld: cannot find libncurses.so.5
+</pre>
+
+<ul>
+<li>To do
+  Miss the DEPENDS: <code>ncures</code>, add `ncurses` to `DEPENDS` 
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh">--- a/recipes/cmake/cmake_2.8.3.bb
++++ b/recipes/cmake/cmake_2.8.3.bb
+@@ -4,7 +4,7 @@ <span style="color: #eedd82;">PR</span> = <span style="color: #ffa07a;">"${INC_PR}.1"</span>
+
+ inherit cmake
+
+-DEPENDS += <span style="color: #ffa07a;">"curl expat zlib libarchive"</span>
++<span style="color: #eedd82;">DEPENDS</span> += <span style="color: #ffa07a;">"curl expat zlib libarchive ncurses"</span>
+
+ <span style="color: #eedd82;">SRC_URI</span>[md5sum] = <span style="color: #ffa07a;">"a76a44b93acf5e3badda9de111385921"</span>
+ <span style="color: #eedd82;">SRC_URI</span>[sha256sum] = <span style="color: #ffa07a;">"689ed02786b5cefa5515c7716784ee82a82e8ece6be5a3d629ac3cc0c05fc288"</span>
+</pre>
+
+
+
+</div>
+
+</div>
+
+<div id="outline-container-7-3" class="outline-3">
+<h3 id="sec-7-3">Ope</h3>
+<div class="outline-text-3" id="text-7-3">
+
 </div>
 </div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-09-25 19:46:38 HKT</p>
+<p class="date">Date: 2012-09-27 14:36:41 HKT</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.09 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

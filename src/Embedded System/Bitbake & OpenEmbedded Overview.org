@@ -14,7 +14,6 @@ downloaded from http://downloads.yoctoproject.org/releases/bitbake/
 and the developer mailing list, bitbake-devel can be found at
 http://lists.linuxtogo.org/cgi-bin/mailman/listinfo/bitbake-devel.
 
-
 * Install and Tutorial
 ** Using OpenEmbedded on Linux systems
 http://wiki.openembedded.org/index.php/OEandYourDistro
@@ -25,8 +24,51 @@ http://gumstix.org/software-development/open-embedded/189-image-types-and-bitbak
 ** OpenEmbedded Directory Layout
 http://gumstix.org/software-development/open-embedded/161-openembedded-directory-layout.html
 
+* Misc
+** Variable
+=openembedded/conf/bitbake.conf=
+#+begin_src  sh
+# Path prefixes
+export base_prefix = ""
+export prefix = "/usr"
+export exec_prefix = "/usr"
 
+# Base paths
+export base_bindir = "${base_prefix}/bin"
+export base_sbindir = "${base_prefix}/sbin"
+export base_libdir = "${base_prefix}/lib"
 
+# Architecture independent paths
+export datadir = "${prefix}/share"
+export sysconfdir = "${base_prefix}/etc"
+export servicedir = "${base_prefix}/srv"
+export sharedstatedir = "${base_prefix}/com"
+export localstatedir = "${base_prefix}/var"
+export infodir = "${datadir}/info"
+export mandir = "${datadir}/man"
+export docdir = "${datadir}/doc"
+.....
+##################################################################
+# Download locations and utilities.
+##################################################################
+
+OE_STRICT_CHECKSUMS ?= "1"
+
+ADOBE_MIRROR = "http://fpdownload.macromedia.com/get/flashplayer/current/"
+APACHE_MIRROR = "http://archive.apache.org/dist"
+DEBIAN_MIRROR = "ftp://ftp.debian.org/debian/pool"
+E_MIRROR = "http://download.enlightenment.org/releases"
+E_SVN = "svn://svn.enlightenment.org/svn/e"
+FREEBSD_MIRROR = "ftp://ftp.freebsd.org/pub/FreeBSD/"
+FREEDESKTOP_CVS = "cvs://anoncvs:anoncvs@anoncvs.freedesktop.org/cvs"
+FREESMARTPHONE_GIT = "git://git.freesmartphone.org"
+GENTOO_MIRROR = "http://distfiles.gentoo.org/distfiles"
+GNOME_GIT = "git://git.gnome.org"
+...
+#+end_src
+
+* Notes of OpenEmbedded User Manual
+** 
 * Notes
 ** =conf/documentation.conf=
 #+begin_verse
@@ -144,3 +186,44 @@ bitbake -e nano
 $ do_clean.rc ../openembedded/packages/meta/opie-image.bb
 #+end_src
 
+*** Customize to you needs
+**** Adding another package repository
+The new BBFILES line(s) are e.g.
+#+begin_src sh
+BBFILES := "${HOME}/dev/oe/org.openembedded.dev/packages/*/*.bb"
+BBFILES += "${HOME}/myoe/packages/*/*.bb"
+#+end_src
+**** Adding a new machine
+**** Adding a new distro
+**** Adding a new bootstrap-image
+**** Build the above mentioned bootstrap-image
+**** Example : Adding a new package (from existing sources)
+#+begin_html
+<p class="info">Info: Preparing the Makefile </p>
+#+end_html
+This subsection describes the changes I had to do on the Makefile and the way to create and provide an appropriate patch.
+#+begin_verse
+Unpack the sources tgz or the cvs dir into your patch dir and create a copy of the resulting dir named xxx_orig.
+Edit the non _orig's Makefile.
+Remove (or comment) the CC entry to force CROSS usage
+Remove (or comment) the CFLAGS entry to force bitbake CFLAGS usage.
+Note, that this may be wrong, when non standard entries need to be provided. Change the CFLAGS to e.g. CYFLAGS entry in the complete Makefile in this case.
+Added $(DESTDIR) to the PRFIX variable to cause make to install binaries to the ${D} dir instead to /
+Potentially you do not want to install something like includ or man pages.
+remove that targets from Makefile then.
+Create a patch calling diff -Naur xxx xxx_orig > xxx_make.patch where xxx is your packages dir name.
+Copy that patch to myoe/packages/schedutils/schedutils dir (matching the SRC_URI's patch entry described above ).
+#+end_verse
+Done that changes, you have the chance to build your new package.
+
+*** FAQ
+**** During build process, a package complains not to find shared libs for installation
+This occured e.g. with the readline package for opie image. I did not
+find out, why this happens. The possible solution (at least it works
+on my system) is a manual (non bitbake) =make clean;./configure= and
+afterwards a =bitbake -b ../.../readline_x.y.bb -c build=. It seems to
+have something to do with the configuration phase of bitbake for this
+package.
+
+**** How can I add a customized /etc/fstab ?
+=/oe/sources/openembedded/recipes/base-files/base-files/fstab=
