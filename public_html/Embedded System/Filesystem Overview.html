@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Filesystem OverView"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-09-27 14:36:41 HKT"/>
+<meta name="generated" content="2012-09-30 21:33:24 HKT"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -145,7 +145,8 @@
 <ul>
 <li><a href="#sec-7-1">Openembedded build cmake: Error running link command: No such file or directory</a></li>
 <li><a href="#sec-7-2">Openembedded build cmake: bin/ld: cannot find libncurses.so.5</a></li>
-<li><a href="#sec-7-3">Ope</a></li>
+<li><a href="#sec-7-3">Openembedded: hang after this line "hwclock: can't open '/dev/misc/rtc':"</a></li>
+<li><a href="#sec-7-4">Openembedded build: Cannot satisfy the following dependencies for task-base</a></li>
 </ul>
 </li>
 </ul>
@@ -2082,22 +2083,222 @@ it.
 </pre>
 
 
-
 </div>
 
 </div>
 
 <div id="outline-container-7-3" class="outline-3">
-<h3 id="sec-7-3">Ope</h3>
+<h3 id="sec-7-3">Openembedded: hang after this line "hwclock: can't open '/dev/misc/rtc':"</h3>
 <div class="outline-text-3" id="text-7-3">
 
+<p>The system ends up with hang after:
+</p>
+
+
+<pre class="src src-sh">INIT: version 2.86 booting
+Please wait: booting...
+Starting udev
+
+Root filesystem already rw, not remounting
+logger: mount: mount point /proc/bus/usb does not exist
+Caching udev devnodes
+Populating dev cache
+ALSA: Restoring mixer settings...
+/usr/sbin/alsactl: load_state:1625: No soundcards found...
+Configuring network interfaces... ifconfig: SIOCGIFFLAGS: No such device
+ifconfig: SIOCGIFFLAGS: No such device
+eth0      No such device
+
+ifconfig: SIOCGIFFLAGS: No such device
+done.
+Starting portmap daemon: portmapportmap: fork: No such device.
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.all.rp_filter = 1
+hwclock: can<span style="color: #ffa07a;">'t open '</span>/dev/misc/rtc<span style="color: #ffa07a;">': No such file or directory</span>
+<span style="color: #ffa07a;">Tue Mar 13 20:12:00 UTC 2012</span>
+<span style="color: #ffa07a;">hwclock: can'</span>t open <span style="color: #ffa07a;">'/dev/misc/rtc'</span>: No such file or directory
+</pre>
+
+<p>
+To fix the problem, follow those steps:<sup><a class="footref" name="fnr.1" href="#fn.1">1</a></sup><sup>, </sup><sup><a class="footref" name="fnr.2" href="#fn.2">2</a></sup>
+</p>
+
+
+<pre class="src src-sh">1. Go to udev receipes
+$ cd ~/oe/openembedded/recipes/udev
+
+2. Delete file udev_171.bb
+$ rm udev_171.bb
+
+3. Modify file udev_git.bb
+Change <span style="color: #eedd82;">PV</span> = <span style="color: #ffa07a;">"171"</span> to be <span style="color: #eedd82;">PV</span> = <span style="color: #ffa07a;">"162"</span> (may older, the linux 2.6.37 uses the 141)
+
+4. Modify ~/oe/openembedded/conf/distro/include/angstrom-2010-preferred-versions.inc
+change from
+<span style="color: #eedd82;">PREFERRED_VERSION_udev</span> = <span style="color: #ffa07a;">"171"</span>
+to
+<span style="color: #eedd82;">PREFERRED_VERSION_udev</span> = <span style="color: #ffa07a;">"162"</span>
+
+5. Re-build udev
+$ bitbake -f udev -c clean
+$ bitbake -f udev -c configure     or (use task-base to replace task-base-extended)
+Go to udev work directory and delete this portion from Makefile.am
+
+                <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">------------------------------------------------------------------------------</span>
+
+                <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Bluetooth HID devices with special magic to switch the device</span>
+
+                <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">------------------------------------------------------------------------------</span>
+
+                <span style="color: #eedd82;">extras_hid2hci_hid2hci_SOURCES</span> = extras/hid2hci/hid2hci.c
+
+                <span style="color: #eedd82;">extras_hid2hci_hid2hci_CPPFLAGS</span> = $(AM_CPPFLAGS) $(LIBUSB_CFLAGS)
+
+                <span style="color: #eedd82;">extras_hid2hci_hid2hci_LDADD</span> = libudev/libudev-private.la $(LIBUSB_LIBS)
+
+                <span style="color: #eedd82;">dist_udevrules_DATA</span> += extras/hid2hci/70-hid2hci.rules
+
+                <span style="color: #eedd82;">libexec_PROGRAMS</span> += extras/hid2hci/hid2hci
+
+$ bitbake -f udev
+
+6. We also need to fix udev verion 171 dependency from previous bitbake otherwise you will see this error
+|  * satisfy_dependencies_for: Cannot satisfy the following dependencies for task-base:
+|  *    libudev0 (&gt;= 171) *
+|  * opkg_install_cmd: Cannot install package task-base.
+
+To find out what packages need to rebuild
+<span style="color: #b0c4de;">cd</span> /home/infocast35/stuff/build/tmp/deploy/eglibc/ipk/armv5te
+$ for f<span style="color: #00ffff;"> in</span> *.ipk; <span style="color: #00ffff;">do</span> ar p $<span style="color: #eedd82;">f</span> control.tar.gz | tar -zxO ./control|grep <span style="color: #ffa07a;">"libudev0 (&gt;= 171)"</span> &amp;&amp; ls $<span style="color: #eedd82;">f</span>; <span style="color: #00ffff;">done</span>
+
+Depends: libusb-0.1-4 (&gt;= 0.1.3), libusb-1.0-0 (&gt;= 1.0.8), libc6 (&gt;= 2.12), libglib-2.0-0 (&gt;= 2.28.5), libdbus-1-3 (&gt;= 1.4.1), libreadline5 (&gt;= 5.2), libudev0 (&gt;= 171)
+bluez4_4.98-r8.0.9_armv7a.ipk......
+
+7. clean some packages
+$ bitbake -f bluez4 -c clean
+$ bitbake -f gstreamer -c clean
+$ bitbake -f gst-plugins-base -c clean
+
+8. ReRun
+$ bitbake -c clean xxx-image
+$ bitbake xxx-image
+</pre>
+
+
+<p>
+Note: 
+</p><ol>
+<li>udev 169 and up require kernel 2.6.36 for ARM
+</li>
+<li>udev 162 may have conflict with bluez and hid2hci, may need to implement this fix <a href="http://git.kernel.org/?p=linux/hotplug/udev.git;a=commitdiff;h=07f1d2860e8ee393abaaead75a6ab3af0f10efbb">http://git.kernel.org/?p=linux/hotplug/udev.git;a=commitdiff;h=07f1d2860e8ee393abaaead75a6ab3af0f10efbb</a>
+</li>
+</ol>
+
+
 </div>
+
+</div>
+
+<div id="outline-container-7-4" class="outline-3">
+<h3 id="sec-7-4">Openembedded build: Cannot satisfy the following dependencies for task-base</h3>
+<div class="outline-text-3" id="text-7-4">
+
+<p>Sometimes its required to downgrade a package version e.g. you are
+suspecting that the problem is caused by udev version 171 so you would
+like to build a root file system incrementally using udev 164
+</p>
+<p>
+So you do required rituals of selecting 164 version of udev using PREFERRED<sub>VERSION</sub><sub>udev</sub> = “164″
+</p>
+<p>
+and then bitbake &lt;your image&gt;
+</p>
+<p>
+and expectedly it should build your image again with udev 164 in it
+but it may not happen and you might end up with errors like
+</p>
+
+
+
+<pre class="src src-sh">| Configuring udev.
+| Configuring task-base-extended.
+| Configuring sysvinit-pidof.
+| Configuring tinylogin.
+| Configuring sysvinit.
+| Collected errors:
+|  * satisfy_dependencies_for: Cannot satisfy the following dependencies for task-base:
+|  *    libudev0 (&gt;= 171) *
+|  * opkg_install_cmd: Cannot install package task-base.
+| ERROR: Function &#8216;do_rootfs&#8217; failed (see /home/kraj/work/angstrom/build/tmp-angstrom_2010_x-uclibc/work/qemumips-angstrom-linux-uclibc/console-image-1.0-r0/temp/log.do_rootfs.15163 for further information)
+NOTE: package console-image-1.0-r0: task do_rootfs: Failed
+ERROR: Task 8 (/home/kraj/work/angstrom/sources/meta-angstrom/recipes-angstrom/images/console-image.bb, do_rootfs) failed with exit code &#8217;1&#8242;
+ERROR:
+&#8216;/home/kraj/work/angstrom/sources/meta-angstrom/recipes-angstrom/images/console-image.bb&#8217;
+failed
+</pre>
+
+
+<p>
+The problem here is that there is a package which has created a
+dependency on libudev0 &gt;= 171 but now we are sysrooting with 164.
+Ideally bitbake should have noticed it and rebuilt the concerned
+recipe but it does not happen
+</p>
+<ul>
+<li>To do
+</li>
+</ul>
+
+<p>You need to figure out with package is wanting libudev0 171+
+</p>
+
+
+<pre class="src src-sh">$<span style="color: #eedd82;">cd</span> /home/testbed/oe/build/tmp-angstrom_2010_x/deploy/eglibc/ipk/armv7a
+$ for f<span style="color: #00ffff;"> in</span> *.ipk; <span style="color: #00ffff;">do</span> ar p $<span style="color: #eedd82;">f</span> control.tar.gz | tar -zxO ./control|grep&#8220;libudev0 (&gt;= 171)&#8221; &amp;&amp; ls $<span style="color: #eedd82;">f</span>; <span style="color: #00ffff;">done</span>
+
+Depends: libusb-0.1-4 (&gt;= 0.1.3), libusb-1.0-0 (&gt;= 1.0.8), libc6 (&gt;= 2.12), libglib-2.0-0 (&gt;= 2.28.5), libdbus-1-3 (&gt;= 1.4.1), libreadline5 (&gt;= 5.2), libudev0 (&gt;= 171)
+bluez4_4.98-r8.0.9_armv7a.ipk
+Depends: libgstinterfaces-0.10-0 (&gt;= 0.10.32), gstreamer (&gt;= 0.10.32), libgmodule-2.0-0 (&gt;= 2.28.5), libxml2 (&gt;= 2.7.8), libz1 (&gt;= 1.2.3), libc6 (&gt;= 2.12), libsm6 (&gt;= 1.2.0), libuuid1 (&gt;= 2.18), libice6 (&gt;= 1.0.7), libxv1 (&gt;= 1.0.6), libxext6 (&gt;= 1.3.0), libx11-6 (&gt;= 1.4.3), libxcb1 (&gt;= 1.6), libpthread-stubs0 (&gt;= 0.2), libxau6 (&gt;= 1.0.6), libxdmcp6 (&gt;= 1.1.0), libgudev-1.0-0 (&gt;= 171), libudev0 (&gt;= 171), libgobject-2.0-0 (&gt;= 2.28.5), libgthread-2.0-0 (&gt;= 2.28.5), libglib-2.0-0 (&gt;= 2.28.5)
+gst-plugin-video4linux_0.10.32-r11.1.9_armv7a.ipk =&gt; gst-plugins 
+Depends: libdrm2 (&gt;= 2.4.25), libc6 (&gt;= 2.12), libkms1 (&gt;= 2.4.25), libcairo2 (&gt;= 1.10.0), libpixman-1-0 (&gt;= 0.22.0), libfontconfig1 (&gt;= 2.8.0), libexpat1 (&gt;= 2.0.1), libfreetype6 (&gt;= 2.4.3), libpng12-0 (&gt;= 1.2.46), libxrender1 (&gt;= 0.9.6), libx11-6 (&gt;= 1.4.3), libxcb1 (&gt;= 1.6), libpthread-stubs0 (&gt;= 0.2), libxau6 (&gt;= 1.0.6), libxdmcp6 (&gt;= 1.1.0), libz1 (&gt;= 1.2.3), libudev0 (&gt;= 171)
+libdrm-tests_2.4.25-r0.9_armv7a.ipk
+</pre>
+
+
+<p>
+So you know now the ipk which is depending on udev 171 and is being
+pulled into the image
+</p>
+
+
+<pre class="src src-sh">$ bitbake -f bluez4 -c clean
+$ bitbake -f gstreamer -c clean
+$ bitbake -f gst-plugins-base -c clean
+</pre>
+
+
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+<p class="footnote"><sup><a class="footnum" name="fn.1" href="#fnr.1">1</a></sup> <a href="http://www.purinux.org/blog/2012/03/openembedded-hang-after-this-line-hwclock-cant-open-devmiscrtc.html">http://www.purinux.org/blog/2012/03/openembedded-hang-after-this-line-hwclock-cant-open-devmiscrtc.html</a>
+</p>
+
+
+<p class="footnote"><sup><a class="footnum" name="fn.2" href="#fnr.2">2</a></sup> <a href="http://www.purinux.org/blog/2012/03/how-to-create-oe-for-infocast35.html">http://www.purinux.org/blog/2012/03/how-to-create-oe-for-infocast35.html</a>
+</p>
+
+
+
+</div>
+</div>
+</div>
+
 </div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-09-27 14:36:41 HKT</p>
+<p class="date">Date: 2012-09-30 21:33:24 HKT</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.09 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
