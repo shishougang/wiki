@@ -1,0 +1,139 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: GPIO Overview
+#+OPTIONS: num:nil H:2
+
+* GPIO Driver
+** Introduction
+site:
+http://processors.wiki.ti.com/index.php/TI81XX_PSP_GPIO_Driver_User_Guide
+
+NOTE:
+
+Linux GPIO numbers start from "0".
+
+NOTE
+
+Some TI SoCs have multiple banks of GPIOs.
+For example the TI814x has 4 banks of 32 GPIOs, for a total of 128 GPIO, i.e Bank-0[0..31], Bank-1[0..31], Bank-2[0..31], Bank-3[0..31].
+
+In this case Bank-1[0..31] maps to Linux GPIO numbers 32..63, Bank-2[0..31] to Linux GPIO numbers 64..95 etc.
+
+** Driver Configuration
+The default kernel configuration enables support for GPIO driver (built into the kernel).
+
+To enable or disable GPIO driver from kernel build, follow these steps:
+#+begin_src sh
+$ make CROSS_COMPILE=arm-none-linux-gnueabi- ARCH=arm menuconfig
+#+end_src
++ Select Device Drivers from the main menu.
+#+begin_src sh
+    Power management options  --->
+[*] Networking support  --->
+    Device Drivers  --->
+    File systems  --->
+...
+...
+#+end_src
++ Select GPIO Support from the menu.
+#+begin_src sh
+    PPS support  --->
+    PTP clock support  --->
+-*- GPIO Support  --->
+< > Dallas's 1-wire support  --->
+...
+...
+#+end_src 
++ Sysfs entries configuration
+  GPIO can be access using SYSFS entries from User Space. For that Select /sys/class/gpio/... (sysfs interface) from the GPIO support.
+#+begin_src sh
+[ ] Debug GPIO calls
+[*] /sys/class/gpio/... (sysfs interface)
+    *** Memory mapped GPIO drivers: ***
+< > Basic memory-mapped GPIO controllers support
+...
+...
+#+end_src
+After doing driver selection, exit and save the kernel configuration when prompted.
+** IRQ handling
+   GPIO pin is also used as a interrupt source, these are the general usage of IRQ handling using GPIO lines.
+
++ Map GPIO number to corresponding IRQ number, GPIO 0 need not use IRQ 0
+#+begin_src sh
+irq_num = gpio_to_irq(30)
+#+end_src
++ Request IRQ, make sure that irq_num should be non-error value
+#+begin_src sh
+request_irq(irq_num, handler, 0, "gpio_test", NULL);
+#+end_src
++ Set IRQ type Raising/Falling/Level triggered
+#+begin_src sh
+set_irq_type(irq_num, IRQ_TYPE_EDGE_RISING);
+#+end_src
++ During the clean-up path free the IRQ and gpio
+#+begin_src sh
+free_irq(irq_num, NULL);
+gpio_free(30);
+#+end_src
+
+
+** Driver Usage
+*** Kernel Level
++ Allocate memory to GPIO line, can be achieved by doing gpio_request()
+#+begin_src c
+err = gpio_request(30, "sample_name");
+#+end_src
++ Depending on the requirement set GPIO as input or output pin then set gpio value as high or low.
+  Setting the GPIO pin 30 as input
+#+begin_src c
+gpio_direction_input(30);
+#+end_src
+  Make pin 30 as output and set the value as high.
+#+begin_src c
+gpio_direction_output(30, 1);
+#+end_src
+  Exporting that particular pin (30) to sysfs entry then use this API
+#+begin_src c
+gpio_export(30, true);
+#+end_src
+  Get value from GPIO pin
+#+begin_src c
+gpio_get_value(30);
+#+end_src
+*** User Space - Sysfs control
++ Enable GPIO sysfs support in kernel configuration and build the kernel
+#+begin_src sh
+Device Drivers  ---> GPIO Support  ---> /sys/class/gpio/... (sysfs interface)
+#+end_src
++ Sysfs entries
+  Export the particular GPIO pin for user control. GPIO30 is taken as example.
+#+begin_src sh
+$ echo 30 > /sys/class/gpio/export
+#+end_src
+  Change the GPIO pin direction to in/out
+#+begin_src sh
+$ echo "out" > /sys/class/gpio/gpio30/direction
+or
+$ echo "in" > /sys/class/gpio/gpio30/direction
+#+end_src
+Change the value
+#+begin_src sh
+$ echo 1 > /sys/class/gpio/gpio30/value
+or
+$ echo 0 > /sys/class/gpio/gpio30/value
+#+end_src
+  Unexport the GPIO pin
+#+begin_src sh
+$ echo 30 > /sys/class/gpio/unexport
+#+end_src
+
+ *Note:* GPIO's which are used already in the drivers can not be control from sysfs, unless until driver export that particular pin.
+
+Run these commands for knowing what are the GPIO's already requested in the drivers.
+#+begin_src sh
+$ mount -t debugfs debugfs /sys/kernel/debug
+$ cat /sys/kernel/debug/gpio
+#+end_src
+
+
+* Notes from gpio in kernel docs
+http://www.kernel.org/doc/Documentation/gpio.txt

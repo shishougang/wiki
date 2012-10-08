@@ -1,0 +1,27 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: General-Purpose Memory Controller(GMPC)
+#+OPTIONS: num:nil
+
+* So, in retrospective, here is a list of things to keep in mind:
+
+- I implemented the FPGA device driver as a platform device driver. I chose ioctl() function calls to let user application access the FPGA;
+
+- Timing  specifications must be set in nanoseconds in the gpmc_timings structure, not gpmc_clocks ticks, as I originally assumed they were;
+
+- compiling the kernel gpmc driver in debug mode helps tracing down incorrect timings: it's easy to specify timing values which exceed the range of their respective bit maps in GPMC config registers;
+
+- At first, make sure the kernel does not turn off unused clocks (it's a kernel config option).
+
+- Make sure that the gpmc_clock pad is set as input/output: the GPMC hardware monitors it to tweak its timing.
+
+- keep it simple: use simple memory interface signals (ex: static RAM cs*, rd*, wr* signals) and relaxed timings: for example, my read/write cycles take about 200ns to complete and I use a 100MHz gpmc_clock.
+
+- don't be afraid to 'hack' the kernel: need to call hidden (static)
+  kernel GPMC functions? Just export() them. I had to do so in order
+  to do extra configuration works on the GPMC-FPGA intervace.
+
+
+* read
+
+http://e2e.ti.com/support/dsp/omap_applications_processors/f/447/t/104077.aspx
+http://processors.wiki.ti.com/index.php/Tips_for_configuring_OMAP35x_and_AM-DM37x_GPMC_registers

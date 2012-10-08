@@ -1,0 +1,67 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Linux Kernel Build
+#+OPTIONS: num:nil H:2
+
+
+* Make kernel
+** clean
+#+begin_src sh
+make mrproper
+make clean
+#+end_src
+** make
+#+begin_src sh
+  make CROSS_COMPILE=arm-none-linux-gnueabi- ARCH=arm ti8168_evm_defconfig
+ To view configuration interactively:
+  make CROSS_COMPILE=arm-none-linux-gnueabi- ARCH=arm menuconfig
+  make CROSS_COMPILE=arm-none-linux-gnueabi- ARCH=arm uImage
+  make CROSS_COMPILE=arm-none-linux-gnueabi- ARCH=arm modules
+  make CROSS_COMPILE=arm-none-linux-gnueabi- ARCH=arm INSTALL_MOD_PATH=/home/testbed/targetfs  modules_install
+#+end_src
+  
+** Auto detection of Kernel Load Address and Run Time RAM Base Determination
+By default, the DM81xx kernel is built to be loaded at physical
+address 0x80008000 in RAM and take start of RAM as 0x80000000.
+
+It is possible to load the kernel at a different location in RAM with kernel automatically determining RAM base
+depending upon the load address.
+This is achieved by the combination of two features added the kernel:
+1. Run time PHYS_OFFSET determination: This feature enables determining physical to virtual translations
+dynamically depending upon the position of kernel in system memory.
+2. Auto calculation of address for uncompressed kernel: This feature enables the compressed kernel entry code (part
+of kernel zImage) to determine the address to uncompress the kernel depending upon the location it is loaded
+(started from).
+
+*** Method 1
+#+begin_src sh
+BUILDHOST$ make ARCH=arm ti8168_evm_defconfig
+BUILDHOST$ make ARCH=arm zImage
+Here we use 0x90008000 as the kernel load address and entry point
+BUILDHOST$ mkimage -A arm -O linux -T kernel -C none -a 0x90008000 -e 0x90008000 -n 'Linux-2.6.37' -d arch/arm/boot/zImage uImage
+#+end_src
+*** Alternate Method: Single Step Build
+#+begin_src sh
+zreladdr-y=<desired-load-address> to make when building the uImage.
+BUILDHOST$ make ARCH=arm zreladdr-y=0x90008000 uImage
+#+end_src
+
+
+
+* FAQ
+
+** Build the kernel 2.6.38, but the name become "linux-2.6.38+". How can I prevent the + symbol from being prefixed to the kernel image name?
+
+disable the plus sign is the LOCALVERSION environment variable or make variable:
+#+begin_src sh
+make LOCALVERSION= all
+make ARCH=arm CROSS_COMPILE=arm-angstrom-linux-gnueabi- LOCALVERSION= -j6 uImage
+#+end_src 
+
+More:
+
+=/scripts/setlocalversion= is the culprit. Read at the bottom of the file under
+which conditions it adds the +.
+
+kbuild will append '+' if you modify the source code unless you
+provide LOCALVERSION=.
+
