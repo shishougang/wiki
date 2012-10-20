@@ -1,0 +1,2793 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+               "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Linux device drivers Notes</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+<meta name="title" content="Linux device drivers Notes"/>
+<meta name="generator" content="Org-mode"/>
+<meta name="generated" content="2012-10-20 14:02:19 HKT"/>
+<meta name="author" content="Shi Shougang"/>
+<meta name="description" content=""/>
+<meta name="keywords" content=""/>
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  html { font-family: Times, serif; font-size: 12pt; }
+  .title  { text-align: center; }
+  .todo   { color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #add8e6; font-weight:normal }
+  .target { }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  {margin-left:auto; margin-right:0px;  text-align:right;}
+  .left   {margin-left:0px;  margin-right:auto; text-align:left;}
+  .center {margin-left:auto; margin-right:auto; text-align:center;}
+  p.verse { margin-left: 3% }
+  pre {
+	border: 1pt solid #AEBDCC;
+	background-color: #F3F5F7;
+	padding: 5pt;
+	font-family: courier, monospace;
+        font-size: 90%;
+        overflow:auto;
+  }
+  table { border-collapse: collapse; }
+  td, th { vertical-align: top;  }
+  th.right  { text-align:center;  }
+  th.left   { text-align:center;   }
+  th.center { text-align:center; }
+  td.right  { text-align:right;  }
+  td.left   { text-align:left;   }
+  td.center { text-align:center; }
+  dt { font-weight: bold; }
+  div.figure { padding: 0.5em; }
+  div.figure p { text-align: center; }
+  div.inlinetask {
+    padding:10px;
+    border:2px solid gray;
+    margin:10px;
+    background: #ffffcc;
+  }
+  textarea { overflow-x: auto; }
+  .linenr { font-size:smaller }
+  .code-highlighted {background-color:#ffff00;}
+  .org-info-js_info-navigation { border-style:none; }
+  #org-info-js_console-label { font-size:10px; font-weight:bold;
+                               white-space:nowrap; }
+  .org-info-js_search-highlight {background-color:#ffff00; color:#000000;
+                                 font-weight:bold; }
+  /*]]>*/-->
+</style><link rel="stylesheet" href="./assets/stylesheet.css" type="text/css"/>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+
+</head>
+<body>
+<div id="org-div-home-and-up" style="text-align:right;font-size:70%;white-space:nowrap;">
+ <a accesskey="h" href="../../index.html"> UP </a>
+ |
+ <a accesskey="H" href="../../index.html"> HOME </a>
+</div>
+
+<div id="preamble">
+
+</div>
+
+<div id="content">
+<h1 class="title">Linux device drivers Notes</h1>
+
+
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">General</a>
+<ul>
+<li><a href="#sec-1-1">Make</a></li>
+<li><a href="#sec-1-2">Generate Files</a></li>
+<li><a href="#sec-1-3">Files</a></li>
+<li><a href="#sec-1-4">Test</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">misc-modules</a>
+<ul>
+<li><a href="#sec-2-1"><code>hello.c</code></a></li>
+<li><a href="#sec-2-2"><code>hellop.c</code></a></li>
+<li><a href="#sec-2-3"><code>complete.c</code></a></li>
+<li><a href="#sec-2-4"><code>faulty.c</code></a></li>
+<li><a href="#sec-2-5"><code>jiq.c</code></a></li>
+<li><a href="#sec-2-6"><code>kdataalign.c</code></a></li>
+<li><a href="#sec-2-7"><code>kdatasize.c</code></a></li>
+<li><a href="#sec-2-8"><code>sleepy.c</code></a></li>
+<li><a href="#sec-2-9"><code>jit.c</code></a></li>
+<li><a href="#sec-2-10"><code>seq.c</code></a></li>
+<li><a href="#sec-2-11"><code>silly.c</code></a></li>
+</ul>
+</li>
+<li><a href="#sec-3">misc-progs</a></li>
+<li><a href="#sec-4">skull</a></li>
+<li><a href="#sec-5">scull</a></li>
+<li><a href="#sec-6">short</a></li>
+<li><a href="#sec-7">scullc</a></li>
+<li><a href="#sec-8">sculld</a></li>
+<li><a href="#sec-9">scullp</a></li>
+<li><a href="#sec-10">scullv</a></li>
+<li><a href="#sec-11">simple</a></li>
+<li><a href="#sec-12">shortprint</a></li>
+<li><a href="#sec-13">pci</a></li>
+<li><a href="#sec-14">usb</a></li>
+<li><a href="#sec-15">lddbus</a></li>
+<li><a href="#sec-16">sbull</a></li>
+<li><a href="#sec-17">snull</a></li>
+<li><a href="#sec-18">tty</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-1" class="outline-2">
+<h2 id="sec-1">General</h2>
+<div class="outline-text-2" id="text-1">
+
+
+</div>
+
+<div id="outline-container-1-1" class="outline-3">
+<h3 id="sec-1-1">Make</h3>
+<div class="outline-text-3" id="text-1-1">
+
+
+
+
+<pre class="src src-sh">KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+<span style="color: #ff7f24;">#  </span><span style="color: #ff7f24;">-r, --kernel-release         &#36755;&#20986;&#20869;&#26680;&#21457;&#34892;&#21495;</span>
+$(MAKE) -C $(KERNELDIR) <span style="color: #eedd82;">M</span>=$(PWD) modules
+</pre>
+
+<p>
+KERNELRELEASE是在内核源码的顶层Makefile中定义的一个变量，在第一次读取
+执行此Makefile时，KERNELRELEASE没有被定义， 所以make将读取执行else之后
+的内容。如果make的目标是clean，直接执行clean操作，然后结束。当make的目
+标为all时，-C $(KDIR) 指明跳转到内核源码目录下读取那里的Makefile；
+M=$(PWD) 表明然后返回到当前目录继续读入、执行当前的Makefile。当从内核
+源码目录返回时，KERNELRELEASE已被被定义，kbuild也被启动去解析kbuild语
+法的语句，make将继续读取else之前的内容。else之前的内容为kbuild语法的语
+句, 指明模块源码中各文件的依赖关系，以及要生成的目标模块名。
+mymodule-objs := file1.o file2.o表示mymoudule.o 由file1.o与file2.o 连
+接生成。obj-m := mymodule.o表示编译连接后将生成mymodule.o模块。
+</p>
+<p>
+ <code>kbuild</code>
+</p>
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Use make M=dir to specify directory of external module to build </span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Old syntax make ... SUBDIRS=$PWD is still supported </span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Setting the environment variable KBUILD_EXTMOD take precedence </span>
+ifdef SUBDIRS 
+KBUILD_EXTMOD ?= $(SUBDIRS) 
+endif 
+ifdef M //&#22914;&#26524;&#27809;&#26377;&#23450;&#20041;&#25110;&#36171;&#20540;M&#65292;&#27492;&#22788;M&#26410;&#23450;&#20041;&#65288;undefined&#65289; 
+<span style="color: #87cefa;">ifeq</span> (<span style="color: #ffa07a;">"$(origin M)"</span>, <span style="color: #ffa07a;">"command line"</span>) //&#22914;&#26524;&#23450;&#20041;&#20102;&#65292;&#27492;&#21477;&#29992;&#26469;&#21028;&#26029;M&#26159;&#21542;&#20174;&#21629;&#20196;&#34892;&#26469; 
+KBUILD_EXTMOD := $(M) 
+endif 
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-1-2" class="outline-3">
+<h3 id="sec-1-2">Generate Files</h3>
+<div class="outline-text-3" id="text-1-2">
+
+
+
+
+<pre class="src src-sh">|-- modules.order
+|-- Module.symvers
+|-- XXX.ko
+|-- XXX.mod.c
+|-- XXX.mod.o
+|-- XXX.o
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-1-3" class="outline-3">
+<h3 id="sec-1-3">Files</h3>
+<div class="outline-text-3" id="text-1-3">
+
+<ul>
+<li id="sec-1-3-1">/proc/moudles<br/>
+/proc/moudles 是旧式的, 那种信息的单个文件版本. 其中的条目包含了模块名,
+每个模块占用的内存数量, 以及使用计数. 另外的字串追加到每行的末尾来指定
+标志, 对这个模块当前是活动的.
+
+
+
+<pre class="src src-sh">binfmt_misc 6587 1 - Live 0xf82b0000
+ppdev 5259 0 - Live 0xf8274000
+vboxnetadp 6390 0 - Live 0xf82ac000
+vboxnetflt 12740 0 - Live 0xf826e000
+vboxdrv 169169 2 vboxnetadp,vboxnetflt, Live 0xf8626000
+nfsd 238778 13 - Live 0xf870d000
+exportfs 3437 1 nfsd, Live 0xf8308000
+nfs 265631 0 - Live 0xf8683000
+lockd 64881 2 nfsd,nfs, Live 0xf8614000
+nfs_acl 2245 2 nfsd,nfs, Live 0xf82a9000
+auth_rpcgss 33767 2 nfsd,nfs, Live 0xf8299000
+sunrpc 193609 12 nfsd,nfs,lockd,nfs_acl,auth_rpcgss, Live 0xf85e2000
+snd_hda_codec_realtek 203472 1 - Live 0xf9d34000
+snd_usb_audio 75861 2 - Live 0xf9cce000
+snd_usb_lib 15833 1 snd_usb_audio, Live 0xf9ca7000
+snd_hda_intel 22165 4 - Live 0xf9c79000
+snd_pcm_oss 35308 0 - Live 0xf9c5c000
+snd_hda_codec 74297 2 snd_hda_codec_realtek,snd_hda_intel, Live 0xf9c2e000
+snd_mixer_oss 13746 1 snd_pcm_oss, Live 0xf9c09000
+snd_pcm 70918 5 snd_usb_audio,snd_hda_intel,snd_pcm_oss,snd_hda_codec, Live 0xf9be5000 
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-1-3-2">/proc/devices<br/>
+
+
+
+<pre class="src src-sh">Character devices:
+  1 mem
+  4 /dev/vc/0
+  4 tty
+  4 ttyS
+  5 /dev/tty
+  5 /dev/console
+  5 /dev/ptmx
+  6 lp
+  7 vcs
+ 10 misc
+ 13 input
+ 14 sound
+ 21 sg
+ 29 fb
+ 99 ppdev
+108 ppp
+116 alsa
+Block devices:
+  1 ramdisk
+259 blkext
+  7 loop
+  8 sd
+  9 md
+ 11 sr
+ 65 sd
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-1-3-3">/sys/module<br/>
+ /sys/module 是一个 sysfs 目录层次, 包含当前加载模块的
+
+
+
+<pre class="src src-sh">/sys/module
+|-- 8250
+|   <span style="color: #fa8072;">`-- parameters</span>
+<span style="color: #fa8072;">|       |-- nr_uarts</span>
+<span style="color: #fa8072;">|       |-- probe_rsa</span>
+<span style="color: #fa8072;">|       |-- share_irqs</span>
+<span style="color: #fa8072;">|       `</span>-- skip_txen_test
+|-- acpi
+|   <span style="color: #fa8072;">`-- parameters</span>
+<span style="color: #fa8072;">|       |-- acpica_version</span>
+<span style="color: #fa8072;">|       |-- bfs</span>
+<span style="color: #fa8072;">|       |-- gts</span>
+<span style="color: #fa8072;">|       `</span>-- immediate_undock
+|-- acpi_cpufreq
+|   <span style="color: #fa8072;">`-- parameters</span>
+<span style="color: #fa8072;">|       `</span>-- acpi_pstate_strict
+|-- agpgart
+|   |-- holders
+|   |   <span style="color: #fa8072;">`-- nvidia -&gt; ../../nvidia</span>
+<span style="color: #fa8072;">|   |-- initstate</span>
+<span style="color: #fa8072;">|   |-- notes</span>
+<span style="color: #fa8072;">|   |-- refcnt</span>
+<span style="color: #fa8072;">|   |-- sections</span>
+<span style="color: #fa8072;">|   |   |-- __kcrctab</span>
+<span style="color: #fa8072;">|   |   |-- __kcrctab_gpl</span>
+<span style="color: #fa8072;">|   |   |-- __ksymtab</span>
+<span style="color: #fa8072;">|   |   |-- __ksymtab_gpl</span>
+<span style="color: #fa8072;">|   |   |-- __ksymtab_strings</span>
+<span style="color: #fa8072;">|   |   `</span>-- __mcount_loc
+|   <span style="color: #fa8072;">`-- srcversion</span>
+<span style="color: #fa8072;">.....</span>
+</pre>
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-1-4" class="outline-3">
+<h3 id="sec-1-4">Test</h3>
+<div class="outline-text-3" id="text-1-4">
+
+
+
+
+<pre class="src src-sh">sudo insmod xxx.ko   or sudo modprobe xxx.ko
+sudo mknod -m og+rw /dev/XXX c MAJNUM 0
+or sudo chmod NNN /dev/XXX
+</pre>
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2">misc-modules</h2>
+<div class="outline-text-2" id="text-2">
+
+
+</div>
+
+<div id="outline-container-2-1" class="outline-3">
+<h3 id="sec-2-1"><code>hello.c</code></h3>
+<div class="outline-text-3" id="text-2-1">
+
+
+
+
+<pre class="src src-c">1) MODULE_LICENSE(<span style="color: #ffa07a;">"Dual BSD/GPL"</span>);
+2) printk(KERN_ALERT <span style="color: #ffa07a;">"Hello, world\n"</span>);
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/kernel.h&gt;</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">printk</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> * <span style="color: #eedd82;">fmt</span>, ...);
+    &#20869;&#26680;&#20195;&#30721;&#30340; <span style="color: #98fb98;">printf</span> <span style="color: #eedd82;">&#31867;&#20284;&#29289;</span>.
+
+3) module_init(hello_init);
+module_exit(hello_exit);
+</pre>
+
+<ul>
+<li id="sec-2-1-1">Check the output message<br/>
+dmesg | tail
+</li>
+</ul>
+<ul>
+<li id="sec-2-1-2">Ref<br/>
+<ul>
+<li id="sec-2-1-2-1"><code>module_init</code> and <code>module_exit</code><br/>
+ <b>chapter 2</b>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/init.h&gt;</span>
+
+<span style="color: #b0c4de;">#if</span><span style="color: #b0c4de;">n</span><span style="color: #b0c4de;">def</span> MODULE
+<span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">module_init()</span><span style="color: #ffa07a;"> - driver initialization entry point</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@x</span><span style="color: #ffa07a;">: function to be run at kernel boot time or module insertion</span>
+<span style="color: #ffa07a;"> * </span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">module_init()</span><span style="color: #ffa07a;"> will either be called during </span><span style="color: #7fffd4;">do_initcalls()</span><span style="color: #ffa07a;"> (if</span>
+<span style="color: #ffa07a;"> * builtin) or at module insertion time (if a module).  There can only</span>
+<span style="color: #ffa07a;"> * be one per module.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">module_init</span>(<span style="color: #eedd82;">x</span>)  __initcall(x);
+
+<span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">module_exit()</span><span style="color: #ffa07a;"> - driver exit entry point</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@x</span><span style="color: #ffa07a;">: function to be run when driver is removed</span>
+<span style="color: #ffa07a;"> * </span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">module_exit()</span><span style="color: #ffa07a;"> will wrap the driver clean-up code</span>
+<span style="color: #ffa07a;"> * with </span><span style="color: #7fffd4;">cleanup_module()</span><span style="color: #ffa07a;"> when used with rmmod when</span>
+<span style="color: #ffa07a;"> * the driver is a module.  If the driver is statically</span>
+<span style="color: #ffa07a;"> * compiled into the kernel, </span><span style="color: #7fffd4;">module_exit()</span><span style="color: #ffa07a;"> has no effect.</span>
+<span style="color: #ffa07a;"> * There can only be one per module.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">module_exit</span>(<span style="color: #eedd82;">x</span>)  __exitcall(x);
+
+<span style="color: #b0c4de;">#else</span> <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">MODULE </span><span style="color: #ff7f24;">*/</span>
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Each module must use one module_init(). </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">module_init</span>(<span style="color: #eedd82;">initfn</span>)                                     \
+        <span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">initcall_t</span> <span style="color: #87cefa;">__inittest</span>(<span style="color: #98fb98;">void</span>)               \
+        { <span style="color: #00ffff;">return</span> initfn; }                                      \
+        <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">init_module</span>(<span style="color: #98fb98;">void</span>) <span style="color: #00ffff;">__attribute__</span>((alias(#initfn)));
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">This is only required if you want to be unloadable. </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">module_exit</span>(<span style="color: #eedd82;">exitfn</span>)                                     \
+        <span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">exitcall_t</span> <span style="color: #87cefa;">__exittest</span>(<span style="color: #98fb98;">void</span>)               \
+        { <span style="color: #00ffff;">return</span> exitfn; }                                      \
+        <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">cleanup_module</span>(<span style="color: #98fb98;">void</span>) <span style="color: #00ffff;">__attribute__</span>((alias(#exitfn)));
+<span style="color: #b0c4de;">#endif</span>
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-1-2-2"><code>printk</code><br/>
+ <b>chapter 2</b>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/printk.h&gt;</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">KERN_EMERG</span>      <span style="color: #ffa07a;">"&lt;0&gt;"</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">system is unusable                   </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">KERN_ALERT</span>      <span style="color: #ffa07a;">"&lt;1&gt;"</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">action must be taken immediately     </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">KERN_CRIT</span>       <span style="color: #ffa07a;">"&lt;2&gt;"</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">critical conditions                  </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">KERN_ERR</span>        <span style="color: #ffa07a;">"&lt;3&gt;"</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">error conditions                     </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">KERN_WARNING</span>    <span style="color: #ffa07a;">"&lt;4&gt;"</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">warning conditions                   </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">KERN_NOTICE</span>     <span style="color: #ffa07a;">"&lt;5&gt;"</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">normal but significant condition     </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">KERN_INFO</span>       <span style="color: #ffa07a;">"&lt;6&gt;"</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">informational                        </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">KERN_DEBUG</span>      <span style="color: #ffa07a;">"&lt;7&gt;"</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">debug-level messages                 </span><span style="color: #ff7f24;">*/</span>
+
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_PRINTK
+asmlinkage <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">printk</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> * <span style="color: #eedd82;">fmt</span>, ...)
+        <span style="color: #00ffff;">__attribute__</span> ((format (printf, 1, 2))) <span style="color: #98fb98;">__cold</span>;
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">printk</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">s</span>, ...)
+        <span style="color: #00ffff;">__attribute__</span> ((format (printf, 1, 2)));
+<span style="color: #b0c4de;">#endif</span>
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-1-2-3"><code>MODULE_LICENSE("Dual BSD/GPL");</code><br/>
+ <b>chapter 2</b>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/module.h&gt;</span>
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Generic info of form tag = "info" </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">MODULE_INFO</span>(<span style="color: #eedd82;">tag</span>, <span style="color: #eedd82;">info</span>) __MODULE_INFO(tag, tag, info)
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * The following license idents are currently accepted as indicating free</span>
+<span style="color: #ff7f24;"> * software modules</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> *      "GPL"                           [GNU Public License v2 or later]</span>
+<span style="color: #ff7f24;"> *      "GPL v2"                        [GNU Public License v2]</span>
+<span style="color: #ff7f24;"> *      "GPL and additional rights"     [GNU Public License v2 rights and more]</span>
+<span style="color: #ff7f24;"> *      "Dual BSD/GPL"                  [GNU Public License v2</span>
+<span style="color: #ff7f24;"> *                                       or BSD license choice]</span>
+<span style="color: #ff7f24;"> *      "Dual MIT/GPL"                  [GNU Public License v2</span>
+<span style="color: #ff7f24;"> *                                       or MIT license choice]</span>
+<span style="color: #ff7f24;"> *      "Dual MPL/GPL"                  [GNU Public License v2</span>
+<span style="color: #ff7f24;"> *                                       or Mozilla license choice]</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * The following other idents are available</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> *      "Proprietary"                   [Non free products]</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * There are dual licensed components, but when running with Linux it is the</span>
+<span style="color: #ff7f24;"> * GPL that is relevant so this is a non issue. Similarly LGPL linked with GPL</span>
+<span style="color: #ff7f24;"> * is a GPL combined work.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * This exists for several reasons</span>
+<span style="color: #ff7f24;"> * 1.   So modinfo can show license info for users wanting to vet their setup </span>
+<span style="color: #ff7f24;"> *      is free</span>
+<span style="color: #ff7f24;"> * 2.   So the community can ignore bug reports including proprietary modules</span>
+<span style="color: #ff7f24;"> * 3.   So vendors can do likewise based on their own policies</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">MODULE_LICENSE</span>(<span style="color: #eedd82;">_license</span>) MODULE_INFO(license, _license)
+</pre>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/moduleparam.h&gt;</span>
+
+<span style="color: #b0c4de;">#ifdef</span> MODULE
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">___module_cat</span>(<span style="color: #eedd82;">a</span>,<span style="color: #eedd82;">b</span>) __mod_ ## a ## b
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__module_cat</span>(<span style="color: #eedd82;">a</span>,<span style="color: #eedd82;">b</span>) ___module_cat(a,b)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__MODULE_INFO</span>(<span style="color: #eedd82;">tag</span>, <span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">info</span>)                                    \
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> <span style="color: #87cefa;">__module_cat</span>(name,__LINE__)[]                           \
+  __used <span style="color: #00ffff;">__attribute__</span>((section(<span style="color: #ffa07a;">".modinfo"</span>), unused, aligned(1)))         \
+  = __stringify(tag) <span style="color: #ffa07a;">"="</span> info
+<span style="color: #b0c4de;">#else</span>  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">!MODULE </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__MODULE_INFO</span>(<span style="color: #eedd82;">tag</span>, <span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">info</span>)
+<span style="color: #b0c4de;">#endif</span>
+</pre>
+
+
+</li>
+</ul>
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-2-2" class="outline-3">
+<h3 id="sec-2-2"><code>hellop.c</code></h3>
+<div class="outline-text-3" id="text-2-2">
+
+<ul>
+<li id="sec-2-2-1">SRC<br/>
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">whom</span> = <span style="color: #ffa07a;">"world"</span>;
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">howmany</span> = 1;
+module_param(howmany, <span style="color: #98fb98;">int</span>, S_IRUGO);
+module_param(whom, charp, S_IRUGO);
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-2"><code>module_param(name, type, perm)</code><br/>
+ <b>chapter 2</b>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/moduleparam.h&gt;</span>
+
+<span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * module_param - typesafe helper for a module/cmdline parameter</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@value</span><span style="color: #ffa07a;">: the variable to alter, and exposed parameter name.</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@type</span><span style="color: #ffa07a;">: the type of the parameter</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@perm</span><span style="color: #ffa07a;">: visibility in sysfs.</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@value</span><span style="color: #ffa07a;"> becomes the module parameter, or (prefixed by KBUILD_MODNAME and a</span>
+<span style="color: #ffa07a;"> * ".") the kernel commandline parameter.  Note that - is changed to _, so</span>
+<span style="color: #ffa07a;"> * the user can use "foo-bar=1" even for variable "foo_bar".</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@perm</span><span style="color: #ffa07a;"> is 0 if the the variable is not to appear in sysfs, or 0444</span>
+<span style="color: #ffa07a;"> * for world-readable, 0644 for root-writable, etc.  Note that if it</span>
+<span style="color: #ffa07a;"> * is writable, you may need to use </span><span style="color: #7fffd4;">kparam_block_sysfs_write()</span><span style="color: #ffa07a;"> around</span>
+<span style="color: #ffa07a;"> * accesses (esp. charp, which can be kfreed when it changes).</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * The </span><span style="color: #7fffd4;">@type</span><span style="color: #ffa07a;"> is simply pasted to refer to a param_ops_#</span><span style="color: #7fffd4;">#type</span><span style="color: #ffa07a;"> and a</span>
+<span style="color: #ffa07a;"> * param_check_#</span><span style="color: #7fffd4;">#type</span><span style="color: #ffa07a;">: for convenience many standard types are provided but</span>
+<span style="color: #ffa07a;"> * you can create your own by defining those variables.</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * Standard types are:</span>
+<span style="color: #ffa07a;"> *      byte, short, ushort, int, uint, long, ulong</span>
+<span style="color: #ffa07a;"> *      charp: a character pointer</span>
+<span style="color: #ffa07a;"> *      bool: a bool, values 0/1, y/n, Y/N.</span>
+<span style="color: #ffa07a;"> *      invbool: the above, only sense-reversed (N = true).</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">module_param</span>(<span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">type</span>, <span style="color: #eedd82;">perm</span>)                          \
+        module_param_named(name, name, type, perm)
+
+<span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * module_param_named - typesafe helper for a renamed module/cmdline parameter</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@name</span><span style="color: #ffa07a;">: a valid C identifier which is the parameter name.</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@value</span><span style="color: #ffa07a;">: the actual lvalue to alter.</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@type</span><span style="color: #ffa07a;">: the type of the parameter</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@perm</span><span style="color: #ffa07a;">: visibility in sysfs.</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * Usually it's a good idea to have variable names and user-exposed names the</span>
+<span style="color: #ffa07a;"> * same, but that's harder if the variable must be non-static or is inside a</span>
+<span style="color: #ffa07a;"> * structure.  This allows exposure under a different name.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">module_param_named</span>(<span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">value</span>, <span style="color: #eedd82;">type</span>, <span style="color: #eedd82;">perm</span>)                        \
+        param_check_##type(name, &amp;(value));                                \
+        module_param_cb(name, &amp;param_ops_##type, &amp;value, perm);            \
+        __MODULE_PARM_TYPE(name, #type)
+
+<span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * module_param_cb - general callback for a module/cmdline parameter</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@name</span><span style="color: #ffa07a;">: a valid C identifier which is the parameter name.</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@ops</span><span style="color: #ffa07a;">: the set &amp; get operations for this parameter.</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@perm</span><span style="color: #ffa07a;">: visibility in sysfs.</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * The ops can have NULL set or get functions.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">module_param_cb</span>(<span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">ops</span>, <span style="color: #eedd82;">arg</span>, <span style="color: #eedd82;">perm</span>)                                 \
+        __module_param_call(MODULE_PARAM_PREFIX,                              \
+                            name, ops, arg, __same_type((arg), <span style="color: #98fb98;">bool</span> *), perm)
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">This is the fundamental function for registering boot/module</span>
+<span style="color: #ff7f24;">   parameters. </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__module_param_call</span>(<span style="color: #eedd82;">prefix</span>, <span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">ops</span>, <span style="color: #eedd82;">arg</span>, <span style="color: #eedd82;">isbool</span>, <span style="color: #eedd82;">perm</span>)       \
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Default value instead of permissions? </span><span style="color: #ff7f24;">*/</span>                     \
+        <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">__param_perm_check_</span>##name <span style="color: #00ffff;">__attribute__</span>((unused)) =  \
+        BUILD_BUG_ON_ZERO((perm) &lt; 0 || (perm) &gt; 0777 || ((perm) &amp; 2))  \
+        + BUILD_BUG_ON_ZERO(<span style="color: #00ffff;">sizeof</span>(<span style="color: #ffa07a;">""</span>prefix) &gt; MAX_PARAM_PREFIX_LEN);   \
+        <span style="color: #00ffff;">static</span> <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">__param_str_</span>##name[] = prefix #name;          \
+        <span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kernel_param</span> <span style="color: #98fb98;">__moduleparam_const</span> <span style="color: #87cefa;">__param_</span>##name   \
+        __used                                                          \
+    <span style="color: #00ffff;">__attribute__</span> ((unused,__section__ (<span style="color: #ffa07a;">"__param"</span>),aligned(<span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">void</span> *)))) \
+        = { __param_str_##name, ops, perm, isbool ? KPARAM_ISBOOL : 0,  \
+            { arg } }
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-3"><code>S_IRUGO</code><br/>
+  <b>chapter 2</b>
+
+
+
+<pre class="src src-c">&lt;linux/stat.h&gt;
+
+<span style="color: #b0c4de;">#if</span> <span style="color: #b0c4de;">defined</span>(__KERNEL__) || !<span style="color: #b0c4de;">defined</span>(__GLIBC__) || (__GLIBC__ &lt; 2)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IRWXU</span> 00700
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IRUSR</span> 00400
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IWUSR</span> 00200
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IXUSR</span> 00100
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IRWXG</span> 00070
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IRGRP</span> 00040
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IWGRP</span> 00020
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IXGRP</span> 00010
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IRWXO</span> 00007
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IROTH</span> 00004
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IWOTH</span> 00002
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IXOTH</span> 00001
+
+<span style="color: #b0c4de;">#endif</span>
+
+
+<span style="color: #b0c4de;">#ifdef</span> __KERNEL__
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IRWXUGO</span>       (S_IRWXU|S_IRWXG|S_IRWXO)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IALLUGO</span>       (S_ISUID|S_ISGID|S_ISVTX|S_IRWXUGO)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IRUGO</span>         (S_IRUSR|S_IRGRP|S_IROTH)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IWUGO</span>         (S_IWUSR|S_IWGRP|S_IWOTH)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">S_IXUGO</span>         (S_IXUSR|S_IXGRP|S_IXOTH)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">UTIME_NOW</span>       ((1l &lt;&lt; 30) - 1l)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">UTIME_OMIT</span>      ((1l &lt;&lt; 30) - 2l)
+<span style="color: #b0c4de;">#endif</span>
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-4">Run<br/>
+
+
+
+<pre class="src src-sh">sudo insmod hellop.ko  <span style="color: #eedd82;">howmany</span>=10 <span style="color: #eedd82;">whom</span>=<span style="color: #ffa07a;">"what"</span>
+</pre>
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-2-3" class="outline-3">
+<h3 id="sec-2-3"><code>complete.c</code></h3>
+<div class="outline-text-3" id="text-2-3">
+
+<ul>
+<li id="sec-2-3-1"><code>struct task_struct *current;</code><br/>
+  <b>chapter 2</b>
+<ul>
+<li>snippet
+</li>
+</ul>
+
+
+
+
+<pre class="src src-c">current-&gt;pid
+current-&gt;comm
+&#36827;&#31243; ID &#21644; &#24403;&#21069;&#36827;&#31243;&#30340;&#21629;&#20196;&#21517;.
+</pre>
+
+
+<ul>
+<li>files
+</li>
+</ul>
+
+
+
+
+<pre class="src src-c">&lt;linux/sched.h&gt;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;asm/current.h&gt;</span>
+</pre>
+
+
+<pre class="src src-c"> &lt;<span style="color: #00ffff;">asm</span>/current.h&gt;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/thread_info.h&gt;</span>
+
+ <span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">task_struct</span> *get_current(<span style="color: #98fb98;">void</span>) __attribute_const__;
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">task_struct</span> *<span style="color: #87cefa;">get_current</span>(<span style="color: #98fb98;">void</span>)
+{
+        <span style="color: #00ffff;">return</span> current_thread_info()-&gt;task;
+}
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">current</span> (get_current())
+</pre>
+
+
+<pre class="src src-c">&lt;linux/thread_info.h&gt;
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">thread_info</span> *current_thread_info(<span style="color: #98fb98;">void</span>) __attribute_const__;
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">thread_info</span> *<span style="color: #87cefa;">current_thread_info</span>(<span style="color: #98fb98;">void</span>)
+{
+        <span style="color: #00ffff;">register</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">sp</span> <span style="color: #00ffff;">asm</span> (<span style="color: #ffa07a;">"sp"</span>);
+        <span style="color: #00ffff;">return</span> (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">thread_info</span> *)(sp &amp; ~(THREAD_SIZE - 1));
+}
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">THREAD_SIZE</span>             8192
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * low level task data that entry.S needs immediate access to.</span>
+<span style="color: #ff7f24;"> * __switch_to() assumes cpu_context follows immediately after cpu_domain.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">thread_info</span> {
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>           <span style="color: #eedd82;">flags</span>;          <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">low level flags </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">int</span>                     <span style="color: #eedd82;">preempt_count</span>;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">0 =&gt; preemptable, &lt;0 =&gt; bug </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">mm_segment_t</span>            <span style="color: #eedd82;">addr_limit</span>;     <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">address limit </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">task_struct</span>      *<span style="color: #eedd82;">task</span>;          <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">main task structure </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">exec_domain</span>      *<span style="color: #eedd82;">exec_domain</span>;   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">execution domain </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">__u32</span>                   <span style="color: #eedd82;">cpu</span>;            <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">cpu </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">__u32</span>                   <span style="color: #eedd82;">cpu_domain</span>;     <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">cpu domain </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">cpu_context_save</span> <span style="color: #eedd82;">cpu_context</span>;    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">cpu context </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">__u32</span>                   <span style="color: #eedd82;">syscall</span>;        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">syscall number </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">__u8</span>                    <span style="color: #eedd82;">used_cp</span>[16];    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">thread used copro </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>           <span style="color: #eedd82;">tp_value</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">crunch_state</span>     <span style="color: #eedd82;">crunchstate</span>;
+        <span style="color: #00ffff;">union</span> <span style="color: #98fb98;">fp_state</span>          <span style="color: #eedd82;">fpstate</span> <span style="color: #00ffff;">__attribute__</span>((aligned(8)));
+        <span style="color: #00ffff;">union</span> <span style="color: #98fb98;">vfp_state</span>         <span style="color: #eedd82;">vfpstate</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_ARM_THUMBEE
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>           <span style="color: #eedd82;">thumbee_state</span>;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ThumbEE Handler Base register </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">restart_block</span>    <span style="color: #eedd82;">restart_block</span>;
+};
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-2"><code>dev_t</code><br/>
+   <b>chapter 3</b>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/types.h&gt;</span>
+<span style="color: #b0c4de;">#ifdef</span> __KERNEL__
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">__u32</span> <span style="color: #98fb98;">__kernel_dev_t</span>;
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">__kernel_dev_t</span>          <span style="color: #98fb98;">dev_t</span>;
+</pre>
+
+
+<ul>
+<li>operation
+</li>
+</ul>
+
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">  #include</span> <span style="color: #ffa07a;">&lt;linux/kdev_t.h&gt;</span>
+<span style="color: #b0c4de;">#ifdef</span> __KERNEL__
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">MINORBITS</span>       20
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">MINORMASK</span>       ((1U &lt;&lt; MINORBITS) - 1)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">MAJOR</span>(<span style="color: #eedd82;">dev</span>)      ((<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>) ((dev) &gt;&gt; MINORBITS))
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">MINOR</span>(<span style="color: #eedd82;">dev</span>)      ((<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>) ((dev) &amp; MINORMASK))
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">MKDEV</span>(<span style="color: #eedd82;">ma</span>,<span style="color: #eedd82;">mi</span>)    (((ma) &lt;&lt; MINORBITS) | (mi))
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">print_dev_t</span>(<span style="color: #eedd82;">buffer</span>, <span style="color: #eedd82;">dev</span>)                                        \
+        sprintf((buffer), <span style="color: #ffa07a;">"%u:%u\n"</span>, MAJOR(dev), MINOR(dev))
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">format_dev_t</span>(<span style="color: #eedd82;">buffer</span>, <span style="color: #eedd82;">dev</span>)                                       \
+        ({                                                              \
+                sprintf(buffer, <span style="color: #ffa07a;">"%u:%u"</span>, MAJOR(dev), MINOR(dev));       \
+                buffer;                                                 \
+        })
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">u32</span> <span style="color: #87cefa;">new_encode_dev</span>(<span style="color: #98fb98;">dev_t</span> <span style="color: #eedd82;">dev</span>)
+{
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">major</span> = MAJOR(dev);
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">minor</span> = MINOR(dev);
+        <span style="color: #00ffff;">return</span> (minor &amp; 0xff) | (major &lt;&lt; 8) | ((minor &amp; ~0xff) &lt;&lt; 12);
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">dev_t</span> <span style="color: #87cefa;">new_decode_dev</span>(<span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">dev</span>)
+{
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">major</span> = (dev &amp; 0xfff00) &gt;&gt; 8;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">minor</span> = (dev &amp; 0xff) | ((dev &gt;&gt; 12) &amp; 0xfff00);
+        <span style="color: #00ffff;">return</span> MKDEV(major, minor);
+}
+
+<span style="color: #b0c4de;">#else</span> <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">__KERNEL__ </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">Some programs want their definitions of MAJOR and MINOR and MKDEV</span>
+<span style="color: #ff7f24;">from the kernel sources. These must be the externally visible ones.</span>
+<span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">MAJOR</span>(<span style="color: #eedd82;">dev</span>)      ((dev)&gt;&gt;8)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">MINOR</span>(<span style="color: #eedd82;">dev</span>)      ((dev) &amp; 0xff)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">MKDEV</span>(<span style="color: #eedd82;">ma</span>,<span style="color: #eedd82;">mi</span>)    ((ma)&lt;&lt;8 | (mi))
+<span style="color: #b0c4de;">#endif</span> <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">__KERNEL__ </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-3">Allocating and Freeing Device Numbers<br/>
+ <b>chapter 3</b>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/fs.h&gt;</span>
+The &#8220;filesystem&#8221; header is the header required <span style="color: #00ffff;">for</span> writing device drivers. Many
+important functions and data structures are declared in here.
+
+<span style="color: #98fb98;">int</span> register_chrdev_region(<span style="color: #98fb98;">dev_t</span> <span style="color: #eedd82;">first</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>)
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">alloc_chrdev_region</span>(<span style="color: #98fb98;">dev_t</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">firstminor</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>)
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">unregister_chrdev_region</span>(<span style="color: #98fb98;">dev_t</span> <span style="color: #eedd82;">first</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span>);
+Functions that allow a driver to allocate and free ranges of <span style="color: #98fb98;">device</span> <span style="color: #eedd82;">numbers</span>.
+register_chrdev_region should be used when the desired major number is known
+in advance; <span style="color: #00ffff;">for</span> dynamic allocation, use <span style="color: #98fb98;">alloc_chrdev_region</span> <span style="color: #eedd82;">instead</span>.
+</pre>
+
+
+<ul>
+<li id="sec-2-3-3-1">how<br/>
+<code>int register_chrdev_region(dev_t first, unsigned int count, char *name);</code>
+
+<p>
+Here, first is the beginning device number of the range you would like to allocate.
+The minor number portion of first is often 0, but there is no requirement to that
+effect. count is the total number of contiguous device numbers you are requesting.
+Note that, if count is large, the range you request could spill over to the next major
+number; but everything will still work properly as long as the number range you
+request is available. Finally, name is the name of the device that should be associated
+with this number range; it will appear in /proc/devices and sysfs.
+</p>
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-4">Char Device Registration<br/>
+  <b>chapter 3</b>
+<ul>
+<li id="sec-2-3-4-1">API<br/>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">  #include</span> <span style="color: #ffa07a;">&lt;linux/cdev.h&gt;</span>
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">cdev</span> {
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kobject</span> <span style="color: #eedd82;">kobj</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">module</span> *<span style="color: #eedd82;">owner</span>;
+        <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_operations</span> *<span style="color: #eedd82;">ops</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">list</span>;
+        <span style="color: #98fb98;">dev_t</span> <span style="color: #eedd82;">dev</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span>;
+};
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">cdev_init</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">cdev</span> *, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_operations</span> *);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">cdev</span> *<span style="color: #87cefa;">cdev_alloc</span>(<span style="color: #98fb98;">void</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">cdev_add</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">cdev</span> *, <span style="color: #98fb98;">dev_t</span>, <span style="color: #98fb98;">unsigned</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">cdev_del</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">cdev</span> *);
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">cdev_put</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">cdev</span> *<span style="color: #eedd82;">p</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">cdev_index</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *<span style="color: #eedd82;">inode</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">cd_forget</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *);
+<span style="color: #00ffff;">extern</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">backing_dev_info</span> <span style="color: #eedd82;">directly_mappable_cdev_bdi</span>;
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-4-2">examples<br/>
+<ol>
+<li>There are two ways of allocating and initializing one of these
+   structures. If you wish to obtain a standalone cdev structure at
+   runtime, you may do so with code such as:
+</li>
+</ol>
+
+
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">cdev</span> *<span style="color: #eedd82;">my_cdev</span> = cdev_alloc( );
+my_cdev-&gt;ops = &amp;my_fops;
+</pre>
+
+
+<ol>
+<li>Chances are, however, that you will want to embed the cdev
+   structure within a device-specific structure of your own; that is
+   what scull does. In that case, you should initialize the structure
+   that you have already allocated with:
+</li>
+</ol>
+
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">scull_setup_cdev</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">scull_dev</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">index</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">err</span>, <span style="color: #eedd82;">devno</span> = MKDEV(scull_major, scull_minor + index);
+  cdev_init(&amp;dev-&gt;cdev, &amp;scull_fops);
+  dev-&gt;cdev.owner = THIS_MODULE;
+  dev-&gt;cdev.ops = &amp;scull_fops;
+  err = cdev_add (&amp;dev-&gt;cdev, devno, 1);
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Fail gracefully if need be </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">if</span> (err)
+    printk(KERN_NOTICE <span style="color: #ffa07a;">"Error %d adding scull%d"</span>, err, index);
+}
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-4-3">how<br/>
+<ul>
+<li><code>int cdev_add(struct cdev *dev, dev_t num, unsigned int count);</code>
+     Here, dev is the cdev structure, num is the first device number to which this device
+     responds, and count is the number of device numbers that should be associated with
+     the device. Often count is one, but there are situations where it makes sense to have
+     more than one device number correspond to a specific device.
+
+<p>
+     There are a couple of important things to keep in mind when using cdev<sub>add</sub>. The
+     first is that this call can fail. If it returns a negative error code, your device has not
+     been added to the system.
+</p></li>
+</ul>
+
+
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-5">Data Structures<br/>
+<ul>
+<li id="sec-2-3-5-1"><code>struct file_opertaions</code><br/>
+The file<sub>operations</sub> structure holds a char driver’s methods; 
+
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">     #include</span> <span style="color: #ffa07a;">&lt;linux/fs.h&gt;</span>
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * NOTE:</span>
+<span style="color: #ff7f24;"> * all file operations except setlease can be called without</span>
+<span style="color: #ff7f24;"> * the big kernel lock held in all filesystems.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_operations</span> {
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">module</span> *<span style="color: #eedd82;">owner</span>;
+        <span style="color: #98fb98;">loff_t</span> (*<span style="color: #87cefa;">llseek</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">loff_t</span>, <span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">ssize_t</span> (*<span style="color: #87cefa;">read</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">__user</span> *, <span style="color: #98fb98;">size_t</span>, <span style="color: #98fb98;">loff_t</span> *);
+        <span style="color: #98fb98;">ssize_t</span> (*<span style="color: #87cefa;">write</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">__user</span> *, <span style="color: #98fb98;">size_t</span>, <span style="color: #98fb98;">loff_t</span> *);
+        <span style="color: #98fb98;">ssize_t</span> (*<span style="color: #87cefa;">aio_read</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kiocb</span> *, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">iovec</span> *, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>, <span style="color: #98fb98;">loff_t</span>);
+        <span style="color: #98fb98;">ssize_t</span> (*<span style="color: #87cefa;">aio_write</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kiocb</span> *, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">iovec</span> *, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>, <span style="color: #98fb98;">loff_t</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">readdir</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">void</span> *, <span style="color: #98fb98;">filldir_t</span>);
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">poll</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">poll_table_struct</span> *);
+        <span style="color: #98fb98;">long</span> (*<span style="color: #87cefa;">unlocked_ioctl</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>);
+        <span style="color: #98fb98;">long</span> (*<span style="color: #87cefa;">compat_ioctl</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">mmap</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">vm_area_struct</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">open</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">flush</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">fl_owner_t</span> <span style="color: #eedd82;">id</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">release</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">fsync</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">datasync</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">aio_fsync</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kiocb</span> *, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">datasync</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">fasync</span>) (<span style="color: #98fb98;">int</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">lock</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">int</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_lock</span> *);
+        <span style="color: #98fb98;">ssize_t</span> (*<span style="color: #87cefa;">sendpage</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">page</span> *, <span style="color: #98fb98;">int</span>, <span style="color: #98fb98;">size_t</span>, <span style="color: #98fb98;">loff_t</span> *, <span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> (*<span style="color: #87cefa;">get_unmapped_area</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">check_flags</span>)(<span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">flock</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">int</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_lock</span> *);
+        <span style="color: #98fb98;">ssize_t</span> (*<span style="color: #87cefa;">splice_write</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">pipe_inode_info</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">loff_t</span> *, <span style="color: #98fb98;">size_t</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">ssize_t</span> (*<span style="color: #87cefa;">splice_read</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">loff_t</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">pipe_inode_info</span> *, <span style="color: #98fb98;">size_t</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">setlease</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *, <span style="color: #98fb98;">long</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_lock</span> **);
+};
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-5-2"><code>struct file</code><br/>
+struct file represents an open file
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> {
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * fu_list becomes invalid after file_free is called and queued via</span>
+<span style="color: #ff7f24;">         * fu_rcuhead for RCU freeing</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">union</span> {
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span>        <span style="color: #eedd82;">fu_list</span>;
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rcu_head</span>         <span style="color: #eedd82;">fu_rcuhead</span>;
+        } <span style="color: #eedd82;">f_u</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">path</span>             <span style="color: #eedd82;">f_path</span>;
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">f_dentry</span>        f_path.dentry
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">f_vfsmnt</span>        f_path.mnt
+        <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_operations</span>    *<span style="color: #eedd82;">f_op</span>;
+        <span style="color: #98fb98;">spinlock_t</span>              <span style="color: #eedd82;">f_lock</span>;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">f_ep_links, f_flags, no IRQ </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_SMP
+        <span style="color: #98fb98;">int</span>                     <span style="color: #eedd82;">f_sb_list_cpu</span>;
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #98fb98;">atomic_long_t</span>           <span style="color: #eedd82;">f_count</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">f_flags</span>;
+        <span style="color: #98fb98;">fmode_t</span>                 <span style="color: #eedd82;">f_mode</span>;
+        <span style="color: #98fb98;">loff_t</span>                  <span style="color: #eedd82;">f_pos</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">fown_struct</span>      <span style="color: #eedd82;">f_owner</span>;
+        <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">cred</span>       *<span style="color: #eedd82;">f_cred</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_ra_state</span>    <span style="color: #eedd82;">f_ra</span>;
+
+        <span style="color: #98fb98;">u64</span>                     <span style="color: #eedd82;">f_version</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_SECURITY
+        <span style="color: #98fb98;">void</span>                    *<span style="color: #eedd82;">f_security</span>;
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">needed for tty driver, and maybe others </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">void</span>                    *<span style="color: #eedd82;">private_data</span>;
+
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_EPOLL
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Used by fs/eventpoll.c to link all the hooks to this file </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span>        <span style="color: #eedd82;">f_ep_links</span>;
+<span style="color: #b0c4de;">#endif</span> <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">#ifdef CONFIG_EPOLL </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">address_space</span>    *<span style="color: #eedd82;">f_mapping</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_DEBUG_WRITECOUNT
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">f_mnt_write_state</span>;
+<span style="color: #b0c4de;">#endif</span>
+};
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-5-3"><code>struct inode</code><br/>
+struct inode represents a file on disk.
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> {
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span>       <span style="color: #eedd82;">i_hash</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span>        <span style="color: #eedd82;">i_wb_list</span>;      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">backing dev IO list </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span>        <span style="color: #eedd82;">i_lru</span>;          <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">inode LRU list </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span>        <span style="color: #eedd82;">i_sb_list</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span>        <span style="color: #eedd82;">i_dentry</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>           <span style="color: #eedd82;">i_ino</span>;
+        <span style="color: #98fb98;">atomic_t</span>                <span style="color: #eedd82;">i_count</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">i_nlink</span>;
+        <span style="color: #98fb98;">uid_t</span>                   <span style="color: #eedd82;">i_uid</span>;
+        <span style="color: #98fb98;">gid_t</span>                   <span style="color: #eedd82;">i_gid</span>;
+        <span style="color: #98fb98;">dev_t</span>                   <span style="color: #eedd82;">i_rdev</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">i_blkbits</span>;
+        <span style="color: #98fb98;">u64</span>                     <span style="color: #eedd82;">i_version</span>;
+        <span style="color: #98fb98;">loff_t</span>                  <span style="color: #eedd82;">i_size</span>;
+<span style="color: #b0c4de;">#ifdef</span> __NEED_I_SIZE_ORDERED
+        <span style="color: #98fb98;">seqcount_t</span>              <span style="color: #eedd82;">i_size_seqcount</span>;
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span>         <span style="color: #eedd82;">i_atime</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span>         <span style="color: #eedd82;">i_mtime</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span>         <span style="color: #eedd82;">i_ctime</span>;
+        <span style="color: #98fb98;">blkcnt_t</span>                <span style="color: #eedd82;">i_blocks</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>          <span style="color: #eedd82;">i_bytes</span>;
+        <span style="color: #98fb98;">umode_t</span>                 <span style="color: #eedd82;">i_mode</span>;
+        <span style="color: #98fb98;">spinlock_t</span>              <span style="color: #eedd82;">i_lock</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">i_blocks, i_bytes, maybe i_size </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">mutex</span>            <span style="color: #eedd82;">i_mutex</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rw_semaphore</span>     <span style="color: #eedd82;">i_alloc_sem</span>;
+        <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode_operations</span>   *<span style="color: #eedd82;">i_op</span>;
+        <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_operations</span>    *<span style="color: #eedd82;">i_fop</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">former -&gt;i_op-&gt;default_file_ops </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">super_block</span>      *<span style="color: #eedd82;">i_sb</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_lock</span>        *<span style="color: #eedd82;">i_flock</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">address_space</span>    *<span style="color: #eedd82;">i_mapping</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">address_space</span>    <span style="color: #eedd82;">i_data</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_QUOTA
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dquot</span>            *<span style="color: #eedd82;">i_dquot</span>[MAXQUOTAS];
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span>        <span style="color: #eedd82;">i_devices</span>;
+        <span style="color: #00ffff;">union</span> {
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">pipe_inode_info</span>  *<span style="color: #eedd82;">i_pipe</span>;
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">block_device</span>     *<span style="color: #eedd82;">i_bdev</span>;
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">cdev</span>             *<span style="color: #eedd82;">i_cdev</span>;
+        };
+
+        <span style="color: #98fb98;">__u32</span>                   <span style="color: #eedd82;">i_generation</span>;
+
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_FSNOTIFY
+        <span style="color: #98fb98;">__u32</span>                   <span style="color: #eedd82;">i_fsnotify_mask</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">all events this inode cares about </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_head</span>       <span style="color: #eedd82;">i_fsnotify_marks</span>;
+<span style="color: #b0c4de;">#endif</span>
+
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>           <span style="color: #eedd82;">i_state</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>           <span style="color: #eedd82;">dirtied_when</span>;   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">jiffies of first dirtying </span><span style="color: #ff7f24;">*/</span>
+
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">i_flags</span>;
+
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_IMA
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">protected by i_lock </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">i_readcount</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">struct files open RO </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #98fb98;">atomic_t</span>                <span style="color: #eedd82;">i_writecount</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_SECURITY
+        <span style="color: #98fb98;">void</span>                    *<span style="color: #eedd82;">i_security</span>;
+<span style="color: #b0c4de;">#endif</span>
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_FS_POSIX_ACL
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">posix_acl</span>        *<span style="color: #eedd82;">i_acl</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">posix_acl</span>        *<span style="color: #eedd82;">i_default_acl</span>;
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #98fb98;">void</span>                    *<span style="color: #eedd82;">i_private</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">fs or device private pointer </span><span style="color: #ff7f24;">*/</span>
+};
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-5-4"><code>struct inode_operations</code><br/>
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode_operations</span> {
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">create</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *,<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *,<span style="color: #98fb98;">int</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">nameidata</span> *);
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> * (*<span style="color: #87cefa;">lookup</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *,<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">nameidata</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">link</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *,<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *,<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">unlink</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *,<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">symlink</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *,<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *,<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">mkdir</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *,<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *,<span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">rmdir</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *,<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">mknod</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *,<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *,<span style="color: #98fb98;">int</span>,<span style="color: #98fb98;">dev_t</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">rename</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *,
+                        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">readlink</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *, <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">__user</span> *,<span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">void</span> * (*<span style="color: #87cefa;">follow_link</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">nameidata</span> *);
+        <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">put_link</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">nameidata</span> *, <span style="color: #98fb98;">void</span> *);
+        <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">truncate</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">permission</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *, <span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">check_acl</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *, <span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">setattr</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">iattr</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">getattr</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">vfsmount</span> *<span style="color: #eedd82;">mnt</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kstat</span> *);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">setxattr</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *,<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> *,<span style="color: #98fb98;">size_t</span>,<span style="color: #98fb98;">int</span>);
+        <span style="color: #98fb98;">ssize_t</span> (*<span style="color: #87cefa;">getxattr</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *, <span style="color: #98fb98;">void</span> *, <span style="color: #98fb98;">size_t</span>);
+        <span style="color: #98fb98;">ssize_t</span> (*<span style="color: #87cefa;">listxattr</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *, <span style="color: #98fb98;">char</span> *, <span style="color: #98fb98;">size_t</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">removexattr</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dentry</span> *, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *);
+        <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">truncate_range</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *, <span style="color: #98fb98;">loff_t</span>, <span style="color: #98fb98;">loff_t</span>);
+        <span style="color: #98fb98;">long</span> (*<span style="color: #87cefa;">fallocate</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *<span style="color: #eedd82;">inode</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mode</span>, <span style="color: #98fb98;">loff_t</span> <span style="color: #eedd82;">offset</span>,
+                          <span style="color: #98fb98;">loff_t</span> <span style="color: #eedd82;">len</span>);
+        <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">fiemap</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">fiemap_extent_info</span> *, <span style="color: #98fb98;">u64</span> <span style="color: #eedd82;">start</span>,
+                      <span style="color: #98fb98;">u64</span> <span style="color: #eedd82;">len</span>);
+};
+</pre>
+
+
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-6">Completions 机制<br/>
+    <b>chapter 5</b>
+<ul>
+<li id="sec-2-3-6-1">how<br/>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/completion.h&gt;</span>
+    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Method 1</span>
+  DECLARE_COMPLETION(comp);
+  wait_for_completion(&amp;comp);
+  complete(&amp;comp);
+  <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Method 2</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> <span style="color: #eedd82;">my_completion</span>;
+init_completion(&amp;my_completion);
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-6-2">API<br/>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/completion.h&gt;</span>
+
+/ * Atomic wait-<span style="color: #00ffff;">for</span>-completion handler data structures.
+ * See kernel/sched.c <span style="color: #00ffff;">for</span> details.
+ */
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> {
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">done</span>;
+        <span style="color: #98fb98;">wait_queue_head_t</span> <span style="color: #eedd82;">wait</span>;
+};
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">COMPLETION_INITIALIZER</span>(<span style="color: #eedd82;">work</span>) \
+        { 0, __WAIT_QUEUE_HEAD_INITIALIZER((work).wait) }
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">COMPLETION_INITIALIZER_ONSTACK</span>(<span style="color: #eedd82;">work</span>) \
+        ({ init_completion(&amp;work); work; })
+
+<span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * DECLARE_COMPLETION - declare and initialize a completion structure</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@work</span><span style="color: #ffa07a;">:  identifier for the completion structure</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * This macro declares and initializes a completion structure. Generally used</span>
+<span style="color: #ffa07a;"> * for static declarations. You should use the _ONSTACK variant for automatic</span>
+<span style="color: #ffa07a;"> * variables.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">DECLARE_COMPLETION</span>(<span style="color: #eedd82;">work</span>) \
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> <span style="color: #eedd82;">work</span> = COMPLETION_INITIALIZER(work)
+
+<span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * init_completion - Initialize a dynamically allocated completion</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@x</span><span style="color: #ffa07a;">:  completion structure that is to be initialized</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * This inline function will initialize a dynamically created completion</span>
+<span style="color: #ffa07a;"> * structure.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">init_completion</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>)
+{
+        x-&gt;done = 0;
+        init_waitqueue_head(&amp;x-&gt;wait);
+}
+
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait_for_completion</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">wait_for_completion_interruptible</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">wait_for_completion_killable</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #87cefa;">wait_for_completion_timeout</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>,
+                                                   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">timeout</span>);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #87cefa;">wait_for_completion_interruptible_timeout</span>(
+                        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">timeout</span>);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #87cefa;">wait_for_completion_killable_timeout</span>(
+                        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">timeout</span>);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_wait_for_completion</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">completion_done</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">x</span>);
+
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">complete</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">complete_all</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *);
+
+<span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * INIT_COMPLETION - reinitialize a completion structure</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@x</span><span style="color: #ffa07a;">:  completion structure to be reinitialized</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * This macro should be used to reinitialize a completion structure so it can</span>
+<span style="color: #ffa07a;"> * be reused. This is especially important after </span><span style="color: #7fffd4;">complete_all()</span><span style="color: #ffa07a;"> is used.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">INIT_COMPLETION</span>(<span style="color: #eedd82;">x</span>)      ((x).done = 0)
+
+</pre>
+
+
+</li>
+</ul>
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-2-4" class="outline-3">
+<h3 id="sec-2-4"><code>faulty.c</code></h3>
+<div class="outline-text-3" id="text-2-4">
+
+<p> <b>chapter 4</b>
+</p><ul>
+<li id="sec-2-4-1">缓存区溢出<br/>
+这个方法拷贝一个字串到一个本地变量; 不幸的是, 字串长于目的数组. 当函数
+返回时导致的缓存区溢出引起一次 oops . 因为返回指令使指令指针到不知何处,
+这类的错误很难跟踪
+<ul>
+<li>SRC
+</li>
+</ul>
+
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">char</span> <span style="color: #eedd82;">stack_buf</span>[4];
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Let's try a buffer overflow </span><span style="color: #ff7f24;">*/</span>
+    memset(stack_buf, 0xff, 20);
+</pre>
+
+<ul>
+<li>Test
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">cat /dev/faulty</span>
+[1]    22139 killed     cat /dev/faulty
+
+[178823.762627] BUG: unable to handle kernel NULL pointer dereference at 0000000b
+[178823.762631] IP: [&lt;c0214ea9&gt;] vfs_read+0xa9/0x1a0
+[178823.762637] *<span style="color: #eedd82;">pdpt</span> = 000000002d2cf001 *<span style="color: #eedd82;">pde</span> = 0000000000000000 
+[178823.762640] Oops: 0000 [#1] SMP 
+[178823.762642] last sysfs file: /sys/devices/pci0000:00/0000:00:03.0/0000:01:00.1/local_cpus
+[178823.762645] Modules linked<span style="color: #00ffff;"> in</span>: faulty complete binfmt_misc ppdev vboxnetadp vboxnetflt vboxdrv nfsd exportfs nfs lockd nfs_acl auth_rpcgss sunrpc snd_hda_codec_realtek snd_usb_audio snd_usb_lib snd_hda_intel snd_pcm_oss snd_hda_codec snd_mixer_oss snd_pcm snd_seq_dummy snd_hwdep snd_seq_oss snd_seq_midi snd_rawmidi snd_seq_midi_event snd_seq fbcon snd_timer tileblit snd_seq_device tpm_tis font snd tpm bitblit tpm_bios softcursor soundcore psmouse snd_page_alloc nvidia(P) serio_raw agpgart vga16fb vgastate lp parport usbhid hid usb_storage ahci e1000e
+[178823.762681] 
+[178823.762684] Pid: 12648, comm: more Tainted: P           (2.6.32-42-generic-pae <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">96-Ubuntu) 5498RF4</span>
+[178823.762693] EIP: 0060:[&lt;c0214ea9&gt;] EFLAGS: 00010202 CPU: 5
+[178823.762697] EIP is at vfs_read+0xa9/0x1a0
+[178823.762703] EAX: 00000004 EBX: ffffffff ECX: 00000000 EDX: b7487000
+[178823.762708] ESI: 00000004 EDI: ffffffff EBP: ffffffff ESP: f166df6c
+[178823.762710]  DS: 007b ES: 007b FS: 00d8 GS: 00e0 SS: 0068
+[178823.762712] Process more (pid: 12648, <span style="color: #eedd82;">ti</span>=f166c000 <span style="color: #eedd82;">task</span>=e251d940 task.ti=f166c000)
+[178823.762714] Stack:
+[178823.762715]  f166df98 f166df88 c0361b19 f82f80f0 ed0f8e80 ed0f8e80 fffffff7 00000002
+[178823.762719] &lt;0&gt; f166dfac c0215052 f166df98 00000000 00000000 00000000 00000003 09ad9c68
+[178823.762723] &lt;0&gt; f166c000 c01096e3 00000003 b7487000 00001000 09ad9c68 00000002 bfaa34c4
+[178823.762728] Call Trace:
+[178823.762732]  [&lt;c0361b19&gt;] ? copy_to_user+0x39/0x130
+[178823.762735]  [&lt;f82f80f0&gt;] ? faulty_read+0x0/0x50 [faulty]
+[178823.762738]  [&lt;c0215052&gt;] ? sys_read+0x42/0x70
+[178823.762741]  [&lt;c01096e3&gt;] ? sysenter_do_call+0x12/0x28
+[178823.762743] Code: a4 8b 43 10 8b 40 08 85 c0 89 45 ec 0f 84 e1 00 00 00 8b 45 08 89 f1 89 fa 89 04 24 89 d8 ff 55 ec 89 c6 85 f6 0f 8e 9a 00 00 00 &lt;8b&gt; 7b 0c 31 db 8b 47 10 89 45 f0 0f b7 40 72 c7 44 24 04 00 00 
+[178823.762791] EIP: [&lt;c0214ea9&gt;] vfs_read+0xa9/0x1a0 SS:ESP 0068:f166df6c
+[178823.762794] CR2: 000000000000000b
+[178823.762803] ---[ end trace 9342d36e7d9d6b0e ]---
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-4-2">make a simple fault by dereferencing a NULL pointer<br/>
+<ul>
+<li>SRC
+</li>
+</ul>
+
+
+
+
+<pre class="src src-c">*(<span style="color: #98fb98;">int</span> *)0 = 0;
+</pre>
+
+<ul>
+<li>Test
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">echo "test" &gt;  /dev/faulty</span>
+
+[179151.985610] BUG: unable to handle kernel NULL pointer dereference at (null)
+[179151.985618] IP: [&lt;f82f800a&gt;] faulty_write+0xa/0x20 [faulty]
+[179151.985627] *<span style="color: #eedd82;">pdpt</span> = 0000000021426001 *<span style="color: #eedd82;">pde</span> = 0000000000000000 
+[179151.985633] Oops: 0002 [#2] SMP 
+[179151.985638] last sysfs file: /sys/devices/pci0000:00/0000:00:03.0/0000:01:00.1/local_cpus
+[179151.985642] Modules linked<span style="color: #00ffff;"> in</span>: faulty complete binfmt_misc ppdev vboxnetadp vboxnetflt vboxdrv nfsd exportfs nfs lockd nfs_acl auth_rpcgss sunrpc snd_hda_codec_realtek snd_usb_audio snd_usb_lib snd_hda_intel snd_pcm_oss snd_hda_codec snd_mixer_oss snd_pcm snd_seq_dummy snd_hwdep snd_seq_oss snd_seq_midi snd_rawmidi snd_seq_midi_event snd_seq fbcon snd_timer tileblit snd_seq_device tpm_tis font snd tpm bitblit tpm_bios softcursor soundcore psmouse snd_page_alloc nvidia(P) serio_raw agpgart vga16fb vgastate lp parport usbhid hid usb_storage ahci e1000e
+[179151.985703] 
+[179151.985708] Pid: 6614, comm: zsh Tainted: P      D    (2.6.32-42-generic-pae <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">96-Ubuntu) 5498RF4</span>
+[179151.985713] EIP: 0060:[&lt;f82f800a&gt;] EFLAGS: 00010246 CPU: 4
+[179151.985718] EIP is at faulty_write+0xa/0x20 [faulty]
+[179151.985721] EAX: 00000000 EBX: edaf1600 ECX: 00000005 EDX: 080d5540
+[179151.985725] ESI: 00000005 EDI: 080d5540 EBP: e19edf64 ESP: e19edf64
+[179151.985729]  DS: 007b ES: 007b FS: 00d8 GS: 00e0 SS: 0068
+[179151.985733] Process zsh (pid: 6614, <span style="color: #eedd82;">ti</span>=e19ec000 <span style="color: #eedd82;">task</span>=e8fda640 task.ti=e19ec000)
+[179151.985736] Stack:
+[179151.985738]  e19edf8c c02146f2 e19edf98 edaf1600 edba3b00 f82f8000 e19edf94 edaf1600
+[179151.985747] &lt;0&gt; fffffff7 080d5540 e19edfac c0214fe2 e19edf98 00000000 00000000 00000000
+[179151.985757] &lt;0&gt; 00000001 00000005 e19ec000 c01096e3 00000001 080d5540 00000005 00000005
+[179151.985767] Call Trace:
+[179151.985774]  [&lt;c02146f2&gt;] ? vfs_write+0xa2/0x1a0
+[179151.985779]  [&lt;f82f8000&gt;] ? faulty_write+0x0/0x20 [faulty]
+[179151.985785]  [&lt;c0214fe2&gt;] ? sys_write+0x42/0x70
+[179151.985790]  [&lt;c01096e3&gt;] ? sysenter_do_call+0x12/0x28
+[179151.985793] Code: &lt;c7&gt; 05 00 00 00 00 00 00 00 00 5d c3 8d 76 00 8d bc 27 00 00 00 00 
+[179151.985816] EIP: [&lt;f82f800a&gt;] faulty_write+0xa/0x20 [faulty] SS:ESP 0068:e19edf64
+[179151.985822] CR2: 0000000000000000
+[179151.985826] ---[ end trace 9342d36e7d9d6b0f ]---
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-4-3"><code>copy_to_user</code> and <code>copy_from_user</code><br/>
+  <b>chapter 3</b>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;asm/uaccess.h&gt;</span>
+This include file declares functions used by kernel code to move data to and
+from <span style="color: #98fb98;">user</span> <span style="color: #87cefa;">space</span>.
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> __must_check copy_from_user(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">to</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__user</span> *from, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">n</span>)
+{
+        <span style="color: #00ffff;">if</span> (access_ok(VERIFY_READ, from, n))
+                n = __copy_from_user(to, from, n);
+        <span style="color: #00ffff;">else</span> <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">security hole - plug it </span><span style="color: #ff7f24;">*/</span>
+                memset(to, 0, n);
+        <span style="color: #00ffff;">return</span> n;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">__must_check</span> <span style="color: #87cefa;">copy_to_user</span>(<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__user</span> *to, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">from</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">n</span>)
+{
+        <span style="color: #00ffff;">if</span> (access_ok(VERIFY_WRITE, to, n))
+                n = __copy_to_user(to, from, n);
+        <span style="color: #00ffff;">return</span> n;
+}
+
+
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_MMU
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">__must_check</span> <span style="color: #87cefa;">__copy_from_user</span>(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">to</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__user</span> *from, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">n</span>);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">__must_check</span> <span style="color: #87cefa;">__copy_to_user</span>(<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__user</span> *to, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">from</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">n</span>);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">__must_check</span> <span style="color: #87cefa;">__copy_to_user_std</span>(<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__user</span> *to, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">from</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">n</span>);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">__must_check</span> <span style="color: #87cefa;">__clear_user</span>(<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__user</span> *addr, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">n</span>);
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">__must_check</span> <span style="color: #87cefa;">__clear_user_std</span>(<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__user</span> *addr, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">n</span>);
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__copy_from_user</span>(<span style="color: #eedd82;">to</span>,<span style="color: #eedd82;">from</span>,<span style="color: #eedd82;">n</span>)     (memcpy(to, (<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__force</span> *)from, n), 0)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__copy_to_user</span>(<span style="color: #eedd82;">to</span>,<span style="color: #eedd82;">from</span>,<span style="color: #eedd82;">n</span>)       (memcpy((<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__force</span> *)to, from, n), 0)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__clear_user</span>(<span style="color: #eedd82;">addr</span>,<span style="color: #eedd82;">n</span>)            (memset((<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__force</span> *)addr, 0, n), 0)
+<span style="color: #b0c4de;">#endif</span>
+
+</pre>
+
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-2-5" class="outline-3">
+<h3 id="sec-2-5"><code>jiq.c</code></h3>
+<div class="outline-text-3" id="text-2-5">
+
+<ul>
+<li id="sec-2-5-1">Error and fix<br/>
+<ul>
+<li>error
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh">jiq.c:18:26: error: linux/config.h: No such file or directory
+jiq.c:122: warning: passing argument 1 of &#8216;schedule_delayed_work&#8217; from incompatible pointer type
+jiq.c:244:46: error: macro <span style="color: #ffa07a;">"INIT_WORK"</span> passed 3 arguments, but takes just 2
+jiq.c:244: error: &#8216;INIT_WORK&#8217; undeclared (first use<span style="color: #00ffff;"> in</span> this <span style="color: #00ffff;">function</span>)
+</pre>
+
+
+<ul>
+<li>Fix
+
+</li>
+<li>从2.6.20的内核开始,INIT<sub>WORK宏做了改变</sub>,原来是三个参数,后来改成了两
+   个参数
+
+<p>
+   In the <code>struct work_struct</code>, the type of <code>work_func_t func</code> is
+   <code>typedef void (*work_func_t)(struct work_struct *work);</code>, so the
+   function should be <code>void XXX(struct work_struct *work)</code>
+</p></li>
+</ul>
+
+
+<p>
+the example:
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/workqueue.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> <span style="color: #eedd82;">my_work</span>;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">my_workfunc</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">ptr</span>);
+INIT_WORK(&amp;my_work, my_workfunc);
+</pre>
+
+
+<p>
+the API:
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/workqueue.h&gt;</span>
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">void</span> (*<span style="color: #98fb98;">work_func_t</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>);
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> {
+        <span style="color: #98fb98;">atomic_long_t</span> <span style="color: #eedd82;">data</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">entry</span>;
+        <span style="color: #98fb98;">work_func_t</span> <span style="color: #eedd82;">func</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_LOCKDEP
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">lockdep_map</span> <span style="color: #eedd82;">lockdep_map</span>;
+<span style="color: #b0c4de;">#endif</span>
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">delayed_work</span> {
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> <span style="color: #eedd82;">work</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timer_list</span> <span style="color: #eedd82;">timer</span>;
+};
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">INIT_WORK</span>(<span style="color: #eedd82;">_work</span>, <span style="color: #eedd82;">_func</span>)                                 \
+        <span style="color: #00ffff;">do</span> {                                                    \
+                __INIT_WORK((_work), (_func), 0);               \
+        } <span style="color: #00ffff;">while</span> (0)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">INIT_WORK_ONSTACK</span>(<span style="color: #eedd82;">_work</span>, <span style="color: #eedd82;">_func</span>)                         \
+        <span style="color: #00ffff;">do</span> {                                                    \
+                __INIT_WORK((_work), (_func), 1);               \
+        } <span style="color: #00ffff;">while</span> (0)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">INIT_DELAYED_WORK</span>(<span style="color: #eedd82;">_work</span>, <span style="color: #eedd82;">_func</span>)                         \
+        <span style="color: #00ffff;">do</span> {                                                    \
+                INIT_WORK(&amp;(_work)-&gt;work, (_func));             \
+                init_timer(&amp;(_work)-&gt;timer);                    \
+        } <span style="color: #00ffff;">while</span> (0)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">INIT_DELAYED_WORK_ONSTACK</span>(<span style="color: #eedd82;">_work</span>, <span style="color: #eedd82;">_func</span>)                 \
+        <span style="color: #00ffff;">do</span> {                                                    \
+                INIT_WORK_ONSTACK(&amp;(_work)-&gt;work, (_func));     \
+                init_timer_on_stack(&amp;(_work)-&gt;timer);           \
+        } <span style="color: #00ffff;">while</span> (0)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">INIT_DELAYED_WORK_DEFERRABLE</span>(<span style="color: #eedd82;">_work</span>, <span style="color: #eedd82;">_func</span>)              \
+        <span style="color: #00ffff;">do</span> {                                                    \
+                INIT_WORK(&amp;(_work)-&gt;work, (_func));             \
+                init_timer_deferrable(&amp;(_work)-&gt;timer);         \
+        } <span style="color: #00ffff;">while</span> (0)
+</pre>
+
+
+<ol>
+<li>
+</li>
+</ol>
+
+
+
+<ol>
+<li>the diff 
+</li>
+</ol>
+
+
+
+
+<pre class="src src-sh">18c18
+&lt; <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">include &lt;linux/config.h&gt;</span>
+---
+&gt; /*#include &lt;linux/config.h&gt;*/
+114c114
+&lt; static void jiq_print_wq(void *ptr)
+---
+&gt; static void jiq_print_wq(struct work_struct *ptr)
+116a117,118
+&gt;       struct delayed_work *temp_work;
+&gt;       <span style="color: #eedd82;">temp_work</span> = to_delayed_work(&amp;jiq_work);
+122c124
+&lt;               schedule_delayed_work(&amp;jiq_work, data-&gt;delay);
+---
+&gt;               schedule_delayed_work(temp_work, data-&gt;delay);
+152a155,156
+&gt;       struct delayed_work *temp_work;
+&gt;       <span style="color: #eedd82;">temp_work</span> = to_delayed_work(&amp;jiq_work);
+160c164
+&lt;       schedule_delayed_work(&amp;jiq_work, delay);
+---
+&gt;       schedule_delayed_work(temp_work, delay);
+244c248
+&lt;       INIT_WORK(&amp;jiq_work, jiq_print_wq, &amp;jiq_data);
+---
+&gt;       INIT_WORK(&amp;jiq_work, jiq_print_wq);
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-2">Test<br/>
+
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">cat /proc/jitimer </span>
+    <span style="color: #b0c4de;">time</span>  delta preempt   pid cpu command
+   221012     0       0  3276   4 cat
+   221262   250     256     0   4 swapper
+
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">cat /proc/jiqtasklet </span>
+    <span style="color: #b0c4de;">time</span>  delta preempt   pid cpu command
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+
+<span style="color: #ff7f24;">#</span>
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-3">创建你的 /proc 文件<br/>
+ <b>Chapter 4.3</b>
+有使用 /proc 的模块应当包含 <code>&lt;linux/proc_fs.h&gt;</code> 来定义正确的函数.
+
+<p>
+当一个进程读你的 <code>/proc</code> 文件, 内核分配了一页内存(就是说, <code>PAGE_SIZE</code>
+字节), 驱动可以写入数据来返回给用户空间. 那个缓存区传递给你的函数, 是
+一个称为 read<sub>proc</sub> 的方法:
+</p>
+<p>
+<code>int (*read_proc)(char *page, char **start, off_t offset, int count, int *eof, void *data);</code>
+</p>
+<p>
+page 指针是你写你的数据的缓存区; start 是这个函数用来说有关的数据写在
+页中哪里(下面更多关于这个); offset 和 count 对于 read 方法有同样的含义.
+eof 参数指向一个整数, 必须由驱动设置来指示它不再有数据返回, data 是驱
+动特定的数据指针, 你可以用做内部用途.
+</p>
+<p>
+一旦你有一个定义好的 <code>read_proc</code> 函数, 你应当连接它到 <code>/proc</code> 层次中的
+一个入口项. 使用一个 <code>creat_proc_read_entry</code> 调用:
+</p>
+<p>
+<code>struct proc_dir_entry *create_proc_read_entry(const char *name,mode_t mode, struct proc_dir_entry *base, read_proc_t *read_proc, void *data);</code> 
+</p>
+<p>
+这里, name 是要创建的文件名子, mod 是文件的保护掩码(缺省系统范围时可以
+作为 0 传递), base 指出要创建的文件的目录( 如果 base 是 NULL, 文件在
+/proc 根下创建 ), <code>read_proc</code> 是实现文件的 <code>read_proc</code> 函数, data 被内核忽
+略( 但是传递给 <code>read_proc</code>). 这就是 scull 使用的调用, 来使它的 <code>/proc</code> 函
+数可用做 <code>/proc/scullmem</code>:
+</p>
+
+<p>
+<code>create_proc_read_entry("scullmem", 0 /* default mode */, NULL /* parent dir */, scull_read_procmem, NULL /* client data */);</code>
+</p>
+<p>
+这里, 我们创建了一个名为 scullmem 的文件, 直接在 /proc 下, 带有缺省的,
+全局可读的保护.
+</p>
+<p>
+/proc 中的入口, 当然, 应当在模块卸载后去除. remove<sub>proc</sub><sub>entry</sub> 是恢复
+create<sub>proc</sub><sub>read</sub><sub>entry</sub> 所做的事情的函数:
+</p>
+<p>
+<code>remove_proc_entry("scullmem", NULL /* parent dir */);</code>
+</p>
+<p>
+去除入口失败会导致在不希望的时间调用, 或者, 如果你的模块已被卸载, 内核
+崩掉.
+</p>
+
+<ul>
+<li id="sec-2-5-3-1">Ref<br/>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/proc_fs.h&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> *<span style="color: #87cefa;">create_proc_read_entry</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>,
+        <span style="color: #98fb98;">mode_t</span> <span style="color: #eedd82;">mode</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> *<span style="color: #eedd82;">base</span>, 
+        <span style="color: #98fb98;">read_proc_t</span> *<span style="color: #eedd82;">read_proc</span>, <span style="color: #98fb98;">void</span> * <span style="color: #eedd82;">data</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> *<span style="color: #eedd82;">res</span>=create_proc_entry(name,mode,base);
+        <span style="color: #00ffff;">if</span> (res) {
+                res-&gt;read_proc=read_proc;
+                res-&gt;data=data;
+        }
+        <span style="color: #00ffff;">return</span> res;
+}
+
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">remove_proc_entry</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> *<span style="color: #eedd82;">parent</span>);
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">int</span> (<span style="color: #98fb98;">read_proc_t</span>)(<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">page</span>, <span style="color: #98fb98;">char</span> **<span style="color: #eedd82;">start</span>, <span style="color: #98fb98;">off_t</span> <span style="color: #eedd82;">off</span>,
+                          <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">eof</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>);
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">int</span> (<span style="color: #98fb98;">write_proc_t</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *<span style="color: #eedd82;">file</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">__user</span> *buffer,
+                           <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">count</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>);
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> {
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">low_ino</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span> <span style="color: #eedd82;">namelen</span>;
+        <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>;
+        <span style="color: #98fb98;">mode_t</span> <span style="color: #eedd82;">mode</span>;
+        <span style="color: #98fb98;">nlink_t</span> <span style="color: #eedd82;">nlink</span>;
+        <span style="color: #98fb98;">uid_t</span> <span style="color: #eedd82;">uid</span>;
+        <span style="color: #98fb98;">gid_t</span> <span style="color: #eedd82;">gid</span>;
+        <span style="color: #98fb98;">loff_t</span> <span style="color: #eedd82;">size</span>;
+        <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode_operations</span> *<span style="color: #eedd82;">proc_iops</span>;
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * NULL -&gt;proc_fops means "PDE is going away RSN" or</span>
+<span style="color: #ff7f24;">         * "PDE is just created". In either case, e.g. -&gt;read_proc won't be</span>
+<span style="color: #ff7f24;">         * called because it's too late or too early, respectively.</span>
+<span style="color: #ff7f24;">         *</span>
+<span style="color: #ff7f24;">         * If you're allocating -&gt;proc_fops dynamically, save a pointer</span>
+<span style="color: #ff7f24;">         * somewhere.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_operations</span> *<span style="color: #eedd82;">proc_fops</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> *<span style="color: #eedd82;">next</span>, *<span style="color: #eedd82;">parent</span>, *<span style="color: #eedd82;">subdir</span>;
+        <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>;
+        <span style="color: #98fb98;">read_proc_t</span> *<span style="color: #eedd82;">read_proc</span>;
+        <span style="color: #98fb98;">write_proc_t</span> *<span style="color: #eedd82;">write_proc</span>;
+        <span style="color: #98fb98;">atomic_t</span> <span style="color: #eedd82;">count</span>;         <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">use count </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pde_users</span>;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">number of callers into module in progress </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">spinlock_t</span> <span style="color: #eedd82;">pde_unload_lock</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">proc_fops checks and pde_users bumps </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> *<span style="color: #eedd82;">pde_unload_completion</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">pde_openers</span>;   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">who did -&gt;open, but not -&gt;release </span><span style="color: #ff7f24;">*/</span>
+};
+</pre>
+
+
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-4">Using the jiffies Counter<br/>
+ <b>chapter 7.1</b>
+Timer interrupts are generated by the system's timing hardware at
+regular intervals; this interval is programmed at boot time by the
+kernel according to the value of <b>HZ</b>, which is an
+architecture-dependent value defined in <code>&lt;linux/param.h&gt;</code> or a
+subplatform file included by it. Default values in the distributed
+kernel source range from 50 to 1200 ticks per second on real hardware,
+down to 24 for software simulators
+
+<p>
+Every time a timer interrupt occurs, the value of an internal kernel
+counter is incremented. The counter is initialized to 0 at system
+boot, so it represents the number of clock ticks since last boot. The
+counter is a 64-bit variable (even on 32-bit architectures) and is
+called jiffies<sub>64</sub>. However, driver writers normally access the jiffies
+variable, an unsigned long that is the same as either jiffies<sub>64</sub> or
+its least significant bits. Using jiffies is usually preferred because
+it is faster, and accesses to the 64-bit jiffies<sub>64</sub> value are not
+necessarily atomic on all architectures.
+</p>
+<p>
+The counter and the utility functions to read it live in
+&lt;linux/jiffies.h&gt;, although you'll usually just include
+&lt;linux/sched.h&gt;, that automatically pulls jiffies.h in.
+</p>
+<p>
+ <b>example</b>
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/jiffies.h&gt;</span>
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">j</span>, <span style="color: #eedd82;">stamp_1</span>, <span style="color: #eedd82;">stamp_half</span>, <span style="color: #eedd82;">stamp_n</span>;
+
+j = jiffies;                      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">read the current value </span><span style="color: #ff7f24;">*/</span>
+stamp_1    = j + HZ;              <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">1 second in the future </span><span style="color: #ff7f24;">*/</span>
+stamp_half = j + HZ/2;            <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">half a second </span><span style="color: #ff7f24;">*/</span>
+stamp_n    = j + n * HZ / 1000;   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">n milliseconds </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+
+<p>
+To compare your cached value and the current value, you should use one
+of the following macros:
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/jiffies.h&gt;</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">time_after</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">b</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">time_before</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">b</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">time_after_eq</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">b</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">time_before_eq</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">b</span>);
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">time_after(a,b) returns true if the time a is after time b. </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">time_after</span>(<span style="color: #eedd82;">a</span>,<span style="color: #eedd82;">b</span>)         \
+        (typecheck(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>, a) &amp;&amp; \
+         typecheck(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>, b) &amp;&amp; \
+         ((<span style="color: #98fb98;">long</span>)(b) - (<span style="color: #98fb98;">long</span>)(a) &lt; 0))
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">time_before</span>(<span style="color: #eedd82;">a</span>,<span style="color: #eedd82;">b</span>)        time_after(b,a)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">time_after_eq</span>(<span style="color: #eedd82;">a</span>,<span style="color: #eedd82;">b</span>)      \
+        (typecheck(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>, a) &amp;&amp; \
+         typecheck(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>, b) &amp;&amp; \
+         ((<span style="color: #98fb98;">long</span>)(a) - (<span style="color: #98fb98;">long</span>)(b) &gt;= 0))
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">time_before_eq</span>(<span style="color: #eedd82;">a</span>,<span style="color: #eedd82;">b</span>)     time_after_eq(b,a)
+</pre>
+
+
+<p>
+Sometimes, however, you need to exchange time representations with
+user space programs that tend to represent time values with struct
+timeval and struct timespec. The two structures represent a precise
+time quantity with two numbers: seconds and microseconds are used in
+the older and popular struct timeval, and seconds and nanoseconds are
+used in the newer struct timespec. The kernel exports four helper
+functions to convert time values expressed as jiffies to and from
+those structures:
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/time.h&gt;</span>
+
+
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #87cefa;">timespec_to_jiffies</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *<span style="color: #eedd82;">value</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">jiffies_to_timespec</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">jiffies</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *<span style="color: #eedd82;">value</span>);
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #87cefa;">timeval_to_jiffies</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> *<span style="color: #eedd82;">value</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">jiffies_to_timeval</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">jiffies</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> *<span style="color: #eedd82;">value</span>);
+
+&lt;linux/time.h&gt;
+ <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> {
+         <span style="color: #98fb98;">__kernel_time_t</span>         <span style="color: #eedd82;">tv_sec</span>;         <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">seconds </span><span style="color: #ff7f24;">*/</span>
+         <span style="color: #98fb98;">__kernel_suseconds_t</span>    <span style="color: #eedd82;">tv_usec</span>;        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">microseconds </span><span style="color: #ff7f24;">*/</span>
+ };
+
+ <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> {
+         <span style="color: #98fb98;">__kernel_time_t</span> <span style="color: #eedd82;">tv_sec</span>;                 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">seconds </span><span style="color: #ff7f24;">*/</span>
+         <span style="color: #98fb98;">long</span>            <span style="color: #eedd82;">tv_nsec</span>;                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">nanoseconds </span><span style="color: #ff7f24;">*/</span>
+ };
+
+&lt;kernel/time.c&gt;
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * The TICK_NSEC - 1 rounds up the value to the next resolution.  Note</span>
+<span style="color: #ff7f24;"> * that a remainder subtract here would not do the right thing as the</span>
+<span style="color: #ff7f24;"> * resolution values don't fall on second boundries.  I.e. the line:</span>
+<span style="color: #ff7f24;"> * nsec -= nsec % TICK_NSEC; is NOT a correct resolution rounding.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * Rather, we just shift the bits off the right.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * The &gt;&gt; (NSEC_JIFFIE_SC - SEC_JIFFIE_SC) converts the scaled nsec</span>
+<span style="color: #ff7f24;"> * value to a scaled second value.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>
+timespec_to_jiffies(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *<span style="color: #eedd82;">value</span>)
+{
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">sec</span> = value-&gt;tv_sec;
+        <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">nsec</span> = value-&gt;tv_nsec + TICK_NSEC - 1;
+
+        <span style="color: #00ffff;">if</span> (sec &gt;= MAX_SEC_IN_JIFFIES){
+                sec = MAX_SEC_IN_JIFFIES;
+                nsec = 0;
+        }
+        <span style="color: #00ffff;">return</span> (((<span style="color: #98fb98;">u64</span>)sec * SEC_CONVERSION) +
+                (((<span style="color: #98fb98;">u64</span>)nsec * NSEC_CONVERSION) &gt;&gt;
+                 (NSEC_JIFFIE_SC - SEC_JIFFIE_SC))) &gt;&gt; SEC_JIFFIE_SC;
+
+}
+EXPORT_SYMBOL(timespec_to_jiffies);
+
+<span style="color: #98fb98;">void</span>
+<span style="color: #87cefa;">jiffies_to_timespec</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">jiffies</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *<span style="color: #eedd82;">value</span>)
+{
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Convert jiffies to nanoseconds and separate with</span>
+<span style="color: #ff7f24;">         * one divide.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">rem</span>;
+        value-&gt;tv_sec = div_u64_rem((<span style="color: #98fb98;">u64</span>)<span style="color: #98fb98;">jiffies</span> * <span style="color: #eedd82;">TICK_NSEC</span>,
+                                    <span style="color: #eedd82;">NSEC_PER_SEC</span>, &amp;rem);
+        value-&gt;tv_nsec = rem;
+}
+EXPORT_SYMBOL(jiffies_to_timespec);
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Same for "timeval"</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * Well, almost.  The problem here is that the real system resolution is</span>
+<span style="color: #ff7f24;"> * in nanoseconds and the value being converted is in micro seconds.</span>
+<span style="color: #ff7f24;"> * Also for some machines (those that use HZ = 1024, in-particular),</span>
+<span style="color: #ff7f24;"> * there is a LARGE error in the tick size in microseconds.</span>
+
+<span style="color: #ff7f24;"> * The solution we use is to do the rounding AFTER we convert the</span>
+<span style="color: #ff7f24;"> * microsecond part.  Thus the USEC_ROUND, the bits to be shifted off.</span>
+<span style="color: #ff7f24;"> * Instruction wise, this should cost only an additional add with carry</span>
+<span style="color: #ff7f24;"> * instruction above the way it was done above.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>
+<span style="color: #87cefa;">timeval_to_jiffies</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> *<span style="color: #eedd82;">value</span>)
+{
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">sec</span> = value-&gt;tv_sec;
+        <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">usec</span> = value-&gt;tv_usec;
+
+        <span style="color: #00ffff;">if</span> (sec &gt;= MAX_SEC_IN_JIFFIES){
+                sec = MAX_SEC_IN_JIFFIES;
+                usec = 0;
+        }
+        <span style="color: #00ffff;">return</span> (((<span style="color: #98fb98;">u64</span>)sec * SEC_CONVERSION) +
+                (((<span style="color: #98fb98;">u64</span>)usec * USEC_CONVERSION + USEC_ROUND) &gt;&gt;
+                 (USEC_JIFFIE_SC - SEC_JIFFIE_SC))) &gt;&gt; SEC_JIFFIE_SC;
+}
+EXPORT_SYMBOL(timeval_to_jiffies);
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">jiffies_to_timeval</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">jiffies</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> *<span style="color: #eedd82;">value</span>)
+{
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Convert jiffies to nanoseconds and separate with</span>
+<span style="color: #ff7f24;">         * one divide.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">rem</span>;
+
+        value-&gt;tv_sec = div_u64_rem((<span style="color: #98fb98;">u64</span>)<span style="color: #98fb98;">jiffies</span> * <span style="color: #eedd82;">TICK_NSEC</span>,
+                                    <span style="color: #eedd82;">NSEC_PER_SEC</span>, &amp;rem);
+        value-&gt;tv_usec = rem / NSEC_PER_USEC;
+}
+EXPORT_SYMBOL(jiffies_to_timeval);
+
+
+&lt;linux/jiffies.h&gt;
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * We want to do realistic conversions of time so we need to use the same</span>
+<span style="color: #ff7f24;"> * values the update wall clock code uses as the jiffies size.  This value</span>
+<span style="color: #ff7f24;"> * is: TICK_NSEC (which is defined in timex.h).  This</span>
+<span style="color: #ff7f24;"> * is a constant and is in nanoseconds.  We will use scaled math</span>
+<span style="color: #ff7f24;"> * with a set of scales defined here as SEC_JIFFIE_SC,  USEC_JIFFIE_SC and</span>
+<span style="color: #ff7f24;"> * NSEC_JIFFIE_SC.  Note that these defines contain nothing but</span>
+<span style="color: #ff7f24;"> * constants and so are computed at compile time.  SHIFT_HZ (computed in</span>
+<span style="color: #ff7f24;"> * timex.h) adjusts the scaling for different HZ values.</span>
+
+<span style="color: #ff7f24;"> * Scaled math???  What is that?</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * Scaled math is a way to do integer math on values that would,</span>
+<span style="color: #ff7f24;"> * otherwise, either overflow, underflow, or cause undesired div</span>
+<span style="color: #ff7f24;"> * instructions to appear in the execution path.  In short, we "scale"</span>
+<span style="color: #ff7f24;"> * up the operands so they take more bits (more precision, less</span>
+<span style="color: #ff7f24;"> * underflow), do the desired operation and then "scale" the result back</span>
+<span style="color: #ff7f24;"> * by the same amount.  If we do the scaling by shifting we avoid the</span>
+<span style="color: #ff7f24;"> * costly mpy and the dastardly div instructions.</span>
+
+<span style="color: #ff7f24;"> * Suppose, for example, we want to convert from seconds to jiffies</span>
+<span style="color: #ff7f24;"> * where jiffies is defined in nanoseconds as NSEC_PER_JIFFIE.  The</span>
+<span style="color: #ff7f24;"> * simple math is: jiff = (sec * NSEC_PER_SEC) / NSEC_PER_JIFFIE; We</span>
+<span style="color: #ff7f24;"> * observe that (NSEC_PER_SEC / NSEC_PER_JIFFIE) is a constant which we</span>
+<span style="color: #ff7f24;"> * might calculate at compile time, however, the result will only have</span>
+<span style="color: #ff7f24;"> * about 3-4 bits of precision (less for smaller values of HZ).</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * So, we scale as follows:</span>
+<span style="color: #ff7f24;"> * jiff = (sec) * (NSEC_PER_SEC / NSEC_PER_JIFFIE);</span>
+<span style="color: #ff7f24;"> * jiff = ((sec) * ((NSEC_PER_SEC * SCALE)/ NSEC_PER_JIFFIE)) / SCALE;</span>
+<span style="color: #ff7f24;"> * Then we make SCALE a power of two so:</span>
+<span style="color: #ff7f24;"> * jiff = ((sec) * ((NSEC_PER_SEC &lt;&lt; SCALE)/ NSEC_PER_JIFFIE)) &gt;&gt; SCALE;</span>
+<span style="color: #ff7f24;"> * Now we define:</span>
+<span style="color: #ff7f24;"> * #define SEC_CONV = ((NSEC_PER_SEC &lt;&lt; SCALE)/ NSEC_PER_JIFFIE))</span>
+<span style="color: #ff7f24;"> * jiff = (sec * SEC_CONV) &gt;&gt; SCALE;</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * Often the math we use will expand beyond 32-bits so we tell C how to</span>
+<span style="color: #ff7f24;"> * do this and pass the 64-bit result of the mpy through the "&gt;&gt; SCALE"</span>
+<span style="color: #ff7f24;"> * which should take the result back to 32-bits.  We want this expansion</span>
+<span style="color: #ff7f24;"> * to capture as much precision as possible.  At the same time we don't</span>
+<span style="color: #ff7f24;"> * want to overflow so we pick the SCALE to avoid this.  In this file,</span>
+<span style="color: #ff7f24;"> * that means using a different scale for each range of HZ values (as</span>
+<span style="color: #ff7f24;"> * defined in timex.h).</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * For those who want to know, gcc will give a 64-bit result from a "*"</span>
+<span style="color: #ff7f24;"> * operator if the result is a long long AND at least one of the</span>
+<span style="color: #ff7f24;"> * operands is cast to long long (usually just prior to the "*" so as</span>
+<span style="color: #ff7f24;"> * not to confuse it into thinking it really has a 64-bit operand,</span>
+<span style="color: #ff7f24;"> * which, buy the way, it can do, but it takes more code and at least 2</span>
+<span style="color: #ff7f24;"> * mpys).</span>
+
+<span style="color: #ff7f24;"> * We also need to be aware that one second in nanoseconds is only a</span>
+<span style="color: #ff7f24;"> * couple of bits away from overflowing a 32-bit word, so we MUST use</span>
+<span style="color: #ff7f24;"> * 64-bits to get the full range time in nanoseconds.</span>
+
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * Here are the scales we will use.  One for seconds, nanoseconds and</span>
+<span style="color: #ff7f24;"> * microseconds.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * Within the limits of cpp we do a rough cut at the SEC_JIFFIE_SC and</span>
+<span style="color: #ff7f24;"> * check if the sign bit is set.  If not, we bump the shift count by 1.</span>
+<span style="color: #ff7f24;"> * (Gets an extra bit of precision where we can use it.)</span>
+<span style="color: #ff7f24;"> * We know it is set for HZ = 1024 and HZ = 100 not for 1000.</span>
+<span style="color: #ff7f24;"> * Haven't tested others.</span>
+
+<span style="color: #ff7f24;"> * Limits of cpp (for #if expressions) only long (no long long), but</span>
+<span style="color: #ff7f24;"> * then we only need the most signicant bit.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">SEC_JIFFIE_SC</span> (31 - SHIFT_HZ)
+<span style="color: #b0c4de;">#if</span> !((((NSEC_PER_SEC &lt;&lt; 2) / TICK_NSEC) &lt;&lt; (SEC_JIFFIE_SC - 2)) &amp; 0x80000000)
+<span style="color: #b0c4de;">#undef</span> SEC_JIFFIE_SC
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">SEC_JIFFIE_SC</span> (32 - SHIFT_HZ)
+<span style="color: #b0c4de;">#endif</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NSEC_JIFFIE_SC</span> (SEC_JIFFIE_SC + 29)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">USEC_JIFFIE_SC</span> (SEC_JIFFIE_SC + 19)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">SEC_CONVERSION</span> ((<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>)((((<span style="color: #98fb98;">u64</span>)NSEC_PER_SEC &lt;&lt; SEC_JIFFIE_SC) +\
+                                TICK_NSEC -1) / (<span style="color: #98fb98;">u64</span>)TICK_NSEC))
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NSEC_CONVERSION</span> ((<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>)((((<span style="color: #98fb98;">u64</span>)1 &lt;&lt; NSEC_JIFFIE_SC) +\
+                                        TICK_NSEC -1) / (<span style="color: #98fb98;">u64</span>)TICK_NSEC))
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">USEC_CONVERSION</span>  \
+                    ((<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>)((((<span style="color: #98fb98;">u64</span>)NSEC_PER_USEC &lt;&lt; USEC_JIFFIE_SC) +\
+                                        TICK_NSEC -1) / (<span style="color: #98fb98;">u64</span>)TICK_NSEC))
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * USEC_ROUND is used in the timeval to jiffie conversion.  See there</span>
+<span style="color: #ff7f24;"> * for more details.  It is the scaled resolution rounding value.  Note</span>
+<span style="color: #ff7f24;"> * that it is a 64-bit value.  Since, when it is applied, we are already</span>
+<span style="color: #ff7f24;"> * in jiffies (albit scaled), it is nothing but the bits we will shift</span>
+<span style="color: #ff7f24;"> * off.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">USEC_ROUND</span> (u64)(((<span style="color: #98fb98;">u64</span>)1 &lt;&lt; USEC_JIFFIE_SC) - 1)
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * The maximum jiffie value is (MAX_INT &gt;&gt; 1).  Here we translate that</span>
+<span style="color: #ff7f24;"> * into seconds.  The 64-bit case will overflow if we are not careful,</span>
+<span style="color: #ff7f24;"> * so use the messy SH_DIV macro to do it.  Still all constants.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#if</span> BITS_PER_LONG &lt; 64
+<span style="color: #b0c4de;"># define</span> <span style="color: #eedd82;">MAX_SEC_IN_JIFFIES</span> \
+        (<span style="color: #98fb98;">long</span>)((<span style="color: #98fb98;">u64</span>)((<span style="color: #98fb98;">u64</span>)MAX_JIFFY_OFFSET * TICK_NSEC) / NSEC_PER_SEC)
+<span style="color: #b0c4de;">#else</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">take care of overflow on 64 bits machines </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;"># define</span> <span style="color: #eedd82;">MAX_SEC_IN_JIFFIES</span> \
+        (SH_DIV((MAX_JIFFY_OFFSET &gt;&gt; SEC_JIFFIE_SC) * TICK_NSEC, NSEC_PER_SEC, 1) - 1)
+
+<span style="color: #b0c4de;">#endif</span>
+
+&lt;linux/time.h&gt;
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Parameters used to convert the timespec values: </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">MSEC_PER_SEC</span>    1000L
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">USEC_PER_MSEC</span>   1000L
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NSEC_PER_USEC</span>   1000L
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NSEC_PER_MSEC</span>   1000000L
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">USEC_PER_SEC</span>    1000000L
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NSEC_PER_SEC</span>    1000000000L
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">FSEC_PER_SEC</span>    1000000000000000LL
+</pre>
+
+
+
+<ul>
+<li id="sec-2-5-4-1">Ref<br/>
+
+
+
+<pre class="src src-c">&lt;linux/jiffies.h&gt;
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">some arch's have a small-data section that can be accessed register-relative</span>
+<span style="color: #ff7f24;"> * but that can only take up to, say, 4-byte variables. jiffies being part of</span>
+<span style="color: #ff7f24;"> * an 8-byte variable may not be correctly accessed unless we force the issue</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__jiffy_data</span>  <span style="color: #00ffff;">__attribute__</span>((section(<span style="color: #ffa07a;">".data"</span>)))
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * The 64-bit value is not atomic - you MUST NOT read it</span>
+<span style="color: #ff7f24;"> * without sampling the sequence number in xtime_lock.</span>
+<span style="color: #ff7f24;"> * get_jiffies_64() will do this for you as appropriate.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">extern</span> u64 __jiffy_data jiffies_64;
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">__jiffy_data</span> <span style="color: #eedd82;">jiffies</span>;
+
+<span style="color: #b0c4de;">#if</span> (BITS_PER_LONG &lt; 64)
+<span style="color: #98fb98;">u64</span> <span style="color: #87cefa;">get_jiffies_64</span>(<span style="color: #98fb98;">void</span>);
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">u64</span> <span style="color: #87cefa;">get_jiffies_64</span>(<span style="color: #98fb98;">void</span>)
+{
+        <span style="color: #00ffff;">return</span> (<span style="color: #98fb98;">u64</span>)jiffies;
+}
+<span style="color: #b0c4de;">#endif</span>
+</pre>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;asm/param.h&gt;</span>                  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">for HZ </span><span style="color: #ff7f24;">*/</span>
+
+<span style="color: #b0c4de;">#ifdef</span> __KERNEL__
+<span style="color: #b0c4de;"># define</span> <span style="color: #eedd82;">HZ</span>             CONFIG_HZ       <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Internal kernel timer frequency </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;"># define</span> <span style="color: #eedd82;">USER_HZ</span>        100             <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">User interfaces are in "ticks" </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;"># define</span> <span style="color: #eedd82;">CLOCKS_PER_SEC</span> (USER_HZ)       <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">like times() </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #b0c4de;"># define</span> <span style="color: #eedd82;">HZ</span>             100
+<span style="color: #b0c4de;">#endif</span>
+</pre>
+
+
+<p>
+In <code>dm816x_defconfig</code>
+</p>
+
+
+<pre class="src src-sh"><span style="color: #eedd82;">CONFIG_HZ</span>=100
+</pre>
+
+
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-5">Sleeping<br/>
+    <b>chapter 6.2</b>
+<ol>
+<li>The first of these rules is: never sleep when you are running in an
+   atomic context. An atomic context is simply a state where multiple
+   steps must be performed without any sort of concurrent access. What
+   that means, with regard to sleeping, is that your driver cannot
+   sleep while holding a spinlock, seqlock, or RCU lock. You also
+   cannot sleep if you have disabled interrupts. It is legal to sleep
+   while holding a semaphore, but you should look very carefully at
+   any code that does so.
+</li>
+<li>Another thing to remember with sleeping is that, when you wake up,
+   you never know how long your process may have been out of the CPU
+   or what may have changed in the mean time. You also do not usually
+   know if another process may have been sleeping for the same event;
+   that process may wake before you and grab whatever resource you
+   were waiting for. 
+</li>
+<li>One other relevant point, of course, is that your process cannot
+   sleep unless it is assured that somebody else, somewhere, will wake
+   it up. 
+</li>
+</ol>
+
+
+<p>
+In Linux, a wait queue is managed by means of a "wait queue head," a
+structure of type <code>wait_queue_head_t</code>, which is defined in
+&lt;linux/wait.h&gt;. A wait queue head can be defined and initialized
+statically with:
+</p>
+
+
+<pre class="src src-c">DECLARE_WAIT_QUEUE_HEAD(name);
+</pre>
+
+
+<p>
+or dynamicly as follows:
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">wait_queue_head_t</span> <span style="color: #eedd82;">my_queue</span>;
+init_waitqueue_head(&amp;my_queue);
+</pre>
+
+
+
+<ul>
+<li id="sec-2-5-5-1">API<br/>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/wait.h&gt;</span>
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> { <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">... </span><span style="color: #ff7f24;">*/</span> } <span style="color: #98fb98;">wait_queue_head_t</span>;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">init_waitqueue_head</span>(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">queue</span>);
+
+DECLARE_WAIT_QUEUE_HEAD(queue);
+    The <span style="color: #98fb98;">defined</span> <span style="color: #87cefa;">type</span> <span style="color: #00ffff;">for</span> Linux wait queues. A wait_queue_head_t must
+    be explicitly initialized with either init_waitqueue_head at
+    runtime or DECLARE_WAIT_QUEUE_HEAD at compile time.
+
+<span style="color: #98fb98;">void</span> wait_event(<span style="color: #98fb98;">wait_queue_head_t</span> <span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">condition</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">wait_event_interruptible</span>(<span style="color: #98fb98;">wait_queue_head_t</span> <span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">condition</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">wait_event_timeout</span>(<span style="color: #98fb98;">wait_queue_head_t</span> <span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">condition</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">time</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">wait_event_interruptible_timeout</span>(<span style="color: #98fb98;">wait_queue_head_t</span> <span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">condition</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">time</span>);
+    Cause the process to sleep on the given queue until the given condition evaluates <span style="color: #98fb98;">to</span> <span style="color: #87cefa;">a</span> <span style="color: #7fffd4;">true</span> value.
+
+<span style="color: #98fb98;">void</span> wake_up(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">wait_queue_head_t</span> **<span style="color: #eedd82;">q</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wake_up_interruptible</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">wait_queue_head_t</span> **<span style="color: #eedd82;">q</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wake_up_nr</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">wait_queue_head_t</span> **<span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nr</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wake_up_interruptible_nr</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">wait_queue_head_t</span> **<span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nr</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wake_up_all</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">wait_queue_head_t</span> **<span style="color: #eedd82;">q</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wake_up_interruptible_all</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">wait_queue_head_t</span> **<span style="color: #eedd82;">q</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wake_up_interruptible_sync</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">wait_queue_head_t</span> **<span style="color: #eedd82;">q</span>);
+    Wake processes that are sleeping on the <span style="color: #98fb98;">queue</span> <span style="color: #eedd82;">q</span>. The _interruptible form wakes only interruptible processes. Normally, <span style="color: #eedd82;">only</span> one exclusive waiter is awakened, <span style="color: #87cefa;">but</span> that behavior can be changed with the _nr or _all forms. The _sync version does not reschedule the CPU before returning.
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/sched.h&gt;</span>
+set_current_state(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">state</span>);
+    Sets the execution state of the <span style="color: #98fb98;">current</span> <span style="color: #eedd82;">process</span>. TASK_RUNNING means it is ready to run, <span style="color: #00ffff;">while</span> the sleep states are TASK_INTERRUPTIBLE and TASK_UNINTERRUPTIBLE.
+
+<span style="color: #98fb98;">void</span> schedule(<span style="color: #98fb98;">void</span>);
+    Selects a runnable process from the <span style="color: #98fb98;">run</span> <span style="color: #eedd82;">queue</span>. The chosen process can be current or a different one.
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> { <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">... </span><span style="color: #ff7f24;">*/</span> } wait_queue_t;
+init_waitqueue_entry(<span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">entry</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">task_struct</span> *<span style="color: #eedd82;">task</span>);
+    The wait_queue_t type is used <span style="color: #98fb98;">to</span> place a process onto a <span style="color: #98fb98;">wait</span> <span style="color: #87cefa;">queue</span>.
+
+<span style="color: #98fb98;">void</span> prepare_to_wait(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">queue</span>, <span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">wait</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">state</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">prepare_to_wait_exclusive</span>(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">queue</span>, <span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">wait</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">state</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">finish_wait</span>(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">queue</span>, <span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">wait</span>);
+    Helper functions that can be used <span style="color: #98fb98;">to</span> code a <span style="color: #98fb98;">manual</span> <span style="color: #87cefa;">sleep</span>.
+
+<span style="color: #98fb98;">void</span> sleep_on(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">queue</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">interruptible_sleep_on</span>(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">queue</span>);
+    Obsolete and deprecated functions that unconditionally put the <span style="color: #98fb98;">current</span> process <span style="color: #98fb98;">to</span> <span style="color: #eedd82;">sleep</span>.
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-5-2">Ref<br/>
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue</span> <span style="color: #98fb98;">wait_queue_t</span>;
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">int</span> (*<span style="color: #98fb98;">wait_queue_func_t</span>)(<span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">wait</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">mode</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flags</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">key</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">default_wake_function</span>(<span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">wait</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">mode</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flags</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">key</span>);
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue</span> {
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flags</span>;
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">WQ_FLAG_EXCLUSIVE</span>       0x01
+        <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">private</span>;
+        <span style="color: #98fb98;">wait_queue_func_t</span> <span style="color: #eedd82;">func</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">task_list</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue_head</span> {
+        <span style="color: #98fb98;">spinlock_t</span> <span style="color: #eedd82;">lock</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">task_list</span>;
+};
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue_head</span> <span style="color: #98fb98;">wait_queue_head_t</span>;
+</pre>
+
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-6">Tasklets<br/>
+ <b>chapter 7.5</b>
+A tasklet exists as a data structure that must be initialized before
+use. Initialization can be performed by calling a specific function or
+by declaring the structure using certain macros:
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/interrupt.h&gt;</span>
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> {
+      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">... </span><span style="color: #ff7f24;">*/</span>
+      <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">func</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>);
+      <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">data</span>;
+};
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tasklet_init</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">func</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>), <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">data</span>);
+DECLARE_TASKLET(name, func, data);
+DECLARE_TASKLET_DISABLED(name, func, data);
+</pre>
+
+
+<p>
+Tasklets offer a number of interesting features:
+</p><ul>
+<li>A tasklet can be disabled and re-enabled later; it won't be executed until it is enabled as many times as it has been disabled.
+</li>
+<li>Just like timers, a tasklet can reregister itself.
+</li>
+<li>A tasklet can be scheduled to execute at normal priority or high priority. The latter group is always executed first.
+</li>
+<li>Tasklets may be run immediately if the system is not under heavy load but never later than the next timer tick.
+</li>
+<li>A tasklets can be concurrent with other tasklets but is strictly
+  serialized with respect to itself—the same tasklet never runs
+     simultaneously on more than one processor. Also, as already
+     noted, a tasklet always runs on the same CPU that schedules it.
+</li>
+</ul>
+
+
+
+<ul>
+<li id="sec-2-5-6-1">API<br/>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/interrupt.h&gt;</span>
+DECLARE_TASKLET(name, func, data);
+DECLARE_TASKLET_DISABLED(name, func, data);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tasklet_init</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">func</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>), <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">data</span>);
+    The first two macros declare a <span style="color: #98fb98;">tasklet</span> <span style="color: #eedd82;">structure</span>, <span style="color: #00ffff;">while</span> the
+tasklet_init function initializes a tasklet structure that has been
+obtained by allocation or other means. The second DECLARE macro marks
+the tasklet as disabled.
+
+<span style="color: #98fb98;">void</span> tasklet_disable(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tasklet_disable_nosync</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tasklet_enable</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>);
+    Disables and reenables <span style="color: #98fb98;">a</span> <span style="color: #87cefa;">tasklet</span>. Each disable must be matched
+with an enable (you can disable the <span style="color: #98fb98;">tasklet</span> <span style="color: #eedd82;">even</span> <span style="color: #00ffff;">if</span> it<span style="color: #ffc0cb; font-weight: bold;">'</span><span style="color: #ffa07a;">s already</span>
+<span style="color: #ffa07a;">disabled). The function tasklet_disable waits for the tasklet to</span>
+<span style="color: #ffa07a;">terminate if it is running on another CPU. The nosync version doesn'</span>t
+take this extra step.
+
+<span style="color: #98fb98;">void</span> tasklet_schedule(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">tasklet_hi_schedule</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>);
+    Schedules <span style="color: #98fb98;">a</span> <span style="color: #98fb98;">tasklet</span> <span style="color: #98fb98;">to</span> <span style="color: #eedd82;">run</span>, <span style="color: #eedd82;">either</span> as a <span style="color: #ffa07a;">"normal"</span> tasklet or a
+high-priority one. When soft interrupts are executed, <span style="color: #eedd82;">high</span>-priority
+tasklets are dealt with first, <span style="color: #00ffff;">while</span> normal tasklets run last.
+
+<span style="color: #98fb98;">void</span> tasklet_kill(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>);
+    Removes the <span style="color: #98fb98;">tasklet</span> from the list of <span style="color: #98fb98;">active</span> <span style="color: #eedd82;">ones</span>, <span style="color: #00ffff;">if</span> it<span style="color: #ffc0cb; font-weight: bold;">'</span><span style="color: #ffa07a;">s</span>
+<span style="color: #ffa07a;">    scheduled to run. Like tasklet_disable, the function may block on</span>
+<span style="color: #ffa07a;">    SMP systems waiting for the tasklet to terminate if it'</span>s currently
+    running on another CPU.
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-6-2">Ref<br/>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/interrupt.h&gt;</span>
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Tasklets --- multithreaded analogue of BHs.</span>
+
+<span style="color: #ff7f24;">   Main feature differing them of generic softirqs: tasklet</span>
+<span style="color: #ff7f24;">   is running only on one CPU simultaneously.</span>
+
+<span style="color: #ff7f24;">   Main feature differing them of BHs: different tasklets</span>
+<span style="color: #ff7f24;">   may be run simultaneously on different CPUs.</span>
+
+<span style="color: #ff7f24;">   Properties:</span>
+<span style="color: #ff7f24;">   * If tasklet_schedule() is called, then tasklet is guaranteed</span>
+<span style="color: #ff7f24;">     to be executed on some cpu at least once after this.</span>
+<span style="color: #ff7f24;">   * If the tasklet is already scheduled, but its excecution is still not</span>
+<span style="color: #ff7f24;">     started, it will be executed only once.</span>
+<span style="color: #ff7f24;">   * If this tasklet is already running on another CPU (or schedule is called</span>
+<span style="color: #ff7f24;">     from tasklet itself), it is rescheduled for later.</span>
+<span style="color: #ff7f24;">   * Tasklet is strictly serialized wrt itself, but not</span>
+<span style="color: #ff7f24;">     wrt another tasklets. If client needs some intertask synchronization,</span>
+<span style="color: #ff7f24;">     he makes it with spinlocks.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span>
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">next</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">state</span>;
+        <span style="color: #98fb98;">atomic_t</span> <span style="color: #eedd82;">count</span>;
+        <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">func</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>);
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">data</span>;
+};
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">DECLARE_TASKLET</span>(<span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">func</span>, <span style="color: #eedd82;">data</span>) \
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> <span style="color: #eedd82;">name</span> = { <span style="color: #7fffd4;">NULL</span>, 0, ATOMIC_INIT(0), func, data }
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">DECLARE_TASKLET_DISABLED</span>(<span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">func</span>, <span style="color: #eedd82;">data</span>) \
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> <span style="color: #eedd82;">name</span> = { <span style="color: #7fffd4;">NULL</span>, 0, ATOMIC_INIT(1), func, data }
+</pre>
+
+
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-7">Workqueues<br/>
+ <b>chapter 7.6</b>
+ The key difference between the two is that tasklets execute quickly,
+ for a short period of time, and in atomic mode, while workqueue
+ functions may have higher latency but need not be atomic. Each
+ mechanism has situations where it is appropriate.
+<ul>
+<li id="sec-2-5-7-1">Normal queue<br/>
+<ol>
+<li>create a workqueue
+ Workqueues have a type of struct workqueue<sub>struct</sub>, which is defined in
+ <code>&lt;linux/workqueue.h&gt;</code>. A workqueue must be explicitly created before
+ use, using one of the following two functions:
+</li>
+</ol>
+
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #87cefa;">create_workqueue</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #87cefa;">create_singlethread_workqueue</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>);
+</pre>
+
+
+<ol>
+<li>submit a task to a workqueue
+<ul>
+<li>To submit a task to a workqueue, you need to fill in a work<sub>struct</sub>
+    structure. This can be done at compile time as follows:
+</li>
+</ul>
+
+</li>
+</ol>
+
+
+
+
+<pre class="src src-c">DECLARE_WORK(name, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">function</span>)(<span style="color: #98fb98;">void</span> *), <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>);
+</pre>
+
+<ul>
+<li>If you need to set up the work<sub>struct</sub> structure at runtime, use the following two macros:
+</li>
+</ul>
+
+
+
+
+<pre class="src src-c">INIT_WORK(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">function</span>)(<span style="color: #98fb98;">void</span> *), <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>);
+PREPARE_WORK(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">function</span>)(<span style="color: #98fb98;">void</span> *), <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>);
+</pre>
+
+<ul>
+<li>There are two functions for submitting work to a workqueue:
+</li>
+</ul>
+
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">queue_work</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">queue</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">queue_delayed_work</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">queue</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">delayed_work</span> *<span style="color: #eedd82;">work</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">delay</span>);
+</pre>
+
+
+<ol>
+<li>cancel a pending workqueue entry
+</li>
+</ol>
+
+
+
+
+<pre class="src src-c">Should you need to cancel a pending <span style="color: #98fb98;">workqueue</span> <span style="color: #eedd82;">entry</span>, <span style="color: #87cefa;">you</span> may call:
+<span style="color: #98fb98;">int</span> cancel_delayed_work(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>);
+
+To be absolutely sure that the work function is not running anywhere in the system after <span style="color: #98fb98;">cancel_delayed_work</span> <span style="color: #eedd82;">returns</span> 0, <span style="color: #87cefa;">you</span> must follow that call with a call to:
+<span style="color: #98fb98;">void</span> flush_workqueue(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">queue</span>);
+</pre>
+
+
+<ol>
+<li>destroy a workqueue
+</li>
+</ol>
+
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">destroy_workqueue</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">queue</span>);
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-7-2">Shared Queue<br/>
+If you only submit tasks to the queue occasionally, it may be more
+efficient to simply use the shared, default workqueue that is provided
+by the kernel. If you use this queue, however, you must be aware that
+you will be sharing it with others. 
+
+
+
+
+<pre class="src src-c">prepare_to_wait(&amp;jiq_wait, &amp;wait, TASK_INTERRUPTIBLE);
+schedule_work(&amp;jiq_work);
+schedule(  );
+finish_wait(&amp;jiq_wait, &amp;wait);
+
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-7-3">API<br/>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/workqueue.h&gt;</span>
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span>;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span>;
+    The structures representing a workqueue and a <span style="color: #98fb98;">work</span> <span style="color: #eedd82;">entry</span>, <span style="color: #87cefa;">respectively</span>.
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *create_workqueue(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #87cefa;">create_singlethread_workqueue</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">destroy_workqueue</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">queue</span>);
+    Functions <span style="color: #00ffff;">for</span> creating and destroying workqueues. A call to create_workqueue creates a queue with a worker thread on each processor in the system; instead, create_singlethread_workqueue creates a workqueue with a single <span style="color: #98fb98;">worker</span> <span style="color: #87cefa;">process</span>.
+
+DECLARE_WORK(name, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">function</span>)(<span style="color: #98fb98;">void</span> *));
+INIT_WORK(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">function</span>)(<span style="color: #98fb98;">void</span> *);
+PREPARE_WORK(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">function</span>)(<span style="color: #98fb98;">void</span> *));
+    Macros that declare and initialize <span style="color: #98fb98;">workqueue</span> <span style="color: #eedd82;">entries</span>.
+
+<span style="color: #98fb98;">int</span> queue_work(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">queue</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">queue_delayed_work</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">queue</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">delayed_work</span> *<span style="color: #eedd82;">work</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">delay</span>);
+    Functions that <span style="color: #98fb98;">queue</span> <span style="color: #eedd82;">work</span> <span style="color: #00ffff;">for</span> execution from a workqueue.
+
+bool cancel_delayed_work_sync(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">delayed_work</span> *<span style="color: #eedd82;">dwork</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">flush_workqueue</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">queue</span>);
+    Use cancel_delayed_work to remove an entry from <span style="color: #98fb98;">a</span> <span style="color: #eedd82;">workqueue</span>; flush_workqueue ensures that no <span style="color: #98fb98;">workqueue</span> entries are running anywhere in <span style="color: #98fb98;">the</span> <span style="color: #eedd82;">system</span>.
+
+<span style="color: #98fb98;">int</span> schedule_work(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">schedule_delayed_work</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">delayed_work</span> *<span style="color: #eedd82;">work</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">delay</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">flush_scheduled_work</span>(<span style="color: #98fb98;">void</span>);
+    Functions <span style="color: #00ffff;">for</span> working with the shared workqueue.
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-7-4">Ref<br/>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/workqueue.h&gt;</span>
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">void</span> (*<span style="color: #98fb98;">work_func_t</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> *<span style="color: #eedd82;">work</span>);
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> {
+        <span style="color: #98fb98;">atomic_long_t</span> <span style="color: #eedd82;">data</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">entry</span>;
+        <span style="color: #98fb98;">work_func_t</span> <span style="color: #eedd82;">func</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_LOCKDEP
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">lockdep_map</span> <span style="color: #eedd82;">lockdep_map</span>;
+<span style="color: #b0c4de;">#endif</span>
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">delayed_work</span> {
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">work_struct</span> <span style="color: #eedd82;">work</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timer_list</span> <span style="color: #eedd82;">timer</span>;
+};
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">create_workqueue</span>(<span style="color: #eedd82;">name</span>)                                  \
+        alloc_workqueue((name), WQ_MEM_RECLAIM, 1)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">create_freezeable_workqueue</span>(<span style="color: #eedd82;">name</span>)                       \
+        alloc_workqueue((name), WQ_FREEZEABLE | WQ_UNBOUND | WQ_MEM_RECLAIM, 1)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">create_singlethread_workqueue</span>(<span style="color: #eedd82;">name</span>)                     \
+        alloc_workqueue((name), WQ_UNBOUND | WQ_MEM_RECLAIM, 1)
+
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">destroy_workqueue</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">wq</span>);
+
+
+
+</pre>
+
+
+
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li id="sec-2-5-8">Kernel Timers<br/>
+ <b>Chapter 7.4</b>
+
+
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-2-6" class="outline-3">
+<h3 id="sec-2-6"><code>kdataalign.c</code></h3>
+<div class="outline-text-3" id="text-2-6">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2-7" class="outline-3">
+<h3 id="sec-2-7"><code>kdatasize.c</code></h3>
+<div class="outline-text-3" id="text-2-7">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2-8" class="outline-3">
+<h3 id="sec-2-8"><code>sleepy.c</code></h3>
+<div class="outline-text-3" id="text-2-8">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2-9" class="outline-3">
+<h3 id="sec-2-9"><code>jit.c</code></h3>
+<div class="outline-text-3" id="text-2-9">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2-10" class="outline-3">
+<h3 id="sec-2-10"><code>seq.c</code></h3>
+<div class="outline-text-3" id="text-2-10">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2-11" class="outline-3">
+<h3 id="sec-2-11"><code>silly.c</code></h3>
+<div class="outline-text-3" id="text-2-11">
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">misc-progs</h2>
+<div class="outline-text-2" id="text-3">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-4" class="outline-2">
+<h2 id="sec-4">skull</h2>
+<div class="outline-text-2" id="text-4">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-5" class="outline-2">
+<h2 id="sec-5">scull</h2>
+<div class="outline-text-2" id="text-5">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-6" class="outline-2">
+<h2 id="sec-6">short</h2>
+<div class="outline-text-2" id="text-6">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-7" class="outline-2">
+<h2 id="sec-7">scullc</h2>
+<div class="outline-text-2" id="text-7">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-8" class="outline-2">
+<h2 id="sec-8">sculld</h2>
+<div class="outline-text-2" id="text-8">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-9" class="outline-2">
+<h2 id="sec-9">scullp</h2>
+<div class="outline-text-2" id="text-9">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-10" class="outline-2">
+<h2 id="sec-10">scullv</h2>
+<div class="outline-text-2" id="text-10">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-11" class="outline-2">
+<h2 id="sec-11">simple</h2>
+<div class="outline-text-2" id="text-11">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-12" class="outline-2">
+<h2 id="sec-12">shortprint</h2>
+<div class="outline-text-2" id="text-12">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-13" class="outline-2">
+<h2 id="sec-13">pci</h2>
+<div class="outline-text-2" id="text-13">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-14" class="outline-2">
+<h2 id="sec-14">usb</h2>
+<div class="outline-text-2" id="text-14">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-15" class="outline-2">
+<h2 id="sec-15">lddbus</h2>
+<div class="outline-text-2" id="text-15">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-16" class="outline-2">
+<h2 id="sec-16">sbull</h2>
+<div class="outline-text-2" id="text-16">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-17" class="outline-2">
+<h2 id="sec-17">snull</h2>
+<div class="outline-text-2" id="text-17">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-18" class="outline-2">
+<h2 id="sec-18">tty</h2>
+<div class="outline-text-2" id="text-18">
+
+</div>
+</div>
+</div>
+
+<div id="postamble">
+<p class="date">Date: 2012-10-20 14:02:19 HKT</p>
+<p class="author">Author: Shi Shougang</p>
+<p class="creator">Org version 7.8.09 with Emacs version 24</p>
+<a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
+
+</div>
+</body>
+</html>

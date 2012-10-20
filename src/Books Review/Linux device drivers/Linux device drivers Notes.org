@@ -1,0 +1,1949 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Linux device drivers Notes
+#+OPTIONS: num:nil H:2
+
+* General
+** Make
+#+begin_src sh
+KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+#  -r, --kernel-release		输出内核发行号
+$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
+#+end_src
+KERNELRELEASE是在内核源码的顶层Makefile中定义的一个变量，在第一次读取
+执行此Makefile时，KERNELRELEASE没有被定义， 所以make将读取执行else之后
+的内容。如果make的目标是clean，直接执行clean操作，然后结束。当make的目
+标为all时，-C $(KDIR) 指明跳转到内核源码目录下读取那里的Makefile；
+M=$(PWD) 表明然后返回到当前目录继续读入、执行当前的Makefile。当从内核
+源码目录返回时，KERNELRELEASE已被被定义，kbuild也被启动去解析kbuild语
+法的语句，make将继续读取else之前的内容。else之前的内容为kbuild语法的语
+句, 指明模块源码中各文件的依赖关系，以及要生成的目标模块名。
+mymodule-objs := file1.o file2.o表示mymoudule.o 由file1.o与file2.o 连
+接生成。obj-m := mymodule.o表示编译连接后将生成mymodule.o模块。
+
+ =kbuild=
+#+begin_src sh
+# Use make M=dir to specify directory of external module to build 
+# Old syntax make ... SUBDIRS=$PWD is still supported 
+# Setting the environment variable KBUILD_EXTMOD take precedence 
+ifdef SUBDIRS 
+KBUILD_EXTMOD ?= $(SUBDIRS) 
+endif 
+ifdef M //如果没有定义或赋值M，此处M未定义（undefined） 
+ifeq ("$(origin M)", "command line") //如果定义了，此句用来判断M是否从命令行来 
+KBUILD_EXTMOD := $(M) 
+endif 
+#+end_src 
+
+** Generate Files
+#+begin_src sh
+|-- modules.order
+|-- Module.symvers
+|-- XXX.ko
+|-- XXX.mod.c
+|-- XXX.mod.o
+|-- XXX.o
+#+end_src
+
+** Files
+*** /proc/moudles
+/proc/moudles 是旧式的, 那种信息的单个文件版本. 其中的条目包含了模块名,
+每个模块占用的内存数量, 以及使用计数. 另外的字串追加到每行的末尾来指定
+标志, 对这个模块当前是活动的.
+#+begin_src sh
+binfmt_misc 6587 1 - Live 0xf82b0000
+ppdev 5259 0 - Live 0xf8274000
+vboxnetadp 6390 0 - Live 0xf82ac000
+vboxnetflt 12740 0 - Live 0xf826e000
+vboxdrv 169169 2 vboxnetadp,vboxnetflt, Live 0xf8626000
+nfsd 238778 13 - Live 0xf870d000
+exportfs 3437 1 nfsd, Live 0xf8308000
+nfs 265631 0 - Live 0xf8683000
+lockd 64881 2 nfsd,nfs, Live 0xf8614000
+nfs_acl 2245 2 nfsd,nfs, Live 0xf82a9000
+auth_rpcgss 33767 2 nfsd,nfs, Live 0xf8299000
+sunrpc 193609 12 nfsd,nfs,lockd,nfs_acl,auth_rpcgss, Live 0xf85e2000
+snd_hda_codec_realtek 203472 1 - Live 0xf9d34000
+snd_usb_audio 75861 2 - Live 0xf9cce000
+snd_usb_lib 15833 1 snd_usb_audio, Live 0xf9ca7000
+snd_hda_intel 22165 4 - Live 0xf9c79000
+snd_pcm_oss 35308 0 - Live 0xf9c5c000
+snd_hda_codec 74297 2 snd_hda_codec_realtek,snd_hda_intel, Live 0xf9c2e000
+snd_mixer_oss 13746 1 snd_pcm_oss, Live 0xf9c09000
+snd_pcm 70918 5 snd_usb_audio,snd_hda_intel,snd_pcm_oss,snd_hda_codec, Live 0xf9be5000 
+#+end_src
+*** /proc/devices
+#+begin_src sh
+Character devices:
+  1 mem
+  4 /dev/vc/0
+  4 tty
+  4 ttyS
+  5 /dev/tty
+  5 /dev/console
+  5 /dev/ptmx
+  6 lp
+  7 vcs
+ 10 misc
+ 13 input
+ 14 sound
+ 21 sg
+ 29 fb
+ 99 ppdev
+108 ppp
+116 alsa
+Block devices:
+  1 ramdisk
+259 blkext
+  7 loop
+  8 sd
+  9 md
+ 11 sr
+ 65 sd
+#+end_src
+*** /sys/module
+ /sys/module 是一个 sysfs 目录层次, 包含当前加载模块的
+#+begin_src sh
+/sys/module
+|-- 8250
+|   `-- parameters
+|       |-- nr_uarts
+|       |-- probe_rsa
+|       |-- share_irqs
+|       `-- skip_txen_test
+|-- acpi
+|   `-- parameters
+|       |-- acpica_version
+|       |-- bfs
+|       |-- gts
+|       `-- immediate_undock
+|-- acpi_cpufreq
+|   `-- parameters
+|       `-- acpi_pstate_strict
+|-- agpgart
+|   |-- holders
+|   |   `-- nvidia -> ../../nvidia
+|   |-- initstate
+|   |-- notes
+|   |-- refcnt
+|   |-- sections
+|   |   |-- __kcrctab
+|   |   |-- __kcrctab_gpl
+|   |   |-- __ksymtab
+|   |   |-- __ksymtab_gpl
+|   |   |-- __ksymtab_strings
+|   |   `-- __mcount_loc
+|   `-- srcversion
+.....
+#+end_src
+** Test
+#+begin_src sh
+sudo insmod xxx.ko   or sudo modprobe xxx.ko
+sudo mknod -m og+rw /dev/XXX c MAJNUM 0
+or sudo chmod NNN /dev/XXX
+#+end_src
+
+* misc-modules
+** =hello.c=
+#+begin_src c
+1) MODULE_LICENSE("Dual BSD/GPL");
+2) printk(KERN_ALERT "Hello, world\n");
+#include <linux/kernel.h>
+int printk(const char * fmt, ...);
+    内核代码的 printf 类似物.
+
+3) module_init(hello_init);
+module_exit(hello_exit);
+#+end_src
+*** Check the output message
+dmesg | tail
+*** Ref
+**** =module_init= and =module_exit=
+ *chapter 2*
+#+begin_src c
+#include <linux/init.h>
+
+#ifndef MODULE
+/**
+ * module_init() - driver initialization entry point
+ * @x: function to be run at kernel boot time or module insertion
+ * 
+ * module_init() will either be called during do_initcalls() (if
+ * builtin) or at module insertion time (if a module).  There can only
+ * be one per module.
+ */
+#define module_init(x)	__initcall(x);
+
+/**
+ * module_exit() - driver exit entry point
+ * @x: function to be run when driver is removed
+ * 
+ * module_exit() will wrap the driver clean-up code
+ * with cleanup_module() when used with rmmod when
+ * the driver is a module.  If the driver is statically
+ * compiled into the kernel, module_exit() has no effect.
+ * There can only be one per module.
+ */
+#define module_exit(x)	__exitcall(x);
+
+#else /* MODULE */
+
+/* Each module must use one module_init(). */
+#define module_init(initfn)					\
+	static inline initcall_t __inittest(void)		\
+	{ return initfn; }					\
+	int init_module(void) __attribute__((alias(#initfn)));
+
+/* This is only required if you want to be unloadable. */
+#define module_exit(exitfn)					\
+	static inline exitcall_t __exittest(void)		\
+	{ return exitfn; }					\
+	void cleanup_module(void) __attribute__((alias(#exitfn)));
+#endif
+#+end_src
+
+**** =printk=
+ *chapter 2*
+#+begin_src c
+#include <linux/printk.h>
+
+#define	KERN_EMERG	"<0>"	/* system is unusable			*/
+#define	KERN_ALERT	"<1>"	/* action must be taken immediately	*/
+#define	KERN_CRIT	"<2>"	/* critical conditions			*/
+#define	KERN_ERR	"<3>"	/* error conditions			*/
+#define	KERN_WARNING	"<4>"	/* warning conditions			*/
+#define	KERN_NOTICE	"<5>"	/* normal but significant condition	*/
+#define	KERN_INFO	"<6>"	/* informational			*/
+#define	KERN_DEBUG	"<7>"	/* debug-level messages			*/
+
+#ifdef CONFIG_PRINTK
+asmlinkage int printk(const char * fmt, ...)
+	__attribute__ ((format (printf, 1, 2))) __cold;
+#else
+static inline int printk(const char *s, ...)
+	__attribute__ ((format (printf, 1, 2)));
+#endif
+#+end_src
+
+**** =MODULE_LICENSE("Dual BSD/GPL");=
+ *chapter 2*
+#+begin_src c
+  #include <linux/module.h>
+  
+  /* Generic info of form tag = "info" */
+  #define MODULE_INFO(tag, info) __MODULE_INFO(tag, tag, info)
+  
+  /*
+   * The following license idents are currently accepted as indicating free
+   * software modules
+   *
+   *      "GPL"                           [GNU Public License v2 or later]
+   *      "GPL v2"                        [GNU Public License v2]
+   *      "GPL and additional rights"     [GNU Public License v2 rights and more]
+   *      "Dual BSD/GPL"                  [GNU Public License v2
+   *                                       or BSD license choice]
+   *      "Dual MIT/GPL"                  [GNU Public License v2
+   *                                       or MIT license choice]
+   *      "Dual MPL/GPL"                  [GNU Public License v2
+   *                                       or Mozilla license choice]
+   *
+   * The following other idents are available
+   *
+   *      "Proprietary"                   [Non free products]
+   *
+   * There are dual licensed components, but when running with Linux it is the
+   * GPL that is relevant so this is a non issue. Similarly LGPL linked with GPL
+   * is a GPL combined work.
+   *
+   * This exists for several reasons
+   * 1.   So modinfo can show license info for users wanting to vet their setup 
+   *      is free
+   * 2.   So the community can ignore bug reports including proprietary modules
+   * 3.   So vendors can do likewise based on their own policies
+   */
+  #define MODULE_LICENSE(_license) MODULE_INFO(license, _license)
+#+end_src
+
+#+begin_src c
+#include <linux/moduleparam.h>
+
+#ifdef MODULE
+#define ___module_cat(a,b) __mod_ ## a ## b
+#define __module_cat(a,b) ___module_cat(a,b)
+#define __MODULE_INFO(tag, name, info)					  \
+static const char __module_cat(name,__LINE__)[]				  \
+  __used __attribute__((section(".modinfo"), unused, aligned(1)))	  \
+  = __stringify(tag) "=" info
+#else  /* !MODULE */
+#define __MODULE_INFO(tag, name, info)
+#endif
+#+end_src
+
+** =hellop.c=
+*** SRC
+#+begin_src c
+static char *whom = "world";
+static int howmany = 1;
+module_param(howmany, int, S_IRUGO);
+module_param(whom, charp, S_IRUGO);
+#+end_src
+*** =module_param(name, type, perm)=
+ *chapter 2*
+#+begin_src c
+#include <linux/moduleparam.h>
+
+/**
+ * module_param - typesafe helper for a module/cmdline parameter
+ * @value: the variable to alter, and exposed parameter name.
+ * @type: the type of the parameter
+ * @perm: visibility in sysfs.
+ *
+ * @value becomes the module parameter, or (prefixed by KBUILD_MODNAME and a
+ * ".") the kernel commandline parameter.  Note that - is changed to _, so
+ * the user can use "foo-bar=1" even for variable "foo_bar".
+ *
+ * @perm is 0 if the the variable is not to appear in sysfs, or 0444
+ * for world-readable, 0644 for root-writable, etc.  Note that if it
+ * is writable, you may need to use kparam_block_sysfs_write() around
+ * accesses (esp. charp, which can be kfreed when it changes).
+ *
+ * The @type is simply pasted to refer to a param_ops_##type and a
+ * param_check_##type: for convenience many standard types are provided but
+ * you can create your own by defining those variables.
+ *
+ * Standard types are:
+ *	byte, short, ushort, int, uint, long, ulong
+ *	charp: a character pointer
+ *	bool: a bool, values 0/1, y/n, Y/N.
+ *	invbool: the above, only sense-reversed (N = true).
+ */
+#define module_param(name, type, perm)				\
+	module_param_named(name, name, type, perm)
+
+/**
+ * module_param_named - typesafe helper for a renamed module/cmdline parameter
+ * @name: a valid C identifier which is the parameter name.
+ * @value: the actual lvalue to alter.
+ * @type: the type of the parameter
+ * @perm: visibility in sysfs.
+ *
+ * Usually it's a good idea to have variable names and user-exposed names the
+ * same, but that's harder if the variable must be non-static or is inside a
+ * structure.  This allows exposure under a different name.
+ */
+#define module_param_named(name, value, type, perm)			   \
+	param_check_##type(name, &(value));				   \
+	module_param_cb(name, &param_ops_##type, &value, perm);		   \
+	__MODULE_PARM_TYPE(name, #type)
+
+/**
+ * module_param_cb - general callback for a module/cmdline parameter
+ * @name: a valid C identifier which is the parameter name.
+ * @ops: the set & get operations for this parameter.
+ * @perm: visibility in sysfs.
+ *
+ * The ops can have NULL set or get functions.
+ */
+#define module_param_cb(name, ops, arg, perm)				      \
+	__module_param_call(MODULE_PARAM_PREFIX,			      \
+			    name, ops, arg, __same_type((arg), bool *), perm)
+
+/* This is the fundamental function for registering boot/module
+   parameters. */
+#define __module_param_call(prefix, name, ops, arg, isbool, perm)	\
+	/* Default value instead of permissions? */			\
+	static int __param_perm_check_##name __attribute__((unused)) =	\
+	BUILD_BUG_ON_ZERO((perm) < 0 || (perm) > 0777 || ((perm) & 2))	\
+	+ BUILD_BUG_ON_ZERO(sizeof(""prefix) > MAX_PARAM_PREFIX_LEN);	\
+	static const char __param_str_##name[] = prefix #name;		\
+	static struct kernel_param __moduleparam_const __param_##name	\
+	__used								\
+    __attribute__ ((unused,__section__ ("__param"),aligned(sizeof(void *)))) \
+	= { __param_str_##name, ops, perm, isbool ? KPARAM_ISBOOL : 0,	\
+	    { arg } }
+#+end_src
+*** =S_IRUGO=
+  *chapter 2*
+#+begin_src c
+<linux/stat.h>
+
+#if defined(__KERNEL__) || !defined(__GLIBC__) || (__GLIBC__ < 2)
+#define S_IRWXU 00700
+#define S_IRUSR 00400
+#define S_IWUSR 00200
+#define S_IXUSR 00100
+
+#define S_IRWXG 00070
+#define S_IRGRP 00040
+#define S_IWGRP 00020
+#define S_IXGRP 00010
+
+#define S_IRWXO 00007
+#define S_IROTH 00004
+#define S_IWOTH 00002
+#define S_IXOTH 00001
+
+#endif
+
+
+#ifdef __KERNEL__
+#define S_IRWXUGO	(S_IRWXU|S_IRWXG|S_IRWXO)
+#define S_IALLUGO	(S_ISUID|S_ISGID|S_ISVTX|S_IRWXUGO)
+#define S_IRUGO		(S_IRUSR|S_IRGRP|S_IROTH)
+#define S_IWUGO		(S_IWUSR|S_IWGRP|S_IWOTH)
+#define S_IXUGO		(S_IXUSR|S_IXGRP|S_IXOTH)
+
+#define UTIME_NOW	((1l << 30) - 1l)
+#define UTIME_OMIT	((1l << 30) - 2l)
+#endif
+#+end_src
+
+*** Run
+#+begin_src sh
+sudo insmod hellop.ko  howmany=10 whom="what"
+#+end_src
+** =complete.c=
+*** =struct task_struct *current;=
+  *chapter 2*
++ snippet
+#+begin_src c
+current->pid
+current->comm
+进程 ID 和 当前进程的命令名.
+#+end_src
+
++ files
+#+begin_src c
+  <linux/sched.h>
+  #include <asm/current.h>
+#+end_src
+#+begin_src c
+   <asm/current.h>
+  #include <linux/thread_info.h>
+  
+   static inline struct task_struct *get_current(void) __attribute_const__;
+  static inline struct task_struct *get_current(void)
+  {
+          return current_thread_info()->task;
+  }
+  
+  #define current (get_current())
+#+end_src
+#+begin_src c
+  <linux/thread_info.h>
+  static inline struct thread_info *current_thread_info(void) __attribute_const__;
+  
+  static inline struct thread_info *current_thread_info(void)
+  {
+          register unsigned long sp asm ("sp");
+          return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
+  }
+  #define THREAD_SIZE             8192
+  
+  /*
+   * low level task data that entry.S needs immediate access to.
+   * __switch_to() assumes cpu_context follows immediately after cpu_domain.
+   */
+  struct thread_info {
+          unsigned long           flags;          /* low level flags */
+          int                     preempt_count;  /* 0 => preemptable, <0 => bug */
+          mm_segment_t            addr_limit;     /* address limit */
+          struct task_struct      *task;          /* main task structure */
+          struct exec_domain      *exec_domain;   /* execution domain */
+          __u32                   cpu;            /* cpu */
+          __u32                   cpu_domain;     /* cpu domain */
+          struct cpu_context_save cpu_context;    /* cpu context */
+          __u32                   syscall;        /* syscall number */
+          __u8                    used_cp[16];    /* thread used copro */
+          unsigned long           tp_value;
+          struct crunch_state     crunchstate;
+          union fp_state          fpstate __attribute__((aligned(8)));
+          union vfp_state         vfpstate;
+  #ifdef CONFIG_ARM_THUMBEE
+          unsigned long           thumbee_state;  /* ThumbEE Handler Base register */
+  #endif
+          struct restart_block    restart_block;
+  };
+#+end_src
+
+*** =dev_t=
+   *chapter 3*
+#+begin_src c
+#include <linux/types.h>
+#ifdef __KERNEL__
+
+typedef __u32 __kernel_dev_t;
+typedef __kernel_dev_t		dev_t;
+#+end_src
+
++ operation
+#+begin_src c
+  #include <linux/kdev_t.h>
+#ifdef __KERNEL__
+#define MINORBITS	20
+#define MINORMASK	((1U << MINORBITS) - 1)
+
+#define MAJOR(dev)	((unsigned int) ((dev) >> MINORBITS))
+#define MINOR(dev)	((unsigned int) ((dev) & MINORMASK))
+#define MKDEV(ma,mi)	(((ma) << MINORBITS) | (mi))
+
+#define print_dev_t(buffer, dev)					\
+	sprintf((buffer), "%u:%u\n", MAJOR(dev), MINOR(dev))
+
+#define format_dev_t(buffer, dev)					\
+	({								\
+		sprintf(buffer, "%u:%u", MAJOR(dev), MINOR(dev));	\
+		buffer;							\
+	})
+static inline u32 new_encode_dev(dev_t dev)
+{
+	unsigned major = MAJOR(dev);
+	unsigned minor = MINOR(dev);
+	return (minor & 0xff) | (major << 8) | ((minor & ~0xff) << 12);
+}
+
+static inline dev_t new_decode_dev(u32 dev)
+{
+	unsigned major = (dev & 0xfff00) >> 8;
+	unsigned minor = (dev & 0xff) | ((dev >> 12) & 0xfff00);
+	return MKDEV(major, minor);
+}
+
+#else /* __KERNEL__ */
+/*
+Some programs want their definitions of MAJOR and MINOR and MKDEV
+from the kernel sources. These must be the externally visible ones.
+*/
+#define MAJOR(dev)	((dev)>>8)
+#define MINOR(dev)	((dev) & 0xff)
+#define MKDEV(ma,mi)	((ma)<<8 | (mi))
+#endif /* __KERNEL__ */
+#+end_src
+*** Allocating and Freeing Device Numbers
+ *chapter 3*
+#+begin_src c
+#include <linux/fs.h>
+The “filesystem” header is the header required for writing device drivers. Many
+important functions and data structures are declared in here.
+
+int register_chrdev_region(dev_t first, unsigned int count, char *name)
+int alloc_chrdev_region(dev_t *dev, unsigned int firstminor, unsigned int count, char *name)
+void unregister_chrdev_region(dev_t first, unsigned int count);
+Functions that allow a driver to allocate and free ranges of device numbers.
+register_chrdev_region should be used when the desired major number is known
+in advance; for dynamic allocation, use alloc_chrdev_region instead.
+#+end_src
+
+**** how
+=int register_chrdev_region(dev_t first, unsigned int count, char *name);=
+
+Here, first is the beginning device number of the range you would like to allocate.
+The minor number portion of first is often 0, but there is no requirement to that
+effect. count is the total number of contiguous device numbers you are requesting.
+Note that, if count is large, the range you request could spill over to the next major
+number; but everything will still work properly as long as the number range you
+request is available. Finally, name is the name of the device that should be associated
+with this number range; it will appear in /proc/devices and sysfs.
+
+*** Char Device Registration
+  *chapter 3*
+**** API
+#+begin_src c
+  #include <linux/cdev.h>
+  struct cdev {
+	struct kobject kobj;
+	struct module *owner;
+	const struct file_operations *ops;
+	struct list_head list;
+	dev_t dev;
+	unsigned int count;
+};
+
+void cdev_init(struct cdev *, const struct file_operations *);
+struct cdev *cdev_alloc(void);
+int cdev_add(struct cdev *, dev_t, unsigned);
+void cdev_del(struct cdev *);
+
+void cdev_put(struct cdev *p);
+int cdev_index(struct inode *inode);
+void cd_forget(struct inode *);
+extern struct backing_dev_info directly_mappable_cdev_bdi;
+#+end_src
+**** examples
+1) There are two ways of allocating and initializing one of these
+   structures. If you wish to obtain a standalone cdev structure at
+   runtime, you may do so with code such as:
+
+#+begin_src c
+struct cdev *my_cdev = cdev_alloc( );
+my_cdev->ops = &my_fops;
+#+end_src
+
+2) Chances are, however, that you will want to embed the cdev
+   structure within a device-specific structure of your own; that is
+   what scull does. In that case, you should initialize the structure
+   that you have already allocated with:
+#+begin_src c
+  static void scull_setup_cdev(struct scull_dev *dev, int index)
+  {
+    int err, devno = MKDEV(scull_major, scull_minor + index);
+    cdev_init(&dev->cdev, &scull_fops);
+    dev->cdev.owner = THIS_MODULE;
+    dev->cdev.ops = &scull_fops;
+    err = cdev_add (&dev->cdev, devno, 1);
+    /* Fail gracefully if need be */
+    if (err)
+      printk(KERN_NOTICE "Error %d adding scull%d", err, index);
+  }
+#+end_src
+
+**** how
++ =int cdev_add(struct cdev *dev, dev_t num, unsigned int count);=
+     Here, dev is the cdev structure, num is the first device number to which this device
+     responds, and count is the number of device numbers that should be associated with
+     the device. Often count is one, but there are situations where it makes sense to have
+     more than one device number correspond to a specific device.
+
+     There are a couple of important things to keep in mind when using cdev_add. The
+     first is that this call can fail. If it returns a negative error code, your device has not
+     been added to the system.
+
+*** Data Structures
+**** =struct file_opertaions=
+The file_operations structure holds a char driver’s methods; 
+
+#+begin_src c
+     #include <linux/fs.h>
+/*
+ * NOTE:
+ * all file operations except setlease can be called without
+ * the big kernel lock held in all filesystems.
+ */
+struct file_operations {
+	struct module *owner;
+	loff_t (*llseek) (struct file *, loff_t, int);
+	ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
+	ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
+	ssize_t (*aio_read) (struct kiocb *, const struct iovec *, unsigned long, loff_t);
+	ssize_t (*aio_write) (struct kiocb *, const struct iovec *, unsigned long, loff_t);
+	int (*readdir) (struct file *, void *, filldir_t);
+	unsigned int (*poll) (struct file *, struct poll_table_struct *);
+	long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
+	long (*compat_ioctl) (struct file *, unsigned int, unsigned long);
+	int (*mmap) (struct file *, struct vm_area_struct *);
+	int (*open) (struct inode *, struct file *);
+	int (*flush) (struct file *, fl_owner_t id);
+	int (*release) (struct inode *, struct file *);
+	int (*fsync) (struct file *, int datasync);
+	int (*aio_fsync) (struct kiocb *, int datasync);
+	int (*fasync) (int, struct file *, int);
+	int (*lock) (struct file *, int, struct file_lock *);
+	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
+	unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+	int (*check_flags)(int);
+	int (*flock) (struct file *, int, struct file_lock *);
+	ssize_t (*splice_write)(struct pipe_inode_info *, struct file *, loff_t *, size_t, unsigned int);
+	ssize_t (*splice_read)(struct file *, loff_t *, struct pipe_inode_info *, size_t, unsigned int);
+	int (*setlease)(struct file *, long, struct file_lock **);
+};
+#+end_src
+**** =struct file=
+struct file represents an open file
+#+begin_src c
+  struct file {
+          /*
+           * fu_list becomes invalid after file_free is called and queued via
+           * fu_rcuhead for RCU freeing
+           */
+          union {
+                  struct list_head        fu_list;
+                  struct rcu_head         fu_rcuhead;
+          } f_u;
+          struct path             f_path;
+  #define f_dentry        f_path.dentry
+  #define f_vfsmnt        f_path.mnt
+          const struct file_operations    *f_op;
+          spinlock_t              f_lock;  /* f_ep_links, f_flags, no IRQ */
+  #ifdef CONFIG_SMP
+          int                     f_sb_list_cpu;
+  #endif
+          atomic_long_t           f_count;
+          unsigned int            f_flags;
+          fmode_t                 f_mode;
+          loff_t                  f_pos;
+          struct fown_struct      f_owner;
+          const struct cred       *f_cred;
+          struct file_ra_state    f_ra;
+  
+          u64                     f_version;
+  #ifdef CONFIG_SECURITY
+          void                    *f_security;
+  #endif
+          /* needed for tty driver, and maybe others */
+          void                    *private_data;
+  
+  #ifdef CONFIG_EPOLL
+          /* Used by fs/eventpoll.c to link all the hooks to this file */
+          struct list_head        f_ep_links;
+  #endif /* #ifdef CONFIG_EPOLL */
+          struct address_space    *f_mapping;
+  #ifdef CONFIG_DEBUG_WRITECOUNT
+          unsigned long f_mnt_write_state;
+  #endif
+  };
+#+end_src
+
+**** =struct inode=
+struct inode represents a file on disk.
+#+begin_src c
+  struct inode {
+          struct hlist_node       i_hash;
+          struct list_head        i_wb_list;      /* backing dev IO list */
+          struct list_head        i_lru;          /* inode LRU list */
+          struct list_head        i_sb_list;
+          struct list_head        i_dentry;
+          unsigned long           i_ino;
+          atomic_t                i_count;
+          unsigned int            i_nlink;
+          uid_t                   i_uid;
+          gid_t                   i_gid;
+          dev_t                   i_rdev;
+          unsigned int            i_blkbits;
+          u64                     i_version;
+          loff_t                  i_size;
+  #ifdef __NEED_I_SIZE_ORDERED
+          seqcount_t              i_size_seqcount;
+  #endif
+          struct timespec         i_atime;
+          struct timespec         i_mtime;
+          struct timespec         i_ctime;
+          blkcnt_t                i_blocks;
+          unsigned short          i_bytes;
+          umode_t                 i_mode;
+          spinlock_t              i_lock; /* i_blocks, i_bytes, maybe i_size */
+          struct mutex            i_mutex;
+          struct rw_semaphore     i_alloc_sem;
+          const struct inode_operations   *i_op;
+          const struct file_operations    *i_fop; /* former ->i_op->default_file_ops */
+          struct super_block      *i_sb;
+          struct file_lock        *i_flock;
+          struct address_space    *i_mapping;
+          struct address_space    i_data;
+  #ifdef CONFIG_QUOTA
+          struct dquot            *i_dquot[MAXQUOTAS];
+  #endif
+          struct list_head        i_devices;
+          union {
+                  struct pipe_inode_info  *i_pipe;
+                  struct block_device     *i_bdev;
+                  struct cdev             *i_cdev;
+          };
+  
+          __u32                   i_generation;
+  
+  #ifdef CONFIG_FSNOTIFY
+          __u32                   i_fsnotify_mask; /* all events this inode cares about */
+          struct hlist_head       i_fsnotify_marks;
+  #endif
+  
+          unsigned long           i_state;
+          unsigned long           dirtied_when;   /* jiffies of first dirtying */
+  
+          unsigned int            i_flags;
+  
+  #ifdef CONFIG_IMA
+          /* protected by i_lock */
+          unsigned int            i_readcount; /* struct files open RO */
+  #endif
+          atomic_t                i_writecount;
+  #ifdef CONFIG_SECURITY
+          void                    *i_security;
+  #endif
+  #ifdef CONFIG_FS_POSIX_ACL
+          struct posix_acl        *i_acl;
+          struct posix_acl        *i_default_acl;
+  #endif
+          void                    *i_private; /* fs or device private pointer */
+  };
+#+end_src
+**** =struct inode_operations=
+#+begin_src c
+struct inode_operations {
+	int (*create) (struct inode *,struct dentry *,int, struct nameidata *);
+	struct dentry * (*lookup) (struct inode *,struct dentry *, struct nameidata *);
+	int (*link) (struct dentry *,struct inode *,struct dentry *);
+	int (*unlink) (struct inode *,struct dentry *);
+	int (*symlink) (struct inode *,struct dentry *,const char *);
+	int (*mkdir) (struct inode *,struct dentry *,int);
+	int (*rmdir) (struct inode *,struct dentry *);
+	int (*mknod) (struct inode *,struct dentry *,int,dev_t);
+	int (*rename) (struct inode *, struct dentry *,
+			struct inode *, struct dentry *);
+	int (*readlink) (struct dentry *, char __user *,int);
+	void * (*follow_link) (struct dentry *, struct nameidata *);
+	void (*put_link) (struct dentry *, struct nameidata *, void *);
+	void (*truncate) (struct inode *);
+	int (*permission) (struct inode *, int);
+	int (*check_acl)(struct inode *, int);
+	int (*setattr) (struct dentry *, struct iattr *);
+	int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
+	int (*setxattr) (struct dentry *, const char *,const void *,size_t,int);
+	ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
+	ssize_t (*listxattr) (struct dentry *, char *, size_t);
+	int (*removexattr) (struct dentry *, const char *);
+	void (*truncate_range)(struct inode *, loff_t, loff_t);
+	long (*fallocate)(struct inode *inode, int mode, loff_t offset,
+			  loff_t len);
+	int (*fiemap)(struct inode *, struct fiemap_extent_info *, u64 start,
+		      u64 len);
+};
+#+end_src
+
+*** Completions 机制
+    *chapter 5*
+**** how
+#+begin_src c
+#include <linux/completion.h>
+    //Method 1
+  DECLARE_COMPLETION(comp);
+  wait_for_completion(&comp);
+  complete(&comp);
+  //Method 2
+struct completion my_completion;
+init_completion(&my_completion);
+#+end_src
+
+**** API
+#+begin_src c
+#include <linux/completion.h>
+
+/ * Atomic wait-for-completion handler data structures.
+ * See kernel/sched.c for details.
+ */
+
+struct completion {
+	unsigned int done;
+	wait_queue_head_t wait;
+};
+
+#define COMPLETION_INITIALIZER(work) \
+	{ 0, __WAIT_QUEUE_HEAD_INITIALIZER((work).wait) }
+
+#define COMPLETION_INITIALIZER_ONSTACK(work) \
+	({ init_completion(&work); work; })
+
+/**
+ * DECLARE_COMPLETION - declare and initialize a completion structure
+ * @work:  identifier for the completion structure
+ *
+ * This macro declares and initializes a completion structure. Generally used
+ * for static declarations. You should use the _ONSTACK variant for automatic
+ * variables.
+ */
+#define DECLARE_COMPLETION(work) \
+	struct completion work = COMPLETION_INITIALIZER(work)
+
+/**
+ * init_completion - Initialize a dynamically allocated completion
+ * @x:  completion structure that is to be initialized
+ *
+ * This inline function will initialize a dynamically created completion
+ * structure.
+ */
+static inline void init_completion(struct completion *x)
+{
+	x->done = 0;
+	init_waitqueue_head(&x->wait);
+}
+
+extern void wait_for_completion(struct completion *);
+extern int wait_for_completion_interruptible(struct completion *x);
+extern int wait_for_completion_killable(struct completion *x);
+extern unsigned long wait_for_completion_timeout(struct completion *x,
+						   unsigned long timeout);
+extern unsigned long wait_for_completion_interruptible_timeout(
+			struct completion *x, unsigned long timeout);
+extern unsigned long wait_for_completion_killable_timeout(
+			struct completion *x, unsigned long timeout);
+extern bool try_wait_for_completion(struct completion *x);
+extern bool completion_done(struct completion *x);
+
+extern void complete(struct completion *);
+extern void complete_all(struct completion *);
+
+/**
+ * INIT_COMPLETION - reinitialize a completion structure
+ * @x:  completion structure to be reinitialized
+ *
+ * This macro should be used to reinitialize a completion structure so it can
+ * be reused. This is especially important after complete_all() is used.
+ */
+#define INIT_COMPLETION(x)	((x).done = 0)
+
+#+end_src
+
+** =faulty.c=
+ *chapter 4*
+*** 缓存区溢出
+这个方法拷贝一个字串到一个本地变量; 不幸的是, 字串长于目的数组. 当函数
+返回时导致的缓存区溢出引起一次 oops . 因为返回指令使指令指针到不知何处,
+这类的错误很难跟踪
++ SRC
+#+begin_src c
+char stack_buf[4];
+    /* Let's try a buffer overflow */
+    memset(stack_buf, 0xff, 20);
+#+end_src
++ Test
+#+begin_src sh
+#cat /dev/faulty
+[1]    22139 killed     cat /dev/faulty
+
+[178823.762627] BUG: unable to handle kernel NULL pointer dereference at 0000000b
+[178823.762631] IP: [<c0214ea9>] vfs_read+0xa9/0x1a0
+[178823.762637] *pdpt = 000000002d2cf001 *pde = 0000000000000000 
+[178823.762640] Oops: 0000 [#1] SMP 
+[178823.762642] last sysfs file: /sys/devices/pci0000:00/0000:00:03.0/0000:01:00.1/local_cpus
+[178823.762645] Modules linked in: faulty complete binfmt_misc ppdev vboxnetadp vboxnetflt vboxdrv nfsd exportfs nfs lockd nfs_acl auth_rpcgss sunrpc snd_hda_codec_realtek snd_usb_audio snd_usb_lib snd_hda_intel snd_pcm_oss snd_hda_codec snd_mixer_oss snd_pcm snd_seq_dummy snd_hwdep snd_seq_oss snd_seq_midi snd_rawmidi snd_seq_midi_event snd_seq fbcon snd_timer tileblit snd_seq_device tpm_tis font snd tpm bitblit tpm_bios softcursor soundcore psmouse snd_page_alloc nvidia(P) serio_raw agpgart vga16fb vgastate lp parport usbhid hid usb_storage ahci e1000e
+[178823.762681] 
+[178823.762684] Pid: 12648, comm: more Tainted: P           (2.6.32-42-generic-pae #96-Ubuntu) 5498RF4
+[178823.762693] EIP: 0060:[<c0214ea9>] EFLAGS: 00010202 CPU: 5
+[178823.762697] EIP is at vfs_read+0xa9/0x1a0
+[178823.762703] EAX: 00000004 EBX: ffffffff ECX: 00000000 EDX: b7487000
+[178823.762708] ESI: 00000004 EDI: ffffffff EBP: ffffffff ESP: f166df6c
+[178823.762710]  DS: 007b ES: 007b FS: 00d8 GS: 00e0 SS: 0068
+[178823.762712] Process more (pid: 12648, ti=f166c000 task=e251d940 task.ti=f166c000)
+[178823.762714] Stack:
+[178823.762715]  f166df98 f166df88 c0361b19 f82f80f0 ed0f8e80 ed0f8e80 fffffff7 00000002
+[178823.762719] <0> f166dfac c0215052 f166df98 00000000 00000000 00000000 00000003 09ad9c68
+[178823.762723] <0> f166c000 c01096e3 00000003 b7487000 00001000 09ad9c68 00000002 bfaa34c4
+[178823.762728] Call Trace:
+[178823.762732]  [<c0361b19>] ? copy_to_user+0x39/0x130
+[178823.762735]  [<f82f80f0>] ? faulty_read+0x0/0x50 [faulty]
+[178823.762738]  [<c0215052>] ? sys_read+0x42/0x70
+[178823.762741]  [<c01096e3>] ? sysenter_do_call+0x12/0x28
+[178823.762743] Code: a4 8b 43 10 8b 40 08 85 c0 89 45 ec 0f 84 e1 00 00 00 8b 45 08 89 f1 89 fa 89 04 24 89 d8 ff 55 ec 89 c6 85 f6 0f 8e 9a 00 00 00 <8b> 7b 0c 31 db 8b 47 10 89 45 f0 0f b7 40 72 c7 44 24 04 00 00 
+[178823.762791] EIP: [<c0214ea9>] vfs_read+0xa9/0x1a0 SS:ESP 0068:f166df6c
+[178823.762794] CR2: 000000000000000b
+[178823.762803] ---[ end trace 9342d36e7d9d6b0e ]---
+#+end_src
+
+*** make a simple fault by dereferencing a NULL pointer 
++ SRC
+#+begin_src c
+  *(int *)0 = 0;
+#+end_src
++ Test
+#+begin_src sh
+# echo "test" >  /dev/faulty
+
+[179151.985610] BUG: unable to handle kernel NULL pointer dereference at (null)
+[179151.985618] IP: [<f82f800a>] faulty_write+0xa/0x20 [faulty]
+[179151.985627] *pdpt = 0000000021426001 *pde = 0000000000000000 
+[179151.985633] Oops: 0002 [#2] SMP 
+[179151.985638] last sysfs file: /sys/devices/pci0000:00/0000:00:03.0/0000:01:00.1/local_cpus
+[179151.985642] Modules linked in: faulty complete binfmt_misc ppdev vboxnetadp vboxnetflt vboxdrv nfsd exportfs nfs lockd nfs_acl auth_rpcgss sunrpc snd_hda_codec_realtek snd_usb_audio snd_usb_lib snd_hda_intel snd_pcm_oss snd_hda_codec snd_mixer_oss snd_pcm snd_seq_dummy snd_hwdep snd_seq_oss snd_seq_midi snd_rawmidi snd_seq_midi_event snd_seq fbcon snd_timer tileblit snd_seq_device tpm_tis font snd tpm bitblit tpm_bios softcursor soundcore psmouse snd_page_alloc nvidia(P) serio_raw agpgart vga16fb vgastate lp parport usbhid hid usb_storage ahci e1000e
+[179151.985703] 
+[179151.985708] Pid: 6614, comm: zsh Tainted: P      D    (2.6.32-42-generic-pae #96-Ubuntu) 5498RF4
+[179151.985713] EIP: 0060:[<f82f800a>] EFLAGS: 00010246 CPU: 4
+[179151.985718] EIP is at faulty_write+0xa/0x20 [faulty]
+[179151.985721] EAX: 00000000 EBX: edaf1600 ECX: 00000005 EDX: 080d5540
+[179151.985725] ESI: 00000005 EDI: 080d5540 EBP: e19edf64 ESP: e19edf64
+[179151.985729]  DS: 007b ES: 007b FS: 00d8 GS: 00e0 SS: 0068
+[179151.985733] Process zsh (pid: 6614, ti=e19ec000 task=e8fda640 task.ti=e19ec000)
+[179151.985736] Stack:
+[179151.985738]  e19edf8c c02146f2 e19edf98 edaf1600 edba3b00 f82f8000 e19edf94 edaf1600
+[179151.985747] <0> fffffff7 080d5540 e19edfac c0214fe2 e19edf98 00000000 00000000 00000000
+[179151.985757] <0> 00000001 00000005 e19ec000 c01096e3 00000001 080d5540 00000005 00000005
+[179151.985767] Call Trace:
+[179151.985774]  [<c02146f2>] ? vfs_write+0xa2/0x1a0
+[179151.985779]  [<f82f8000>] ? faulty_write+0x0/0x20 [faulty]
+[179151.985785]  [<c0214fe2>] ? sys_write+0x42/0x70
+[179151.985790]  [<c01096e3>] ? sysenter_do_call+0x12/0x28
+[179151.985793] Code: <c7> 05 00 00 00 00 00 00 00 00 5d c3 8d 76 00 8d bc 27 00 00 00 00 
+[179151.985816] EIP: [<f82f800a>] faulty_write+0xa/0x20 [faulty] SS:ESP 0068:e19edf64
+[179151.985822] CR2: 0000000000000000
+[179151.985826] ---[ end trace 9342d36e7d9d6b0f ]---
+#+end_src
+
+*** =copy_to_user= and =copy_from_user=
+  *chapter 3*
+#+begin_src c
+#include <asm/uaccess.h>
+This include file declares functions used by kernel code to move data to and
+from user space.
+
+static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
+{
+	if (access_ok(VERIFY_READ, from, n))
+		n = __copy_from_user(to, from, n);
+	else /* security hole - plug it */
+		memset(to, 0, n);
+	return n;
+}
+
+static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
+{
+	if (access_ok(VERIFY_WRITE, to, n))
+		n = __copy_to_user(to, from, n);
+	return n;
+}
+
+
+#ifdef CONFIG_MMU
+extern unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n);
+extern unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n);
+extern unsigned long __must_check __copy_to_user_std(void __user *to, const void *from, unsigned long n);
+extern unsigned long __must_check __clear_user(void __user *addr, unsigned long n);
+extern unsigned long __must_check __clear_user_std(void __user *addr, unsigned long n);
+#else
+#define __copy_from_user(to,from,n)	(memcpy(to, (void __force *)from, n), 0)
+#define __copy_to_user(to,from,n)	(memcpy((void __force *)to, from, n), 0)
+#define __clear_user(addr,n)		(memset((void __force *)addr, 0, n), 0)
+#endif
+
+#+end_src
+
+** =jiq.c=
+*** Error and fix
++ error
+#+begin_src sh
+  jiq.c:18:26: error: linux/config.h: No such file or directory
+  jiq.c:122: warning: passing argument 1 of ‘schedule_delayed_work’ from incompatible pointer type
+  jiq.c:244:46: error: macro "INIT_WORK" passed 3 arguments, but takes just 2
+  jiq.c:244: error: ‘INIT_WORK’ undeclared (first use in this function)
+#+end_src
+
++ Fix
+
+1. 从2.6.20的内核开始,INIT_WORK宏做了改变,原来是三个参数,后来改成了两
+   个参数
+
+   In the =struct work_struct=, the type of =work_func_t func= is
+   =typedef void (*work_func_t)(struct work_struct *work);=, so the
+   function should be =void XXX(struct work_struct *work)=
+
+the example:
+#+begin_src c
+#include <linux/workqueue.h>
+struct work_struct my_work;
+void my_workfunc(struct work_struct *ptr);
+INIT_WORK(&my_work, my_workfunc);
+#+end_src
+
+the API:
+#+begin_src c
+  #include <linux/workqueue.h>
+  
+  typedef void (*work_func_t)(struct work_struct *work);
+  
+  struct work_struct {
+          atomic_long_t data;
+          struct list_head entry;
+          work_func_t func;
+  #ifdef CONFIG_LOCKDEP
+          struct lockdep_map lockdep_map;
+  #endif
+  };
+  
+  struct delayed_work {
+          struct work_struct work;
+          struct timer_list timer;
+  };
+  
+  #define INIT_WORK(_work, _func)                                 \
+          do {                                                    \
+                  __INIT_WORK((_work), (_func), 0);               \
+          } while (0)
+  
+  #define INIT_WORK_ONSTACK(_work, _func)                         \
+          do {                                                    \
+                  __INIT_WORK((_work), (_func), 1);               \
+          } while (0)
+  
+  #define INIT_DELAYED_WORK(_work, _func)                         \
+          do {                                                    \
+                  INIT_WORK(&(_work)->work, (_func));             \
+                  init_timer(&(_work)->timer);                    \
+          } while (0)
+  
+  #define INIT_DELAYED_WORK_ONSTACK(_work, _func)                 \
+          do {                                                    \
+                  INIT_WORK_ONSTACK(&(_work)->work, (_func));     \
+                  init_timer_on_stack(&(_work)->timer);           \
+          } while (0)
+  
+  #define INIT_DELAYED_WORK_DEFERRABLE(_work, _func)              \
+          do {                                                    \
+                  INIT_WORK(&(_work)->work, (_func));             \
+                  init_timer_deferrable(&(_work)->timer);         \
+          } while (0)
+#+end_src
+
+2. 
+
+
+3. the diff 
+#+begin_src sh
+18c18
+< #include <linux/config.h>
+---
+> /*#include <linux/config.h>*/
+114c114
+< static void jiq_print_wq(void *ptr)
+---
+> static void jiq_print_wq(struct work_struct *ptr)
+116a117,118
+> 	struct delayed_work *temp_work;
+> 	temp_work = to_delayed_work(&jiq_work);
+122c124
+< 		schedule_delayed_work(&jiq_work, data->delay);
+---
+> 		schedule_delayed_work(temp_work, data->delay);
+152a155,156
+> 	struct delayed_work *temp_work;
+> 	temp_work = to_delayed_work(&jiq_work);
+160c164
+< 	schedule_delayed_work(&jiq_work, delay);
+---
+> 	schedule_delayed_work(temp_work, delay);
+244c248
+< 	INIT_WORK(&jiq_work, jiq_print_wq, &jiq_data);
+---
+> 	INIT_WORK(&jiq_work, jiq_print_wq);
+#+end_src
+
+*** Test 
+#+begin_src sh
+#cat /proc/jitimer 
+    time  delta preempt   pid cpu command
+   221012     0       0  3276   4 cat
+   221262   250     256     0   4 swapper
+
+#cat /proc/jiqtasklet 
+    time  delta preempt   pid cpu command
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+   231361     0     256    25   7 ksoftirqd/7
+
+#
+#+end_src
+
+*** 创建你的 /proc 文件
+ *Chapter 4.3*
+有使用 /proc 的模块应当包含 =<linux/proc_fs.h>= 来定义正确的函数.
+
+当一个进程读你的 =/proc= 文件, 内核分配了一页内存(就是说, =PAGE_SIZE=
+字节), 驱动可以写入数据来返回给用户空间. 那个缓存区传递给你的函数, 是
+一个称为 read_proc 的方法:
+
+=int (*read_proc)(char *page, char **start, off_t offset, int count, int *eof, void *data);=
+
+page 指针是你写你的数据的缓存区; start 是这个函数用来说有关的数据写在
+页中哪里(下面更多关于这个); offset 和 count 对于 read 方法有同样的含义.
+eof 参数指向一个整数, 必须由驱动设置来指示它不再有数据返回, data 是驱
+动特定的数据指针, 你可以用做内部用途.
+
+一旦你有一个定义好的 =read_proc= 函数, 你应当连接它到 =/proc= 层次中的
+一个入口项. 使用一个 =creat_proc_read_entry= 调用:
+
+=struct proc_dir_entry *create_proc_read_entry(const char *name,mode_t mode, struct proc_dir_entry *base, read_proc_t *read_proc, void *data);= 
+
+这里, name 是要创建的文件名子, mod 是文件的保护掩码(缺省系统范围时可以
+作为 0 传递), base 指出要创建的文件的目录( 如果 base 是 NULL, 文件在
+/proc 根下创建 ), =read_proc= 是实现文件的 =read_proc= 函数, data 被内核忽
+略( 但是传递给 =read_proc=). 这就是 scull 使用的调用, 来使它的 =/proc= 函
+数可用做 =/proc/scullmem=:
+
+
+=create_proc_read_entry("scullmem", 0 /* default mode */, NULL /*
+parent dir */, scull_read_procmem, NULL /* client data */);=
+
+这里, 我们创建了一个名为 scullmem 的文件, 直接在 /proc 下, 带有缺省的,
+全局可读的保护.
+
+/proc 中的入口, 当然, 应当在模块卸载后去除. remove_proc_entry 是恢复
+create_proc_read_entry 所做的事情的函数:
+
+=remove_proc_entry("scullmem", NULL /* parent dir */);=
+
+去除入口失败会导致在不希望的时间调用, 或者, 如果你的模块已被卸载, 内核
+崩掉.
+
+
+**** Ref
+#+begin_src c
+#include <linux/proc_fs.h>
+static inline struct proc_dir_entry *create_proc_read_entry(const char *name,
+	mode_t mode, struct proc_dir_entry *base, 
+	read_proc_t *read_proc, void * data)
+{
+	struct proc_dir_entry *res=create_proc_entry(name,mode,base);
+	if (res) {
+		res->read_proc=read_proc;
+		res->data=data;
+	}
+	return res;
+}
+
+extern void remove_proc_entry(const char *name, struct proc_dir_entry *parent);
+
+typedef	int (read_proc_t)(char *page, char **start, off_t off,
+			  int count, int *eof, void *data);
+typedef	int (write_proc_t)(struct file *file, const char __user *buffer,
+			   unsigned long count, void *data);
+
+struct proc_dir_entry {
+	unsigned int low_ino;
+	unsigned short namelen;
+	const char *name;
+	mode_t mode;
+	nlink_t nlink;
+	uid_t uid;
+	gid_t gid;
+	loff_t size;
+	const struct inode_operations *proc_iops;
+	/*
+	 * NULL ->proc_fops means "PDE is going away RSN" or
+	 * "PDE is just created". In either case, e.g. ->read_proc won't be
+	 * called because it's too late or too early, respectively.
+	 *
+	 * If you're allocating ->proc_fops dynamically, save a pointer
+	 * somewhere.
+	 */
+	const struct file_operations *proc_fops;
+	struct proc_dir_entry *next, *parent, *subdir;
+	void *data;
+	read_proc_t *read_proc;
+	write_proc_t *write_proc;
+	atomic_t count;		/* use count */
+	int pde_users;	/* number of callers into module in progress */
+	spinlock_t pde_unload_lock; /* proc_fops checks and pde_users bumps */
+	struct completion *pde_unload_completion;
+	struct list_head pde_openers;	/* who did ->open, but not ->release */
+};
+#+end_src
+
+*** Using the jiffies Counter
+ *chapter 7.1*
+Timer interrupts are generated by the system's timing hardware at
+regular intervals; this interval is programmed at boot time by the
+kernel according to the value of *HZ*, which is an
+architecture-dependent value defined in =<linux/param.h>= or a
+subplatform file included by it. Default values in the distributed
+kernel source range from 50 to 1200 ticks per second on real hardware,
+down to 24 for software simulators
+
+Every time a timer interrupt occurs, the value of an internal kernel
+counter is incremented. The counter is initialized to 0 at system
+boot, so it represents the number of clock ticks since last boot. The
+counter is a 64-bit variable (even on 32-bit architectures) and is
+called jiffies_64. However, driver writers normally access the jiffies
+variable, an unsigned long that is the same as either jiffies_64 or
+its least significant bits. Using jiffies is usually preferred because
+it is faster, and accesses to the 64-bit jiffies_64 value are not
+necessarily atomic on all architectures.
+
+The counter and the utility functions to read it live in
+<linux/jiffies.h>, although you'll usually just include
+<linux/sched.h>, that automatically pulls jiffies.h in.
+
+ *example*
+#+begin_src c
+#include <linux/jiffies.h>
+unsigned long j, stamp_1, stamp_half, stamp_n;
+
+j = jiffies;                      /* read the current value */
+stamp_1    = j + HZ;              /* 1 second in the future */
+stamp_half = j + HZ/2;            /* half a second */
+stamp_n    = j + n * HZ / 1000;   /* n milliseconds */
+#+end_src
+
+To compare your cached value and the current value, you should use one
+of the following macros:
+#+begin_src c
+#include <linux/jiffies.h>
+int time_after(unsigned long a, unsigned long b);
+int time_before(unsigned long a, unsigned long b);
+int time_after_eq(unsigned long a, unsigned long b);
+int time_before_eq(unsigned long a, unsigned long b);
+
+/* time_after(a,b) returns true if the time a is after time b. */
+#define time_after(a,b)		\
+	(typecheck(unsigned long, a) && \
+	 typecheck(unsigned long, b) && \
+	 ((long)(b) - (long)(a) < 0))
+#define time_before(a,b)	time_after(b,a)
+
+#define time_after_eq(a,b)	\
+	(typecheck(unsigned long, a) && \
+	 typecheck(unsigned long, b) && \
+	 ((long)(a) - (long)(b) >= 0))
+#define time_before_eq(a,b)	time_after_eq(b,a)
+#+end_src
+
+Sometimes, however, you need to exchange time representations with
+user space programs that tend to represent time values with struct
+timeval and struct timespec. The two structures represent a precise
+time quantity with two numbers: seconds and microseconds are used in
+the older and popular struct timeval, and seconds and nanoseconds are
+used in the newer struct timespec. The kernel exports four helper
+functions to convert time values expressed as jiffies to and from
+those structures:
+#+begin_src c
+#include <linux/time.h>
+
+
+unsigned long timespec_to_jiffies(struct timespec *value);
+void jiffies_to_timespec(unsigned long jiffies, struct timespec *value);
+unsigned long timeval_to_jiffies(struct timeval *value);
+void jiffies_to_timeval(unsigned long jiffies, struct timeval *value);
+
+<linux/time.h>
+ struct timeval {
+         __kernel_time_t         tv_sec;         /* seconds */
+         __kernel_suseconds_t    tv_usec;        /* microseconds */
+ };
+
+ struct timespec {
+         __kernel_time_t tv_sec;                 /* seconds */
+         long            tv_nsec;                /* nanoseconds */
+ };
+
+<kernel/time.c>
+/*
+ * The TICK_NSEC - 1 rounds up the value to the next resolution.  Note
+ * that a remainder subtract here would not do the right thing as the
+ * resolution values don't fall on second boundries.  I.e. the line:
+ * nsec -= nsec % TICK_NSEC; is NOT a correct resolution rounding.
+ *
+ * Rather, we just shift the bits off the right.
+ *
+ * The >> (NSEC_JIFFIE_SC - SEC_JIFFIE_SC) converts the scaled nsec
+ * value to a scaled second value.
+ */
+unsigned long
+timespec_to_jiffies(const struct timespec *value)
+{
+	unsigned long sec = value->tv_sec;
+	long nsec = value->tv_nsec + TICK_NSEC - 1;
+
+	if (sec >= MAX_SEC_IN_JIFFIES){
+		sec = MAX_SEC_IN_JIFFIES;
+		nsec = 0;
+	}
+	return (((u64)sec * SEC_CONVERSION) +
+		(((u64)nsec * NSEC_CONVERSION) >>
+		 (NSEC_JIFFIE_SC - SEC_JIFFIE_SC))) >> SEC_JIFFIE_SC;
+
+}
+EXPORT_SYMBOL(timespec_to_jiffies);
+
+void
+jiffies_to_timespec(const unsigned long jiffies, struct timespec *value)
+{
+	/*
+	 * Convert jiffies to nanoseconds and separate with
+	 * one divide.
+	 */
+	u32 rem;
+	value->tv_sec = div_u64_rem((u64)jiffies * TICK_NSEC,
+				    NSEC_PER_SEC, &rem);
+	value->tv_nsec = rem;
+}
+EXPORT_SYMBOL(jiffies_to_timespec);
+
+/* Same for "timeval"
+ *
+ * Well, almost.  The problem here is that the real system resolution is
+ * in nanoseconds and the value being converted is in micro seconds.
+ * Also for some machines (those that use HZ = 1024, in-particular),
+ * there is a LARGE error in the tick size in microseconds.
+
+ * The solution we use is to do the rounding AFTER we convert the
+ * microsecond part.  Thus the USEC_ROUND, the bits to be shifted off.
+ * Instruction wise, this should cost only an additional add with carry
+ * instruction above the way it was done above.
+ */
+unsigned long
+timeval_to_jiffies(const struct timeval *value)
+{
+	unsigned long sec = value->tv_sec;
+	long usec = value->tv_usec;
+
+	if (sec >= MAX_SEC_IN_JIFFIES){
+		sec = MAX_SEC_IN_JIFFIES;
+		usec = 0;
+	}
+	return (((u64)sec * SEC_CONVERSION) +
+		(((u64)usec * USEC_CONVERSION + USEC_ROUND) >>
+		 (USEC_JIFFIE_SC - SEC_JIFFIE_SC))) >> SEC_JIFFIE_SC;
+}
+EXPORT_SYMBOL(timeval_to_jiffies);
+
+void jiffies_to_timeval(const unsigned long jiffies, struct timeval *value)
+{
+	/*
+	 * Convert jiffies to nanoseconds and separate with
+	 * one divide.
+	 */
+	u32 rem;
+
+	value->tv_sec = div_u64_rem((u64)jiffies * TICK_NSEC,
+				    NSEC_PER_SEC, &rem);
+	value->tv_usec = rem / NSEC_PER_USEC;
+}
+EXPORT_SYMBOL(jiffies_to_timeval);
+
+
+<linux/jiffies.h>
+
+/*
+ * We want to do realistic conversions of time so we need to use the same
+ * values the update wall clock code uses as the jiffies size.  This value
+ * is: TICK_NSEC (which is defined in timex.h).  This
+ * is a constant and is in nanoseconds.  We will use scaled math
+ * with a set of scales defined here as SEC_JIFFIE_SC,  USEC_JIFFIE_SC and
+ * NSEC_JIFFIE_SC.  Note that these defines contain nothing but
+ * constants and so are computed at compile time.  SHIFT_HZ (computed in
+ * timex.h) adjusts the scaling for different HZ values.
+
+ * Scaled math???  What is that?
+ *
+ * Scaled math is a way to do integer math on values that would,
+ * otherwise, either overflow, underflow, or cause undesired div
+ * instructions to appear in the execution path.  In short, we "scale"
+ * up the operands so they take more bits (more precision, less
+ * underflow), do the desired operation and then "scale" the result back
+ * by the same amount.  If we do the scaling by shifting we avoid the
+ * costly mpy and the dastardly div instructions.
+
+ * Suppose, for example, we want to convert from seconds to jiffies
+ * where jiffies is defined in nanoseconds as NSEC_PER_JIFFIE.  The
+ * simple math is: jiff = (sec * NSEC_PER_SEC) / NSEC_PER_JIFFIE; We
+ * observe that (NSEC_PER_SEC / NSEC_PER_JIFFIE) is a constant which we
+ * might calculate at compile time, however, the result will only have
+ * about 3-4 bits of precision (less for smaller values of HZ).
+ *
+ * So, we scale as follows:
+ * jiff = (sec) * (NSEC_PER_SEC / NSEC_PER_JIFFIE);
+ * jiff = ((sec) * ((NSEC_PER_SEC * SCALE)/ NSEC_PER_JIFFIE)) / SCALE;
+ * Then we make SCALE a power of two so:
+ * jiff = ((sec) * ((NSEC_PER_SEC << SCALE)/ NSEC_PER_JIFFIE)) >> SCALE;
+ * Now we define:
+ * #define SEC_CONV = ((NSEC_PER_SEC << SCALE)/ NSEC_PER_JIFFIE))
+ * jiff = (sec * SEC_CONV) >> SCALE;
+ *
+ * Often the math we use will expand beyond 32-bits so we tell C how to
+ * do this and pass the 64-bit result of the mpy through the ">> SCALE"
+ * which should take the result back to 32-bits.  We want this expansion
+ * to capture as much precision as possible.  At the same time we don't
+ * want to overflow so we pick the SCALE to avoid this.  In this file,
+ * that means using a different scale for each range of HZ values (as
+ * defined in timex.h).
+ *
+ * For those who want to know, gcc will give a 64-bit result from a "*"
+ * operator if the result is a long long AND at least one of the
+ * operands is cast to long long (usually just prior to the "*" so as
+ * not to confuse it into thinking it really has a 64-bit operand,
+ * which, buy the way, it can do, but it takes more code and at least 2
+ * mpys).
+
+ * We also need to be aware that one second in nanoseconds is only a
+ * couple of bits away from overflowing a 32-bit word, so we MUST use
+ * 64-bits to get the full range time in nanoseconds.
+
+ */
+
+/*
+ * Here are the scales we will use.  One for seconds, nanoseconds and
+ * microseconds.
+ *
+ * Within the limits of cpp we do a rough cut at the SEC_JIFFIE_SC and
+ * check if the sign bit is set.  If not, we bump the shift count by 1.
+ * (Gets an extra bit of precision where we can use it.)
+ * We know it is set for HZ = 1024 and HZ = 100 not for 1000.
+ * Haven't tested others.
+
+ * Limits of cpp (for #if expressions) only long (no long long), but
+ * then we only need the most signicant bit.
+ */
+
+#define SEC_JIFFIE_SC (31 - SHIFT_HZ)
+#if !((((NSEC_PER_SEC << 2) / TICK_NSEC) << (SEC_JIFFIE_SC - 2)) & 0x80000000)
+#undef SEC_JIFFIE_SC
+#define SEC_JIFFIE_SC (32 - SHIFT_HZ)
+#endif
+#define NSEC_JIFFIE_SC (SEC_JIFFIE_SC + 29)
+#define USEC_JIFFIE_SC (SEC_JIFFIE_SC + 19)
+#define SEC_CONVERSION ((unsigned long)((((u64)NSEC_PER_SEC << SEC_JIFFIE_SC) +\
+                                TICK_NSEC -1) / (u64)TICK_NSEC))
+
+#define NSEC_CONVERSION ((unsigned long)((((u64)1 << NSEC_JIFFIE_SC) +\
+                                        TICK_NSEC -1) / (u64)TICK_NSEC))
+#define USEC_CONVERSION  \
+                    ((unsigned long)((((u64)NSEC_PER_USEC << USEC_JIFFIE_SC) +\
+                                        TICK_NSEC -1) / (u64)TICK_NSEC))
+/*
+ * USEC_ROUND is used in the timeval to jiffie conversion.  See there
+ * for more details.  It is the scaled resolution rounding value.  Note
+ * that it is a 64-bit value.  Since, when it is applied, we are already
+ * in jiffies (albit scaled), it is nothing but the bits we will shift
+ * off.
+ */
+#define USEC_ROUND (u64)(((u64)1 << USEC_JIFFIE_SC) - 1)
+/*
+ * The maximum jiffie value is (MAX_INT >> 1).  Here we translate that
+ * into seconds.  The 64-bit case will overflow if we are not careful,
+ * so use the messy SH_DIV macro to do it.  Still all constants.
+ */
+#if BITS_PER_LONG < 64
+# define MAX_SEC_IN_JIFFIES \
+	(long)((u64)((u64)MAX_JIFFY_OFFSET * TICK_NSEC) / NSEC_PER_SEC)
+#else	/* take care of overflow on 64 bits machines */
+# define MAX_SEC_IN_JIFFIES \
+	(SH_DIV((MAX_JIFFY_OFFSET >> SEC_JIFFIE_SC) * TICK_NSEC, NSEC_PER_SEC, 1) - 1)
+
+#endif
+
+<linux/time.h>
+/* Parameters used to convert the timespec values: */
+#define MSEC_PER_SEC	1000L
+#define USEC_PER_MSEC	1000L
+#define NSEC_PER_USEC	1000L
+#define NSEC_PER_MSEC	1000000L
+#define USEC_PER_SEC	1000000L
+#define NSEC_PER_SEC	1000000000L
+#define FSEC_PER_SEC	1000000000000000LL
+#+end_src
+
+
+**** Ref
+#+begin_src c
+<linux/jiffies.h>
+/* some arch's have a small-data section that can be accessed register-relative
+ * but that can only take up to, say, 4-byte variables. jiffies being part of
+ * an 8-byte variable may not be correctly accessed unless we force the issue
+ */
+#define __jiffy_data  __attribute__((section(".data")))
+
+/*
+ * The 64-bit value is not atomic - you MUST NOT read it
+ * without sampling the sequence number in xtime_lock.
+ * get_jiffies_64() will do this for you as appropriate.
+ */
+extern u64 __jiffy_data jiffies_64;
+extern unsigned long volatile __jiffy_data jiffies;
+
+#if (BITS_PER_LONG < 64)
+u64 get_jiffies_64(void);
+#else
+static inline u64 get_jiffies_64(void)
+{
+	return (u64)jiffies;
+}
+#endif
+#+end_src
+
+#+begin_src c
+#include <asm/param.h>			/* for HZ */
+
+#ifdef __KERNEL__
+# define HZ		CONFIG_HZ	/* Internal kernel timer frequency */
+# define USER_HZ	100		/* User interfaces are in "ticks" */
+# define CLOCKS_PER_SEC	(USER_HZ)	/* like times() */
+#else
+# define HZ		100
+#endif
+#+end_src
+
+In =dm816x_defconfig=
+#+begin_src sh
+CONFIG_HZ=100
+#+end_src
+
+*** Sleeping
+    *chapter 6.2*
+1. The first of these rules is: never sleep when you are running in an
+   atomic context. An atomic context is simply a state where multiple
+   steps must be performed without any sort of concurrent access. What
+   that means, with regard to sleeping, is that your driver cannot
+   sleep while holding a spinlock, seqlock, or RCU lock. You also
+   cannot sleep if you have disabled interrupts. It is legal to sleep
+   while holding a semaphore, but you should look very carefully at
+   any code that does so.
+2. Another thing to remember with sleeping is that, when you wake up,
+   you never know how long your process may have been out of the CPU
+   or what may have changed in the mean time. You also do not usually
+   know if another process may have been sleeping for the same event;
+   that process may wake before you and grab whatever resource you
+   were waiting for. 
+3. One other relevant point, of course, is that your process cannot
+   sleep unless it is assured that somebody else, somewhere, will wake
+   it up. 
+
+In Linux, a wait queue is managed by means of a "wait queue head," a
+structure of type =wait_queue_head_t=, which is defined in
+<linux/wait.h>. A wait queue head can be defined and initialized
+statically with:
+#+begin_src c
+DECLARE_WAIT_QUEUE_HEAD(name);
+#+end_src
+
+or dynamicly as follows:
+#+begin_src c
+wait_queue_head_t my_queue;
+init_waitqueue_head(&my_queue);
+#+end_src
+
+
+**** API
+#+begin_src c
+#include <linux/wait.h>
+typedef struct { /* ... */ } wait_queue_head_t;
+void init_waitqueue_head(wait_queue_head_t *queue);
+
+DECLARE_WAIT_QUEUE_HEAD(queue);
+    The defined type for Linux wait queues. A wait_queue_head_t must
+    be explicitly initialized with either init_waitqueue_head at
+    runtime or DECLARE_WAIT_QUEUE_HEAD at compile time.
+
+void wait_event(wait_queue_head_t q, int condition);
+int wait_event_interruptible(wait_queue_head_t q, int condition);
+int wait_event_timeout(wait_queue_head_t q, int condition, int time);
+int wait_event_interruptible_timeout(wait_queue_head_t q, int condition, int time);
+    Cause the process to sleep on the given queue until the given condition evaluates to a true value.
+
+void wake_up(struct wait_queue_head_t **q);
+void wake_up_interruptible(struct wait_queue_head_t **q);
+void wake_up_nr(struct wait_queue_head_t **q, int nr);
+void wake_up_interruptible_nr(struct wait_queue_head_t **q, int nr);
+void wake_up_all(struct wait_queue_head_t **q);
+void wake_up_interruptible_all(struct wait_queue_head_t **q);
+void wake_up_interruptible_sync(struct wait_queue_head_t **q);
+    Wake processes that are sleeping on the queue q. The _interruptible form wakes only interruptible processes. Normally, only one exclusive waiter is awakened, but that behavior can be changed with the _nr or _all forms. The _sync version does not reschedule the CPU before returning.
+
+#include <linux/sched.h>
+set_current_state(int state);
+    Sets the execution state of the current process. TASK_RUNNING means it is ready to run, while the sleep states are TASK_INTERRUPTIBLE and TASK_UNINTERRUPTIBLE.
+
+void schedule(void);
+    Selects a runnable process from the run queue. The chosen process can be current or a different one.
+
+typedef struct { /* ... */ } wait_queue_t;
+init_waitqueue_entry(wait_queue_t *entry, struct task_struct *task);
+    The wait_queue_t type is used to place a process onto a wait queue.
+
+void prepare_to_wait(wait_queue_head_t *queue, wait_queue_t *wait, int state);
+void prepare_to_wait_exclusive(wait_queue_head_t *queue, wait_queue_t *wait, int state);
+void finish_wait(wait_queue_head_t *queue, wait_queue_t *wait);
+    Helper functions that can be used to code a manual sleep.
+
+void sleep_on(wait_queue_head_t *queue);
+void interruptible_sleep_on(wait_queue_head_t *queue);
+    Obsolete and deprecated functions that unconditionally put the current process to sleep.
+#+end_src
+**** Ref
+#+begin_src c
+typedef struct __wait_queue wait_queue_t;
+typedef int (*wait_queue_func_t)(wait_queue_t *wait, unsigned mode, int flags, void *key);
+int default_wake_function(wait_queue_t *wait, unsigned mode, int flags, void *key);
+
+struct __wait_queue {
+	unsigned int flags;
+#define WQ_FLAG_EXCLUSIVE	0x01
+	void *private;
+	wait_queue_func_t func;
+	struct list_head task_list;
+};
+
+struct __wait_queue_head {
+	spinlock_t lock;
+	struct list_head task_list;
+};
+typedef struct __wait_queue_head wait_queue_head_t;
+#+end_src
+*** Tasklets
+ *chapter 7.5*
+A tasklet exists as a data structure that must be initialized before
+use. Initialization can be performed by calling a specific function or
+by declaring the structure using certain macros:
+#+begin_src c
+#include <linux/interrupt.h>
+
+struct tasklet_struct {
+      /* ... */
+      void (*func)(unsigned long);
+      unsigned long data;
+};
+
+void tasklet_init(struct tasklet_struct *t, void (*func)(unsigned long), unsigned long data);
+DECLARE_TASKLET(name, func, data);
+DECLARE_TASKLET_DISABLED(name, func, data);
+#+end_src
+
+Tasklets offer a number of interesting features:
++ A tasklet can be disabled and re-enabled later; it won't be executed until it is enabled as many times as it has been disabled.
++ Just like timers, a tasklet can reregister itself.
++ A tasklet can be scheduled to execute at normal priority or high priority. The latter group is always executed first.
++ Tasklets may be run immediately if the system is not under heavy load but never later than the next timer tick.
++ A tasklets can be concurrent with other tasklets but is strictly
+  serialized with respect to itself—the same tasklet never runs
+     simultaneously on more than one processor. Also, as already
+     noted, a tasklet always runs on the same CPU that schedules it.
+
+
+**** API
+#+begin_src c
+#include <linux/interrupt.h>
+DECLARE_TASKLET(name, func, data);
+DECLARE_TASKLET_DISABLED(name, func, data);
+void tasklet_init(struct tasklet_struct *t, void (*func)(unsigned long), unsigned long data);
+    The first two macros declare a tasklet structure, while the
+tasklet_init function initializes a tasklet structure that has been
+obtained by allocation or other means. The second DECLARE macro marks
+the tasklet as disabled.
+
+void tasklet_disable(struct tasklet_struct *t);
+void tasklet_disable_nosync(struct tasklet_struct *t);
+void tasklet_enable(struct tasklet_struct *t);
+    Disables and reenables a tasklet. Each disable must be matched
+with an enable (you can disable the tasklet even if it's already
+disabled). The function tasklet_disable waits for the tasklet to
+terminate if it is running on another CPU. The nosync version doesn't
+take this extra step.
+
+void tasklet_schedule(struct tasklet_struct *t);
+void tasklet_hi_schedule(struct tasklet_struct *t);
+    Schedules a tasklet to run, either as a "normal" tasklet or a
+high-priority one. When soft interrupts are executed, high-priority
+tasklets are dealt with first, while normal tasklets run last.
+
+void tasklet_kill(struct tasklet_struct *t);
+    Removes the tasklet from the list of active ones, if it's
+    scheduled to run. Like tasklet_disable, the function may block on
+    SMP systems waiting for the tasklet to terminate if it's currently
+    running on another CPU.
+#+end_src
+
+**** Ref
+#+begin_src c
+#include <linux/interrupt.h>
+/* Tasklets --- multithreaded analogue of BHs.
+
+   Main feature differing them of generic softirqs: tasklet
+   is running only on one CPU simultaneously.
+
+   Main feature differing them of BHs: different tasklets
+   may be run simultaneously on different CPUs.
+
+   Properties:
+   * If tasklet_schedule() is called, then tasklet is guaranteed
+     to be executed on some cpu at least once after this.
+   * If the tasklet is already scheduled, but its excecution is still not
+     started, it will be executed only once.
+   * If this tasklet is already running on another CPU (or schedule is called
+     from tasklet itself), it is rescheduled for later.
+   * Tasklet is strictly serialized wrt itself, but not
+     wrt another tasklets. If client needs some intertask synchronization,
+     he makes it with spinlocks.
+ */
+
+struct tasklet_struct
+{
+	struct tasklet_struct *next;
+	unsigned long state;
+	atomic_t count;
+	void (*func)(unsigned long);
+	unsigned long data;
+};
+
+#define DECLARE_TASKLET(name, func, data) \
+struct tasklet_struct name = { NULL, 0, ATOMIC_INIT(0), func, data }
+
+#define DECLARE_TASKLET_DISABLED(name, func, data) \
+struct tasklet_struct name = { NULL, 0, ATOMIC_INIT(1), func, data }
+#+end_src
+
+*** Workqueues
+ *chapter 7.6*
+ The key difference between the two is that tasklets execute quickly,
+ for a short period of time, and in atomic mode, while workqueue
+ functions may have higher latency but need not be atomic. Each
+ mechanism has situations where it is appropriate.
+**** Normal queue
+1. create a workqueue
+ Workqueues have a type of struct workqueue_struct, which is defined in
+ =<linux/workqueue.h>=. A workqueue must be explicitly created before
+ use, using one of the following two functions:
+#+begin_src c
+struct workqueue_struct *create_workqueue(const char *name);
+struct workqueue_struct *create_singlethread_workqueue(const char *name);
+#+end_src
+
+2. submit a task to a workqueue
+  + To submit a task to a workqueue, you need to fill in a work_struct
+    structure. This can be done at compile time as follows:
+#+begin_src c
+DECLARE_WORK(name, void (*function)(void *), void *data);
+#+end_src
+  + If you need to set up the work_struct structure at runtime, use the following two macros:
+#+begin_src c
+INIT_WORK(struct work_struct *work, void (*function)(void *), void *data);
+PREPARE_WORK(struct work_struct *work, void (*function)(void *), void *data);
+#+end_src
+  + There are two functions for submitting work to a workqueue:
+#+begin_src c
+int queue_work(struct workqueue_struct *queue, struct work_struct *work);
+int queue_delayed_work(struct workqueue_struct *queue, struct delayed_work *work, unsigned long delay);
+#+end_src
+
+3. cancel a pending workqueue entry
+#+begin_src c
+Should you need to cancel a pending workqueue entry, you may call:
+int cancel_delayed_work(struct work_struct *work);
+
+To be absolutely sure that the work function is not running anywhere in the system after cancel_delayed_work returns 0, you must follow that call with a call to:
+void flush_workqueue(struct workqueue_struct *queue);
+#+end_src
+
+4. destroy a workqueue
+#+begin_src c
+void destroy_workqueue(struct workqueue_struct *queue);
+#+end_src
+**** Shared Queue
+If you only submit tasks to the queue occasionally, it may be more
+efficient to simply use the shared, default workqueue that is provided
+by the kernel. If you use this queue, however, you must be aware that
+you will be sharing it with others. 
+
+#+begin_src c
+prepare_to_wait(&jiq_wait, &wait, TASK_INTERRUPTIBLE);
+schedule_work(&jiq_work);
+schedule(  );
+finish_wait(&jiq_wait, &wait);
+
+#+end_src
+**** API
+#+begin_src c
+#include <linux/workqueue.h>
+
+struct workqueue_struct;
+struct work_struct;
+    The structures representing a workqueue and a work entry, respectively.
+
+struct workqueue_struct *create_workqueue(const char *name);
+struct workqueue_struct *create_singlethread_workqueue(const char *name);
+void destroy_workqueue(struct workqueue_struct *queue);
+    Functions for creating and destroying workqueues. A call to create_workqueue creates a queue with a worker thread on each processor in the system; instead, create_singlethread_workqueue creates a workqueue with a single worker process.
+
+DECLARE_WORK(name, void (*function)(void *));
+INIT_WORK(struct work_struct *work, void (*function)(void *);
+PREPARE_WORK(struct work_struct *work, void (*function)(void *));
+    Macros that declare and initialize workqueue entries.
+
+int queue_work(struct workqueue_struct *queue, struct work_struct *work);
+int queue_delayed_work(struct workqueue_struct *queue, struct delayed_work *work, unsigned long delay);
+    Functions that queue work for execution from a workqueue.
+
+bool cancel_delayed_work_sync(struct delayed_work *dwork);
+void flush_workqueue(struct workqueue_struct *queue);
+    Use cancel_delayed_work to remove an entry from a workqueue; flush_workqueue ensures that no workqueue entries are running anywhere in the system.
+
+int schedule_work(struct work_struct *work);
+int schedule_delayed_work(struct delayed_work *work, unsigned long delay);
+void flush_scheduled_work(void);
+    Functions for working with the shared workqueue.
+#+end_src
+
+**** Ref
+#+begin_src c
+#include <linux/workqueue.h>
+
+typedef void (*work_func_t)(struct work_struct *work);
+
+struct work_struct {
+	atomic_long_t data;
+	struct list_head entry;
+	work_func_t func;
+#ifdef CONFIG_LOCKDEP
+	struct lockdep_map lockdep_map;
+#endif
+};
+
+struct delayed_work {
+	struct work_struct work;
+	struct timer_list timer;
+};
+
+#define create_workqueue(name)					\
+	alloc_workqueue((name), WQ_MEM_RECLAIM, 1)
+#define create_freezeable_workqueue(name)			\
+	alloc_workqueue((name), WQ_FREEZEABLE | WQ_UNBOUND | WQ_MEM_RECLAIM, 1)
+#define create_singlethread_workqueue(name)			\
+	alloc_workqueue((name), WQ_UNBOUND | WQ_MEM_RECLAIM, 1)
+
+extern void destroy_workqueue(struct workqueue_struct *wq);
+
+
+
+#+end_src
+
+
+*** Kernel Timers
+ *Chapter 7.4*
+
+
+
+** =kdataalign.c=
+
+** =kdatasize.c=
+
+** =sleepy.c=
+
+** =jit.c=
+
+** =seq.c=
+
+** =silly.c=
+
+* misc-progs
+
+* skull
+
+* scull
+
+* short
+
+* scullc
+
+* sculld
+
+* scullp
+
+* scullv
+
+* simple
+
+* shortprint
+
+* pci
+
+* usb
+
+* lddbus
+
+* sbull
+
+* snull
+
+* tty
