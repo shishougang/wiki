@@ -44,6 +44,263 @@ endif
 |-- XXX.o
 #+end_src
 
+** Some important Data Structures
+*** File Operation
+The structure, defined in <linux/fs.h>, is a collection of function
+pointers. Each open file (represented internally by a file structure,
+which we will examine shortly) is associated with its own set of
+functions (by including a field called f_op that points to a
+file_operations structure).
+
+
+struct module *owner
+
+    The first file_operations field is not an operation at all; it is a pointer to the module that "owns" the structure. This field is used to prevent the module from being unloaded while its operations are in use. Almost all the time, it is simply initialized to THIS_MODULE, a macro defined in <linux/module.h>.
+
+loff_t (*llseek) (struct file *, loff_t, int);
+
+    The llseek method is used to change the current read/write position in a file, and the new position is returned as a (positive) return value. The loff_t parameter is a "long offset" and is at least 64 bits wide even on 32-bit platforms. Errors are signaled by a negative return value. If this function pointer is NULL, seek calls will modify the position counter in the file structure (described in Section 3.3.2) in potentially unpredictable ways.
+
+ssize_t (*read) (struct file *, char _ _user *, size_t, loff_t *);
+
+    Used to retrieve data from the device. A null pointer in this position causes the read system call to fail with -EINVAL ("Invalid argument"). A nonnegative return value represents the number of bytes successfully read (the return value is a "signed size" type, usually the native integer type for the target platform).
+
+ssize_t (*aio_read)(struct kiocb *, char _ _user *, size_t, loff_t);
+
+    Initiates an asynchronous read—a read operation that might not complete before the function returns. If this method is NULL, all operations will be processed (synchronously) by read instead.
+
+ssize_t (*write) (struct file *, const char _ _user *, size_t, loff_t *);
+
+    Sends data to the device. If NULL, -EINVAL is returned to the program calling the write system call. The return value, if nonnegative, represents the number of bytes successfully written.
+
+ssize_t (*aio_write)(struct kiocb *, const char _ _user *, size_t, loff_t *);
+
+    Initiates an asynchronous write operation on the device.
+
+int (*readdir) (struct file *, void *, filldir_t);
+
+    This field should be NULL for device files; it is used for reading directories and is useful only for filesystems.
+
+unsigned int (*poll) (struct file *, struct poll_table_struct *);
+
+    The poll method is the back end of three system calls: poll, epoll, and select, all of which are used to query whether a read or write to one or more file descriptors would block. The poll method should return a bit mask indicating whether non-blocking reads or writes are possible, and, possibly, provide the kernel with information that can be used to put the calling process to sleep until I/O becomes possible. If a driver leaves its poll method NULL, the device is assumed to be both readable and writable without blocking.
+
+int (*ioctl) (struct inode *, struct file *, unsigned int, unsigned long);
+
+    The ioctl system call offers a way to issue device-specific commands (such as formatting a track of a floppy disk, which is neither reading nor writing). Additionally, a few ioctl commands are recognized by the kernel without referring to the fops table. If the device doesn't provide an ioctl method, the system call returns an error for any request that isn't predefined (-ENOTTY, "No such ioctl for device").
+
+int (*mmap) (struct file *, struct vm_area_struct *);
+
+    mmap is used to request a mapping of device memory to a process's address space. If this method is NULL, the mmap system call returns -ENODEV.
+
+int (*open) (struct inode *, struct file *);
+
+    Though this is always the first operation performed on the device file, the driver is not required to declare a corresponding method. If this entry is NULL, opening the device always succeeds, but your driver isn't notified.
+
+int (*flush) (struct file *);
+
+    The flush operation is invoked when a process closes its copy of a file descriptor for a device; it should execute (and wait for) any outstanding operations on the device. This must not be confused with the fsync operation requested by user programs. Currently, flush is used in very few drivers; the SCSI tape driver uses it, for example, to ensure that all data written makes it to the tape before the device is closed. If flush is NULL, the kernel simply ignores the user application request.
+
+int (*release) (struct inode *, struct file *);
+
+    This operation is invoked when the file structure is being released. Like open, release can be NULL.
+
+        Note that release isn't invoked every time a process calls close. Whenever a file structure is shared (for example, after a fork or a dup), release won't be invoked until all copies are closed. If you need to flush pending data when any copy is closed, you should implement the flush method.
+
+
+int (*fsync) (struct file *, struct dentry *, int);
+
+    This method is the back end of the fsync system call, which a user calls to flush any pending data. If this pointer is NULL, the system call returns -EINVAL.
+
+int (*aio_fsync)(struct kiocb *, int);
+
+    This is the asynchronous version of the fsync method.
+
+int (*fasync) (int, struct file *, int);
+
+    This operation is used to notify the device of a change in its FASYNC flag. Asynchronous notification is an advanced topic and is described in Chapter 6. The field can be NULL if the driver doesn't support asynchronous notification.
+
+int (*lock) (struct file *, int, struct file_lock *);
+
+    The lock method is used to implement file locking; locking is an indispensable feature for regular files but is almost never implemented by device drivers.
+
+ssize_t (*readv) (struct file *, const struct iovec *, unsigned long, loff_t *);
+
+
+ssize_t (*writev) (struct file *, const struct iovec *, unsigned long, loff_t *);
+
+    These methods implement scatter/gather read and write operations. Applications occasionally need to do a single read or write operation involving multiple memory areas; these system calls allow them to do so without forcing extra copy operations on the data. If these function pointers are left NULL, the read and write methods are called (perhaps more than once) instead.
+
+ssize_t (*sendfile)(struct file *, loff_t *, size_t, read_actor_t, void *);
+
+    This method implements the read side of the sendfile system call, which moves the data from one file descriptor to another with a minimum of copying. It is used, for example, by a web server that needs to send the contents of a file out a network connection. Device drivers usually leave sendfile NULL.
+
+ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *,
+
+
+int);
+
+    sendpage is the other half of sendfile; it is called by the kernel to send data, one page at a time, to the corresponding file. Device drivers do not usually implement sendpage.
+
+unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned
+
+
+long, unsigned long, unsigned long);
+
+    The purpose of this method is to find a suitable location in the process's address space to map in a memory segment on the underlying device. This task is normally performed by the memory management code; this method exists to allow drivers to enforce any alignment requirements a particular device may have. Most drivers can leave this method NULL.
+
+int (*check_flags)(int)
+
+    This method allows a module to check the flags passed to an fcntl(F_SETFL...) call.
+
+int (*dir_notify)(struct file *, unsigned long);
+
+    This method is invoked when an application uses fcntl to request directory change notifications. It is useful only to filesystems; drivers need not implement dir_notify.
+
+The scull device driver implements only the most important device methods. Its file_operations structure is initialized as follows:
+
+struct file_operations scull_fops = {
+
+    .owner =    THIS_MODULE,
+
+    .llseek =   scull_llseek,
+
+    .read =     scull_read,
+
+    .write =    scull_write,
+
+    .ioctl =    scull_ioctl,
+
+    .open =     scull_open,
+
+    .release =  scull_release,
+
+};
+
+*** The file Structure
+struct file, defined in <linux/fs.h>, is the second most important
+data structure used in device drivers. Note that a file has nothing to
+do with the FILE pointers of user-space programs. A FILE is defined in
+the C library and never appears in kernel code. A struct file, on the
+other hand, is a kernel structure that never appears in user programs.
+
+mode_t f_mode;
+
+    The file mode identifies the file as either readable or writable (or both), by means of the bits FMODE_READ and FMODE_WRITE. You might want to check this field for read/write permission in your open or ioctl function, but you don't need to check permissions for read and write, because the kernel checks before invoking your method. An attempt to read or write when the file has not been opened for that type of access is rejected without the driver even knowing about it.
+
+loff_t f_pos;
+
+    The current reading or writing position. loff_t is a 64-bit value on all platforms (long long in gcc terminology). The driver can read this value if it needs to know the current position in the file but should not normally change it; read and write should update a position using the pointer they receive as the last argument instead of acting on filp->f_pos directly. The one exception to this rule is in the llseek method, the purpose of which is to change the file position.
+
+unsigned int f_flags;
+
+    These are the file flags, such as O_RDONLY, O_NONBLOCK, and O_SYNC. A driver should check the O_NONBLOCK flag to see if nonblocking operation has been requested (we discuss nonblocking I/O in Section 6.2.3); the other flags are seldom used. In particular, read/write permission should be checked using f_mode rather than f_flags. All the flags are defined in the header <linux/fcntl.h>.
+
+struct file_operations *f_op;
+
+    The operations associated with the file. The kernel assigns the pointer as part of its implementation of open and then reads it when it needs to dispatch any operations. The value in filp->f_op is never saved by the kernel for later reference; this means that you can change the file operations associated with your file, and the new methods will be effective after you return to the caller. For example, the code for open associated with major number 1 (/dev/null, /dev/zero, and so on) substitutes the operations in filp->f_op depending on the minor number being opened. This practice allows the implementation of several behaviors under the same major number without introducing overhead at each system call. The ability to replace the file operations is the kernel equivalent of "method overriding" in object-oriented programming.
+
+void *private_data;
+
+    The open system call sets this pointer to NULL before calling the open method for the driver. You are free to make its own use of the field or to ignore it; you can use the field to point to allocated data, but then you must remember to free that memory in the release method before the file structure is destroyed by the kernel. private_data is a useful resource for preserving state information across system calls and is used by most of our sample modules.
+
+struct dentry *f_dentry;
+
+    The directory entry (dentry) structure associated with the file. Device driver writers normally need not concern themselves with dentry structures, other than to access the inode structure as filp->f_dentry->d_inode.
+
+*** The inode Structure
+The inode structure is used by the kernel internally to represent files. Therefore, it is different from the file structure that represents an open file descriptor. There can be numerous file structures representing multiple open descriptors on a single file, but they all point to a single inode structure.
+
+The inode structure contains a great deal of information about the file. As a general rule, only two fields of this structure are of interest for writing driver code:
+
+
+dev_t i_rdev;
+
+    For inodes that represent device files, this field contains the actual device number.
+
+struct cdev *i_cdev;
+
+    struct cdev is the kernel's internal structure that represents char devices; this field contains a pointer to that structure when the inode refers to a char device file.
+
+The type of i_rdev changed over the course of the 2.5 development series, breaking a lot of drivers. As a way of encouraging more portable programming, the kernel developers have added two macros that can be used to obtain the major and minor number from an inode:
+
+unsigned int iminor(struct inode *inode);
+
+unsigned int imajor(struct inode *inode);
+
+*** The dentry Structure
+
+#+begin_src c
+<linux/dcache.h>
+struct dentry {
+	atomic_t d_count;
+	unsigned int d_flags;		/* protected by d_lock */
+	spinlock_t d_lock;		/* per dentry lock */
+	int d_mounted;
+	struct inode *d_inode;		/* Where the name belongs to - NULL is
+					 * negative */
+	/*
+	 * The next three fields are touched by __d_lookup.  Place them here
+	 * so they all fit in a cache line.
+	 */
+	struct hlist_node d_hash;	/* lookup hash list */
+	struct dentry *d_parent;	/* parent directory */
+	struct qstr d_name;
+
+	struct list_head d_lru;		/* LRU list */
+	/*
+	 * d_child and d_rcu can share memory
+	 */
+	union {
+		struct list_head d_child;	/* child of parent list */
+	 	struct rcu_head d_rcu;
+	} d_u;
+	struct list_head d_subdirs;	/* our children */
+	struct list_head d_alias;	/* inode alias list */
+	unsigned long d_time;		/* used by d_revalidate */
+	const struct dentry_operations *d_op;
+	struct super_block *d_sb;	/* The root of the dentry tree */
+	void *d_fsdata;			/* fs-specific data */
+
+	unsigned char d_iname[DNAME_INLINE_LEN_MIN];	/* small names */
+};
+#+end_src
+
+
+*** The utsname structure
+#+begin_src c
+<usr/include/sys/utsname.h>
+
+/* Structure describing the system and machine.  */
+struct utsname
+  {
+    /* Name of the implementation of the operating system.  */
+    char sysname[_UTSNAME_SYSNAME_LENGTH];
+
+    /* Name of this node on the network.  */
+    char nodename[_UTSNAME_NODENAME_LENGTH];
+
+    /* Current release level of this implementation.  */
+    char release[_UTSNAME_RELEASE_LENGTH];
+    /* Current version level of this release.  */
+    char version[_UTSNAME_VERSION_LENGTH];
+
+    /* Name of the hardware type the system is running on.  */
+    char machine[_UTSNAME_MACHINE_LENGTH];
+
+#if _UTSNAME_DOMAIN_LENGTH - 0
+    /* Name of the domain of this node on the network.  */
+# ifdef __USE_GNU
+    char domainname[_UTSNAME_DOMAIN_LENGTH];
+# else
+    char __domainname[_UTSNAME_DOMAIN_LENGTH];
+# endif
+#endif
+  };
+
+/* Put information about the system in NAME.  */
+extern int uname (struct utsname *__name) __THROW;
+#+end_src
 ** Files
 *** /proc/moudles
 /proc/moudles 是旧式的, 那种信息的单个文件版本. 其中的条目包含了模块名,
@@ -403,7 +660,11 @@ sudo insmod hellop.ko  howmany=10 whom="what"
 #+end_src
 ** =complete.c=
 *** =struct task_struct *current;=
-  *chapter 2*
+ *chapter 2.3*
+Kernel code can refer to the current process by accessing the global
+item current, defined in =<asm/current.h>=, which yields a pointer to
+struct =task_struct=, defined by =<linux/sched.h>=.
+
 + snippet
 #+begin_src c
 current->pid
@@ -1079,37 +1340,58 @@ the API:
           } while (0)
 #+end_src
 
-2. 
-
-
 3. the diff 
 #+begin_src sh
 18c18
-< #include <linux/config.h>
+< /*#include <linux/config.h>*/
 ---
-> /*#include <linux/config.h>*/
+> #include <linux/config.h>
+56c56
+< static struct delayed_work jiq_work;
+---
+> static struct work_struct jiq_work;
+83c83
+< 	struct clientdata *data = (struct clientdata *) ptr;
+---
+> 	struct clientdata *data = ptr;
 114c114
-< static void jiq_print_wq(void *ptr)
+< static void jiq_print_wq(struct work_struct *ptr)
 ---
-> static void jiq_print_wq(struct work_struct *ptr)
-116a117,118
-> 	struct delayed_work *temp_work;
-> 	temp_work = to_delayed_work(&jiq_work);
-122c124
-< 		schedule_delayed_work(&jiq_work, data->delay);
+> static void jiq_print_wq(void *ptr)
+116,117c116
+< 	/*struct clientdata *data = jiq_data;*/
+< 	
 ---
-> 		schedule_delayed_work(temp_work, data->delay);
-152a155,156
-> 	struct delayed_work *temp_work;
-> 	temp_work = to_delayed_work(&jiq_work);
-160c164
-< 	schedule_delayed_work(&jiq_work, delay);
+> 	struct clientdata *data = (struct clientdata *) ptr;
+119c118
+< 	if (! jiq_print (&jiq_data))
 ---
-> 	schedule_delayed_work(temp_work, delay);
-244c248
-< 	INIT_WORK(&jiq_work, jiq_print_wq, &jiq_data);
+> 	if (! jiq_print (ptr))
+122,123c121,122
+< 	if (jiq_data.delay)
+< 		schedule_delayed_work(&jiq_work, jiq_data.delay);
 ---
-> 	INIT_WORK(&jiq_work, jiq_print_wq);
+> 	if (data->delay)
+> 		schedule_delayed_work(&jiq_work, data->delay);
+125c124
+< 		schedule_work(&jiq_work.work);
+---
+> 		schedule_work(&jiq_work);
+141c140
+< 	schedule_work(&jiq_work.work);
+---
+> 	schedule_work(&jiq_work);
+154d152
+< 
+246,247c244
+< 	printk(KERN_ALERT "jiq init");
+< 	INIT_DELAYED_WORK(&jiq_work, jiq_print_wq);
+---
+> 	INIT_WORK(&jiq_work, jiq_print_wq, &jiq_data);
+253d249
+< 	
+260d255
+< 	printk(KERN_ALERT "jiq_cleanup");
 #+end_src
 
 *** Test 
@@ -1118,6 +1400,19 @@ the API:
     time  delta preempt   pid cpu command
    221012     0       0  3276   4 cat
    221262   250     256     0   4 swapper
+
+jiq_print(&jiq_data);
+nit_timer(&jiq_timer);              /* init the timer structure */
+	jiq_timer.function = jiq_timedout;
+	jiq_timer.data = (unsigned long)&jiq_data;
+	jiq_timer.expires = jiffies + HZ; /* one second */
+static void jiq_timedout(unsigned long ptr)
+{
+	jiq_print((void *)ptr);            /* print a line */
+	wake_up_interruptible(&jiq_wait);  /* awake the process */
+}
+
+
 
 #cat /proc/jiqtasklet 
     time  delta preempt   pid cpu command
@@ -1135,7 +1430,48 @@ the API:
    231361     0     256    25   7 ksoftirqd/7
    231361     0     256    25   7 ksoftirqd/7
 
-#
+	if (jiq_print ((void *) ptr))
+		tasklet_schedule (&jiq_tasklet);
+
+#cat /proc/jiqwq
+    time  delta preempt   pid cpu command
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+    69546     0       0    32   5 events/5
+
+	if (jiq_data.delay)
+		schedule_delayed_work(&jiq_work, jiq_data.delay);
+	else
+		schedule_work(&jiq_work.work);
+
+#cat /proc/jiqwqdelay 
+    time  delta preempt   pid cpu command
+   117793     1       0    33   6 events/6
+   117794     1       0    33   6 events/6
+   117795     1       0    33   6 events/6
+   117796     1       0    33   6 events/6
+   117797     1       0    33   6 events/6
+   117798     1       0    33   6 events/6
+   117799     1       0    33   6 events/6
+   117800     1       0    33   6 events/6
+   117801     1       0    33   6 events/6
+   117802     1       0    33   6 events/6
+
+
+
 #+end_src
 
 *** 创建你的 /proc 文件
@@ -1831,7 +2167,6 @@ prepare_to_wait(&jiq_wait, &wait, TASK_INTERRUPTIBLE);
 schedule_work(&jiq_work);
 schedule(  );
 finish_wait(&jiq_wait, &wait);
-
 #+end_src
 **** API
 #+begin_src c
@@ -1898,52 +2233,856 @@ extern void destroy_workqueue(struct workqueue_struct *wq);
 
 #+end_src
 
-
 *** Kernel Timers
  *Chapter 7.4*
+A kernel timer is a data structure that instructs the kernel to
+execute a user-defined function with a user-defined argument at a
+user-defined time. The implementation resides in =<linux/timer.h>= and
+=kernel/timer.c=.
 
+In fact, kernel timers are run as the result of a "software
+interrupt." When running in this sort of atomic context, your code is
+subject to a number of constraints. Timer functions must be atomic in
+all the ways
+
+A number of actions require the context of a process in order to be
+executed. When you are outside of process context (i.e., in interrupt
+context), you must observe the following rules:
+
++ No access to user space is allowed. Because there is no process context, there is no path to the user space associated with any particular process.
++ The current pointer is not meaningful in atomic mode and cannot be used since the relevant code has no connection with the process that has been interrupted.
++ No sleeping or scheduling may be performed. Atomic code may not
+     call schedule or a form of wait_event, nor may it call any other
+     function that could sleep. For example, calling kmalloc(...,
+     GFP_KERNEL) is against the rules. Semaphores also must not be
+     used since they can sleep
+
+Kernel code can tell if it is running in interrupt context by calling
+the function =in_interrupt( )=, which takes no parameters and returns
+nonzero if the processor is currently running in interrupt context,
+either hardware interrupt or software interrupt.
+
+**** API
+#+begin_src c
+#include <asm/hardirq.h>
+int in_interrupt(void);
+int in_atomic(void);
+    Returns a Boolean value telling whether the calling code is executing in interrupt context or atomic context. Interrupt context is outside of a process context, either during hardware or software interrupt processing. Atomic context is when you can't schedule either an interrupt context or a process's context with a spinlock held.
+
+#include <linux/timer.h>
+struct timer_list {
+        /* ... */
+        unsigned long expires;
+        void (*function)(unsigned long);
+        unsigned long data;
+};
+The expires field represents the jiffies value when the timer is
+        expected to run; at that time, the function function is called
+        with data as an argument.
+
+
+void init_timer(struct timer_list * timer);
+struct timer_list TIMER_INITIALIZER(_function, _expires, _data);
+    This function and the static declaration of the timer structure are the two ways to initialize a timer_list data structure.
+
+void add_timer(struct timer_list * timer);
+    Registers the timer structure to run on the current CPU.
+
+int mod_timer(struct timer_list *timer, unsigned long expires);
+    Changes the expiration time of an already scheduled timer structure. It can also act as an alternative to add_timer.
+
+int timer_pending(struct timer_list * timer);
+Macro that returns a Boolean value stating whether the timer structure is already registered to run.
+
+void del_timer(struct timer_list * timer);
+void del_timer_sync(struct timer_list * timer);
+    Removes a timer from the list of active timers. The latter function ensures that the timer is not currently running on another CPU.
+#+end_src
+**** Ref
+#+begin_src c
+  struct timer_list {
+          /*
+           * All fields that change during normal runtime grouped to the
+           * same cacheline
+           */
+          struct list_head entry;
+          unsigned long expires;
+          struct tvec_base *base;
+  
+          void (*function)(unsigned long);
+          unsigned long data;
+  
+          int slack;
+  
+  #ifdef CONFIG_TIMER_STATS
+          void *start_site;
+          char start_comm[16];
+          int start_pid;
+  #endif
+  #ifdef CONFIG_LOCKDEP
+          struct lockdep_map lockdep_map;
+  #endif
+  };
+#+end_src
 
 
 ** =kdataalign.c=
+*** error and fix
++ error
+#+begin_src sh
+  error: ‘system_utsname’ undeclared (first use in this function)
+#+end_src
++ fix
+#+begin_src c
+  #define system_utsname init_uts_ns.name
+#+end_src
+ Ref:
+#+begin_src c
+<linux/utsname.h>
+extern struct uts_namespace init_uts_ns;
 
+struct uts_namespace {
+	struct kref kref;
+	struct new_utsname name;
+};
+
+struct new_utsname {
+	char sysname[__NEW_UTS_LEN + 1];
+	char nodename[__NEW_UTS_LEN + 1];
+	char release[__NEW_UTS_LEN + 1];
+	char version[__NEW_UTS_LEN + 1];
+	char machine[__NEW_UTS_LEN + 1];
+	char domainname[__NEW_UTS_LEN + 1];
+};
+#+end_src
+
+*** Test
+**** align of char
++ SRC
+#+begin_src c
+  struct c   {char c;  char      t;} c;
+  struct s   {char c;  short     t;} s;
+  struct i   {char c;  int       t;} i;
+  struct l   {char c;  long      t;} l;
+  struct ll  {char c;  long long t;} ll;
+  struct p   {char c;  void *    t;} p;
+  struct u1b {char c;  __u8      t;} u1b;
+  struct u2b {char c;  __u16     t;} u2b;
+  struct u4b {char c;  __u32     t;} u4b;
+  struct u8b {char c;  __u64     t;} u8b;
+  
+  (int)((void *)(&c.t)   - (void *)&c),
+#+end_src
++ Result
+#+begin_src sh
+[19232.053968] arch  Align:  char  short  int  long   ptr long-long  u8 u16 u32 u64
+[19232.053972] i686            1     2     4     4     4     4        1   2   4   4
+#+end_src
+
+**** align of other type
++ SRC
+#+begin_src c
+struct c2   {char c;  char      t;} c2;
+struct s2   {short c;  char     t;} s2;
+struct i2   {int  c;  char       t;} i2;
+struct l2   {long c;  char       t;} l2;
+struct ll2  {long long c;  char  t;} ll2;
+struct p2   {void * c;  char  t;} p2;
+struct u1b2 {__u8 c;  char   t;} u1b2;
+struct u2b2 {__u16 c; char   t;} u2b2;
+struct u4b2 {__u32 c; char   t;} u4b2;
+struct u8b2 {__u64 c; char   t;} u8b2;
+	(int)((void *)(&c2.t)   - (void *)&c2),
+#+end_src
++ Result
+#+begin_src sh
+[20443.346930] arch  Align:  char  short  int  long   ptr long-long  u8 u16 u32 u64
+[20443.346933] i686            1     2     4     4     4     8        1   2   4   8
+#+end_src
+**** compare
+#+begin_src sh
+[20443.346924] arch  Align:  char  short  int  long   ptr long-long  u8 u16 u32 u64
+[20443.346929] i686  char      1     2     4     4     4     4        1   2   4   4
+[20443.346930] arch  Align:  char  short  int  long   ptr long-long  u8 u16 u32 u64
+[20443.346933] i686  Other     1     2     4     4     4     8        1   2   4   8
+#+end_src
 ** =kdatasize.c=
+#+BEGIN_SRC c
+(int)sizeof(char), (int)sizeof(short), (int)sizeof(int),
+		(int)sizeof(long),
+		(int)sizeof(void *), (int)sizeof(long long), (int)sizeof(__u8),
+		(int)sizeof(__u16), (int)sizeof(__u32), (int)sizeof(__u64));
+#+END_SRC
+#+begin_src sh
+[19790.346939] arch   Size:  char  short  int  long   ptr long-long  u8 u16 u32 u64
+[19790.346946] i686            1     2     4     4     4     8        1   2   4   8
+#+end_src
 
 ** =sleepy.c=
++ SRC
+#+begin_src c
+static DECLARE_WAIT_QUEUE_HEAD(wq);
+
+wait_event_interruptible(wq, flag != 0);
+
+wake_up_interruptible(&wq);
+#+end_src
+
++ Test
+#+begin_src sh
+# sudo insmod sleepy.ko
+# sudo mknod -m og+rw  /dev/sleepy c  XXX 0
+# cat /dev/sleepy
+# echo "X" > /dev/sleepy
+
+[11010.693929] process 4770 (cat) going to sleep
+[11063.180845] process 4772 (zsh) awakening the readers...
+[11063.180861] awoken 4770 (cat)
+#+end_src
 
 ** =jit.c=
+*** Error and Fix
+#+begin_src sh
+jit.c: In function ‘jit_fn’:
+jit.c:73: error: implicit declaration of function ‘schedule’
+jit.c:77: error: ‘TASK_INTERRUPTIBLE’ undeclared (first use in this function)
+jit.c:77: error: (Each undeclared identifier is reported only once
+jit.c:77: error: for each function it appears in.)
+jit.c:77: error: implicit declaration of function ‘signal_pending’
+jit.c:77: error: implicit declaration of function ‘schedule_timeout’
+jit.c:80: error: implicit declaration of function ‘set_current_state’
+#+end_src
++ Fix
+#+begin_src c
+#include <linux/sched.h>
+#+end_src
 
+
+
+*** =tasklet_hi_schedule=
+ *chapter 7.5*
+**** API
+#+begin_src c
+void tasklet_hi_schedule(struct tasklet_struct *t);
+
+Schedule the tasklet for execution with higher priority. When the soft interrupt
+handler runs, it deals with high-priority tasklets before other soft interrupt tasks,
+including “normal” tasklets. Ideally, only tasks with low-latency requirements
+(such as filling the audio buffer) should use this function, to avoid the additional
+latencies introduced by other soft interrupt handlers. Actually, /proc/
+jitasklethi shows no human-visible difference from /proc/jitasklet.
+#+end_src
+
+*** Test
++ =/proc/currentime=
+#+begin_src sh
+0x00a7d291 0x0000000100a7d291 1350830993.423880
+                              1350830993.423499790
+0x00a7d291 0x0000000100a7d291 1350830993.423881
+                              1350830993.423499790
+0x00a7d291 0x0000000100a7d291 1350830993.423882
+                              1350830993.423499790
+0x00a7d291 0x0000000100a7d291 1350830993.423883
+                              1350830993.423499790
+0x00a7d291 0x0000000100a7d291 1350830993.423885
+                              1350830993.423499790
+0x00a7d291 0x0000000100a7d291 1350830993.423886
+                              1350830993.423499790
+0x00a7d291 0x0000000100a7d291 1350830993.423887
+                              1350830993.423499790
+0x00a7d291 0x0000000100a7d291 1350830993.423888
+                              1350830993.423499790
+0x00a7d291 0x0000000100a7d291 1350830993.423890
+                              1350830993.423499790
+0x00a7d291 0x0000000100a7d291 1350830993.423891
+                              1350830993.423499790
+#+end_src
+
+#+begin_src c
+	struct timeval tv1;
+	struct timespec tv2;
+	unsigned long j1;
+	u64 j2;
+
+	/* get them four */
+	j1 = jiffies;
+	j2 = get_jiffies_64();
+	do_gettimeofday(&tv1);
+	tv2 = current_kernel_time();
+
+	/* print */
+	len=0;
+	len += sprintf(buf,"0x%08lx 0x%016Lx %10i.%06i\n"
+		       "%40i.%09i\n",
+		       j1, j2,
+		       (int) tv1.tv_sec, (int) tv1.tv_usec,
+		       (int) tv2.tv_sec, (int) tv2.tv_nsec);
+#+end_src
++ =/proc/jitbusy=
+ *chapter 7.3*
+#+begin_src sh
+# dd bs=20 count=5 < /proc/jitbusy
+ 11160469  11160719
+ 11160719  11160969
+ 11160969  11161219
+ 11161219  11161469
+ 11161469  11161719
+#+end_src
+
+#+begin_src c
+  j0 = jiffies;
+  j1 = j0 + delay;
+  
+  while (time_before(jiffies, j1))
+    cpu_relax();
+#+end_src
++ =/proc/jitsched=
+#+begin_src sh
+dd bs=20 count=5 < /proc/jitsched
+ 20901444  20901694
+ 20901694  20901944
+ 20901944  20902194
+ 20902194  20902444
+ 20902444  20902694
+#+end_src
+
+#+begin_src c
+    j0 = jiffies;
+    j1 = j0 + delay;
+  
+  while (time_before(jiffies, j1)) {
+    schedule();
+   }
+#+end_src
+
++ =/proc/jitqueue=
+#+begin_src sh
+#dd bs=20 count=5 < /proc/jitqueue 
+ 20928572  20928822
+ 20928822  20929072
+ 20929072  20929322
+ 20929322  20929572
+ 20929572  20929822
+#+end_src
+
+#+begin_src c
+wait_event_interruptible_timeout(wait, 0, delay);
+#+end_src 
+
++ =/proc/jitschedto=
+#+begin_src sh
+ dd bs=20 count=5 < /proc/jitschedto 
+ 20955019  20955269
+ 20955269  20955519
+ 20955519  20955769
+ 20955769  20956019
+ 20956019  20956269
+#+end_src
+
+#+begin_src c
+  set_current_state(TASK_INTERRUPTIBLE);
+  schedule_timeout (delay);
+#+end_src 
+
++ =/proc/jitimer=
+#+begin_src sh
+# cat /proc/jitimer 
+   time   delta  inirq    pid   cpu command
+ 20978101    0     0     19300   5   cat
+ 20978111   10     1         0   5   swapper
+ 20978121   10     1         0   5   swapper
+ 20978131   10     1         0   5   swapper
+ 20978141   10     1         0   5   swapper
+ 20978151   10     1         0   5   swapper
+#+end_src
+
+#+begin_src c
+  init_timer(&data->timer);
+  init_waitqueue_head (&data->wait);
+  data->loops = JIT_ASYNC_LOOPS;
+        
+  /* register the timer */
+  data->timer.data = (unsigned long)data;
+  data->timer.function = jit_timer_fn;
+  data->timer.expires = j + tdelay; /* parameter */
+  add_timer(&data->timer);
+  
+  /* wait for the buffer to fill */
+  wait_event_interruptible(data->wait, !data->loops);
+#+end_src 
+
++ =/proc/jitasklet=
+#+begin_src sh
+# cat /proc/jitasklet
+   time   delta  inirq    pid   cpu command
+ 21042512    0     0     19332   6   cat
+ 21042512    0     1        22   6   ksoftirqd/6
+ 21042512    0     1        22   6   ksoftirqd/6
+ 21042512    0     1        22   6   ksoftirqd/6
+ 21042512    0     1        22   6   ksoftirqd/6
+ 21042512    0     1        22   6   ksoftirqd/6
+#+end_src
+
+#+begin_src c
+  /* register the tasklet */
+  tasklet_init(&data->tlet, jit_tasklet_fn, (unsigned long)data);
+  data->hi = hi;
+  if (hi)
+    tasklet_hi_schedule(&data->tlet);
+   else
+     tasklet_schedule(&data->tlet);
+  
+  /* wait for the buffer to fill */
+  wait_event_interruptible(data->wait, !data->loops);
+#+end_src 
+
++ =/proc/jitasklethi=
+#+begin_src sh
+# cat /proc/jitasklethi 
+   time   delta  inirq    pid   cpu command
+ 21047810    0     0     19340   6   cat
+ 21047810    0     1        22   6   ksoftirqd/6
+ 21047810    0     1        22   6   ksoftirqd/6
+ 21047810    0     1        22   6   ksoftirqd/6
+ 21047810    0     1        22   6   ksoftirqd/6
+ 21047810    0     1        22   6   ksoftirqd/6
+#+end_src
+
+#+begin_src c
+  /* register the tasklet */
+  tasklet_init(&data->tlet, jit_tasklet_fn, (unsigned long)data);
+  data->hi = hi;
+  if (hi)
+    tasklet_hi_schedule(&data->tlet);
+   else
+     tasklet_schedule(&data->tlet);
+  
+  /* wait for the buffer to fill */
+  wait_event_interruptible(data->wait, !data->loops);
+#+end_src 
 ** =seq.c=
+*** =seq_file=
+ *chapter 4.3*
+The =seq_file= interface assumes that you are creating a virtual file
+that steps through a sequence of items that must be returned to user
+space. To use seq_file, you must create a simple "iterator" object
+that can establish a position within the sequence, step forward, and
+output one item in the sequence. It may sound complicated, but, in
+fact, the process is quite simple. 
+
+The first step, inevitably, is the inclusion of =<linux/seq_file.h>=.
+Then you must create four iterator methods, called start, next, stop,
+and show.
+
+=void *start(struct seq_file *sfile, loff_t *pos);=
+The sfile argument can almost always be ignored. pos is an integer
+position indicating where the reading should start. The interpretation
+of the position is entirely up to the implementation; it need not be a
+byte position in the resulting file. 
+
+The next function should move the iterator to the next position,
+returning NULL if there is nothing left in the sequence. This method's
+prototype is:
+=void *next(struct seq_file *sfile, void *v, loff_t *pos);=
+Here, v is the iterator as returned from the previous call to start or
+next, and pos is the current position in the file. next should
+increment the value pointed to by pos; depending on how your iterator
+works, you might (though probably won't) want to increment pos by more
+than one.
+
+When the kernel is done with the iterator, it calls stop to clean up:
+=void stop(struct seq_file *sfile, void *v);=
+
+
+In between these calls, the kernel calls the show method to actually
+output something interesting to the user space. This method's
+prototype is:
+=int show(struct seq_file *sfile, void *v);=
+
+Now that it has a full set of iterator operations, seq must package
+them up and connect them to a file in =/proc=. The first step is done by
+filling in a =seq_operations= structure:
+#+begin_src c
+static struct seq_operations ct_seq_ops = {
+	.start = ct_seq_start,
+	.next  = ct_seq_next,
+	.stop  = ct_seq_stop,
+	.show  = ct_seq_show
+};
+#+end_src
+
+With that structure in place, we must create a file implementation
+that the kernel understands. We do not use the =read_proc= method
+described previously; when using =seq_file=, it is best to connect in to
+/proc at a slightly lower level. That means creating a file_operations
+structure (yes, the same structure used for char drivers) implementing
+all of the operations needed by the kernel to handle reads and seeks
+on the file. Fortunately, this task is straightforward. The first step
+is to create an open method that connects the file to the =seq_file=
+operations:
+
+#+begin_src c
+/*
+ * Time to set up the file operations for our /proc file.  In this case,
+ * all we need is an open function which sets up the sequence ops.
+ */
+
+static int ct_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &ct_seq_ops);
+};
+#+end_src
+
+The call to =seq_open= connects the file structure with our sequence
+operations defined above. As it turns out, open is the only file
+operation we must implement ourselves, so we can now set up our
+=file_operations= structure:
+
+#+begin_src c
+static struct file_operations ct_file_ops = {
+	.owner   = THIS_MODULE,
+	.open    = ct_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release
+};
+#+end_src
+
+The final step is to create the actual file in /proc:
+#+begin_src c
+entry = create_proc_entry("scullseq", 0, NULL);
+if (entry)
+    entry->proc_fops = &scull_proc_ops;
+#+end_src
+
+**** API
+#+begin_src c
+  void *start(struct seq_file *sfile, loff_t *pos);
+  void *next(struct seq_file *sfile, void *v, loff_t *pos)
+  void stop(struct seq_file *sfile, void *v);
+  int show(struct seq_file *sfile, void *v)
+  
+  In between these calls, the kernel calls the show method to actually output something interesting to the user space. This method's prototype is:
+  
+  int show(struct seq_file *sfile, void *v);
+  
+  This method should create output for the item in the sequence indicated by the iterator v. It should not use printk, however; instead, there is a special set of functions for seq_file output:
+  
+  int seq_printf(struct seq_file *sfile, const char *fmt, ...);
+      This is the printf equivalent for seq_file implementations; it takes the usual format string and additional value arguments. You must also pass it the seq_file structure given to the show function, however. If seq_printf returns a nonzero value, it means that the buffer has filled, and output is being discarded. Most implementations ignore the return value, however.
+  
+  int seq_putc(struct seq_file *sfile, char c);
+  
+  int seq_puts(struct seq_file *sfile, const char *s);
+      These are the equivalents of the user-space putc and puts functions.
+  
+  int seq_escape(struct seq_file *m, const char *s, const char *esc);
+      This function is equivalent to seq_puts with the exception that any character in s that is also found in esc is printed in octal format. A common value for esc is " \t\n\\", which keeps embedded white space from messing up the output and possibly confusing shell scripts.
+  
+  int seq_path(struct seq_file *sfile, struct vfsmount *m, struct dentry
+      *dentry, char *esc);
+      This function can be used for outputting the file name associated with a given directory entry. It is unlikely to be useful in device drivers; we have included it here for completeness.
+#+end_src
+
+**** Ref
+#+begin_src c
+<linux/seq_file.h>
+
+struct seq_file {
+	char *buf;
+	size_t size;
+	size_t from;
+	size_t count;
+	loff_t index;
+	loff_t read_pos;
+	u64 version;
+	struct mutex lock;
+	const struct seq_operations *op;
+	void *private;
+};
+
+struct seq_operations {
+	void * (*start) (struct seq_file *m, loff_t *pos);
+	void (*stop) (struct seq_file *m, void *v);
+	void * (*next) (struct seq_file *m, void *v, loff_t *pos);
+	int (*show) (struct seq_file *m, void *v);
+};
+#+end_src
+
+*** test
+#+begin_src sh
+# cat /proc/sequence
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+.........
+#+end_src
 
 ** =silly.c=
+ *chapter 9.4*
+*** I/O Ports and I/O Memory
+
+**** API
+#+begin_src c
+  #include <asm/io.h>
+  void *ioremap(unsigned long phys_addr, unsigned long size);
+  void *ioremap_nocache(unsigned long phys_addr, unsigned long size);
+  void iounmap(void *virt_addr);
+     /* ioremap remaps a physical address range into the processor's
+  virtual address space, making it available to the kernel. iounmap
+  frees the mapping when it is no longer needed.*/
+  
+  #include <asm/io.h>
+  unsigned int ioread8(void *addr);
+  unsigned int ioread16(void *addr);
+  unsigned int ioread32(void *addr);
+  void iowrite8(u8 value, void *addr);
+  void iowrite16(u16 value, void *addr);
+  void iowrite32(u32 value, void *addr);
+      Accessor functions that are used to work with I/O memory.
+  
+  void ioread8_rep(void *addr, void *buf, unsigned long count);
+  void ioread16_rep(void *addr, void *buf, unsigned long count);
+  void ioread32_rep(void *addr, void *buf, unsigned long count);
+  void iowrite8_rep(void *addr, const void *buf, unsigned long count);
+  void iowrite16_rep(void *addr, const void *buf, unsigned long count);
+  void iowrite32_rep(void *addr, const void *buf, unsigned long count);
+      /* "Repeating" versions of the I/O memory primitives.*/
+  
+  unsigned readb(address);
+  unsigned readw(address);
+  unsigned readl(address);
+  void writeb(unsigned value, address);
+  void writew(unsigned value, address);
+  void writel(unsigned value, address);
+  
+  memset_io(address, value, count);
+  memcpy_fromio(dest, source, nbytes);
+  memcpy_toio(dest, source, nbytes);
+      Older, type-unsafe functions for accessing I/O memory.
+  
+  void *ioport_map(unsigned long port, unsigned int count);
+  void ioport_unmap(void *addr);
+      A driver author that wants to treat I/O ports as if they were I/O memory may pass those ports to ioport_map. The mapping should be done (with ioport_unmap) when no longer needed.
+#+end_src
+
+**** Ref
+#+begin_src c
+
+#+end_src
 
 * misc-progs
+** dataalign.c
+*** SRC
+#+begin_src c
+  #include <sys/utsname.h>
+  
+  struct utsname name;
+  uname(&name);  //=> name.machine
+#+end_src 
+
+#+BEGIN_SRC c
+  struct c   {char c;  char      t;} c;
+  struct s   {char c;  short     t;} s;
+  struct i   {char c;  int       t;} i;
+  struct l   {char c;  long      t;} l;
+  struct ll  {char c;  long long t;} ll;
+  struct p   {char c;  void *    t;} p;
+  struct u1b {char c;  __u8      t;} u1b;
+  struct u2b {char c;  __u16     t;} u2b;
+  struct u4b {char c;  __u32     t;} u4b;
+  struct u8b {char c;  __u64     t;} u8b;
+  (int)((void *)(&c.t)   - (void *)&c),
+  
+    struct c2   {char c;  char      t;} c2;
+  struct s2   {short c;  char     t;} s2;
+  struct i2   {int  c;  char       t;} i2;
+  struct l2   {long c;  char       t;} l2;
+  struct ll2  {long long c;  char  t;} ll2;
+  struct p2   {void * c;  char  t;} p2;
+  struct u1b2 {__u8 c;  char   t;} u1b2;
+  struct u2b2 {__u16 c; char   t;} u2b2;
+  struct u4b2 {__u32 c; char   t;} u4b2;
+  struct u8b2 {__u64 c; char   t;} u8b2;
+  (int)((void *)(&c2.t)   - (void *)&c2)
+#+END_SRC
+*** Test 
+#+begin_src sh
+arch  Align:  char  short  int  long   ptr long-long  u8 u16 u32 u64
+i686            1     2     4     4     4     4        1   2   4   4
+
+arch  Align:  char  short  int  long   ptr long-long  u8 u16 u32 u64
+i686            1     2     4     4     4     8        1   2   4   8
+#+end_src
+
+** datasize.c
+#+BEGIN_SRC c
+(int)sizeof(char), (int)sizeof(short), (int)sizeof(int),
+	   (int)sizeof(long),
+	   (int)sizeof(void *), (int)sizeof(long long), (int)sizeof(__u8),
+	   (int)sizeof(__u16), (int)sizeof(__u32), (int)sizeof(__u64));
+#+END_SRC
+
+#+begin_src sh
+arch   Size:  char  short  int  long   ptr long-long  u8 u16 u32 u64
+i686            1     2     4     4     4     8        1   2   4   8
+#+end_src
+
+
+
+** asynctest.c
+
+** gdbline
+
+** inp.c
+
+** load50.c
+
+** mapcmp.c
+
+** mapper.c
+
+** nbtest.c
+
+** netifdebug.c
+
+** outp.c
+
+** polltest.c
+
+** setconsole.c
+
+** setlevel.c
+
 
 * skull
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * scull
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * short
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * scullc
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * sculld
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * scullp
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * scullv
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * simple
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * shortprint
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * pci
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * usb
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * lddbus
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * sbull
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * snull
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
 
 * tty
+**** API
+#+begin_src c
+#+end_src
+**** Ref
+#+begin_src c
+#+end_src
+
