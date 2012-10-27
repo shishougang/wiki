@@ -2942,12 +2942,150 @@ i686            1     2     4     4     4     8        1   2   4   8
 
 
 ** asynctest.c
+*** Asynchronous Notification
+ *chapter 6.4*
+**** SRC
+#+begin_src c
+  struct sigaction action;
+    
+  memset(&action, 0, sizeof(action));
+  action.sa_handler = sighandler;
+  action.sa_flags = 0;
+    
+  sigaction(SIGIO, &action, NULL);
+    
+  fcntl(STDIN_FILENO, F_SETOWN, getpid());
+  fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | FASYNC);
+  
+  void sighandler(int signo){}
+#+end_src
+**** Overview
+
+
+
+
+**** Ref
++ =struct sigaction=
+#+begin_src c
+<usr/include/signal.h>
+# include <bits/sigaction.h>
+
+/* Structure describing the action to be taken when a signal arrives.  */
+struct sigaction
+  {
+    /* Signal handler.  */
+#ifdef __USE_POSIX199309
+    union
+      {
+	/* Used if SA_SIGINFO is not set.  */
+	__sighandler_t sa_handler;
+	/* Used if SA_SIGINFO is set.  */
+	void (*sa_sigaction) (int, siginfo_t *, void *);
+      }
+    __sigaction_handler;
+# define sa_handler	__sigaction_handler.sa_handler
+# define sa_sigaction	__sigaction_handler.sa_sigaction
+#else
+    __sighandler_t sa_handler;
+#endif
+
+    /* Additional set of signals to be blocked.  */
+    __sigset_t sa_mask;
+
+    /* Special flags.  */
+    int sa_flags;
+
+    /* Restore handler.  */
+    void (*sa_restorer) (void);
+  };
+
+/* Bits in `sa_flags'.  */
+#define	SA_NOCLDSTOP  1		 /* Don't send SIGCHLD when children stop.  */
+#define SA_NOCLDWAIT  2		 /* Don't create zombie on child death.  */
+#define SA_SIGINFO    4		 /* Invoke signal-catching function with
+				    three arguments instead of one.  */
+#+end_src
+
++ =sigaction()=
+#+begin_src c
+/* Get and/or set the action for signal SIG.  */
+extern int sigaction (int __sig, __const struct sigaction *__restrict __act,
+		      struct sigaction *__restrict __oact) __THROW;
+#+end_src
+
++ =fcntl=
+#+begin_src c
+<fcntl.h>
+/* Do the file control operation described by CMD on FD.
+   The remaining arguments are interpreted depending on CMD.
+
+   This function is a cancellation point and therefore not marked with
+   __THROW.  */
+extern int fcntl (int __fd, int __cmd, ...);
+
+#include <bits/fcntl.h>
+
+/* Values for the second argument to `fcntl'.  */
+#define F_DUPFD		0	/* Duplicate file descriptor.  */
+#define F_GETFD		1	/* Get file descriptor flags.  */
+#define F_SETFD		2	/* Set file descriptor flags.  */
+#define F_GETFL		3	/* Get file status flags.  */
+#define F_SETFL		4	/* Set file status flags.  */
+#if __WORDSIZE == 64
+# define F_GETLK	5	/* Get record locking info.  */
+# define F_SETLK	6	/* Set record locking info (non-blocking).  */
+# define F_SETLKW	7	/* Set record locking info (blocking).	*/
+/* Not necessary, we always have 64-bit offsets.  */
+# define F_GETLK64	5	/* Get record locking info.  */
+# define F_SETLK64	6	/* Set record locking info (non-blocking).  */
+# define F_SETLKW64	7	/* Set record locking info (blocking).	*/
+#else
+# ifndef __USE_FILE_OFFSET64
+#  define F_GETLK	5	/* Get record locking info.  */
+#  define F_SETLK	6	/* Set record locking info (non-blocking).  */
+#  define F_SETLKW	7	/* Set record locking info (blocking).	*/
+# else
+#  define F_GETLK	F_GETLK64  /* Get record locking info.	*/
+#  define F_SETLK	F_SETLK64  /* Set record locking info (non-blocking).*/
+#  define F_SETLKW	F_SETLKW64 /* Set record locking info (blocking).  */
+# endif
+# define F_GETLK64	12	/* Get record locking info.  */
+# define F_SETLK64	13	/* Set record locking info (non-blocking).  */
+# define F_SETLKW64	14	/* Set record locking info (blocking).	*/
+#endif
+
+#if defined __USE_BSD || defined __USE_UNIX98
+# define F_SETOWN	8	/* Get owner (process receiving SIGIO).  */
+# define F_GETOWN	9	/* Set owner (process receiving SIGIO).  */
+#endif
+
+#ifdef __USE_GNU
+# define F_SETSIG	10	/* Set number of signal to be sent.  */
+# define F_GETSIG	11	/* Get number of signal to be sent.  */
+# define F_SETOWN_EX	15	/* Get owner (thread receiving SIGIO).  */
+# define F_GETOWN_EX	16	/* Set owner (thread receiving SIGIO).  */
+#endif
+
+#ifdef __USE_GNU
+# define F_SETLEASE	1024	/* Set a lease.	 */
+# define F_GETLEASE	1025	/* Enquire what lease is active.  */
+# define F_NOTIFY	1026	/* Request notfications on a directory.	 */
+# define F_DUPFD_CLOEXEC 1030	/* Duplicate file descriptor with
+				   close-on-exit set.  */
+#endif
+#+end_src
 
 ** gdbline
 
 ** inp.c
 
 ** load50.c
+ *chapter 7.3*
+This program forks a number of processes that do nothing, but do it in
+a CPU-intensive way. The program is part of the sample files accompanying this
+book, and forks 50 processes by default, although the number can be specified on
+the command line.
+
 
 ** mapcmp.c
 
