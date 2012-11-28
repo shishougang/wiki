@@ -8,7 +8,6 @@
 + http://ettus-apps.sourcerepo.com/redmine/ettus/projects/uhd/wiki
 + http://files.ettus.com/uhd_docs/manual/html/index.html
 
-
 ** Github
 https://github.com/EttusResearch/UHD-Mirror
 
@@ -151,4 +150,62 @@ std::string uhd::get_tmp_path(void){
     return "/tmp";
 }
 #+end_src
-** 
+** =usrp/subdev_spec=
+#+begin_src c
+  struct UHD_API subdev_spec_pair_t : boost::equality_comparable<subdev_spec_pair_t>{
+      //! The daughterboard slot name
+      std::string db_name;
+  
+      //! The subdevice name
+      std::string sd_name;
+#+end_src
+
+#+begin_src c
+class UHD_API subdev_spec_t : public std::vector<subdev_spec_pair_t>
+#+end_src
+** =usrp/dboard_manager.cpp=
+#+begin_src c
+//dboard registry tuple: dboard constructor, canonical name, subdev names
+typedef boost::tuple<dboard_manager::dboard_ctor_t, std::string, prop_names_t> args_t;
+
+//map a dboard id to a dboard constructor
+typedef uhd::dict<dboard_key_t, args_t> id_to_args_map_t;
+UHD_SINGLETON_FCN(id_to_args_map_t, get_id_to_args_map)
+#+end_src
+
+main member:
+#+begin_src c
+    uhd::dict<std::string, subdev_proxy::sptr> _rx_dboards;
+
+            _rx_dboards[subdev] = subdev_proxy::sptr(
+                new subdev_proxy(xcvr_dboard, subdev_proxy::RX_TYPE)
+            );
+
+    uhd::dict<std::string, subdev_proxy::sptr> _tx_dboards;
+            _tx_dboards[subdev] = subdev_proxy::sptr(
+                new subdev_proxy(xcvr_dboard, subdev_proxy::TX_TYPE)
+            );
+
+    dboard_iface::sptr _iface;  ==>_dboard_iface  (_fpga_ctrl, _fpga_i2c_ctrl....)
+#+end_src
+** =usrp/e100/e100_mmap_zero_copy.cpp=
+#+begin_src c
+    //re-usable managed buffers
+    std::vector<e100_mmap_zero_copy_mrb> _mrb_pool;
+    std::vector<e100_mmap_zero_copy_msb> _msb_pool;
+
+        //initialize the managed receive buffers
+        for (size_t i = 0; i < get_num_recv_frames(); i++){
+            _mrb_pool.push_back(e100_mmap_zero_copy_mrb(
+                recv_buff + get_recv_frame_size()*i, (*recv_info) + i
+            ));
+        }
+
+        //initialize the managed send buffers
+        for (size_t i = 0; i < get_num_recv_frames(); i++){
+            _msb_pool.push_back(e100_mmap_zero_copy_msb(
+                send_buff + get_send_frame_size()*i, (*send_info) + i,
+                get_send_frame_size(), _fd
+            ));
+        }
+#+end_src

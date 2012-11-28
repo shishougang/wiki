@@ -1,0 +1,178 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Mac pro install Ubuntu 12.04
+#+OPTIONS: num:nil H:2
+
+* Determine your hardware revision[fn:1]
+** OS X
+click in OS X on the Apple on the top left, then "About this Mac" -- "More Info...", see the generation in the "Model Identifier" row; or ... 
+** ubuntu
+#+begin_src sh
+sudo dmidecode -s system-product-name
+#+end_src
+
+* par
+
+* install 
+
+* configuration
+** Screen(Not) 
+The resolution is right recognised, the LED-backlit works properly.
+
+NOTE: In order to be able to adjust the brightness you will have to install the apple-gmux package and boot with acpi_backlight=vendor kernel parameter which you can set e.g. in the /etc/default/grub file in GRUB_CMDLINE_LINUX line. Details: https://wiki.ubuntu.com/Kernel/AppleGmuxBacklight
+** Colors
+import these profiles as .icc files in System Settings - Color by
+ selecting the appropriate screen icon, clicking "add profile" and
+ navigating to the .icc files (located in OS X under =/Users/username/Library/ColorSync/Profiles= or =/Library/ColorSync/Profiles/Displays=
+ if the settings were saved for all users). After this, 
+choosing the radio button under the new OS X profile should
+ yield a nice color profile. 
+** HFS+
+HFS is mounted as Read-Only. By turning [[http://support.apple.com/kb/ht2355][journaling]] off in OS X, the HFS+ file system will be read/write under Linux. 
+This is the recommended solution if you need read/write access to your OS X partition.
+
+It's also possible to mount HFS+ journaling-enabled volumes using the "-o force,rw" option though this is extremely risky.
+
+Leaving the HFS's journaling turned on you're able to access it as root. 
+** Touchpad
+Works fine out-of-the-box. You can disable the mouse-click with the trackpad tap and the horizontal scrolling in Preferences.
+
+Unity supports multitouch with this funcs:
+#+begin_src sh
+    1 finger
+        move = move the cursor;
+        click = "your-favourite-hand"-click; 
+    2 fingers
+        move = vertical/horizontal scrolling;
+        click = "2nd-button"-click; 
+    3 fingers
+        move = move the window and shows resizing options; 
+    4 fingers
+        move = show/hide the launcher (horizontal-scroll, enable auto-hide the launcher first);
+        single-tap = show the dash. 
+#+end_src
+To get multitouch with just two finger scrolling and drag-and-drop follow these instructions:
+#+begin_src sh
+sudo add-apt-repository ppa:mactel-support && sudo apt-get update
+sudo apt-get install xserver-xorg-input-synaptics
+#+end_src
+
+*** Palm Recognition
+
+By default palm recognition is not turned off, so you might have trouble moving the cursor or clicking something by brushing the trackpad with your palm while typing. To turn palm recognition on, open up a terminal and copy your default conf file:
+#+begin_src sh
+sudo cp /usr/share/X11/xorg.conf.d/50-synaptics.conf /etc/X11/xorg.conf.d/my-synaptics.conf
+#+end_src
+Now edit the new conf file:
+#+begin_src sh
+gksudo gedit /etc/X11/xorg.conf.d/my-synaptics.conf
+#+end_src
+and add the following line just before the EndSection marker of your input class:
+#+begin_src
+Option "PalmDetect" "on"
+#+end_src
+*** Fine-tuning the touchpad
+You can play with other options offered by Synaptic 
+input drivers that are explained [[http://manpages.ubuntu.com/manpages/karmic/man4/synaptics.4.html][here]] and in this [[http://uselessuseofcat.com/?p=74][blog post]]. 
+
+** TODO External Monitor
+External monitors connected via HDMI work out of the box.
+
+If your external display's native resolution is not recognised when
+ connected via a VGA port (only a lower resolution, such as 800x600 is 
+offered, for example), then you need to issue a couple of xrandr 
+commands in a terminal to force add the desired resolution. 
+The source of information for this fix comes from [[http://mac.linux.be/content/setting-xorgconf-manually-xrandr][here]].
+
+To check that xrandr is installed issue:
+#+begin_src sh
+$ sudo apt-get install xrandr
+#+end_src
+You have to create a modeline using the gtf or cvt utility. For example, if you want to add a mode with resolution 1920x1080, you can enter the following command (The output is shown following):
+#+begin_src sh
+$ cvt 1920 1080
+# 1920x1080 59.96 Hz (CVT 2.07M9) hsync: 67.16 kHz; pclk: 173.00 MHz
+Modeline "1920x1080_60.00"  173.00  1920 2048 2248 2576  1080 1083 1088 1120 -hsync +vsync
+#+end_src
+Then copy the information after the word "Modeline" into the xrandr command (which would in my example state):
+#+begin_src sh
+xrandr --newmode "1920x1080_60.00"  173.00  1920 2048 2248 2576  1080 1083 1088 1120 -hsync +vsync
+#+end_src
+Now get the code of your external monitor by issuing xrandr. For me the external screen is branded DP1.
+
+Now add this mode to the available ones for your external screen:
+#+begin_src sh
+xrandr --addmode DP1 1920x1080_60.00
+#+end_src
+And select it:
+#+begin_src sh
+xrandr --output DP1 --mode 1920x1080_60.00
+#+end_src
+If everything goes well, the resolution should be ok now and you'll have the desired option in the normal display preferences. This will have to be repeated every time. The easiest way to automate the task, add the 3 xrandr commands to the ~/.xprofile file.
+#+begin_src sh
+$ gedit ~/.xprofile
+#+end_src
+The file should look something like:
+#+begin_src sh
+xrandr --newmode "1920x1080_60.00"  173.00  1920 2048 2248 2576  1080 1083 1088 1120 -hsync +vsync
+xrandr --addmode DP1 1920x1080_60.00
+xrandr --output DP1 --mode 1920x1080_60.00
+#+end_src
+Afterwards, you have to add executable access to the file:
+#+begin_src sh
+$ chmod +x ~/.xprofile
+#+end_src
+Note: if you make a mistake in the .xprofile file, you might have trouble reverting back to normal settings - in this case you can always use ctrl+alt+F1 to open the shell interface and issue mv ~/.xprofile ~/.xprofile-old; sudo reboot to get the previous settings back. 
+
+** Sound
+Works out-of the box, but some volume corrections are necessary.
+
+You can install gnome-alsamixer for a nice GUI to set up your sound:
+#+begin_src sh
+sudo apt-get install gnome-alsamixer
+#+end_src
+** Wireless
+
+There is no official support yet in Ubuntu 11.10, but you can get it working with the following repository:
+#+begin_src sh
+sudo add-apt-repository ppa:mpodroid/mactel
+sudo apt-get update
+sudo apt-get install b43-fwcutter firmware-b43-installer
+#+end_src
+Then install the linux-backports-modules-cw-3.2-oneiric-generic or, if you have the pae kernel installed, the linux-backports-modules-cw-3.2-oneiric-generic-pae package. While this tutorial deals with Oneiric, the same instructions for the wireless work for Precise, with the above installation of "linux-backports-modules-cw-3.2-oneiric-generic" replaced with "linux-backports-modules-cw-3.3-precise-generic".
+
+Edit the /etc/modprobe.d/blacklist.conf and add the line:
+
+blacklist ndiswrapper
+
+Create or edit the file /etc/pm/config.d/modules and make sure the wireless modules (b43 and bcma) are blacklisted:
+
+SUSPEND_MODULES="b43 bcma"
+
+Reboot and the wireless should work. 
+
+
+
+
+
+sudo add-apt-repository ppa:tualatrix/ppa
+sudo apt-get update
+sudo apt-get install ubuntu-tweak
+
+
+** 
+* ref 
+http://pof.eslack.org/2011/12/04/lightum-auto-adjust-keyboard-brightness-on-macbook/
+
+https://github.com/poliva/lightum#lightum---macbook-automatic-light-sensor-daemon
+
+
+http://camielv.nl/thesis/installing-ubuntu-12-04-on-macbook-pro-8-1/
+
+https://github.com/poliva/lightum#lightum---macbook-automatic-light-sensor-daemon
+
+* Footnotes
+
+[fn:1] https://help.ubuntu.com/community/MacBookPro
+
+
+

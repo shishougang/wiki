@@ -1,0 +1,28 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: DAC5688
+#+OPTIONS: num:nil H:2
+
+
+* CLKO output
+
+In both the external mode and PLL modes the CLKO will output the
+required DATACLK frequency for the configured interpolation and data
+input mode. The CLK1IN_ENA register in config2 will need to be set to
+"0" in both modes. The DAC5688's internal divider logic will
+automatically derive the CLKO from DAC's internal clock, so you cannot
+set CLKO at a other frequencies other than the one needed to latch in
+the data properly.
+
+For instance, if the DAC output update rate is at 320MHz with 4x
+interpolation. The effective data rate is 80MSPS. The DAC will latch
+in data in SDR fashion. 
+
+1. With normal dual bus mode, the CLKO will toggle at 80MHz to latch
+   in all 32-bits of I/Q data. 
+2. With interleaved bus mode, the CLKO will toggle at 160MHz (2x
+   required to interleave) to latch in 16-bit of I/Q interleaved data.
+3. With half-rate bus mode, the CLKO will toggle at 40MHz. 
+
+You can use this CLK0 as a reference to the FPGA and establish the
+required setup/hold time for the DAC's data input.
+
