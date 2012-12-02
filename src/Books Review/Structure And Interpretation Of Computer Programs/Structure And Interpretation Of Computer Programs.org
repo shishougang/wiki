@@ -18,4 +18,222 @@ specifications, it is the responsibility of the programmer to estimate, and alwa
 their performance.
 
 
+* Preface to the First Edition
+Our design of this introductory computer-science subject reflects two major concerns. First, we want to
+establish the idea that a computer language is not just a way of getting a computer to perform operations
+but rather that it is a novel formal medium for expressing ideas about methodology. Thus, programs must
+be written for people to read, and only incidentally for machines to execute. Second, we believe that the
+essential material to be addressed by a subject at this level is not the syntax of particular programming-
+language constructs, nor clever algorithms for computing particular functions efficiently, nor even the
+mathematical analysis of algorithms and the foundations of computing, but rather the techniques used to
+control the intellectual complexity of large software systems.
+
+Our goal is that students who complete this subject should have a good feel for the elements of style and
+the aesthetics of programming. They should have command of the major techniques for controlling
+complexity in a large system. They should be capable of reading a 50-page-long program, if it is written in
+an exemplary style. They should know what not to read, and what they need not understand at any
+moment. They should feel secure about modifying a program, retaining the spirit and style of the original
+author.
+
+These skills are by no means unique to computer programming. The techniques we teach and draw upon
+are common to all of engineering design. We control complexity by building abstractions that hide details
+when appropriate. We control complexity by establishing conventional interfaces that enable us to
+construct systems by combining standard, well-understood pieces in a ``mix and match'' way. We control
+complexity by establishing new languages for describing a design, each of which emphasizes particular
+aspects of the design and deemphasizes others.
+
+Underlying our approach to this subject is our conviction that ``computer science'' is not a science and that
+its significance has little to do with computers. The computer revolution is a revolution in the way we
+think and in the way we express what we think. The essence of this change is the emergence of what might
+best be called procedural epistemology -- the study of the structure of knowledge from an imperative point
+of view, as opposed to the more declarative point of view taken by classical mathematical subjects.
+Mathematics provides a framework for dealing precisely with notions of ``what is.'' Computation provides
+a framework for dealing precisely with notions of ``how to.''
+
+* Chapter 1 Building Abstractions with Procedures
+#+begin_verse
+The acts of the mind, wherein it exerts its power over simple ideas, are chiefly
+these three: 1. Combining several simple ideas into one compound one, and thus all
+complex ideas are made. 2. The second is bringing two ideas, whether simple or
+complex, together, and setting them by one another so as to take a view of them at
+once, without uniting them into one, by which it gets all its ideas of relations. 3.
+The third is separating them from all other ideas that accompany them in their real
+existence: this is called abstraction, and thus all its general ideas are made.
+       John Locke, An Essay Concerning Human Understanding (1690)
+#+end_verse
+
+ Lisp was invented in the late
+1950s as a formalism for reasoning about the use of certain kinds of logical expressions, called recursion
+equations, as a model for computation. The language was conceived by John McCarthy and is based on
+his paper ``Recursive Functions of Symbolic Expressions and Their Computation by Machine'' (McCarthy
+1960).
+
+Lisp, whose
+name is an acronym for LISt Processing, was designed to provide symbol-manipulating capabilities for
+attacking programming problems such as the symbolic differentiation and integration of algebraic
+expressions.
+
+** 1.1 The Elements of Programming
+Every powerful language has three mechanisms for
+accomplishing this:
++ primitive expressions, which represent the simplest entities the language is concerned with,
++ means of combination, by which compound elements are built from simpler ones, and
++ means of abstraction, by which compound elements can be named and manipulated as units.
+
+
+In the Scheme dialect of Lisp, we name things with define. Typing
+#+begin_src lisp
+(define size 2)
+#+end_src
+
+It should be clear that the possibility of associating values with symbols and later retrieving them means
+that the interpreter must maintain some sort of memory that keeps track of the name-object pairs. This
+memory is called the environment (more precisely the global environment, since we will see later that a
+computation may involve a number of different environments).
+
+
+We have identified in Lisp some of the elements that must appear in any powerful programming language:
++ Numbers and arithmetic operations are primitive data and procedures.
++ Nesting of combinations provides a means of combining operations.
++ Definitions that associate names with values provide a limited means of abstraction.
+
+The general form of a procedure definition is
+(define (<name> <formal parameters>) <body>)
+*** 1.1.5 The Substitution Model for Procedure Application
+We can assume that the mechanism for applying primitive procedures to arguments is built into the
+interpreter. For compound procedures, the application process is as follows:
+
+To apply a compound procedure to arguments, evaluate the body of the procedure with each
+formal parameter replaced by the corresponding argument.
+
+(+ (square 6) (square 10))
+If we use the definition of square, this reduces to
+(+ (* 6 6) (* 10 10))
+which reduces by multiplication to
+(+ 36 100)
+and finally to
+136
+The process we have just described is called the substitution model for procedure application. It can be
+taken as a model that determines the ``meaning'' of procedure application, insofar as the procedures in this
+chapter are concerned.
+ *Applicative order versus normal order*
+According to the description of evaluation given in section 1.1.3, the interpreter first evaluates the operator
+and operands and then applies the resulting procedure to the resulting arguments. This is not the only way
+to perform evaluation. An alternative evaluation model would not evaluate the operands until their values
+were needed. Instead it would first substitute operand expressions for parameters until it obtained an
+expression involving only primitive operators, and would then perform the evaluation. If we used this
+method, the evaluation of
+(f 5)
+would proceed according to the sequence of expansions
+#+begin_src lisp
+(sum-of-squares (+ 5 1) (* 5 2))
+(+ (square (+ 5 1)) (square (* 5 2))
+(+ (* (+ 5 1) (+ 5 1)) (* (* 5 2) (* 5 2)))
+followed by the reductions
+(+
+(+
+(* 6 6)
+(* 10 10))
+36
+100)
+136
+#+end_src
+
+This alternative ``fully expand and then reduce'' evaluation method is known as normal-order evaluation,
+in contrast to the ``evaluate the arguments and then apply'' method that the interpreter actually uses, which
+is called applicative-order evaluation.
+
+Lisp uses applicative-order evaluation, partly because of the additional efficiency obtained from avoiding
+multiple evaluations of expressions such as those illustrated with (+ 5 1) and (* 5 2) above and,
+more significantly, because normal-order evaluation becomes much more complicated to deal with when
+we leave the realm of procedures that can be modeled by substitution. On the other hand, normal-order
+evaluation can be an extremely valuable tool, and we will investigate some of its implications in chapters 3
+and 4.
+
+*** 1.1.6 Conditional Expressions and Predicates
+It is called cond (which stands for ``conditional'')
+
+The general form of a conditional expression is
+(cond (<p1> <e1>)
+(<p2> <e2>)
+(<pn> <en>))
+
+consisting of the symbol cond followed by parenthesized pairs of expressions (<p> <e>) called
+clauses. The first expression in each pair is a predicate -- that is, an expression whose value is interpreted
+as either true or false.
+
+Conditional expressions are evaluated as follows. The predicate <p1> is evaluated first. If its value is false,
+then <p2> is evaluated. If <p2>'s value is also false, then <p3> is evaluated. This process continues until a
+predicate is found whose value is true, in which case the interpreter returns the value of the corresponding
+consequent expression <e> of the clause as the value of the conditional expression. If none of the <p>'s is
+found to be true, the value of the cond is undefined.
+
+This uses the special form if, a restricted type of conditional that can be used when there are precisely
+two cases in the case analysis. The general form of an if expression is
+(if <predicate> <consequent> <alternative>)
+
+To evaluate an if expression, the interpreter starts by evaluating the <predicate> part of the expression. If
+the <predicate> evaluates to a true value, the interpreter then evaluates the <consequent> and returns its
+value. Otherwise it evaluates the <alternative> and returns its value.
+
+In addition to primitive predicates such as <, =, and >, there are logical composition operations, which
+enable us to construct compound predicates. The three most frequently used are these:
+
++ (and <e1> ... <en>)
+The interpreter evaluates the expressions <e> one at a time, in left-to-right order. If any <e>
+evaluates to false, the value of the and expression is false, and the rest of the <e>'s are not
+evaluated. If all <e>'s evaluate to true values, the value of the and expression is the value of the
+last one.
+
++ (or <e1> ... <en>)
+The interpreter evaluates the expressions <e> one at a time, in left-to-right order. If any <e>
+evaluates to a true value, that value is returned as the value of the or expression, and the rest of
+the <e>'s are not evaluated. If all <e>'s evaluate to false, the value of the or expression is false.
+
++ (not <e>)
+The value of a not expression is true when the expression <e> evaluates to false, and false
+otherwise.
+
+Notice that and and or are special forms, not procedures, because the subexpressions are not necessarily
+all evaluated. Not is an ordinary procedure.
+
+Exercise 1.5. Ben Bitdiddle has invented a test to determine whether the interpreter he is faced with is
+using applicative-order evaluation or normal-order evaluation. He defines the following two procedures:
+(define (p) (p))
+(define (test x y)
+(if (= x 0)
+0
+y))
+Then he evaluates the expression
+(test 0 (p))
+What behavior will Ben observe with an interpreter that uses applicative-order evaluation? What behavior
+will he observe with an interpreter that uses normal-order evaluation? Explain your answer. (Assume that
+the evaluation rule for the special form if is the same whether the interpreter is using normal or
+applicative order: The predicate expression is evaluated first, and the result determines whether to evaluate
+the consequent or the alternative expression.)
+
+*** 1.1.7 Example: Square Roots by Newton's Method
+*** 1.1.8 Procedures as Black-Box Abstractions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

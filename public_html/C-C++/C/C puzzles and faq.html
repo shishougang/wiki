@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="C puzzles and FAQ"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-11-29T00:48+0800"/>
+<meta name="generated" content="2012-12-02T11:00+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -137,6 +137,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3">Swap</a></li>
 <li><a href="#sec-4">指针数组和数组指针</a></li>
 <li><a href="#sec-5">pointer</a></li>
+<li><a href="#sec-6">What is the significance of the keyword “volatile” in C?</a></li>
 </ul>
 </div>
 </div>
@@ -389,6 +390,98 @@ p=m;    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">p&#
 <a href="http://blog.csdn.net/qq515383106/article/details/7370241">http://blog.csdn.net/qq515383106/article/details/7370241</a>
 <a href="http://blog.csdn.net/dtmine/article/details/7366750">http://blog.csdn.net/dtmine/article/details/7366750</a>
 </p>
+</div>
+
+</div>
+
+<div id="outline-container-6" class="outline-2">
+<h2 id="sec-6">What is the significance of the keyword “volatile” in C?</h2>
+<div class="outline-text-2" id="text-6">
+
+
+<p>                
+SOLUTION
+Volatile informs the compiler that the value of the variable can
+change from the outside, without any update done by the code.
+Declaring a simple volatile variable:
+</p>
+
+
+<pre class="src src-c"><span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>;
+<span style="color: #98fb98;">int</span> <span style="color: #00ffff;">volatile</span> <span style="color: #eedd82;">x</span>;
+</pre>
+
+<p>
+Declaring a pointer variable for a volatile memory (only the pointer
+address is volatile):
+</p>
+
+
+<pre class="src src-c"><span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">int</span> * <span style="color: #eedd82;">x</span>;
+<span style="color: #98fb98;">int</span> <span style="color: #00ffff;">volatile</span> * <span style="color: #eedd82;">x</span>;
+</pre>
+
+<p>
+Declaring a volatile pointer variable for a non-volatile memory (only
+memory contained is volatile):
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> * <span style="color: #00ffff;">volatile</span> <span style="color: #eedd82;">x</span>;
+</pre>
+
+<p>
+Declaring a volatile variable pointer for a volatile memory (both
+pointer address and memory contained are volatile):
+</p>
+
+
+<pre class="src src-c"><span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">int</span> * <span style="color: #00ffff;">volatile</span> <span style="color: #eedd82;">x</span>;
+<span style="color: #98fb98;">int</span> <span style="color: #00ffff;">volatile</span> * <span style="color: #00ffff;">volatile</span> <span style="color: #eedd82;">x</span>;
+</pre>
+
+<p>
+Volatile variables are not optimized, but this can actually be useful.
+Imagine this function:
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">opt</span> = 1;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Fn</span>(<span style="color: #98fb98;">void</span>) {
+
+<span style="color: #7fffd4;">start</span>:
+
+<span style="color: #00ffff;">if</span> (opt == 1) <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">start</span>;
+
+<span style="color: #00ffff;">else</span> <span style="color: #00ffff;">break</span>;
+}
+</pre>
+
+<p>
+At first glance, our code appears to loop infinitely. The compiler
+will try to optimize it to:
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Fn</span>(<span style="color: #98fb98;">void</span>) {
+
+<span style="color: #7fffd4;">start</span>:
+
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">opt</span> = 1;
+
+<span style="color: #00ffff;">if</span> (<span style="color: #7fffd4;">true</span>)
+
+<span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">start</span>;
+}
+</pre>
+
+<p>
+This becomes an infinite loop. However, an external program might
+write ‘0’ to the location of variable opt. Volatile variables are also
+useful when multi-threaded programs have global variables and any
+thread can modify these shared variables. Of course, we don’t want
+optimization on them.
+</p>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
@@ -404,7 +497,7 @@ p=m;    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">p&#
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-11-29T00:48+0800</p>
+<p class="date">Date: 2012-12-02T11:00+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.2+ with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

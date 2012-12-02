@@ -184,3 +184,63 @@ http://blog.csdn.net/dtmine/article/details/7366750
 [fn:1] http://blog.csdn.net/carry1314lele/article/details/2191113
 
 
+* What is the significance of the keyword “volatile” in C?
+		
+SOLUTION
+Volatile informs the compiler that the value of the variable can
+change from the outside, without any update done by the code.
+Declaring a simple volatile variable:
+#+begin_src c
+volatile int x;
+int volatile x;
+#+end_src
+Declaring a pointer variable for a volatile memory (only the pointer
+address is volatile):
+#+begin_src c
+volatile int * x;
+int volatile * x;
+#+end_src
+Declaring a volatile pointer variable for a non-volatile memory (only
+memory contained is volatile):
+#+begin_src c
+int * volatile x;
+#+end_src 
+Declaring a volatile variable pointer for a volatile memory (both
+pointer address and memory contained are volatile):
+#+begin_src c
+volatile int * volatile x;
+int volatile * volatile x;
+#+end_src
+Volatile variables are not optimized, but this can actually be useful.
+Imagine this function:
+#+begin_src c
+int opt = 1;
+void Fn(void) {
+	
+start:
+		
+if (opt == 1) goto start;
+		
+else break;
+}
+#+end_src
+At first glance, our code appears to loop infinitely. The compiler
+will try to optimize it to:
+#+begin_src c
+void Fn(void) {
+	
+start:
+		
+int opt = 1;
+		
+if (true)
+		
+goto start;
+}
+#+end_src
+This becomes an infinite loop. However, an external program might
+write ‘0’ to the location of variable opt. Volatile variables are also
+useful when multi-threaded programs have global variables and any
+thread can modify these shared variables. Of course, we don’t want
+optimization on them.
+
