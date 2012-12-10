@@ -142,10 +142,19 @@ options iwl3945 debug=10 disable_hw_scan=0 swcrypto=1
 
 [fn:1] http://ubuntuforums.org/showthread.php?t=2011612
 
+[fn:2] http://www.cnblogs.com/ggjucheng/archive/2012/01/14/2322659.html
+
+[fn:3] http://www.cnblogs.com/allen8807/archive/2010/11/10/1874001.html
+
+[fn:4] http://blog.csdn.net/wh62592855/article/details/6332540
+
 
 * To read
 ** at 
+atq 命令来查看系统没有执行工作任务。
 
+atrm+任务号
+例:atrm 1 //删除计划任务1
 
 使用权限 : 所有使用者
 
@@ -174,3 +183,1319 @@ at 5pm + 2 weeks /bin/ls
 
 明天的 17:20 执行 /bin/date :
 at 17:20 tomorrow /bin/date
+
+** badblocks
+badblocks -- 检查磁盘装置中损坏的区块
+
+#+begin_src sh
+ badblocks [ -svwnf ] [ -b block-size ] [ -c blocks_at_once ] [ -e max_bad_blocks ] [ -d read_delay_factor ] [ -i
+       input_file ] [ -o output_file ] [ -p num_passes ] [ -t test_pattern ] device [ last-block ] [ first-block ]
+#+end_src
+
+#+beign_verse
+-b blocksize 指定磁盘的区块大小，单位为字节，默认值为“block 4K ”(4K/block)
+-c blocksize 每个区块检查的次数，默认是16次
+-f 强制在一个已经挂载的设备上执行读写或非破坏性的写测试操作
+Warning: 建议先umount设备，然后再进行坏道检测。仅当/etc/mtab出现误报设备挂载错误的时候可以使用该选项.
+-i file 跳过已经显示在file文件中的坏道，而不进行检测（可以避免重复检测）
+-o file 把检测结果输出到file文件 -p number 重复搜寻设备，直到在指定通过次数内都没有找到新的坏块位置，默认次数为0
+-s 在检查时显示进度
+-t pattern 通过按指定的模式读写来检测区块。你可以指定一个0到ULONG_MAX-1的十进制正值，或使用random（随机）。如果你指定多个模式，badblocks将使用第一个模式检测所有的区块，然后再使用下一个模式检测所有的区块。
+Read-only方式仅接受一个模式，它不能接受random模式的。
+-v 执行时显示详细的信息
+-w 对每个区块都先写入，然后再从它读取信息
+[device] 指定要检查的磁盘装置。
+[last-block] 指定磁盘装置的区块总数。
+[start-block] 指定要从哪个区块开始检查
+#+end_verse
+
+*** example
+#+begin_src sh
+# badblocks -b 4096 -c 16 /dev/hda1 -o hda-badblocks-list
+以4096的一个block，每一个block检查16次，将结果输出到“hda-badblocks-list”文件里
+# badblocks -b 4096 -c 1 /dev/hda1 -o hda-badblocks-list.1 63000 51000
+以4096字节为一个“block”,每一个“block”检查1次, 将结果输出到“hda-badblocks-list.1”文件中，由第51000 block开始，到63000 block结束
+#+end_src
+
+
+
+** cfdisk
+功能说明：磁盘分区。
+
+语　　法：cfdisk [-avz][-c <柱面数目>-h <磁头数目>-s <盘区数目>][-P <r,s,t>][外围设备代号]
+
+补充说明：cfdisk是用来磁盘分区的程序，它十分类似DOS的fdisk，具有互动式操作界面而非传统fdisk的问答式界面，您可以轻易地利用方向键来操控分区操作。
+
+参　　数：
+#+begin_verse
+  -a   在程序里不用反白代表选取，而以箭头表示。
+  -c<柱面数目>   忽略BIOS的数值，直接指定磁盘的柱面数目。
+  -h<磁头数目>   忽略BIOS的数值，直接指定磁盘的磁头数目。
+  -P<r,s,t>   显示分区表的内容，附加参数"r"会显示整个分区表的详细资料，附加参数"s"会依照磁区的顺序显示相关信息，附加参数"t"则会以磁头，磁区，柱面的方式来显示资料。
+  -s<磁区数目>   忽略BIOS的数值，直接指定磁盘的磁区数目。
+  -v   显示版本信息。
+  -z   不读取现有的分区，直接当作没有分区的新磁盘使用。
+#+end_verse
+
+** chattr 用于设置文件属性     lsattr 用于查看文件属性
+
+1.作用
+
+修改ext2和ext3文件系统属性(attribute)，使用权限超级用户。 
+
+2.格式
+
+chattr [-RV] [-+=AacDdijsSu] [-v version] 文件或目录 
+
+3.主要参数
+
+－R：递归处理所有的文件及子目录。
+
+－V：详细显示修改内容，并打印输出。
+
+－：失效属性。
+
+＋：激活属性。
+
+= ：指定属性。
+
+A：Atime，告诉系统不要修改对这个文件的最后访问时间。
+
+S：Sync，一旦应用程序对这个文件执行了写操作，使系统立刻把修改的结果写到磁盘。 
+
+a：Append Only，系统只允许在这个文件之后追加数据，不允许任何进程覆盖或截断这个文件。如果目录具有这个属性，系统将只允许在这个目录下建立和修改文件，而不允许删除任何文件。 
+
+i：Immutable，系统不允许对这个文件进行任何的修改。如果目录具有这个属性，那么任何的进程只能修改目录之下的文件，不允许建立和删除文件。 
+
+D：检查压缩文件中的错误。
+
+d：No dump，在进行文件系统备份时，dump程序将忽略这个文件。 
+
+C：Compress，系统以透明的方式压缩这个文件。从这个文件读取时，返回的是解压之后的数据；而向这个文件中写入数据时，数据首先被压缩之后才写入磁盘。 
+
+s：Secure Delete，让系统在删除这个文件时，使用0填充文件所在的区域。 
+
+u：Undelete，当一个应用程序请求删除这个文件，系统会保留其数据块以便以后能够恢复删除这个文件。 
+
+4.说明
+
+chattr 命令的作用很大，其中一些功能是由Linux内核版本来支持的，如果Linux内核版本低于2.2，那么许多功能不能实现。同样－D检查压缩文件中的错误的功能，需要2.5.19以上内核才能支持。另外，通过chattr命令修改属性能够提高系统的安全性，但是它并不适合所有的目录。chattr命令不能保护/、/dev、/tmp、/var目录。
+ 
+ 
+Linux命令：lsattr
+功能说明：显示文件属性。 
+ 
+语　　法：lsattr [-adlRvV][文件或目录...]  
+补充说明：用chattr执行改变文件或目录的属性，可执行lsattr指令查询其属性。 
+参　　数：
+ -a 　显示所有文件和目录，包括以"."为名称开头字符的额外内建，现行目录"."与上层目录".."。 
+ -d 　显示，目录名称，而非其内容。 
+ -l 　此参数目前没有任何作用。 
+ -R 　递归处理，将指定目录下的所有文件及子目录一并处理。 
+ -v 　显示文件或目录版本。 
+ -V 　显示版本信息。 
+
+** chgrp命令
+
+　　功能：改变文件或目录所属的组。
+
+　　语法：chgrp [选项] group filename?
+
+　　该命令改变指定指定文件所属的用户组。其中group可以是用户组ID，也可以是/etc/group文件中用户组的组名。文件名是以空格分开的要改变属组的文件列表，支持通配符。如果用户不是该文件的属主或超级用户，则不能改变该文件的组。
+
+　　该命令的各选项含义为：
+
+　　- R 递归式地改变指定目录及其下的所有子目录和文件的属组。
+
+** chown 命令
+
+　　功能：更改某个文件或目录的属主和属组。这个命令也很常用。例如root用户把自己的一个文件拷贝给用户xu，为了让用户xu能够存取这个文件，root用户应该把这个文件的属主设为xu，否则，用户xu无法存取这个文件。
+
+　　语法：chown [选项] 用户或组 文件
+
+　　说明：chown将指定文件的拥有者改为指定的用户或组。用户可以是用户名或用户ID。组可以是组名或组ID。文件是以空格分开的要改变权限的文件列表，支持通配符。
+
+　　该命令的各选项含义如下：
+
+　　- R 递归式地改变指定目录及其下的所有子目录和文件的拥有者。
+
+　　- v 显示chown命令所做的工作。
+
+** chroot(change root)
+
+功能说明：改变根目录。
+
+语　　法：chroot [--help][--version][目的目录][执行指令...]
+
+补充说明：把根目录换成指定的目的目录。
+
+
+命令CHROOT 的意义何在: 
+1. 限制CHROOT环境下的使用者所能行的程式，如SetUid的程式，或是造成 Load 的 Compiler等等 
+2. 防止使用者存取某些特定档案及配置文件，如/etc/passwd 
+3. 防止入侵者/bin/rm -rf / 
+4. 提供Guest服务及限制不守规矩的使用者。 
+5. 增强系系统的安全。
+
+** chsh
+
+shell改成zsh
+
+[rocrocket@jb51.net ~]$ chsh -s /bin/zsh
+
+** cksum
+语　　法：cksum [--help][--version][文件...] 
+** cmp
+cmp（compare）
+功能说明：比较两个文件是否有差异
+
+语法：cmp [-clsv] [-i<字符数目>] [--help] [第一个文件] [第二个文件]
+
+补充说明：当相互比较的两个文件完全一样时，不会显示任何信息，若发现差异，会显示出第一个不同之处的字符和列数缩号，若不指定任何文件名或是所给与的文件名为—，则cmp命令会从标准的输入设备读取数据。
+
+参数：
+
+-c 除了表明差异处的十进制字码外，一并显示该字符所对应字符。
+
+-i<字符数目> 指定一个数目
+
+-l 标示出所有不一样的地方
+
+-s 不显示错误信息
+
+-v 显示版本信息
+
+--help 在线帮助
+
+参考dos下的comp及fc命令：
+
+Comp 
+逐字节地比较两个文件或几组文件的内容。Comp 可以比较相同驱动器或不同驱动器上的文件以及相同目录或不同目录中的文件。comp 比较文件时，它将显示文件的位置和文件名。如果在不含参数的情况下使用，则 comp 提示输入要进行比较的文件。 
+语法 
+comp [data1] [data2] [/d] [/a] [/l] [/n=number] [/c] 
+参数 
+data1 
+指定要比较的第一个文件或文件集的位置和名称。使用通配字符（* 和 ?）可以指定多个文件。 
+data2 
+指定要比较的第二个文件或文件集的位置和名称。使用通配字符（* 和 ?）可以指定多个文件。 
+/d 
+用十进制格式显示差别。（默认格式为十六进制。） 
+/a 
+将差别显示为字符形式。 
+/l 
+显示出现差别的行编号，而不显示字节偏量。 
+/n=number 
+比较两个文件的第一个 number，即使两个文件的大小并不相同。 
+/c 
+执行不区分大小写的比较。 
+/? 
+在命令提示符显示帮助。 
+
+** col
+文档编辑
+
+功能说明：过滤控制字符。
+
+语　　法：col [-bfx][-l<缓冲区列数>]
+
+补充说明：在许多UNIX说明文件里，都有RLF控制字符。当我们运用shell特殊字符">"和">>"，把说明文件的内容输出成纯文本文件时，控制字符会变成乱码，col指令则能有效滤除这些控制字符。
+
+参　　数：
+#+begin_verse
+  -b   过滤掉所有的控制字符，包括RLF和HRLF。
+  -f   滤除RLF字符，但允许将HRLF字符呈现出来。
+  -x   以多个空格字符来表示跳格字符。
+  -l<缓冲区列数>   预设的内存缓冲区有128列，您可以自行指定缓冲区的大小。
+#+end_verse
+
+** colrm
+column remove
+
+功能说明：滤掉指定的行。
+
+语　　法：colrm [开始行数编号<结束行数编号>]
+
+标准输入作为输入：   
+
+colrm 3 abcd 终端会输出ab，即将第3列之后的删去输出。   
+
+colrm 3 5 123456 终端会输出126，即将第3到5列删去。
+
+** comm
+功能说明：比较两个已排过序的文件。
+
+语　　法：comm [-123][--help][--version][第1个文件][第2个文件]
+
+补充说明：这项指令会一列列地比较两个已排序文件的差异，并将其结果显示出来，如果没有指定任何参数，则会把结果分成3行显示：第1行仅是在第1个文件中出现过的列，第2行是仅在第2个文件中出现过的列，第3行则是在第1与第2个文件里都出现过的列。若给予的文件名称为"-"，则comm指令会从标准输入设备读取数据。
+
+参　　数：
+#+begin_verse
+  -1   不显示只在第1个文件里出现过的列。
+  -2   不显示只在第2个文件里出现过的列。
+  -3   不显示只在第1和第2个文件里出现过的列。
+  --help   在线帮助。
+  --version   显示版本信息。
+#+end_verse
+
+** cp
+
+功能: 复制文件或目录
+说明: cp指令用于复制文件或目录，如同时指定两个以上的文件或目录，且最后的目的地是一个已经存在的目录，则它会把前面指定的所有文件或目录复制到此目录中。若同时指定多个文件或目录，而最后的目的地并非一个已存在的目录，则会出现错误信息
+参数:
+#+begin_verse
+     -a 或 --archive     此参数的效果和同时指定"-dpR"参数相同
+     -b 或 --backup      删除、覆盖目的文件先备份，备份的文件或目录亦建立为符号链接，并指向源文件或目录链接的源文件或目录。假如没有加上这个参数，在复制过程中若遇到符号链接，则会直接复制源文件或目录
+     -f 或 --force       强行复制文件或目录， 不论目的文件或目录是否已经存在
+     -i 或 --interactive 覆盖文件之前先询问用户
+     -l 或 --link        对源文件建立硬链接，而非复制文件
+     -p 或 --preserve    保留源文件或目录的属性，包括所有者、所属组、权限与时间
+     -P 或 --parents     保留源文件或目录的路径，此路径可以是绝对路径或相对路径，且目的目录必须已经丰在
+     -r                  递归处理，将指定目录下的文件与子目录一并处理。若源文件或目录的形态，不属于目录或符号链接，则一律视为普通文件处理
+     -R 或 --recursive   递归处理，将指定目录下的文件及子目录一并处理
+     -s 或 --symbolic-link  对源文件建立符号链接，而非复制文件
+     -S <备份字尾字符串> 或 --suffix=<备份字尾字符串> 用"-b"参数备份目的文件后，备份文件的字尾会被加上一个备份字符串。默认的备份字尾符串是符号"~"
+     -u 或 --update      使用这项参数之后，只会在源文件的修改时间(Modification Time)较目的文件更新时，或是名称相互对应的目的文件并不存在，才复制文件
+     -v 或 --verbose     显示执行过程
+     -V <备份方式> 或 --version-control=<备份方式>  指定当备份文件时，备份文件名的命名方式，有以下3种:
+                         1.numbered或t, 将使用备份编号，会在字尾加上~1~字符串，其数字编号依次递增
+                         2.simple或never 将使用简单备份，默认的备份字尾字符串是~, 也可通过-S来指定
+                         3.existing或nil将使用当前方式，程序会先检查是否存在着备份编号，若有则采用备份编号，若无则采用简单备份
+     -x 或 --one-file-system  复制的文件或目录存放的文件系统，必须与cp指令执行时所处的文件系统相同，否则不复制，亦不处理位于其他分区的文件
+     --help              显示在线帮助
+     --sparse=<使用时机>  设置保存希疏文件的时机
+     --version           显示版本
+#+end_verse
+*** 示例:
+    .复制文件，只有源文件较目的文件的修改时间新时，才复制文件
+     cp -u -v file1 file2
+
+    .将文件file1复制成文件file2
+     cp file1 file2
+
+    .采用交互方式将文件file1复制成文件file2
+     cp -i file1 file2
+
+    .将文件file1复制成file2，因为目的文件已经存在，所以指定使用强制复制的模式
+     cp -f file1 file2
+
+    .将目录dir1复制成目录dir2
+     cp -R file1 file2
+
+    .同时将文件file1、file2、file3与目录dir1复制到dir2
+　　 cp -R file1 file2 file3 dir1 dir2
+
+    .复制时保留文件属性
+     cp -p a.txt tmp/
+
+    .复制时保留文件的目录结构
+     cp -P  /var/tmp/a.txt  ./temp/
+
+    .复制时产生备份文件
+     cp -b a.txt tmp/
+
+    .复制时产生备份文件，尾标 ~1~格式
+     cp -b -V t   a.txt /tmp    
+  
+    .指定备份文件尾标    
+     cp -b -S _bak a.txt /tmp
+
+
+
+
+
+
+
+
+** tar(tape archive)
+简介
+参数：
+#+begin_verse
+-c  ：建立一个压缩档案的参数指令(create 的意思)；
+-x  ：解开一个压缩档案的参数指令！
+-t  ：查看 tarfile 里面的档案！
+      特别注意，在参数的下达中， c/x/t 仅能存在一个！不可同时存在！
+      因为不可能同时压缩与解压缩。
+-z  ：是否同时具有 gzip 的属性？亦即是否需要用 gzip 压缩？
+-j  ：是否同时具有 bzip2 的属性？亦即是否需要用 bzip2 压缩？
+-v  ：压缩的过程中显示档案！这个常用，但不建议用在背景执行过程！
+-f  ：使用档名，请留意，在 f 之后要立即接档名喔！不要再加参数！
+　　　例如使用『 tar -zcvfP tfile sfile』就是错误的写法，要写成
+　　　『 tar -zcvPf tfile sfile』才对喔！
+-p  ：使用原档案的原来属性（属性不会依据使用者而变）
+-P  ：可以使用绝对路径来压缩！
+-N  ：比后面接的日期(yyyy/mm/dd)还要新的才会被打包进新建的档案中！
+--exclude FILE：在压缩的过程中，不要将 FILE 打包！
+#+end_verse
+
+范例：
+范例一：将整个 /etc 目录下的档案全部打包成为 /tmp/etc.tar
+#+begin_src sh
+[root@linux ~]# tar -cvf /tmp/etc.tar /etc  <==仅打包，不压缩！
+[root@linux ~]# tar -zcvf /tmp/etc.tar.gz /etc  <==打包后，以 gzip 压缩
+[root@linux ~]# tar -jcvf /tmp/etc.tar.bz2 /etc  <==打包后，以 bzip2 压缩
+# 特别注意，在参数 f 之后的档案档名是自己取的，我们习惯上都用 .tar 来作为辨识。
+# 如果加 z 参数，则以 .tar.gz 或 .tgz 来代表 gzip 压缩过的 tar file ～
+# 如果加 j 参数，则以 .tar.bz2 来作为附档名啊～
+# 上述指令在执行的时候，会显示一个警告讯息：
+# 『tar: Removing leading `/' from member names』那是关于绝对路径的特殊设定。
+#+end_src   
+
+范例二：查阅上述 /tmp/etc.tar.gz 档案内有哪些档案？
+#+begin_src sh
+[root@linux ~]# tar -ztvf /tmp/etc.tar.gz
+# 由于我们使用 gzip 压缩，所以要查阅该 tar file 内的档案时，
+# 就得要加上 z 这个参数了！这很重要的！
+#+end_src   
+
+范例三：将 /tmp/etc.tar.gz 档案解压缩在 /usr/local/src 底下
+#+begin_src sh
+[root@linux ~]# cd /usr/local/src
+[root@linux src]# tar -zxvf /tmp/etc.tar.gz
+# 在预设的情况下，我们可以将压缩档在任何地方解开的！以这个范例来说，
+# 我先将工作目录变换到 /usr/local/src 底下，并且解开 /tmp/etc.tar.gz ，
+# 则解开的目录会在 /usr/local/src/etc 呢！另外，如果您进入 /usr/local/src/etc
+# 则会发现，该目录下的档案属性与 /etc/ 可能会有所不同喔！
+#+end_src  
+
+范例四：在 /tmp 底下，我只想要将 /tmp/etc.tar.gz 内的 etc/passwd 解开
+而已
+#+begin_src sh
+[root@linux ~]# cd /tmp
+[root@linux tmp]# tar -zxvf /tmp/etc.tar.gz etc/passwd
+# 我可以透过 tar -ztvf 来查阅 tarfile 内的文件名称，如果单只要一个档案，
+# 就可以透过这个方式来下达！注意到！ etc.tar.gz 内的根目录 / 是被拿掉了！
+#+end_src  
+
+范例五：将 /etc/ 内的所有档案备份下来，并且保存其权限！
+#+begin_src sh
+[root@linux ~]# tar -zcvpf /tmp/etc.tar.gz /etc
+# 这个 -p 的属性是很重要的，尤其是当您要保留原本档案的属性时！
+#+end_src 
+
+范例六：在 /home 当中，比 2005/06/01 新的档案才备份
+#+begin_src sh
+[root@linux ~]# tar -N '2005/06/01' -zcvf home.tar.gz /home
+#+end_src 
+ 
+范例七：我要备份 /home, /etc ，但不要 /home/dmtsai
+#+begin_src sh
+[root@linux ~]# tar --exclude /home/dmtsai -zcvf myfile.tar.gz /home/* /etc
+#+end_src 
+ 
+范例八：将 /etc/ 打包后直接解开在 /tmp 底下，而不产生档案！
+#+begin_src sh
+[root@linux ~]# cd /tmp
+[root@linux tmp]# tar -cvf - /etc | tar -xvf -
+# 这个动作有点像是 cp -r /etc /tmp 啦～依旧是有其有用途的！
+# 要注意的地方在于输出档变成 - 而输入档也变成 - ，又有一个 | 存在～
+# 这分别代表 standard output, standard input 与管线命令啦！
+#+end_src
+
+
+
+
+** tcpdump命令详解[fn:2]
+用简单的话来定义tcpdump，就是：dump the traffic on a network，根据使用
+者的定义对网络上的数据包进行截获的包分析工具。 tcpdump可以将网络中传送
+的数据包的“头”完全截获下来提供分析。它支持针对网络层、协议、主机、网络
+或端口的过滤，并提供and、or、not等逻辑语句来帮助你去掉无用的信息。
+
+实用命令实例
+默认启动
+
+tcpdump
+普通情况下，直接启动tcpdump将监视第一个网络接口上所有流过的数据包。
+
+监视指定网络接口的数据包
+
+tcpdump -i eth1
+如果不指定网卡，默认tcpdump只会监视第一个网络接口，一般是eth0，下面的例子都没有指定网络接口。　
+
+监视指定主机的数据包
+#+begin_src sh
+打印所有进入或离开sundown的数据包.
+tcpdump host sundown
+也可以指定ip,例如截获所有210.27.48.1 的主机收到的和发出的所有的数据包
+
+tcpdump host 210.27.48.1 
+打印helios 与 hot 或者与 ace 之间通信的数据包
+
+tcpdump host helios and \( hot or ace \)
+截获主机210.27.48.1 和主机210.27.48.2 或210.27.48.3的通信
+
+tcpdump host 210.27.48.1 and \ (210.27.48.2 or 210.27.48.3 \) 
+打印ace与任何其他主机之间通信的IP 数据包, 但不包括与helios之间的数据包.
+
+tcpdump ip host ace and not helios
+如果想要获取主机210.27.48.1除了和主机210.27.48.2之外所有主机通信的ip包，使用命令：
+
+tcpdump ip host 210.27.48.1 and ! 210.27.48.2
+截获主机hostname发送的所有数据
+
+tcpdump -i eth0 src host hostname
+监视所有送到主机hostname的数据包
+
+tcpdump -i eth0 dst host hostname
+ 
+
+监视指定主机和端口的数据包
+
+如果想要获取主机210.27.48.1接收或发出的telnet包，使用如下命令
+
+tcpdump tcp port 23 host 210.27.48.1
+对本机的udp 123 端口进行监视 123 为ntp的服务端口
+
+tcpdump udp port 123 
+#+end_src
+
+监视指定网络的数据包
+#+begin_src sh
+打印本地主机与Berkeley网络上的主机之间的所有通信数据包(nt: ucb-ether, 此处可理解为'Berkeley网络'的网络地址,此表达式最原始的含义可表达为: 打印网络地址为ucb-ether的所有数据包)
+
+tcpdump net ucb-ether
+打印所有通过网关snup的ftp数据包(注意, 表达式被单引号括起来了, 这可以防止shell对其中的括号进行错误解析)
+
+tcpdump 'gateway snup and (port ftp or ftp-data)'
+打印所有源地址或目标地址是本地主机的IP数据包
+
+(如果本地网络通过网关连到了另一网络, 则另一网络并不能算作本地网络.(nt: 此句翻译曲折,需补充).localnet 实际使用时要真正替换成本地网络的名字)
+
+tcpdump ip and not net localnet
+#+end_src 
+
+监视指定协议的数据包
+#+begin_src sh
+打印TCP会话中的的开始和结束数据包, 并且数据包的源或目的不是本地网络上的主机.(nt: localnet, 实际使用时要真正替换成本地网络的名字))
+
+tcpdump 'tcp[tcpflags] & (tcp-syn|tcp-fin) != 0 and not src and dst net localnet'
+打印所有源或目的端口是80, 网络层协议为IPv4, 并且含有数据,而不是SYN,FIN以及ACK-only等不含数据的数据包.(ipv6的版本的表达式可做练习)
+
+tcpdump 'tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)'
+(nt: 可理解为, ip[2:2]表示整个ip数据包的长度, (ip[0]&0xf)<<2)表示ip数据包包头的长度(ip[0]&0xf代表包中的IHL域, 而此域的单位为32bit, 要换算
+
+成字节数需要乘以4,　即左移2.　(tcp[12]&0xf0)>>4 表示tcp头的长度, 此域的单位也是32bit,　换算成比特数为 ((tcp[12]&0xf0) >> 4)　<<　２,　
+即 ((tcp[12]&0xf0)>>2).　((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0　表示: 整个ip数据包的长度减去ip头的长度,再减去
+tcp头的长度不为0, 这就意味着, ip数据包中确实是有数据.对于ipv6版本只需考虑ipv6头中的'Payload Length' 与 'tcp头的长度'的差值, 并且其中表达方式'ip[]'需换成'ip6[]'.)
+
+打印长度超过576字节, 并且网关地址是snup的IP数据包
+
+tcpdump 'gateway snup and ip[2:2] > 576'
+打印所有IP层广播或多播的数据包， 但不是物理以太网层的广播或多播数据报
+
+tcpdump 'ether[0] & 1 = 0 and ip[16] >= 224'
+打印除'echo request'或者'echo reply'类型以外的ICMP数据包( 比如,需要打印所有非ping 程序产生的数据包时可用到此表达式 .
+(nt: 'echo reuqest' 与 'echo reply' 这两种类型的ICMP数据包通常由ping程序产生))
+
+tcpdump 'icmp[icmptype] != icmp-echo and icmp[icmptype] != icmp-echoreply'
+#+end_src
+
+
+Linux tcpdump的选项介绍
+#+begin_src sh
+-a将网络地址和广播地址转变成名字；
+-d将匹配信息包的代码以人们能够理解的汇编格式给出；
+-dd将匹配信息包的代码以c语言程序段的格式给出；
+-ddd将匹配信息包的代码以十进制的形式给出；
+-e在输出行打印出数据链路层的头部信息；
+-f将外部的Internet地址以数字的形式打印出来；
+-l使标准输出变为缓冲行形式；
+-n不把网络地址转换成名字；
+-t在输出的每一行不打印时间戳；
+-v输出一个稍微详细的信息，例如在ip包中可以包括ttl和服务类型的信息；
+-vv输出详细的报文信息；
+-c在收到指定的包的数目后，tcpdump就会停止；
+-F从指定的文件中读取表达式,忽略其它的表达式；
+-i指定监听的网络接口；
+-r从指定的文件中读取包(这些包一般通过-w选项产生)；
+-w直接将包写入文件中，并不分析和打印出来；
+-T将监听到的包直接解释为指定的类型的报文，常见的类型有rpc（远程过程调用）和snmp（简单网络管理协议；）
+#+end_src
+
+** tee
+功能说明：读取标准输入的数据，并将其内容输出成文件。
+
+语 　 法：tee [-ai][--help][--version][文件…]
+
+补充说明：tee指令会从标准输入设备读取数据，将其内容输出到标准输出设备,同时保存成文件。我们可利用tee把管道导入的数据存成文件，甚至一次保存数份文件。
+
+参 　 数：-a 附加到既有文件的后面，而非覆盖它。如果给予tee指令的文件名
+称已经存在，预设会覆盖该文件的内容。加上此参数后，数据会新增在该文件内
+容的最后面，而不会删除原先之内容。
+
+范 　 例：
+
+列出文本文件slayers.story的内容，同时复制3份副本，文件名称分别为
+ss-copy1、ss-copy2、ss-copy3：
+
+$ cat slayers.story |tee ss-copy1 ss-copy2 ss-copy3
+
+** tload
+
+功能说明：显示系统负载状况。
+
+语　　法：tload [-V][-d <间隔秒数>][-s <刻度大小>][终端机编号]
+
+补充说明：tload指令使用ASCII字符简单地以文字模式显示系统负载状态。假设不给予终端机编号，则会在执行tload指令的终端机显示负载情形。
+
+参　　数：
+　-d<间隔秒数> 　设置tload检测系统负载的间隔时间，单位以秒计算。 
+
+　-s<刻度大小> 　设置图表的垂直刻度大小，单位以列计算。 
+
+　-V 　显示版本信息。
+
+** top[fn:3]
+top：动态观察程序的变化
+
+=[root@linux ~]# top [-d] | top [-bnp]=
+
+参数：
+#+begin_verse
+-d ：后面可以接秒数，就是整个程序画面更新的秒数。预设是 5 秒；
+-b ：以批次的方式执行 top ，还有更多的参数可以使用喔！
+通常会搭配数据流重导向来将批次的结果输出成为档案。
+-n ：与 -b 搭配，意义是，需要进行几次 top 的输出结果。
+-p ：指定某些个 PID 来进行观察监测而已。
+在 top 执行过程当中可以使用的按键指令：
+? ：显示在 top 当中可以输入的按键指令；
+P ：以 CPU 的使用资源排序显示；
+M ：以 Memory 的使用资源排序显示；
+N ：以 PID 来排序喔！
+T ：由该 Process 使用的 CPU 时间累积 (TIME+) 排序。
+k ：给予某个 PID 一个讯号 (signal)
+r ：给予某个 PID 重新制订一个 nice 值。
+#+end_verse
+
+
+
+ 
+
+范例1：每两秒钟更新一次 top ，观察整体信息
+#+begin_src sh
+[root@linux ~]# top -d 2
+top - 18:30:36 up 30 days, 7 min, 1 user, load average: 0.42, 0.48, 0.45
+Tasks: 163 total, 1 running, 161 sleeping, 1 stopped, 0 zombie
+Cpu(s): 4.7% us, 4.0% sy, 6.3% ni, 82.5% id, 0.4% wa, 0.1% hi, 2.0% si
+Mem: 1033592k total, 955252k used, 78340k free, 208648k buffers
+Swap: 1052216k total, 728k used, 1051488k free, 360248k cached
+<==如果加入 k 或 r 时，就会有相关的字样出现在这里喔！
+ 
+PID USER PR NI VIRT RES SHR S %CPU %MEM TIME+ COMMAND
+3981 apache 34 19 84012 11m 7352 S 17.3 1.2 0:00.09 httpd
+1454 mysql 16 0 289m 40m 2228 S 3.8 4.0 115:01.32 mysqld
+3985 dmtsai 15 0 2148 904 668 R 3.8 0.1 0:00.03 top
+1 root 16 0 3552 552 472 S 0.0 0.1 0:08.90 init
+2 root RT 0 0 0 0 S 0.0 0.0 0:52.76 migration/0
+3 root 34 19 0 0 0 S 0.0 0.0 0:03.01 ksoftirqd/0
+#+end_src
+
+ 
+
+范例2：将 top 的信息进行 2 次，然后将结果输出到 /tmp/top.txt
+#+begin_src sh
+[root@linux ~]# top -b -n 2 > /tmp/top.txt
+# 这样一来，嘿嘿！就可以将 top 的信息存到 /tmp/top.txt 档案中了。
+#+end_src
+
+ 
+
+范例3：假设 10604 是一个已经存在的 PID ，仅观察该程序？
+#+begin_src sh
+[root@linux ~]# top -d 2 -p10604
+top - 13:53:00 up 51 days, 2:27, 1 user, load average: 0.00, 0.00, 0.00
+Tasks: 1 total, 0 running, 1 sleeping, 0 stopped, 0 zombie
+Cpu(s): 0.0% us, 0.0% sy, 0.0% ni, 100.0% id, 0.0% wa, 0.0% hi, 0.0% si
+Mem: 385676k total, 371760k used, 13916k free, 131164k buffers
+Swap: 1020116k total, 880k used, 1019236k free, 95772k cached
+ 
+PID USER PR NI VIRT RES SHR S %CPU %MEM TIME+ COMMAND
+10604 root 16 0 5396 1544 1244 S 0.0 0.4 0:00.07 bash
+#+end_src
+
+ 
+
+范例四：承上题，上面的 NI 值是 0 ，想要改成 10 的话？
+#+begin_src sh
+# 在范例三的 top 画面当中直接按下 r 之后，会出现如下的图样！
+top - 13:53:00 up 51 days, 2:27, 1 user, load average: 0.00, 0.00, 0.00
+Tasks: 1 total, 0 running, 1 sleeping, 0 stopped, 0 zombie
+Cpu(s): 0.0% us, 0.0% sy, 0.0% ni, 100.0% id, 0.0% wa, 0.0% hi, 0.0% si
+Mem: 385676k total, 371760k used, 13916k free, 131164k buffers
+Swap: 1020116k total, 880k used, 1019236k free, 95772k cached
+PID to renice: 10604
+ 
+PID USER PR NI VIRT RES SHR S %CPU %MEM TIME+ COMMAND
+10604 root 16 0 5396 1544 1244 S 0.0 0.4 0:00.07 bash
+# 之后，可以输入 nice 值了！
+top - 13:53:00 up 51 days, 2:27, 1 user, load average: 0.00, 0.00, 0.00
+Tasks: 1 total, 0 running, 1 sleeping, 0 stopped, 0 zombie
+Cpu(s): 0.0% us, 0.0% sy, 0.0% ni, 100.0% id, 0.0% wa, 0.0% hi, 0.0% si
+Mem: 385676k total, 371760k used, 13916k free, 131164k buffers
+Swap: 1020116k total, 880k used, 1019236k free, 95772k cached
+Renice PID 10604 to value: 10
+ 
+PID USER PR NI VIRT RES SHR S %CPU %MEM TIME+ COMMAND
+10604 root 30 10 5396 1544 1244 S 0.0 0.4 0:00.07 bash
+#+end_src
+
+** touch - 创建文件或修改文件时间
+-a
+更改文件的讀取時間(access time)
+
+-c, --no-create
+不建立任何新檔案
+
+-m
+更改文件的修改時間(modification time)
+
+-t <time> 用于指定时间。格式可以是MMDDhhmm或者yyyyMMDDhhmm。
+
+-r <file> 设置与file相同的时间。
+
+** tty 
+Usage: tty [OPTION]...
+Print the file name of the terminal connected to standard input.
+#+begin_src sh
+  -s, --silent, --quiet   print nothing, only return an exit status
+      --help     display this help and exit
+      --version  output version information and exit
+#+end_src
+
+
+
+
+
+** ulimit[fn:4]
+
+ulimit 通过一些参数选项来管理不同种类的系统资源。在本节，我们将讲解这
+些参数的使用。
+
+ulimit 命令的格式为：ulimit [options] [limit]
+具体的 options 含义以及简单示例可以参考以下表格。
+
+表 1. ulimit 参数说明
+#+begin_src sh
+选项 [options]	含义	例子
+-H	 设置硬资源限制，一旦设置不能增加。	 ulimit – Hs 64；限制硬资源，线程栈大小为 64K。
+-S	 设置软资源限制，设置后可以增加，但是不能超过硬资源设置。	 ulimit – Sn 32；限制软资源，32 个文件描述符。
+-a	 显示当前所有的 limit 信息。	 ulimit – a；显示当前所有的 limit 信息。
+-c	 最大的 core 文件的大小， 以 blocks 为单位。	 ulimit – c unlimited； 对生成的 core 文件的大小不进行限制。
+-d	 进程最大的数据段的大小，以 Kbytes 为单位。	 ulimit -d unlimited；对进程的数据段大小不进行限制。
+-f	 进程可以创建文件的最大值，以 blocks 为单位。	 ulimit – f 2048；限制进程可以创建的最大文件大小为 2048 blocks。
+-l	 最大可加锁内存大小，以 Kbytes 为单位。	 ulimit – l 32；限制最大可加锁内存大小为 32 Kbytes。
+-m	 最大内存大小，以 Kbytes 为单位。	 ulimit – m unlimited；对最大内存不进行限制。
+-n	 可以打开最大文件描述符的数量。	 ulimit – n 128；限制最大可以使用 128 个文件描述符。
+-p	 管道缓冲区的大小，以 Kbytes 为单位。	 ulimit – p 512；限制管道缓冲区的大小为 512 Kbytes。
+-s	 线程栈大小，以 Kbytes 为单位。	 ulimit – s 512；限制线程栈的大小为 512 Kbytes。
+-t	 最大的 CPU 占用时间，以秒为单位。	 ulimit – t unlimited；对最大的 CPU 占用时间不进行限制。
+-u	 用户最大可用的进程数。	 ulimit – u 64；限制用户最多可以使用 64 个进程。
+-v	 进程最大可用的虚拟内存，以 Kbytes 为单位。	 ulimit – v 200000；限制最大可用的虚拟内存为 200000 Kbytes。
+#+end_src
+
+以下几种方式来使用 ulimit：
+
++ 在用户的启动脚本中
+如果用户使用的是 bash，就可以在用户的目录下的 .bashrc 文件中，加入
+ulimit – u 64，来限制用户最多可以使用 64 个进程。此外，可以在与
+.bashrc 功能相当的启动脚本中加入 ulimt。
+
++ 在应用程序的启动脚本中
+如果用户要对某个应用程序 myapp 进行限制，可以写一个简单的脚本 startmyapp。
+ ulimit – s 512 
+
+ myapp 
+
+
+以后只要通过脚本 startmyapp 来启动应用程序，就可以限制应用程序 myapp 的线程栈大小为 512K。
+
++ 直接在控制台输入
+ user@tc511-ui:~>ulimit – p 256 
+
+
+限制管道的缓冲区为 256K。
+
+** umask
+umask设置了用户创建文件的默认权限，它与chmod的效果刚好相反，umask设置
+的是权限“补码”，而chmod设置的是文件权限码。一般在=/etc/profile=、=$[HOME]/.bash_profile=或=$[HOME]/.profile=中设置umask值。
+
+记住u m a s k是从权限中“拿走”相应的位即可。
+
+** uname
+用法：uname [选项]...
+输出一组系统信息。如果不跟随选项，则视为只附加-s 选项。
+
+#+begin_src sh
+  -a, --all 以如下次序输出所有信息。其中若-p 和
+-i 的探测结果不可知则被省略：
+  -s, --kernel-name 输出内核名称
+  -n, --nodename 输出网络节点上的主机名
+  -r, --kernel-release 输出内核发行号
+  -v, --kernel-version 输出内核版本
+  -m, --machine 输出主机的硬件架构名称
+  -p, --processor 输出处理器类型或"unknown"
+  -i, --hardware-platform 输出硬件平台或"unknown"
+  -o, --operating-system 输出操作系统名称
+      --help 显示此帮助信息并退出
+      --version 显示版本信息并退出
+#+end_src
+
+** uniq
+uniq [选项] 文件
+
+说明：这个命令读取输入文件，并比较相邻的行。在正常情况下，第二个及以后
+更多个重复行将被删去，行比较是根据所用字符集的排序序列进行的。该命令加
+工后的结果写到输出文件中。输入文件和输出文件必须不同。如果输入文件用“-
+”表示，则从标准输入读取。
+
+该命令各选项含义如下：、
+
+– c 显示输出中，在每行行首加上本行在文件中出现的次数。它可取代- u和- d选项。
+
+– d 只显示重复行。
+
+– u 只显示文件中不重复的各行。
+
+– n 前n个字段与每个字段前的空白一起被忽略。一个字段是一个非空格、非制表符的字符串，彼此由制表符和空格隔开(字段从0开始编号)。
+
++n 前n个字符被忽略，之前的字符被跳过(字符从0开始编号)。
+
+– f n 与- n相同，这里n是字段数。
+
+– s n 与+n相同，这里n是字符数。
+
+接下来通过实践实例说明：
+
+===========================================
+
+[root@stu100 ~]# cat test
+boy took bat home
+boy took bat home
+girl took bat home
+boy took bat home
+boy took bat home
+dog brought hat home
+dog brought hat home
+dog brought hat home
+看test文件的内容
+
+============================================
+
+[root@stu100 ~]# uniq test
+boy took bat home
+girl took bat home
+boy took bat home
+dog brought hat home
+uniq命令不加任何参数，仅显示连续重复的行一次
+
+============================================
+
+[root@stu100 ~]# uniq -c test
+2 boy took bat home
+1 girl took bat home
+2 boy took bat home
+3 dog brought hat home
+1
+-c 参数显示文件中每行连续出现的次数。
+
+============================================
+
+[root@stu100 ~]# cat test |sort | uniq -c
+1
+4 boy took bat home
+3 dog brought hat home
+1 girl took bat home
+排序后再显示
+
+============================================
+
+[root@stu100 ~]# uniq -d test
+boy took bat home
+boy took bat home
+dog brought hat home
+-d选项仅显示文件中连续重复出现的行。
+
+============================================
+
+[root@stu100 ~]# uniq -u test
+girl took bat home
+-u选项显示文件中没有连续出现的行。
+
+============================================
+
+[root@stu100 ~]# uniq -f 2 -s 2 test
+boy took bat home
+忽略每行的前2个字段，忽略第二 个空白字符和第三个字段的首字符，结果at home
+
+============================================
+
+[root@stu100 ~]# uniq -f 1 test
+boy took bat home
+dog brought hat home
+忽 略每行的第一个字段，这样boy ，girl开头的行看起来是连续重复的行。
+
+============================================
+
+[root@stu100 ~]# uniq -D test
+boy took bat home
+boy took bat home
+boy took bat home
+boy took bat home
+dog brought hat home
+dog brought hat home
+dog brought hat home
+显示所有重复的行，每个重复的行都显示
+
+** useradd
+功能说明：建立用户帐号。
+
+语　　法：useradd [-mMnr][-c <备注>][-d <登入目录>][-e <有效期限>][-f <缓冲天数>][-g <群组>][-G <群组>][-s <shell>][-u <uid>][用户帐号] 或 useradd -D [-b][-e <有效期限>][-f <缓冲天数>][-g <群组>][-G <群组>][-s <shell>]
+
+补充说明：useradd可用来建立用户帐号。帐号建好之后，再用passwd设定帐号的密码．而可用userdel删除帐号。使用useradd指令所建立的帐号，实际上是保存在/etc/passwd文本文件中。
+
+参　　数：
+#+begin_src sh
+　-c<备注> 　加上备注文字。备注文字会保存在passwd的备注栏位中。　 
+　-d<登入目录> 　指定用户登入时的启始目录。 
+　-D 　变更预设值． 
+　-e<有效期限> 　指定帐号的有效期限。 
+　-f<缓冲天数> 　指定在密码过期后多少天即关闭该帐号。 
+　-g<群组> 　指定用户所属的群组。 
+　-G<群组> 　指定用户所属的附加群组。 
+　-m 　自动建立用户的登入目录。 
+　-M 　不要自动建立用户的登入目录。 
+　-n 　取消建立以用户名称为名的群组． 
+　-r 　建立系统帐号。 
+　-s<shell>　 　指定用户登入后所使用的shell。 
+　-u<uid> 　指定用户ID。
+#+end_src
+
+** userdel
+　userdel - 删 除 使 用 者 帐 号 及 相 关 档 案
+
+　　语法
+
+　　userdel [-r] login
+
+　　描述
+
+　　userdel 命 令 修 改 系 统 帐 号 档 删 除 所 有 login 会 参 考 的 部 份 。 使 用 者 名 称 必 须是 存 在 的 。
+
+　　-r
+
+　　使 用 者 目 录 下 的 档 案 一 并 移 除 。 在 其 他 位 置 上 的 档 案 也 将 一 一 找 出 并 删 除 。
+
+　　档案
+
+　　/etc/passwd - 使 用 者 帐 号 资 料 /etc/shadow - 使 用 者 帐 号 资 讯 加 密 /etc/group - 群 组 资 讯
+
+　　警告
+
+　　userdel 不 允 许 你 移 除 正 在线 上 的 使 用 者 帐 号 。 你 必 须
+砍 掉 此 帐 号 现 在 在 系 统 上 执 行 的 程 序 才 能 进 行 帐 号 删
+除 。 不 能 在 NIS client 端 移 除 NIS 属 性 的 东 西 。 这 动 做 须
+在 NIS server 端 上 执 行 。
+
+** usermod
+功能说明：修改用户帐号。
+　　语　　法：usermod [-LU][-c <备注>][-d <登入目录>][-e <有效期限>][-f <缓冲天数>][-g <群组>][-G <群组>][-l <帐号名称>][-s ][-u ][用户帐号]
+
+　　补充说明：usermod可用来修改用户帐号的各项设定。
+
+　　参　　数：
+
+　　-c<备注> 　修改用户帐号的备注文字。
+
+　　-d登入目录> 　修改用户登入时的目录。
+
+　　-e<有效期限> 　修改帐号的有效期限。
+
+　　-f<缓冲天数> 　修改在密码过期后多少天即关闭该帐号。
+
+　　-g<群组> 　修改用户所属的群组。
+
+　　-G<群组> 　修改用户所属的附加群组。
+
+　　-l<帐号名称> 　修改用户帐号名称。
+
+　　-L 　锁定用户密码，使密码无效。
+
+　　-s 　修改用户登入后所使用的shell。
+
+　　-u 　修改用户ID。
+
+　　-U 　解除密码锁定。
+
+** w
+ 打印当前系统活动摘要。
+#+begin_verse
+  语法
+  w [ -h ] [ -u ] [ -w ] [ -l | -s ] [ User ]
+  描述
+  w 命令打印系统中当前活动的摘要。该摘要包含以下内容：
+  用户 登录的用户。
+  tty 用户使用的 tty 名称。
+  注册 @ 用户登录的日期和时间。
+  空闲 自一个程序上次试图从终端读取开始所持续的分钟数。
+  JCPU 该终端上的所有进程及其子进程使用的系统部件时间。
+  PCPU 当前活动进程所使用的系统部件时间。
+
+  -h 禁用标题。
+  -l 用长格式打印摘要。这是缺省值。
+  -s 用短格式打印摘要。在短格式中，tty 是缩写，并且登录时间、系统部件时间和命令参数都被省略。
+  -u 打印日期和时间、自上次系统启动以来的时间总计、登录的用户数和正在运行的进程数。这是缺省值。指定 -u 标志而不指定 -w 或 -h 标志等效于 uptime 命令。
+  -w 等效于同时指定 -u 和 -l 标志，这是缺省值。
+#+end_verse
+
+** wc(word count)
+wc -c filename：显示一个文件的字节数
+
+wc -m filename：显示一个文件的字符数
+
+wc -l filename：显示一个文件的行数
+
+wc -L filename：显示一个文件中的最长行的长度
+
+wc -w filename：显示一个文件的字数
+#+begin_src sh
+[rocrocket@rocrocket programming]$ cat wc1.txt
+1 2
+34 5
+你好
+[rocrocket@rocrocket programming]$ wc -c wc1.txt
+16 wc1.txt 
+[rocrocket@rocrocket programming]$ wc -m wc1.txt
+12 wc1.txt 
+[rocrocket@rocrocket programming]$ wc -l wc1.txt
+3 wc1.txt 
+[rocrocket@rocrocket programming]$ wc -L wc1.txt
+4 wc1.txt 
+[rocrocket@rocrocket programming]$ wc -w wc1.txt
+5 wc1.txt
+#+end_src
+每行结尾的换行符也算一个字符，空格也算一个字符。
+
+由于采用UTF-8编码，所以一个汉字在这里被转换为3字节，所以wc -c显示的结果是16，即“第一行的4个字节＋第二行的5个字节＋第三行的7个字节”＝4+5+7=16。
+
+而当使用-m选项时，一个汉字就作为一个字符计算，所以是4+5+3=12。
+
+当使用-L时，是给出最长行的长度，第二行最长，有4个字符长。（显然是不把换行符计算在内）
+
+使用-w是计算字数，一个字是一个word，所以“34”表示一个word，一个“你好”表示一个word(我试过了，当中文是连在一起的，不管多少个，在计算字数word时，只有一个)，因此2+2+1=5。
+
+插孔说说tab制表符，这个符号比较特殊，当使用-L时，制表符算7个字符（这要依据一个制表符的长度而定，在我的系统中一个制表符算7个空格长度）。而当使用-w时，制表符和空格没有两样，都作为字的间隔来看待。当用-c时，一个制表符也就算一个字符，因为它的确就只是一个字符而已。
+
+如果你直接执行wc wc1.txt，则显示：
+
+[rocrocket@rocrocket programming]$ wc wc1.txt 3  5 16 wc1.txt
+输出信息依次是：行数 字数 字节数 文件名称。
+
+** wget
+
+$ wget -r -np -nd http://example.com/packages/
+这条命令可以下载 http://example.com 网站上 packages 目录中的所有文件。其中，-np 的作用是不遍历父目录，-nd 表示不在本机重新创建目录结构。
+
+$ wget -r -np -nd --accept=iso http://example.com/centos-5/i386/
+与上一条命令相似，但多加了一个 --accept=iso 选项，这指示 wget 仅下载 i386 目录中所有扩展名为 iso 的文件。你也可以指定多个扩展名，只需用逗号分隔即可。
+
+$ wget -i filename.txt
+此命令常用于批量下载的情形，把所有需要下载文件的地址放到 filename.txt 中，然后 wget 就会自动为你下载所有文件了。
+
+$ wget -c http://example.com/really-big-file.iso
+这里所指定的 -c 选项的作用为断点续传。
+
+$ wget -m -k (-H) http://www.example.com/
+该命令可用来镜像一个网站，wget 将对链接进行转换。如果网站中的图像是放
+在另外的站点，那么可以使用 -H 选项。
+
+** Find
+
+Find是一个非常有效的工具，它可以遍历当前目录甚至于整个文件系统来查找某些文件或目录. 
+
+主要选项: 
+#+begin_src sh
+-name	 按照文件名查找文件 
+-perm	 按照文件权限来查找文件 
+-prune	 不在当前指定的目录中查找 
+-user	 按照文件属主来查找文件 
+-group	 按照文件所属的组来查找文件 
+-mtime -n +n	按照文件的更改时间来查找文件，-n表示文件更改时间距现在n天以内，+n表示文件更改时间距现在n天以前. 
+-nogroup	查找无有效所属组的文件，即该文件所属的组不存在 
+-nouser	 查找无有效属主的文件 
+-newer file1 ! file2	查找更改时间比文件file1新但比文件file2旧的文件 
+-type	 查找某一类型的文件 
+
+[	文件类型： 
+b	块设备文件 
+d	目录 
+c	字符设备文件 
+p	管道文件 
+l	符号链接文件 
+f	普通文件 
+]	
+
+-size n[c]	查找文件长度为n块的文件，带有c时表示文件长度以字节计 
+-depth	 在查找文件时，首先查找当前目录中的文件，然后再在其子目录中查找 
+-mount	 在查找文件时不跨越文件系统mount点 
+-follow	 如果find命令遇到符号链接文件，就跟踪到链接所指向的文件 
+-cpio	 对匹配的文件使用cpio命令，就将这些文件备份到磁盘设备中 
+#+end_src
+
+(其余选项，请man find，进一步查看) 
+对find命令选项的一些例子： 
+#+begin_src sh
+  $ find /etc -type d	 ＃在/ etc目录下查找所有的目录 
+  $ find /etc -user yaoyuan	＃在/etc目录下查找文件属主为yaoyuan的文件 
+  $ find . -size +1000000c	＃在当前目录下查找文件长度大于1 M字节的文件 
+#+end_src
+
+** whereis
+whereis命令会在指定的目录中查找符合条件的文件，文件应的属性应属于原始代码，二进制文件，或是帮助文件. 
+
+the path to look for:
+#+begin_src sh
+/bin /etc /sbin /usr/bin
+/usr/etc /usr/games  /usr/include  /usr/lib
+...
+#+end_src
+
+选项： 
+#+begin_src sh
+-b	只查找二进制文件 
+-B	只在设置的目录下查找二进制文件 
+-f	不显示文件名前的路径名称 
+-m	只查找说明文件 
+-M	只在设置的目录下查找说明文件 
+-s	只查找原始代码文件 
+-S	只在设置的目录下查找原始代码文件 
+-u	查找不包含指定类型的文件 
+#+end_src
+
+*** whereis例子 
+#+begin_src sh
+$ whereis mysql 
+mysql: /usr/bin/mysql /etc/mysql /usr/share/mysql/usr/share/man/man1/mysql.1.gz 
+#+end_src
+
+** locate
+locate命令用于查找符合条件的文件，它会去保存文件与目录名称的数据库内，查找符合条件的文件或目录 
+#+begin_src sh
+选项： 
+-u	建立数据库，由根目录开始 
+-U	建立数据库，可以指定开始的位置 
+-e	将排除在寻找的范围之外 
+-f	将特定的档案系统排除在外 
+-q	安静模式，不会显示任何错误讯息 
+-n	至多显示n个输出 
+-r	使用正规运算式 做寻找的条件 
+-o	指定数据库存的名称 
+-d	指定数据库的路径 
+-h	显示辅助讯息 
+-v	显示更多的讯息 
+-V	显示程序的版本讯息 
+#+end_src
+（locate命令可以在搜寻数据库时快速找到档案，数据库由updatedb程序来更新，updatedb是由cron daemon周期性建立的，locate命令在搜寻数据库时比由整个由硬盘资料来搜寻资料来得快，但较差劲的是locate所找到的档案若是最近才建立或刚更名的，可能会找不到，在内定值中，updatedb每天会跑一次，可以由修改crontab来更新设定值。(etc/crontab) 
+　　locate指定用在搜寻符合条件的档案，它会去储存档案与目录名称的数据库内，寻找合乎范本样式条件的档案或目录录，可以使用特殊字元（如"*"或"?"等）来指定范本样式，如指定范本为kcpa*ner, locate会找出所有起始字串为kcpa且结尾为ner的档案或目录，如名称为kcpartner若目录录名称为kcpa_ner则会列出该目录下包括子目录在内的所有档案。 ） 
+
+locate例子： 
+#+begin_src sh
+$ locate inittab 
+/usr/lib/upstart/migrate-inittab.pl 
+/usr/share/terminfo/a/ansi+inittabs 
+#+end_src
+
+** which
+which 和where 相似，只是我们所设置的环境变量$PATH中设置好的路径中寻找；比如； 
+#+begin_src sh
+[root@localhost ~]# which fdisk  
+/sbin/fdisk  
+#+end_src
+
+** who
+** whoami
+** whois
+** xlsatoms 
+功能说明：列出X Server定义的成分。
+
+语　　法：xlsatoms [-display<显示器编号>][-format<输出格式>][-name<成分名称>][-range<列表范围>]
+
+补充说明：执行xlsatoms指令会列出X Server内部所有定义的成分，每个成分都有其编号，您可利用参数设置列表范围，或直接指定欲查询的成分名称。
+
+参　　数：
+  -display<显示器编号>   指定X Server连接的显示器编号，该编号由"0"开始计算， 依序递增。
+  -format<输出格式>   设置成分清单的列表格式，您可使用控制字符改变显示样式。
+  -name<成分名称>   列出指定的成分。
+  -range<列表范围>   设置成分清单的列表范围。
+
+** xlsclients
+功能说明：列出显示器中的客户端应用程序。
+
+语　　法：xlsclients [-al][-display<显示器编号>][-m<最大指令长度>]
+
+补充说明：执行xlsclients指令可列出某个显示器中，正在执行的客户端应用程序信息。
+
+参　　数：
+  -a   列出所有显示器的客户端应用程序信息。
+  -display<显示器编号>   指定X Server连接的显示器编号，该编号由"0"开始计算，依序递增。
+  -l   使用详细格式列表。
+  -m<最大指令长度>   设置显示指令信息的最大长度，单位以字符计算。
+
+** xlsfonts 
+
+功能说明：列出X Server使用的字体。
+
+语　　法：xlsfonts [-1Clmou][-display<主机名称或IP地址>:<显示器编号>][-fn<范本样式>][-ll][-lll][-n<显示栏位数>][-w<每列字符数>]
+
+补充说明：执行xlsfonts指令会显示目前X Server可使用的字体，也能使用范本样式仅列出的符合条件的字体。
+
+参　　数：
+#+begin_src sh
+  -1   仅用单一栏位列出字体清单。
+  -C   使用多个栏位列出字体清单。
+  -display<主机名称或IP地址>:<显示器编号>   指定显示XF86Setup设置画面的主机名称以及欲放在该主机机上的哪个显示器画面。
+  -fn<范本样式>   只列出符合范本样式指定的条件的字体。
+  -l   除字体名称外，同时列出字体的属性。
+  -ll   此参数的效果和指定"l"参数类似，但显示更详细的信息。
+  -lll   此参数的效果和指定"ll"参数类似，但显示更详细的信息。
+  -m   配合参数"-l"使用时，一并列出字体大小的上下限。
+  -n<显示栏位数>   设置每列显示的栏位数。
+  -o   以OpenFont的形式列出字体清单。
+  -u   列出字体清单时不依照其名称排序。
+  -w<每列字符数>   设置每列的最大字符数。
+#+end_src
+
+** zip
+linux zip 命令详解 
+功能说明：压缩文件。 
+语 法：zip [-AcdDfFghjJKlLmoqrSTuvVwXyz$][-b <工作目录>][-ll][-n <字尾字符串>][-t <日期时间>][-<压缩效率>][压缩文件][文件...][-i <范本样式>][-x <范本样式>] 
+补充说明：zip是个使用广泛的压缩程序，文件经它压缩后会另外产生具有".zip"扩展名的压缩文件。 
+参 数： 
+#+begin_verse
+-A 调整可执行的自动解压缩文件。 
+-b<工作目录> 指定暂时存放文件的目录。 
+-c 替每个被压缩的文件加上注释。 
+-d 从压缩文件内删除指定的文件。 
+-D 压缩文件内不建立目录名称。 
+-f 此参数的效果和指定"-u"参数类似，但不仅更新既有文件，如果某些文件原本不存在于压缩文件内，使用本参数会一并将其加入压缩文件中。 
+-F 尝试修复已损坏的压缩文件。 
+-g 将文件压缩后附加在既有的压缩文件之后，而非另行建立新的压缩文件。 
+-h 在线帮助。 
+-i<范本样式> 只压缩符合条件的文件。 
+-j 只保存文件名称及其内容，而不存放任何目录名称。 
+-J 删除压缩文件前面不必要的数据。 
+-k 使用MS-DOS兼容格式的文件名称。 
+-l 压缩文件时，把LF字符置换成LF+CR字符。 
+-ll 压缩文件时，把LF+CR字符置换成LF字符。 
+-L 显示版权信息。 
+-m 将文件压缩并加入压缩文件后，删除原始文件，即把文件移到压缩文件中。 
+-n<字尾字符串> 不压缩具有特定字尾字符串的文件。 
+-o 以压缩文件内拥有最新更改时间的文件为准，将压缩文件的更改时间设成和该文件相同。 
+-q 不显示指令执行过程。 
+-r 递归处理，将指定目录下的所有文件和子目录一并处理。 
+-S 包含系统和隐藏文件。 
+-t<日期时间> 把压缩文件的日期设成指定的日期。 
+-T 检查备份文件内的每个文件是否正确无误。 
+-u 更换较新的文件到压缩文件内。 
+-v 显示指令执行过程或显示版本信息。 
+-V 保存VMS操作系统的文件属性。 
+-w 在文件名称里假如版本编号，本参数仅在VMS操作系统下有效。 
+-x<范本样式> 压缩时排除符合条件的文件。 
+-X 不保存额外的文件属性。 
+-y 直接保存符号连接，而非该连接所指向的文件，本参数仅在UNIX之类的系统下有效。 
+-z 替压缩文件加上注释。 
+-$ 保存第一个被压缩文件所在磁盘的卷册名称。 
+-<压缩效率> 压缩效率是一个介于1-9的数值。
+#+end_verse
+linux unzip 命令详解
+
+功能说明：解压缩zip文件
+
+语 法：unzip [-cflptuvz][-agCjLMnoqsVX][-P <密码>][.zip文件][文件][-d <目录>][-x <文件>] 或 unzip [-Z]
+
+补充说明：unzip为.zip压缩文件的解压缩程序。
+
+参 数：
+
+-c 将解压缩的结果显示到屏幕上，并对字符做适当的转换。
+
+-f 更新现有的文件。
+
+-l 显示压缩文件内所包含的文件。
+
+-p 与-c参数类似，会将解压缩的结果显示到屏幕上，但不会执行任何的转换。
+
+-t 检查压缩文件是否正确。
+
+-u 与-f参数类似，但是除了更新现有的文件外，也会将压缩文件中的其他文件解压缩到目录中。
+
+-v 执行是时显示详细的信息。
+
+-z 仅显示压缩文件的备注文字。
+
+-a 对文本文件进行必要的字符转换。
+
+-b 不要对文本文件进行字符转换。
+
+-C 压缩文件中的文件名称区分大小写。
+
+-j 不处理压缩文件中原有的目录路径。
+
+-L 将压缩文件中的全部文件名改为小写。
+
+-M 将输出结果送到more程序处理。
+
+-n 解压缩时不要覆盖原有的文件。
+
+-o 不必先询问用户，unzip执行后覆盖原有文件。
+
+-P<密码> 使用zip的密码选项。
+
+-q 执行时不显示任何信息。
+
+-s 将文件名中的空白字符转换为底线字符。
+
+-V 保留VMS的文件版本信息。
+
+-X 解压缩时同时回存文件原来的UID/GID。
+
+[.zip文件] 指定.zip压缩文件。
+
+[文件] 指定要处理.zip压缩文件中的哪些文件。
+
+-d<目录> 指定文件解压缩后所要存储的目录。
+
+-x<文件> 指定不要处理.zip压缩文件中的哪些文件。
+
+-Z unzip -Z等于执行zipinfo指令
+
+范例：
+#+begin_src sh
+zip命令可以用来将文件压缩成为常用的zip格式。unzip命令则用来解压缩zip文件。
+
+1. 我想把一个文件abc.txt和一个目录dir1压缩成为yasuo.zip：
+
+＃ zip -r yasuo.zip abc.txt dir1
+
+2.我下载了一个yasuo.zip文件，想解压缩：
+
+# unzip yasuo.zip
+
+3.我当前目录下有abc1.zip，abc2.zip和abc3.zip，我想一起解压缩它们：
+
+＃ unzip abc\?.zip
+
+注释：?表示一个字符，如果用*表示任意多个字符。
+
+4.我有一个很大的压缩文件large.zip，我不想解压缩，只想看看它里面有什么：
+
+# unzip -v large.zip
+
+5.我下载了一个压缩文件large.zip，想验证一下这个压缩文件是否下载完全了
+
+# unzip -t large.zip
+
+6.我用-v选项发现music.zip压缩文件里面有很多目录和子目录，并且子目录中其实都是歌曲mp3文件，我想把这些文件都下载到第一级目录，而不是一层一层建目录：
+
+# unzip -j music.zip
+#+end_src
+
+
