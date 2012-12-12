@@ -1,0 +1,54 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Reservoir sampling
+#+OPTIONS: num:nil H:2
+
+
+* wiki
+http://en.wikipedia.org/wiki/Reservoir_sampling#cite_note-2
+
+* implemention
+#+begin_src sh
+array R[k];    // result
+integer i, j;
+
+// fill the reservoir array
+for each i in 1 to k do
+    R[i] := S[i]
+done;
+
+// replace elements with gradually decreasing probability
+for each i in k+1 to length(S) do
+    j := random(1, i);   // important: inclusive range
+    if j <= k then
+        R[j] := S[i]
+    fi
+done
+#+end_src
+* Relation to Fisher-Yates shuffle
+To initialize an array a of n elements to a randomly shuffled copy of S, both 0-based:
+#+begin_src sh
+   a[0] ← S[0]
+   for i from 1 to n - 1 do
+       r ← random (0 .. i)
+       a[i] ← a[r]
+       a[r] ← S[i]
+#+end_src
+
+Note that although the rest of the cards are shuffled, only the top k are important in the present context. Therefore, the array a need only track the cards in the top k positions while performing the shuffle, reducing the amount of memory needed. Truncating a to length k, the algorithm is modified accordingly:
+
+To initialize an array a to k random elements of S (which is of length n), both 0-based:
+#+begin_src sh
+   a[0] ← S[0]
+   for i from 1 to k - 1 do
+       r ← random (0 .. i)
+       a[i] ← a[r]
+       a[r] ← S[i]
+
+   for i from k to n - 1 do
+       r ← random (0 .. i)
+
+       if (r < k) then a[r] ← S[i]
+#+end_src
+Since the order of the first k cards is immaterial, the first loop can
+be removed and a can be initialized to be the first k items of S. This
+yields Algorithm R.

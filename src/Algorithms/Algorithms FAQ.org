@@ -88,6 +88,26 @@ void ShuffleArray_Fisher_Yates(char* arr, int len)
 }
 #+end_src
 
+
+** Fisher_Yates from begin
+#+begin_src c
+/* Arrange the N elements of ARRAY in random order.
+   Only effective if N is much smaller than RAND_MAX;
+   if this may not be the case, use a better random
+   number generator. */
+void shuffle(int *array, size_t n)
+{
+    if (n > 1) {
+        size_t i;
+	for (i = 0; i < n - 1; i++) {
+	  size_t j = i + rand() / (RAND_MAX / (n - i) + 1);
+	  int t = array[j];
+	  array[j] = array[i];
+	  array[i] = t;
+	}
+    }
+}
+#+end_src
 ** 模拟我们玩牌洗牌的算法
 #+begin_src c
 void ShuffleArray_Manual(char* arr, int len)
@@ -124,3 +144,66 @@ void ShuffleArray_Manual(char* arr, int len)
     }
 }
 #+end_src
+
+* 一个不知道长度的数组，让你随机取出1000个数字。只能走一边。只能常数空间
+resevior sampling
+
+假设当前考虑第n个数， n>1000，如果n<=1000，直接选上。
+从之前的1000个选出来的数里随机选一个出来，以 1000/n的概率和当前数交换。
+#+begin_src sh
+array R[k];    // result
+integer i, j;
+
+// fill the reservoir array
+for each i in 1 to k do
+    R[i] := S[i]
+done;
+
+// replace elements with gradually decreasing probability
+for each i in k+1 to length(S) do
+    j := random(1, i);   // important: inclusive range
+    if j <= k then
+        R[j] := S[i]
+    fi
+done
+#+end_src
+
+
+* 有一个数组，然后你和另外一个人两头开始取数字。每次你只能取两头里面的某一个数字。让你设计一种策略，使得你取的数字尽可能大
+2个的话，先取则赢
+3 1
+3个的话，中间那个如果比两边和大，则先取必输，否则则先取必赢
+2 4 1 
+4 1 2
+1 2 4
+4个的话 分成两组，奇数位一组，偶数位一组，那组大则先取哪组，先取必赢
+1 2 3 4 
+
+现在可以推出规律了，分成两组，奇数位一组，偶数位一组，看哪组和最大，最大的话
+先取哪组，然后一直保持取那一组的数即可
+
+比如
+1 2 3 4 5 6
+偶数位和比较大，先取6 ，对方只能取1或者5，取1你就取2，取5你就取4，保持对方取
+奇数位上的就行了
+
+
+
+1. 静下来，从2，3，4，5,试试，就找出规律啦
+2. 动态规划问题.
+找最大和Max-gain(1,n)，等价于找“比对手最多赢多少”max-diff(1,n) + 
+max-diff(i,j) 为
+1, A[i] - max-diff(i+1,j)
+2, A[j] - max=diff(i,j-1)
+的两个最大值
+边界--- max-diff(i,i) = A[i] only one left, and it's A's turn.
+
+用DP...反着做，O(N^2)
+
+p(i,j) = max { A[i] + min {p(i+2,j), p(i+1,j-1)}, 
+                     A[j] + min {p(i,j-2), p(i+1,j-1)} }
+
+
+
+
+* 

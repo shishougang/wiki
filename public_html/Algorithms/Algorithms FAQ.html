@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Algorithms FAQ"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-11-29T00:48+0800"/>
+<meta name="generated" content="2012-12-13T00:06+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -135,9 +135,13 @@ for the JavaScript code in this tag.
 <li><a href="#sec-1-2">快排Hack法</a></li>
 <li><a href="#sec-1-3">大多数人的实现</a></li>
 <li><a href="#sec-1-4">正确的算法</a></li>
-<li><a href="#sec-1-5">模拟我们玩牌洗牌的算法</a></li>
+<li><a href="#sec-1-5">Fisher<sub>Yates</sub> from begin</a></li>
+<li><a href="#sec-1-6">模拟我们玩牌洗牌的算法</a></li>
 </ul>
 </li>
+<li><a href="#sec-2">一个不知道长度的数组，让你随机取出1000个数字。只能走一边。只能常数空间</a></li>
+<li><a href="#sec-3">有一个数组，然后你和另外一个人两头开始取数字。每次你只能取两头里面的某一个数字。让你设计一种策略，使得你取的数字尽可能大</a></li>
+<li><a href="#sec-4"></a></li>
 </ul>
 </div>
 </div>
@@ -269,13 +273,43 @@ for the JavaScript code in this tag.
 </pre>
 
 
+
 </div>
 
 </div>
 
 <div id="outline-container-1-5" class="outline-3">
-<h3 id="sec-1-5">模拟我们玩牌洗牌的算法</h3>
+<h3 id="sec-1-5">Fisher<sub>Yates</sub> from begin</h3>
 <div class="outline-text-3" id="text-1-5">
+
+
+
+
+<pre class="src src-c"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Arrange the N elements of ARRAY in random order.</span>
+<span style="color: #ff7f24;">   Only effective if N is much smaller than RAND_MAX;</span>
+<span style="color: #ff7f24;">   if this may not be the case, use a better random</span>
+<span style="color: #ff7f24;">   number generator. </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">shuffle</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">n</span>)
+{
+    <span style="color: #00ffff;">if</span> (n &gt; 1) {
+        <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">i</span>;
+        <span style="color: #00ffff;">for</span> (i = 0; i &lt; n - 1; i++) {
+          <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">j</span> = i + rand() / (RAND_MAX / (n - i) + 1);
+          <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span> = array[j];
+          array[j] = array[i];
+          array[i] = t;
+        }
+    }
+}
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-1-6" class="outline-3">
+<h3 id="sec-1-6">模拟我们玩牌洗牌的算法</h3>
+<div class="outline-text-3" id="text-1-6">
 
 
 
@@ -315,13 +349,110 @@ for the JavaScript code in this tag.
 }
 </pre>
 
+
 </div>
+</div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2">一个不知道长度的数组，让你随机取出1000个数字。只能走一边。只能常数空间</h2>
+<div class="outline-text-2" id="text-2">
+
+<p>resevior sampling
+</p>
+<p>
+假设当前考虑第n个数， n&gt;1000，如果n&lt;=1000，直接选上。
+从之前的1000个选出来的数里随机选一个出来，以 1000/n的概率和当前数交换。
+</p>
+
+
+<pre class="src src-sh">array R[k];    // result
+<span style="color: #b0c4de;">integer</span> i, j;
+
+// fill the reservoir array
+<span style="color: #00ffff;">for</span> each i<span style="color: #00ffff;"> in</span> 1 to k do
+    R[i] := S[i]
+<span style="color: #00ffff;">done</span>;
+
+// replace elements with gradually decreasing probability
+<span style="color: #00ffff;">for</span> each i<span style="color: #00ffff;"> in</span> k+1 to length(S) <span style="color: #00ffff;">do</span>
+    j := random(1, i);   // important: inclusive range
+    <span style="color: #00ffff;">if</span> j &lt;= k then
+        R[j] := S[i]
+    <span style="color: #00ffff;">fi</span>
+<span style="color: #00ffff;">done</span>
+</pre>
+
+
+
+</div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">有一个数组，然后你和另外一个人两头开始取数字。每次你只能取两头里面的某一个数字。让你设计一种策略，使得你取的数字尽可能大</h2>
+<div class="outline-text-2" id="text-3">
+
+<p>2个的话，先取则赢
+3 1
+3个的话，中间那个如果比两边和大，则先取必输，否则则先取必赢
+2 4 1 
+4 1 2
+1 2 4
+4个的话 分成两组，奇数位一组，偶数位一组，那组大则先取哪组，先取必赢
+1 2 3 4 
+</p>
+<p>
+现在可以推出规律了，分成两组，奇数位一组，偶数位一组，看哪组和最大，最大的话
+先取哪组，然后一直保持取那一组的数即可
+</p>
+<p>
+比如
+1 2 3 4 5 6
+偶数位和比较大，先取6 ，对方只能取1或者5，取1你就取2，取5你就取4，保持对方取
+奇数位上的就行了
+</p>
+
+
+<ol>
+<li>静下来，从2，3，4，5,试试，就找出规律啦
+</li>
+<li>动态规划问题.
+</li>
+</ol>
+
+<p>找最大和Max-gain(1,n)，等价于找“比对手最多赢多少”max-diff(1,n) + 
+max-diff(i,j) 为
+1, A[i] - max-diff(i+1,j)
+2, A[j] - max=diff(i,j-1)
+的两个最大值
+边界&mdash; max-diff(i,i) = A[i] only one left, and it's A's turn.
+</p>
+<p>
+用DP&hellip;反着做，O(N<sup>2</sup>)
+</p>
+<p>
+p(i,j) = max { A[i] + min {p(i+2,j), p(i+1,j-1)}, 
+                     A[j] + min {p(i,j-2), p(i+1,j-1)} }
+</p>
+
+
+
+</div>
+
+</div>
+
+<div id="outline-container-4" class="outline-2">
+<h2 id="sec-4"></h2>
+<div class="outline-text-2" id="text-4">
+
 </div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-11-29T00:48+0800</p>
+<p class="date">Date: 2012-12-13T00:06+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.2+ with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

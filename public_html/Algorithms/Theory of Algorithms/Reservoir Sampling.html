@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+               "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Reservoir sampling</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+<meta name="title" content="Reservoir sampling"/>
+<meta name="generator" content="Org-mode"/>
+<meta name="generated" content="2012-12-13T00:06+0800"/>
+<meta name="author" content="Shi Shougang"/>
+<meta name="description" content=""/>
+<meta name="keywords" content=""/>
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  html { font-family: Times, serif; font-size: 12pt; }
+  .title  { text-align: center; }
+  .todo   { color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #add8e6; font-weight:normal }
+  .target { }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  {margin-left:auto; margin-right:0px;  text-align:right;}
+  .left   {margin-left:0px;  margin-right:auto; text-align:left;}
+  .center {margin-left:auto; margin-right:auto; text-align:center;}
+  p.verse { margin-left: 3% }
+  pre {
+	border: 1pt solid #AEBDCC;
+	background-color: #F3F5F7;
+	padding: 5pt;
+	font-family: courier, monospace;
+        font-size: 90%;
+        overflow:auto;
+  }
+  table { border-collapse: collapse; }
+  td, th { vertical-align: top;  }
+  th.right  { text-align:center;  }
+  th.left   { text-align:center;   }
+  th.center { text-align:center; }
+  td.right  { text-align:right;  }
+  td.left   { text-align:left;   }
+  td.center { text-align:center; }
+  dt { font-weight: bold; }
+  div.figure { padding: 0.5em; }
+  div.figure p { text-align: center; }
+  div.inlinetask {
+    padding:10px;
+    border:2px solid gray;
+    margin:10px;
+    background: #ffffcc;
+  }
+  textarea { overflow-x: auto; }
+  .linenr { font-size:smaller }
+  .code-highlighted {background-color:#ffff00;}
+  .org-info-js_info-navigation { border-style:none; }
+  #org-info-js_console-label { font-size:10px; font-weight:bold;
+                               white-space:nowrap; }
+  .org-info-js_search-highlight {background-color:#ffff00; color:#000000;
+                                 font-weight:bold; }
+  /*]]>*/-->
+</style><link rel="stylesheet" href="./assets/stylesheet.css" type="text/css"/>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012  Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+
+</head>
+<body>
+<div id="org-div-home-and-up" style="text-align:right;font-size:70%;white-space:nowrap;">
+ <a accesskey="h" href="../../index.html"> UP </a>
+ |
+ <a accesskey="H" href="../../index.html"> HOME </a>
+</div>
+
+<div id="preamble">
+
+</div>
+
+<div id="content">
+<h1 class="title">Reservoir sampling</h1>
+
+
+
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">wiki</a></li>
+<li><a href="#sec-2">implemention</a></li>
+<li><a href="#sec-3">Relation to Fisher-Yates shuffle</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-1" class="outline-2">
+<h2 id="sec-1">wiki</h2>
+<div class="outline-text-2" id="text-1">
+
+<p><a href="http://en.wikipedia.org/wiki/Reservoir_sampling#cite_note-2">http://en.wikipedia.org/wiki/Reservoir_sampling#cite_note-2</a>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2">implemention</h2>
+<div class="outline-text-2" id="text-2">
+
+
+
+
+<pre class="src src-sh">array R[k];    // result
+<span style="color: #b0c4de;">integer</span> i, j;
+
+// fill the reservoir array
+<span style="color: #00ffff;">for</span> each i<span style="color: #00ffff;"> in</span> 1 to k do
+    R[i] := S[i]
+<span style="color: #00ffff;">done</span>;
+
+// replace elements with gradually decreasing probability
+<span style="color: #00ffff;">for</span> each i<span style="color: #00ffff;"> in</span> k+1 to length(S) <span style="color: #00ffff;">do</span>
+    j := random(1, i);   // important: inclusive range
+    <span style="color: #00ffff;">if</span> j &lt;= k then
+        R[j] := S[i]
+    <span style="color: #00ffff;">fi</span>
+<span style="color: #00ffff;">done</span>
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">Relation to Fisher-Yates shuffle</h2>
+<div class="outline-text-2" id="text-3">
+
+<p>To initialize an array a of n elements to a randomly shuffled copy of S, both 0-based:
+</p>
+
+
+<pre class="src src-sh">a[0] &#8592; S[0]
+<span style="color: #00ffff;">for</span> i from 1 to n - 1 do
+    <span style="color: #b0c4de;">r</span> &#8592; random (0 .. i)
+    a[i] &#8592; a[r]
+    a[r] &#8592; S[i]
+</pre>
+
+
+<p>
+Note that although the rest of the cards are shuffled, only the top k are important in the present context. Therefore, the array a need only track the cards in the top k positions while performing the shuffle, reducing the amount of memory needed. Truncating a to length k, the algorithm is modified accordingly:
+</p>
+<p>
+To initialize an array a to k random elements of S (which is of length n), both 0-based:
+</p>
+
+
+<pre class="src src-sh">a[0] &#8592; S[0]
+<span style="color: #00ffff;">for</span> i from 1 to k - 1 do
+    <span style="color: #b0c4de;">r</span> &#8592; random (0 .. i)
+    a[i] &#8592; a[r]
+    a[r] &#8592; S[i]
+
+<span style="color: #00ffff;">for</span> i from k to n - 1 do
+    <span style="color: #b0c4de;">r</span> &#8592; random (0 .. i)
+
+    <span style="color: #00ffff;">if</span> (<span style="color: #b0c4de;">r</span> &lt; k) <span style="color: #00ffff;">then</span> a[r] &#8592; S[i]
+</pre>
+
+<p>
+Since the order of the first k cards is immaterial, the first loop can
+be removed and a can be initialized to be the first k items of S. This
+yields Algorithm R.
+</p></div>
+</div>
+</div>
+
+<div id="postamble">
+<p class="date">Date: 2012-12-13T00:06+0800</p>
+<p class="author">Author: Shi Shougang</p>
+<p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.2+ with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
+<a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
+
+</div>
+</body>
+</html>
