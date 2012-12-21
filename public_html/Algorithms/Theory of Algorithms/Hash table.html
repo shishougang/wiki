@@ -1,0 +1,755 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+               "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Hash table</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+<meta name="title" content="Hash table"/>
+<meta name="generator" content="Org-mode"/>
+<meta name="generated" content="2012-12-14T23:25+0800"/>
+<meta name="author" content="Shi Shougang"/>
+<meta name="description" content=""/>
+<meta name="keywords" content=""/>
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  html { font-family: Times, serif; font-size: 12pt; }
+  .title  { text-align: center; }
+  .todo   { color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #add8e6; font-weight:normal }
+  .target { }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  {margin-left:auto; margin-right:0px;  text-align:right;}
+  .left   {margin-left:0px;  margin-right:auto; text-align:left;}
+  .center {margin-left:auto; margin-right:auto; text-align:center;}
+  p.verse { margin-left: 3% }
+  pre {
+	border: 1pt solid #AEBDCC;
+	background-color: #F3F5F7;
+	padding: 5pt;
+	font-family: courier, monospace;
+        font-size: 90%;
+        overflow:auto;
+  }
+  table { border-collapse: collapse; }
+  td, th { vertical-align: top;  }
+  th.right  { text-align:center;  }
+  th.left   { text-align:center;   }
+  th.center { text-align:center; }
+  td.right  { text-align:right;  }
+  td.left   { text-align:left;   }
+  td.center { text-align:center; }
+  dt { font-weight: bold; }
+  div.figure { padding: 0.5em; }
+  div.figure p { text-align: center; }
+  div.inlinetask {
+    padding:10px;
+    border:2px solid gray;
+    margin:10px;
+    background: #ffffcc;
+  }
+  textarea { overflow-x: auto; }
+  .linenr { font-size:smaller }
+  .code-highlighted {background-color:#ffff00;}
+  .org-info-js_info-navigation { border-style:none; }
+  #org-info-js_console-label { font-size:10px; font-weight:bold;
+                               white-space:nowrap; }
+  .org-info-js_search-highlight {background-color:#ffff00; color:#000000;
+                                 font-weight:bold; }
+  /*]]>*/-->
+</style><link rel="stylesheet" href="./assets/stylesheet.css" type="text/css"/>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012  Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+
+</head>
+<body>
+<div id="org-div-home-and-up" style="text-align:right;font-size:70%;white-space:nowrap;">
+ <a accesskey="h" href="../../index.html"> UP </a>
+ |
+ <a accesskey="H" href="../../index.html"> HOME </a>
+</div>
+
+<div id="preamble">
+
+</div>
+
+<div id="content">
+<h1 class="title">Hash table</h1>
+
+
+
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Hash table</a></li>
+<li><a href="#sec-2">Choosing a good hash function</a></li>
+<li><a href="#sec-3">Collision resolution</a></li>
+<li><a href="#sec-4">Features</a></li>
+<li><a href="#sec-5">Independent packages</a></li>
+<li><a href="#sec-6">General Purpose Hash Function Algorithms</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-1" class="outline-2">
+<h2 id="sec-1">Hash table</h2>
+<div class="outline-text-2" id="text-1">
+
+<p>In computing, a hash table (also hash map) is a data structure used to
+implement an associative array, a structure that can map keys to
+values. A hash table uses a hash function to compute an index into an
+array of buckets, from which the correct value can be found.<sup><a class="footref" name="fnr-.1" href="#fn-.1">1</a></sup>
+</p></div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2">Choosing a good hash function</h2>
+<div class="outline-text-2" id="text-2">
+
+<p>Some authors claim that good hash functions should have the <a href="http://en.wikipedia.org/wiki/Avalanche_effect">avalanche effect</a>; that is, a single-bit change in the input key should affect,
+on average, half the bits in the output. Some popular hash functions
+do not have this property.
+</p>
+<ul>
+<li id="sec-2-1">avalanche affect<br/>
+The avalanche effect is evident if, when an input is changed slightly
+(for example, flipping a single bit) the output changes significantly
+(e.g., half the output bits flip).
+
+<p>
+If a block cipher or cryptographic hash function does not exhibit the
+avalanche effect to a significant degree, then it has poor
+randomization, and thus a cryptanalyst can make predictions about the
+input, being given only the output. This may be sufficient to
+partially or completely break the algorithm. Thus, the avalanche
+effect is a desirable condition from the point of view of the designer
+of the cryptographic algorithm or device.
+</p>
+<p>
+Constructing a cipher or hash to exhibit a substantial avalanche
+effect is one of the primary design objectives. This is why most block
+ciphers are product ciphers. <b>It is also why hash functions have large data blocks.</b> Both of these features allow small changes to propagate
+rapidly through iterations of the algorithm, such that every bit of
+the output should depend on every bit of the input before the
+algorithm terminates
+</p>
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">Collision resolution</h2>
+<div class="outline-text-2" id="text-3">
+
+<ul>
+<li id="sec-3-1">Separate chaining<br/>
+</li>
+</ul>
+<ul>
+<li id="sec-3-2">Open addressing<br/>
+</li>
+</ul>
+<ul>
+<li id="sec-3-3">Coalesced hashing<br/>
+</li>
+</ul>
+<ul>
+<li id="sec-3-4">Robin Hood hashing<br/>
+</li>
+</ul>
+<ul>
+<li id="sec-3-5">Cuckoo hashing<br/>
+</li>
+</ul>
+<ul>
+<li id="sec-3-6">Hopscotch hashing<br/>
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-4" class="outline-2">
+<h2 id="sec-4">Features</h2>
+<div class="outline-text-2" id="text-4">
+
+
+<ul>
+<li id="sec-4-1">Advantages<br/>
+The main advantage of hash tables over other table data structures is
+speed. This advantage is more apparent when the number of entries is
+large. Hash tables are particularly efficient when the maximum number
+of entries can be predicted in advance, so that the bucket array can
+be allocated once with the optimum size and never resized.
+
+<p>
+If the set of key-value pairs is fixed and known ahead of time (so
+insertions and deletions are not allowed), one may reduce the average
+lookup cost by a careful choice of the hash function, bucket table
+size, and internal data structures. In particular, one may be able to
+devise a hash function that is collision-free, or even perfect (see
+below). In this case the keys need not be stored in the table.
+</p>
+</li>
+</ul>
+<ul>
+<li id="sec-4-2">Drawbacks<br/>
+Although operations on a hash table take constant time on average, the
+cost of a good hash function can be significantly higher than the
+inner loop of the lookup algorithm for a sequential list or search
+tree. Thus hash tables are not effective when the number of entries is
+very small. (However, in some cases the high cost of computing the
+hash function can be mitigated by saving the hash value together with
+the key.)
+
+<p>
+For certain string processing applications, such as spell-checking,
+hash tables may be less efficient than tries, finite automata, or Judy
+arrays. Also, if each key is represented by a small enough number of
+bits, then, instead of a hash table, one may use the key directly as
+the index into an array of values. Note that there are no collisions
+in this case.
+</p>
+<p>
+The entries stored in a hash table can be enumerated efficiently (at
+constant cost per entry), but only in some pseudo-random order.
+Therefore, there is no efficient way to locate an entry whose key is
+nearest to a given key. Listing all n entries in some specific order
+generally requires a separate sorting step, whose cost is proportional
+to log(n) per entry. In comparison, ordered search trees have lookup
+and insertion cost proportional to log(n), but allow finding the
+nearest key at about the same cost, and ordered enumeration of all
+entries at constant cost per entry.
+</p>
+<p>
+If the keys are not stored (because the hash function is
+collision-free), there may be no easy way to enumerate the keys that
+are present in the table at any given moment.
+</p>
+<p>
+Although the average cost per operation is constant and fairly small,
+the cost of a single operation may be quite high. In particular, if
+the hash table uses dynamic resizing, an insertion or deletion
+operation may occasionally take time proportional to the number of
+entries. This may be a serious drawback in real-time or interactive
+applications.
+</p>
+<p>
+Hash tables in general exhibit poor locality of reference—that is, the
+data to be accessed is distributed seemingly at random in memory.
+Because hash tables cause access patterns that jump around, this can
+trigger microprocessor cache misses that cause long delays. Compact
+data structures such as arrays searched with linear search may be
+faster, if the table is relatively small and keys are integers or
+other short strings. According to Moore's Law, cache sizes are growing
+exponentially and so what is considered "small" may be increasing. The
+optimal performance point varies from system to system.
+</p>
+<p>
+Hash tables become quite inefficient when there are many collisions.
+While extremely uneven hash distributions are extremely unlikely to
+arise by chance, a malicious adversary with knowledge of the hash
+function may be able to supply information to a hash that creates
+worst-case behavior by causing excessive collisions, resulting in very
+poor performance, e.g. a denial of service attack. In critical
+applications, universal hashing can be used; a data structure with
+better worst-case guarantees may be preferable.
+</p></li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-5" class="outline-2">
+<h2 id="sec-5">Independent packages</h2>
+<div class="outline-text-2" id="text-5">
+
+<ul>
+<li id="sec-5-1">SparseHash<br/>
+<a href="http://code.google.com/p/sparsehash/">http://code.google.com/p/sparsehash/</a>
+
+<p>
+SparseHash (formerly Google SparseHash) An extremely memory-efficient
+hash<sub>map</sub> implementation, with only 2 bits/entry of overhead. The
+SparseHash library has several C++ hash map implementations with
+different performance characteristics, including one that optimizes
+for memory use and another that optimizes for speed.
+</p></li>
+</ul>
+<ul>
+<li id="sec-5-2">SunriseDD<br/>
+<a href="http://www.sunrisetel.net/software/devtools/sunrise-data-dictionary.shtml">http://www.sunrisetel.net/software/devtools/sunrise-data-dictionary.shtml</a>
+
+<p>
+SunriseDD An open source C library for hash table storage of arbitrary
+data objects with lock-free lookups, built-in reference counting and
+guaranteed order iteration. The library can participate in external
+reference counting systems or use its own built-in reference counting.
+It comes with a variety of hash functions and allows the use of
+runtime supplied hash functions via callback mechanism. Source code is
+well documented.
+</p>
+</li>
+</ul>
+<ul>
+<li id="sec-5-3">uthash<br/>
+<a href="http://uthash.sourceforge.net/">http://uthash.sourceforge.net/</a>
+
+<p>
+uthash This is an easy-to-use hash table for C structures.
+</p>
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-6" class="outline-2">
+<h2 id="sec-6">General Purpose Hash Function Algorithms<sup><a class="footref" name="fnr-.2" href="#fn-.2">2</a></sup></h2>
+<div class="outline-text-2" id="text-6">
+
+<ul>
+<li id="sec-6-1">choose the hash function<br/>
+<ul>
+<li>Data Distribution
+  This is the measure of how well the hash function distributes the
+  hash values of elements within a set of data.
+</li>
+<li>Hash Function Efficiency
+  This is the measure of how efficiently the hash function produces
+  hash values for elements within a set of data.
+</li>
+</ul>
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-2">Hashing Methodologies<br/>
+Hash functions are typically defined by the way they create hash
+values from data. There are two main methodologies for a hash
+algorithm to implement, they are:
+<ul>
+<li>Addative and Multiplicative Hashing
+  This is where the hash value is constructed by traversing through
+  the data and continually incrementing an initial value by a
+  calculated value relative to an element within the data. The
+  calculation done on the element value is usually in the form of a
+  multiplication by a prime number.
+
+<p>
+  <a href="#pic"><img src="./files/hashfunction-img1.png" alt="hashfunction-img1.png"/></a>
+</p></li>
+<li>Rotative Hashing
+  Same as additive hashing in that every element in the data string is
+  used to construct the hash, but unlike additive hashing the values
+  are put through a process of bitwise shifting. Usually a combination
+  of both left and right shifts, the shift amounts as before are
+  prime. The result of each process is added to some form of
+  accumulating count, the final result being the hash value is passed
+  back as the final accumulation.
+  <a href="#pic"><img src="./files/hashfunction-img2.png" alt="hashfunction-img2.png"/></a>
+</li>
+</ul>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-3">Various Forms Of Hashing<br/>
+<ul>
+<li>String Hashing
+  Used in the area of data storage access. Mainly within indexing of
+  data and as a structural back end to associative containers
+</li>
+<li>Cryptographic Hashing
+  Used for data/user verification and authentication. A strong
+  cryptographic hash function has the property of being very difficult
+  to reverse the result of the hash and hence reproduce the original
+  piece of data. 
+</li>
+<li>Geometric Hashing
+   This form of hashing is used in the field of computer vision for
+  the detection of classified objects in arbitrary scenes.
+</li>
+<li>Bloom Filters
+   A Bloom filter allows for the "state of existence" of a large set
+  of possible values to be represented with a much smaller piece of
+  memory than the sum size of the values. In computer science this is
+  known as a membership query and is core concept in associative
+  containers.
+</li>
+</ul>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-4">Available Hash Functions<br/>
+<ul>
+<li id="sec-6-4-1">RS Hash Function<br/>
+A simple hash function from Robert Sedgwicks Algorithms in C book.
+I've added some simple optimizations to the algorithm in order to
+speed up its hashing process.
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">RSHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">b</span>    = 378551;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>    = 63689;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span> = 0;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>    = 0;
+
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash = hash * a + (*str);
+      a    = a * b;
+   }
+
+   <span style="color: #00ffff;">return</span> hash;
+}
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-4-2">JS Hash Function<br/>
+A bitwise hash function written by Justin Sobel
+
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">JSHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span> = 1315423911;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>    = 0;
+
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash ^= ((hash &lt;&lt; 5) + (*str) + (hash &gt;&gt; 2));
+   }
+
+   <span style="color: #00ffff;">return</span> hash;
+}
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-4-3">PJW Hash Function<br/>
+This hash algorithm is based on work by Peter J. Weinberger of AT&amp;T
+Bell Labs. The book Compilers (Principles, Techniques and Tools) by
+Aho, Sethi and Ulman, recommends the use of hash functions that employ
+the hashing methodology found in this particular algorithm.
+
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">PJWHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">BitsInUnsignedInt</span> = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>)(<span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>) * 8);
+   <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ThreeQuarters</span>     = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>)((BitsInUnsignedInt  * 3) / 4);
+   <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">OneEighth</span>         = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>)(BitsInUnsignedInt / 8);
+   <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">HighBits</span>          = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>)(0xFFFFFFFF) &lt;&lt; (BitsInUnsignedInt - OneEighth);
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span>              = 0;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">test</span>              = 0;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>                 = 0;
+
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash = (hash &lt;&lt; OneEighth) + (*str);
+
+      <span style="color: #00ffff;">if</span>((test = hash &amp; HighBits)  != 0)
+      {
+         hash = (( hash ^ (test &gt;&gt; ThreeQuarters)) &amp; (~HighBits));
+      }
+   }
+
+   <span style="color: #00ffff;">return</span> hash;
+}
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-4-4">ELF Hash Function<br/>
+
+<p>
+Similar to the PJW Hash function, but tweaked for 32-bit processors.
+Its the hash function widely used on most UNIX systems.
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ELFHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span> = 0;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>    = 0;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>    = 0;
+
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash = (hash &lt;&lt; 4) + (*str);
+      <span style="color: #00ffff;">if</span>((x = hash &amp; 0xF0000000L) != 0)
+      {
+         hash ^= (x &gt;&gt; 24);
+      }
+      hash &amp;= ~x;
+   }
+
+   <span style="color: #00ffff;">return</span> hash;
+}
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-4-5">BKDR Hash Function<br/>
+
+<p>
+This hash function comes from Brian Kernighan and Dennis Ritchie's
+book "The C Programming Language". It is a simple hash function using
+a strange set of possible seeds which all constitute a pattern of
+31&hellip;.31&hellip;31 etc, it seems to be very similar to the DJB hash
+function.
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">BKDRHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">seed</span> = 131; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">31 131 1313 13131 131313 etc.. </span><span style="color: #ff7f24;">*/</span>
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span> = 0;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>    = 0;
+
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash = (hash * seed) + (*str);
+   }
+
+   <span style="color: #00ffff;">return</span> hash;
+}
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-4-6">SDBM Hash Function<br/>
+
+<p>
+This is the algorithm of choice which is used in the open source SDBM
+project. The hash function seems to have a good over-all distribution
+for many different data sets. It seems to work well in situations
+where there is a high variance in the MSBs of the elements in a data
+set.
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">SDBMHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span> = 0;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>    = 0;
+
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash = (*str) + (hash &lt;&lt; 6) + (hash &lt;&lt; 16) - hash;
+   }
+
+   <span style="color: #00ffff;">return</span> hash;
+}
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-4-7">DJB Hash Function<br/>
+
+<p>
+An algorithm produced by Professor Daniel J. Bernstein and shown first
+to the world on the usenet newsgroup comp.lang.c. It is one of the
+most efficient hash functions ever published.
+</p>
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">DJBHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span> = 5381;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>    = 0;
+
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash = ((hash &lt;&lt; 5) + hash) + (*str);
+   }
+
+   <span style="color: #00ffff;">return</span> hash;
+}
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-4-8">DEK Hash Function<br/>
+
+<p>
+An algorithm proposed by Donald E. Knuth in The Art Of Computer
+Programming Volume 3, under the topic of sorting and search chapter
+6.4.
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">DEKHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span> = len;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>    = 0;
+
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash = ((hash &lt;&lt; 5) ^ (hash &gt;&gt; 27)) ^ (*str);
+   }
+   <span style="color: #00ffff;">return</span> hash;
+}
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-4-9">other<br/>
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">BPHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span> = 0;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>    = 0;
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash = hash &lt;&lt; 7 ^ (*str);
+   }
+
+   <span style="color: #00ffff;">return</span> hash;
+}
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">End Of BP Hash Function </span><span style="color: #ff7f24;">*/</span>
+
+
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FNVHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">fnv_prime</span> = 0x811C9DC5;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span>      = 0;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>         = 0;
+
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash *= fnv_prime;
+      hash ^= (*str);
+   }
+
+   <span style="color: #00ffff;">return</span> hash;
+}
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">End Of FNV Hash Function </span><span style="color: #ff7f24;">*/</span>
+
+
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">APHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">hash</span> = 0xAAAAAAAA;
+   <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>    = 0;
+
+   <span style="color: #00ffff;">for</span>(i = 0; i &lt; len; str++, i++)
+   {
+      hash ^= ((i &amp; 1) == 0) ? (  (hash &lt;&lt;  7) ^ (*str) * (hash &gt;&gt; 3)) :
+                               (~((hash &lt;&lt; 11) + ((*str) ^ (hash &gt;&gt; 5))));
+   }
+
+   <span style="color: #00ffff;">return</span> hash;
+}
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">End Of AP Hash Function </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+<p class="footnote"><sup><a class="footnum" name="fn-.1" href="#fnr-.1">1</a></sup> <a href="http://en.wikipedia.org/wiki/Hash_table">http://en.wikipedia.org/wiki/Hash_table</a>
+</p>
+
+
+<p class="footnote"><sup><a class="footnum" name="fn-.2" href="#fnr-.2">2</a></sup> <a href="http://www.partow.net/programming/hashfunctions/index.html#DJBHashFunction">http://www.partow.net/programming/hashfunctions/index.html#DJBHashFunction</a>
+</p>
+
+
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<div id="postamble">
+<p class="date">Date: 2012-12-14T23:25+0800</p>
+<p class="author">Author: Shi Shougang</p>
+<p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.2+ with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
+<a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
+
+</div>
+</body>
+</html>

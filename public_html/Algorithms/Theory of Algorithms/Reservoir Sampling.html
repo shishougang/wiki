@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Reservoir sampling"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-12-13T00:06+0800"/>
+<meta name="generated" content="2012-12-14T23:25+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -132,6 +132,11 @@ for the JavaScript code in this tag.
 <li><a href="#sec-1">wiki</a></li>
 <li><a href="#sec-2">implemention</a></li>
 <li><a href="#sec-3">Relation to Fisher-Yates shuffle</a></li>
+<li><a href="#sec-4">Proof of correctness1</a></li>
+<li><a href="#sec-5">Proof2</a></li>
+<li><a href="#sec-6">Distributing Reservoir Sampling</a></li>
+<li><a href="#sec-7">Weighted Reservoir Sampling Variation</a></li>
+<li><a href="#sec-8">Ref</a></li>
 </ul>
 </div>
 </div>
@@ -215,11 +220,133 @@ Since the order of the first k cards is immaterial, the first loop can
 be removed and a can be initialized to be the first k items of S. This
 yields Algorithm R.
 </p></div>
+
+</div>
+
+<div id="outline-container-4" class="outline-2">
+<h2 id="sec-4">Proof of correctness1</h2>
+<div class="outline-text-2" id="text-4">
+
+<p>After n ≥ k items in S have been processed, each of those items is
+sampled with probability s/n.
+</p>
+<p>
+prove the theorem by induction. Basic step: for n = k the statement
+is obviously correct. Inductive step: assuming the correctness for n = m,
+next we show that the statement is also correct for n = m + 1.
+</p>
+<p>
+第（m+1）个数是o， 前m个书中的o<sup>'</sup> 
+</p><ul>
+<li>o被采样仅当为o产生的随机数x的范围在[1,m]，o被采样的概率为s/(m+1)
+</li>
+<li>o<sup>'</sup> 被采样（在处理数o后）仅当（i）在采样前m个数的过程后它任然在 （ii）
+  为o产生的随机数x不等于数o<sup>'在数组的位置</sup>
+</li>
+</ul>
+
+
+<p>
+通过归纳法得，（i）以概率s/m发生，（ii）以m/(m+1)概率发生，因为两事件
+独立，同时发生的概率(s/m) * (m/(m+1)) = s/(m+1)
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-5" class="outline-2">
+<h2 id="sec-5">Proof2</h2>
+<div class="outline-text-2" id="text-5">
+
+<p>reservoir为R是简单的一个大小为s的数组，数据流是大小为n的D
+</p>
+<p>
+对于第k+1个数，一个位置&lt;=k的元素i在R中的概率为s/k.元素i被这第k+1数取代的概率是这第k+1个数被选中的概率乘以元素i被选中的概率，是s/(k+1) * 1/s = 1/(k+1), 即元素i不被取代的概率是k/(k+1).
+</p>
+<p>
+所以在第k+1次取数后，任意给定的元素仍然在R中的概率是：（第k步被选中并且没有在第k+1步被移除）
+=s/k * k/(k+1) = s/(k+1).
+所以，当k+1 = n时，任意元素在R中的概率是s/n.
+</p></div>
+
+</div>
+
+<div id="outline-container-6" class="outline-2">
+<h2 id="sec-6">Distributing Reservoir Sampling<sup><a class="footref" name="fnr-.1" href="#fn-.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-6">
+
+<p> distribute the reservoir sampling algorithm to n nodes.
+</p>
+<p>
+Split the data stream into n partitions, one for each node. Apply
+reservoir sampling with reservoir size s, the final reservoir size, on
+each of the partitions. Finally, aggregate each reservoir into a final
+reservoir sample by carrying out reservoir sampling on them.
+</p>
+<p>
+Lets say you split data of size n into 2 nodes, where each partition
+is of size n/2. Sub-reservoirs R1 and R2 are each of size s.
+</p>
+<p>
+Probability that a record will be in sub-reservoir is: 
+s / (n/2) = 2s/n
+</p>
+<p>
+The Probability that a record will end up in the final reservoir given
+it is in a sub-reservoir is: s/(2s) = 1/2.
+</p>
+<p>
+It follows that the probability any given record will end up in the final reservoir is: 
+2s/n * 1/2 = s/n
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-7" class="outline-2">
+<h2 id="sec-7">Weighted Reservoir Sampling Variation<sup><a class="footref" name="fnr-.2" href="#fn-.2">2</a></sup></h2>
+<div class="outline-text-2" id="text-7">
+
+<p>This is sorta tricky. Pavlos S. Efraimidis figured out the solution in
+2005 in a paper titled Weighted Random Sampling with a Reservoir. It
+works similarly to the assigning a random number solution above.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-8" class="outline-2">
+<h2 id="sec-8">Ref</h2>
+<div class="outline-text-2" id="text-8">
+
+<p><a href="http://blogs.msdn.com/b/spt/archive/2008/02/05/reservoir-sampling.aspx">http://blogs.msdn.com/b/spt/archive/2008/02/05/reservoir-sampling.aspx</a>
+</p>
+<p>
+<a href="http://code-slim-jim.blogspot.hk/2010/06/reservoir-sampling.html">http://code-slim-jim.blogspot.hk/2010/06/reservoir-sampling.html</a>
+</p>
+<p>
+<a href="http://the-lost-beauty.blogspot.hk/2010/01/on-fairness-of-reservoir-sampling.html">http://the-lost-beauty.blogspot.hk/2010/01/on-fairness-of-reservoir-sampling.html</a>
+</p>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+<p class="footnote"><sup><a class="footnum" name="fn-.1" href="#fnr-.1">1</a></sup> <a href="http://blogs.msdn.com/b/spt/archive/2008/02/05/reservoir-sampling.aspx">http://blogs.msdn.com/b/spt/archive/2008/02/05/reservoir-sampling.aspx</a>
+</p>
+
+
+<p class="footnote"><sup><a class="footnum" name="fn-.2" href="#fnr-.2">2</a></sup> <a href="http://gregable.com/2007/10/reservoir-sampling.html">http://gregable.com/2007/10/reservoir-sampling.html</a>
+</p>
+
+
+</div>
+</div>
+
+</div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-12-13T00:06+0800</p>
+<p class="date">Date: 2012-12-14T23:25+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.2+ with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

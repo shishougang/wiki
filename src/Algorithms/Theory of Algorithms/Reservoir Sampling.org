@@ -52,3 +52,67 @@ To initialize an array a to k random elements of S (which is of length n), both 
 Since the order of the first k cards is immaterial, the first loop can
 be removed and a can be initialized to be the first k items of S. This
 yields Algorithm R.
+* Proof of correctness1
+After n ≥ k items in S have been processed, each of those items is
+sampled with probability s/n.
+
+prove the theorem by induction. Basic step: for n = k the statement
+is obviously correct. Inductive step: assuming the correctness for n = m,
+next we show that the statement is also correct for n = m + 1.
+
+第（m+1）个数是o， 前m个书中的o^' 
++ o被采样仅当为o产生的随机数x的范围在[1,m]，o被采样的概率为s/(m+1)
++ o^' 被采样（在处理数o后）仅当（i）在采样前m个数的过程后它任然在 （ii）
+  为o产生的随机数x不等于数o^'在数组的位置
+
+通过归纳法得，（i）以概率s/m发生，（ii）以m/(m+1)概率发生，因为两事件
+独立，同时发生的概率(s/m) * (m/(m+1)) = s/(m+1)
+
+* Proof2
+reservoir为R是简单的一个大小为s的数组，数据流是大小为n的D
+
+对于第k+1个数，一个位置<=k的元素i在R中的概率为s/k.元素i被这第k+1数取代的概率是这第k+1个数被选中的概率乘以元素i被选中的概率，是s/(k+1) * 1/s = 1/(k+1), 即元素i不被取代的概率是k/(k+1).
+
+所以在第k+1次取数后，任意给定的元素仍然在R中的概率是：（第k步被选中并且没有在第k+1步被移除）
+=s/k * k/(k+1) = s/(k+1).
+所以，当k+1 = n时，任意元素在R中的概率是s/n.
+* Distributing Reservoir Sampling[fn:2]
+ distribute the reservoir sampling algorithm to n nodes.
+
+Split the data stream into n partitions, one for each node. Apply
+reservoir sampling with reservoir size s, the final reservoir size, on
+each of the partitions. Finally, aggregate each reservoir into a final
+reservoir sample by carrying out reservoir sampling on them.
+
+Lets say you split data of size n into 2 nodes, where each partition
+is of size n/2. Sub-reservoirs R1 and R2 are each of size s.
+
+Probability that a record will be in sub-reservoir is: 
+s / (n/2) = 2s/n
+
+The Probability that a record will end up in the final reservoir given
+it is in a sub-reservoir is: s/(2s) = 1/2.
+
+It follows that the probability any given record will end up in the final reservoir is: 
+2s/n * 1/2 = s/n
+
+* Weighted Reservoir Sampling Variation[fn:1]
+This is sorta tricky. Pavlos S. Efraimidis figured out the solution in
+2005 in a paper titled Weighted Random Sampling with a Reservoir. It
+works similarly to the assigning a random number solution above.
+
+* Ref
+http://blogs.msdn.com/b/spt/archive/2008/02/05/reservoir-sampling.aspx
+
+http://code-slim-jim.blogspot.hk/2010/06/reservoir-sampling.html
+
+http://the-lost-beauty.blogspot.hk/2010/01/on-fairness-of-reservoir-sampling.html
+
+* Footnotes
+
+[fn:1] http://gregable.com/2007/10/reservoir-sampling.html
+
+[fn:2] http://blogs.msdn.com/b/spt/archive/2008/02/05/reservoir-sampling.aspx
+
+
+
