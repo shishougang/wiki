@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Shell Scrap"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-11-29T00:47+0800"/>
+<meta name="generated" content="2013-02-10T00:29+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -66,7 +66,7 @@
 @licstart  The following is the entire license notice for the
 JavaScript code in this tag.
 
-Copyright (C) 2012  Free Software Foundation, Inc.
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
 
 The JavaScript code in this tag is free software: you can
 redistribute it and/or modify it under the terms of the GNU
@@ -160,9 +160,14 @@ for the JavaScript code in this tag.
 <li><a href="#sec-6">Debug</a>
 <ul>
 <li><a href="#sec-6-1">Watching your script run</a></li>
+<li><a href="#sec-6-2">trap command</a></li>
+<li><a href="#sec-6-3">tee command</a></li>
+<li><a href="#sec-6-4">use debug hook</a></li>
+<li><a href="#sec-6-5">command</a></li>
 </ul>
 </li>
-<li><a href="#sec-7">Command</a></li>
+<li><a href="#sec-7">String Operators</a></li>
+<li><a href="#sec-8">Command</a></li>
 </ul>
 </div>
 </div>
@@ -254,6 +259,9 @@ Expression    Description
 <li>string1 = string2  True if string1 equals string2.
 </li>
 <li>string1 != string2  True if string1 does not equal string2.
+</li>
+<li>-a (AND) and -o (OR). The -a and -o operators are similar to the &amp;&amp;
+  and || operators used with exit statuses. 
 </li>
 </ul>
 
@@ -577,13 +585,218 @@ example.:
 </li>
 </ul>
 </div>
+
+</div>
+
+<div id="outline-container-6-2" class="outline-3">
+<h3 id="sec-6-2">trap command</h3>
+<div class="outline-text-3" id="text-6-2">
+
+<p>其基本的语法是:
+</p>
+
+
+<pre class="src src-sh"><span style="color: #00ffff;">trap</span> <span style="color: #ffa07a;">'command'</span> signal
+</pre>
+
+<p>
+其中signal是要捕获的信号，command是捕获到指定的信号之后，所要执行的命
+令。可以用kill –l命令看到系统中全部可用的信号名，捕获信号后所执行的命
+令可以是任何一条或多条合法的shell语句，也可以是一个函数名。
+</p>
+<p>
+shell脚本在执行时，会产生三个所谓的“伪信号”，(之所以称之为“伪信号”
+是因为这三个信号是由shell产生的，而其它的信号是由操作系统产生的)，通过
+使用trap命令捕获这三个“伪信号”并输出相关信息对调试非常有帮助。
+</p>
+
+
+
+<pre class="src src-sh">EXIT  &#20174;&#19968;&#20010;&#20989;&#25968;&#20013;&#36864;&#20986;&#25110;&#25972;&#20010;&#33050;&#26412;&#25191;&#34892;&#23436;&#27605; 
+ERR   &#24403;&#19968;&#26465;&#21629;&#20196;&#36820;&#22238;&#38750;&#38646;&#29366;&#24577;&#26102;(&#20195;&#34920;&#21629;&#20196;&#25191;&#34892;&#19981;&#25104;&#21151;) 
+DEBUG &#33050;&#26412;&#20013;&#27599;&#19968;&#26465;&#21629;&#20196;&#25191;&#34892;&#20043;&#21069; 
+</pre>
+
+<ul>
+<li id="sec-6-2-1">example<br/>
+<ul>
+<li>ERR
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh"><span style="color: #87cefa;">ERRTRAP</span>()
+     {
+       <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"[LINE:$1] Error: Command or function exited with status $?"</span>
+     }
+     foo()
+     {
+       <span style="color: #00ffff;">return</span> 1;
+     }
+     <span style="color: #00ffff;">trap</span> <span style="color: #ffa07a;">'ERRTRAP $LINENO'</span> ERR
+    abc
+    foo
+</pre>
+
+<ul>
+<li>DEBUG
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/bin/</span><span style="color: #00ffff;">bash</span>
+<span style="color: #00ffff;">trap</span> <span style="color: #ffa07a;">'echo &#8220;before execute line:$LINENO, a=$a,b=$b,c=$c&#8221;'</span> DEBUG
+<span style="color: #eedd82;">a</span>=1
+<span style="color: #00ffff;">if</span> [ <span style="color: #ffa07a;">"$a"</span> -eq 1 ]
+<span style="color: #00ffff;">then</span>
+    <span style="color: #eedd82;">b</span>=2
+<span style="color: #00ffff;">else</span>
+    <span style="color: #eedd82;">b</span>=1
+<span style="color: #00ffff;">fi</span>
+<span style="color: #eedd82;">c</span>=3
+<span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"end"</span>
+</pre>
+
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-6-3" class="outline-3">
+<h3 id="sec-6-3">tee command</h3>
+<div class="outline-text-3" id="text-6-3">
+
+<p>tee命令会从标准输入读取数据，将其内容输出到标准输出设备,同时又可将内容
+保存成文件。
+</p>
+<p>
+运行这个脚本，实际输出的却不是本机的ip地址，而是广播地址,这时我们可以借助tee命令，输出某些中间结果，将上述脚本片段修改为： 
+</p>
+
+
+<pre class="src src-sh"><span style="color: #eedd82;">ipaddr</span>=<span style="color: #fa8072;">`/sbin/ifconfig | grep 'inet addr:' | grep -v '127.0.0.1'</span>
+<span style="color: #fa8072;">| tee temp.txt | cut -d : -f3 | awk '{print $1}'`</span>
+<span style="color: #b0c4de;">echo</span> $<span style="color: #eedd82;">ipaddr</span>
+</pre>
+
+
+<p>
+之后，将这段脚本再执行一遍，然后查看temp.txt文件的内容： 
+</p>
+
+
+<pre class="src src-sh">$ cat temp.txt
+inet addr:192.168.0.1  Bcast:192.168.0.255  Mask:255.255.255.0
+</pre>
+
+
+
+
+
+
+</div>
+
+</div>
+
+<div id="outline-container-6-4" class="outline-3">
+<h3 id="sec-6-4">use debug hook</h3>
+<div class="outline-text-3" id="text-6-4">
+
+<p>使用DEBUG宏来控制是否要输出调试信息，在shell脚本中我们同样可以使用这样
+的机制，如下列代码所示： 
+</p>
+
+
+<pre class="src src-sh"><span style="color: #00ffff;">if</span> [ &#8220;$<span style="color: #eedd82;">DEBUG</span>&#8221; = &#8220;true&#8221; ]; <span style="color: #00ffff;">then</span>
+<span style="color: #b0c4de;">echo</span> &#8220;debugging&#8221;  <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">&#27492;&#22788;&#21487;&#20197;&#36755;&#20986;&#35843;&#35797;&#20449;&#24687;</span>
+<span style="color: #00ffff;">fi</span>
+</pre>
+
+
+
+<pre class="src src-sh"><span style="color: #87cefa;">DEBUG</span>()
+{
+    <span style="color: #00ffff;">if</span> [ <span style="color: #ffa07a;">"$DEBUG"</span> = <span style="color: #ffa07a;">"true"</span> ]; <span style="color: #00ffff;">then</span>
+        $<span style="color: #eedd82;">@</span>&#12288;&#12288;
+    <span style="color: #00ffff;">fi</span>
+}
+<span style="color: #eedd82;">a</span>=1
+DEBUG echo <span style="color: #ffa07a;">"a=$a"</span>
+</pre>
+
+
+
+</div>
+
+</div>
+
+<div id="outline-container-6-5" class="outline-3">
+<h3 id="sec-6-5">command</h3>
+<div class="outline-text-3" id="text-6-5">
+
+<p>-n 只读取shell脚本，但不实际执行
+-x 进入跟踪方式，显示所执行的每一条命令
+-c "string" 从strings中读取命令 <code>{sh -c 'a=1;b=2;let c=$a+$b;echo "c=$c"'}</code>
+</p><ul>
+<li id="sec-6-5-1">对"-x"选项的增强<br/>
+几个shell内置的环境变量： 
+
+<ul>
+<li>$LINENO
+  代表shell脚本的当前行号，类似于C语言中的内置宏_<sub>LINE</sub>__ 
+
+</li>
+<li>$FUNCNAME
+  函数的名字，类似于C语言中的内置宏_<sub>func</sub>__,但宏_<sub>func</sub>_<sub>只能代表当前所</sub>
+  在的函数名，而$FUNCNAME的功能更强大，它是一个数组变量，其中包含了整
+  个调用链上所有的函数的名字，故变量${FUNCNAME[0]}代表shell脚本当前正
+  在执行的函数的名字，而变量${FUNCNAME[1]}则代表调用函数${FUNCNAME[0]}
+  的函数的名字，余者可以依此类推。 
+
+</li>
+<li>$PS4
+  $PS4的值将被显示在“-x”选项输出的每一条命令的前面
+</li>
+</ul>
+
+
+
+
+
+<pre class="src src-sh">$ export <span style="color: #eedd82;">PS4</span>=<span style="color: #ffa07a;">'+{$LINENO:${FUNCNAME[0]}} '</span>
+</pre>
+
+
+
+
+
+
+
+</li>
+</ul>
+</div>
 </div>
 
 </div>
 
 <div id="outline-container-7" class="outline-2">
-<h2 id="sec-7">Command</h2>
+<h2 id="sec-7">String Operators</h2>
 <div class="outline-text-2" id="text-7">
+
+
+</div>
+
+</div>
+
+<div id="outline-container-8" class="outline-2">
+<h2 id="sec-8">Command</h2>
+<div class="outline-text-2" id="text-8">
 
 <p>!$
 !$是一个特殊的环境变量，它代表了上一个命令的最后一个字符串。如：你可能会这样：
@@ -663,9 +876,9 @@ history | awk '{CMD[$2]++;count++;} END { for (a in CMD )print CMD[a] " " CMD[a]
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-11-29T00:47+0800</p>
+<p class="date">Date: 2013-02-10T00:29+0800</p>
 <p class="author">Author: Shi Shougang</p>
-<p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.2+ with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
+<p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3d with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
 
 </div>

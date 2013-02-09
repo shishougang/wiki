@@ -1,0 +1,573 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Doxygen Notes
+#+OPTIONS: num:nil H:2
+
+
+* Doxygen Download Page
+http://www.stack.nl/~dimitri/doxygen/download.html
+
+* Compiling from source on UNIX
+** Unpack the archive, unless you already have done that:
+#+begin_src sh
+gunzip doxygen-$VERSION.src.tar.gz    # uncompress the archive
+tar xf doxygen-$VERSION.src.tar       # unpack it
+#+end_src
+** Run the configure script:
+#+begin_src sh
+sh ./configure
+#+end_src
+The script tries to determine the platform you use, the make tool
+(which must be GNU make) and the perl interpreter. It will report what
+it finds.
+
+To override the auto detected platform and compiler you can run
+configure as follows:
+#+begin_src sh
+configure --platform platform-type
+#+end_src
+See the PLATFORMS file for a list of possible platform options.
+
+If you have Qt-4.3 or higher installed and want to build the GUI
+front-end, you should run the configure script with the
+–with-doxywizard option:
+#+begin_src sh
+configure --with-doxywizard
+#+end_src
+For an overview of other configuration options use
+#+begin_src sh
+configure --help
+#+end_src
+** Compile the program by running make:
+#+begin_src sh
+make
+#+end_src
+The program should compile without problems and the binaries (doxygen
+and optionally doxywizard) should be available in the bin directory of
+the distribution.
+
+** Optional: Generate the user manual.
+#+begin_src sh
+make docs
+#+end_src
+To let doxygen generate the HTML documentation.
+
+The HTML directory of the distribution will now contain the html
+documentation (just point a HTML browser to the file index.html in the
+html directory). You will need the python interpreter for this.
+
+** Optional: Generate a PDF version of the manual (you will need pdflatex, makeindex, and egrep for this).
+#+begin_src sh
+make pdf
+#+end_src
+The PDF manual doxygen_manual.pdf will be located in the latex
+directory of the distribution. Just view and print it via the acrobat
+reader.
+
+
+
+** install
+make install
+
+* Tools used to develop doxygen
+Doxygen was developed and tested under Linux & MacOSX using the following open-source tools:
+
++ GCC version 3.3.6 (Linux) and 4.0.1 (MacOSX)
++ GNU flex version 2.5.33 (Linux) and 2.5.4 (MacOSX)
++ GNU bison version 1.75
++ GNU make version 3.80
++ Perl version 5.8.1
++ VIM version 6.2
++ Firefox 1.5
++ Trolltech's tmake version 1.3 (included in the distribution)
++ teTeX version 2.0.2
++ CVS 1.12.12
+
+* LaTex and Ghostscript
+LaTex:
+
++ MikTex: http://www.miktex.org/
++ XemTex: http://www.xemtex.org/
+
+Ghostscript:
+
+http://sourceforge.net/projects/ghostscript/
+
+* Getting started 
+** Step 1: Creating a configuration file
+doxygen -g <config-file>
+
+If you use - (i.e. the minus sign) as the file name then doxygen will try to read the configuration file from standard input (stdin), which can be useful for scripting.
+
+** Step 2: Running doxygen
+To generate the documentation you can now enter: 
+
+doxygen <config-file>
+
+** Step 3: Documenting the sources
+1. Place a special documentation block in front of the declaration or
+   definition of the member, class or namespace. For file, class and
+   namespace members it is also allowed to place the documentation
+   directly after the member.
+
+   See section Special comment blocks to learn more about special
+   documentation blocks.
+
+2. Place a special documentation block somewhere else (another file or
+   another location) and put a structural command in the documentation
+   block. A structural command links a documentation block to a
+   certain entity that can be documented (e.g. a member, class,
+   namespace or file).
+
+   See section Documentation at other places to learn more about
+   structural commands.
+
+
+During parsing the following steps take place:
+
++ Markdown formatting is replaced by corresponding HTML or special commands.
++ The special commands inside the documentation are executed. See
+  section Special Commands for an overview of all commands.
++ If a line starts with some whitespace followed by one or more
+  asterisks (*) and then optionally more whitespace, then all
+  whitespace and asterisks are removed.
++ All resulting blank lines are treated as a paragraph separators.
+  This saves you from placing new-paragraph commands yourself in order
+  to make the generated documentation readable.
++ Links are created for words corresponding to documented classes
+  (unless the word is preceded by a %; then the word will not be
+  linked and the % sign is removed).
++ Links to members are created when certain patterns are found in the
+  text. See section Automatic link generation for more information on
+  how the automatic link generation works.
++ HTML tags that are in the documentation are interpreted and
+  converted to  equivalents for the  output. See section HTML Commands
+  for an overview of all supported HTML tags.
+
+
+* Documenting the code 
+** Comment blocks for C-like languages (C/C++/C#/Objective-C/PHP/Java)
+*** There are several ways to mark a comment block as a detailed description: 
+
+**** 1.You can use the JavaDoc style, which consist of a C-style comment block starting with two *'s, like this:
+#+begin_src sh
+/**
+ * ... text ...
+ */
+#+end_src
+**** 2.or you can use the Qt style and add an exclamation mark (!) after the opening of a C-style comment block, as shown in this example:
+#+begin_src sh
+/*!
+ * ... text ...
+ */
+#+end_src
+In both cases the intermediate *'s are optional, so
+#+begin_src sh
+/*!
+ ... text ...
+*/
+#+end_src
+is also valid.
+
+
+**** 3.A third alternative is to use a block of at least two C++ comment lines, where each line starts with an additional slash or an exclamation mark. Here are examples of the two cases:
+#+begin_src sh
+///
+/// ... text ...
+///
+#+end_src
+or
+#+begin_src sh
+//!
+//!... text ...
+//!
+#+end_src
+Note that a blank line ends a documentation block in this case.
+
+
+**** 4. Some people like to make their comment blocks more visible 
+in the documentation. For this purpose you can use the following:
+#+begin_src sh
+/********************************************//**
+ *  ... text
+ ***********************************************/
+(note the 2 slashes to end the normal comment block and start a special comment block).
+#+end_src
+or
+#+begin_src sh
+/////////////////////////////////////////////////
+/// ... text ...
+/////////////////////////////////////////////////
+#+end_src
+
+*** For the brief description there are also several possibilities: 
+**** 1.One could use the \brief 
+command with one of the above comment blocks. This command ends at the
+end of a paragraph, so the detailed description follows after an empty
+line.
+
+Here is an example:
+#+begin_src sh
+/*! \brief Brief description.
+ *         Brief description continued.
+ *
+ *  Detailed description starts here.
+ */
+#+end_src
+**** 2.If JAVADOC_AUTOBRIEF is set to YES 
+in the configuration file, then using JavaDoc style comment blocks
+will automatically start a brief description which ends at the first
+dot followed by a space or new line. Here is an example:
+
+#+begin_src sh
+/** Brief description which ends at this dot. Details follow
+ *  here.
+ */
+#+end_src
+The option has the same effect for multi-line special C++ comments: 
+#+begin_src sh
+/// Brief description which ends at this dot. Details follow
+/// here.
+#+end_src
+**** 3.A third option is to use a special C++ style comment 
+which does not span more than one line. Here are two examples: 
+#+begin_src sh
+/// Brief description.
+/** Detailed description. */
+#+end_src
+or
+#+begin_src sh
+//! Brief description.
+
+//! Detailed description 
+//! starts here.
+#+end_src
+Note the blank line in the last example, which is required to separate
+the brief description from the block containing the detailed
+description. The JAVADOC_AUTOBRIEF should also be set to NO for this
+case.
+
+
+As you can see doxygen is quite flexible. If you have multiple detailed descriptions, like in the following example:
+#+begin_src sh
+//! Brief description, which is
+//! really a detailed description since it spans multiple lines.
+/*! Another detailed description!
+ */
+#+end_src
+
+*** Putting documentation after members
+    If you want to document the members of a file, struct, union, class,
+or enum, it is sometimes desired to place the documentation block
+after the member instead of before. For this purpose you have to put
+an additional < marker in the comment block. Note that this also works
+for the parameters of a function.
+
+Here are some examples: 
+#+begin_src sh
+int var; /*!< Detailed description after the member */
+#+end_src
+This block can be used to put a Qt style detailed documentation block after a member. Other ways to do the same are: 
+#+begin_src sh
+int var; /**< Detailed description after the member */
+#+end_src
+or 
+#+begin_src sh
+int var; //!< Detailed description after the member
+         //!< 
+#+end_src
+or 
+#+begin_src sh
+int var; ///< Detailed description after the member
+         ///< 
+#+end_src
+Most often one only wants to put a brief description after a member.
+This is done as follows: 
+#+begin_src sh
+int var; //!< Brief description after the member
+#+end_src
+or 
+#+begin_src sh
+int var; ///< Brief description after the member
+#+end_src
+For functions one can use the @param command to document the parameters and then use [in], [out], [in,out] to document the direction. For inline documentation this is also possible by starting with the direction attribute, e.g. 
+#+begin_src sh
+void foo(int v /**< [in] docs for input parameter v. */);
+#+end_src
+*** Examples
+**** Here is an example of a documented piece of C++ code using the Qt style: 
+#+begin_src c
+  
+  //!  A test class. 
+  /*!  
+  A more elaborate class description.
+  ,*/
+  class Test
+  {  
+   public:
+    //! An enum.
+    /*! More detailed enum description. */
+    enum TEnum {
+      TVal1, /*!< Enum value TVal1. */
+      TVal2, /*!< Enum value TVal2. */
+      TVal3  /*!< Enum value TVal3. */
+    }
+    //! Enum pointer.
+    /*! Details. */
+    *enumPtr,
+      //! Enum variable.
+      /*! Details. */
+      enumVar;
+  
+    //! A constructor.
+    /*!      A more elaborate description of the constructor.    */
+    Test();
+    //! A destructor.
+    /*!
+      A more elaborate description of the destructor.
+    */
+    ~Test();
+  
+    //! A normal member taking two arguments and returning an integer value.
+    /*!
+      \param a an integer argument.
+      \param s a constant character pointer.
+      \return The test results
+      \sa Test(), ~Test(), testMeToo() and publicVar()
+    */
+    int testMe(int a,const char *s);
+    //! A pure virtual member.
+    /*!
+      \sa testMe()
+      \param c1 the first argument.
+      \param c2 the second argument.
+    */
+    virtual void testMeToo(char c1,char c2) = 0;
+    //! A public variable.
+    /*!
+      Details.
+    */
+    int publicVar;
+    //! A function variable.
+    /*!
+      Details.
+    */
+    int (*handler)(int a,int b);
+  };
+#+end_src
+**** using JAVADOC style
+This is not according the JavaDoc specification however, where the
+first sentence of the documentation block is automatically treated as
+a brief description. To enable this behavior you should set
+JAVADOC_AUTOBRIEF to YES in the configuration file. If you enable this
+option and want to put a dot in the middle of a sentence without
+ending it, you should put a backslash and a space after it. Here is an
+example: 
+
+#+begin_src c
+  /** Brief description (e.g.\ using only a few words). Details follow. */
+#+end_src
+
+#+begin_src c
+  /**
+   *  A test class. A more elaborate class description.
+   */
+  class Test
+  {
+   public:
+    /**
+     * An enum.
+     * More detailed enum description.
+     */
+    enum TEnum {
+      TVal1, /**< enum value TVal1. */
+      TVal2, /**< enum value TVal2. */
+      TVal3  /**< enum value TVal3. */
+    }
+    *enumPtr, /**< enum pointer. Details. */
+      enumVar;  /**< enum variable. Details. */
+    
+    /**
+     * A constructor.
+     * A more elaborate description of the constructor.
+     */
+    Test();
+    /**
+     * A destructor.
+     * A more elaborate description of the destructor.
+     */
+    ~Test();
+  
+    /**
+     *a normal member taking two arguments and returning an integer value.
+     * @param a an integer argument.
+     * @param s a constant character pointer.
+     * @see Test()
+     * @see ~Test()
+     * @see testMeToo()
+     * @see publicVar()
+     * @return The test results
+     */
+    int testMe(int a,const char *s);
+    /**
+     * A pure virtual member.
+     * @see testMe()
+     * @param c1 the first argument.
+     * @param c2 the second argument.
+     */
+    virtual void testMeToo(char c1,char c2) = 0;
+    /**
+     * a public variable.
+     * Details.
+     */
+    int publicVar;
+    /**
+     * a function variable.
+     * Details.
+     */
+    int (*handler)(int a,int b);};
+#+end_src
+
+** Documentation at other places
+*** some structural commands are:
+#+begin_src sh
+•\struct to document a C-struct. 
+•\union to document a union. 
+•\enum to document an enumeration type. 
+•\fn to document a function. 
+•\var to document a variable or typedef or enum value. 
+•\def to document a #define. 
+•\typedef to document a type definition. 
+•\file to document a file. 
+•\namespace to document a namespace. 
+•\package to document a Java package. 
+•\interface to document an IDL interface. 
+#+end_src
+
+*** Here is an example of a C header named structcmd.h that is documented using structural commands:
+#+begin_src c
+/*! \file structcmd.h
+    \brief A Documented file.
+    
+    Details.
+*/
+/*! \def MAX(a,b)
+    \brief A macro that returns the maximum of \a a and \a b.
+   
+    Details.
+*/
+/*! \var typedef unsigned int UINT32
+    \brief A type definition for a .
+    
+    Details.
+*/
+/*! \var int errno
+    \brief Contains the last error code.
+    \warning Not thread safe!
+*/
+/*! \fn int open(const char *pathname,int flags)
+    \brief Opens a file descriptor.
+    \param pathname The name of the descriptor.
+    \param flags Opening flags.
+*/
+/*! \fn int close(int fd)
+    \brief Closes the file descriptor \a fd.
+    \param fd The descriptor to close.
+*/
+/*! \fn size_t write(int fd,const char *buf, size_t count)
+    \brief Writes \a count bytes from \a buf to the filedescriptor \a fd.
+    \param fd The descriptor to write to.
+    \param buf The data buffer to write.
+    \param count The number of bytes to write.
+*/
+/*! \fn int read(int fd,char *buf,size_t count)
+    \brief Read bytes from a file descriptor.
+    \param fd The descriptor to read from.
+    \param buf The buffer to read into.
+    \param count The number of bytes to read.
+*/
+#define MAX(a,b) (((a)>(b))?(a):(b))
+typedef unsigned int UINT32;
+int errno;
+int open(const char *,int);
+int close(int);
+size_t write(int,const char *, size_t);
+int read(int,char *,size_t);
+#+end_src
+
+** Comment blocks in Python
+*** For Python there is a standard way of documenting the code using so called documentation strings.
+Note that in this case none of doxygen's special commands are supported.
+#+begin_src python
+  """@package docstring
+       Documentation for this module.
+       
+       More details.
+       """
+       
+       def func():
+           """Documentation for a function.
+       
+          More details.
+          """
+          pass
+      
+      class PyClass:
+          """Documentation for a class.
+      
+          More details.
+          """
+         
+          def __init__(self):
+              """The constructor."""
+              self._memVar = 0;
+         
+          def PyMethod(self):
+              """Documentation for a method."""
+             pass
+#+end_src
+
+*** using doxygen style comments
+There is also another way to document Python code using comments that
+start with "##". These type of comment blocks are more in line with
+the way documentation blocks work for the other languages supported by
+doxygen and this also allows the use of special commands.
+
+#+begin_src python
+    ## @package pyexample
+    #  Documentation for this module.
+    #
+    #  More details.
+    
+    ## Documentation for a function.
+    #
+    #  More details.
+    def func():
+       pass
+   
+   ## Documentation for a class.
+   #
+   #  More details.
+   class PyClass:
+      
+       ## The constructor.
+       def __init__(self):
+           self._memVar = 0;
+      
+       ## Documentation for a method.
+       #  @param self The object pointer.
+       def PyMethod(self):
+           pass
+        
+       ## A class variable.
+       classVar = 0;
+   
+       ## @var _memVar
+       #  a member variable
+#+end_src
+
+** Anatomy of a comment block
+For this doxygen supports the Markdown syntax, including parts of the Markdown Extra extension.
+
+
+
+* 

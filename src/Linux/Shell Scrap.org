@@ -55,6 +55,8 @@ Expression    Description
 + -n string  True if string is not empty.
 + string1 = string2  True if string1 equals string2.
 + string1 != string2  True if string1 does not equal string2.
++ -a (AND) and -o (OR). The -a and -o operators are similar to the &&
+  and || operators used with exit statuses. 
 
 ** case
 *** syntax
@@ -201,6 +203,127 @@ else
 fi
 set +x
 #+end_src
+** trap command
+其基本的语法是:
+#+begin_src sh
+trap 'command' signal
+#+end_src
+其中signal是要捕获的信号，command是捕获到指定的信号之后，所要执行的命
+令。可以用kill –l命令看到系统中全部可用的信号名，捕获信号后所执行的命
+令可以是任何一条或多条合法的shell语句，也可以是一个函数名。
+
+shell脚本在执行时，会产生三个所谓的“伪信号”，(之所以称之为“伪信号”
+是因为这三个信号是由shell产生的，而其它的信号是由操作系统产生的)，通过
+使用trap命令捕获这三个“伪信号”并输出相关信息对调试非常有帮助。
+
+#+begin_src sh
+  EXIT  从一个函数中退出或整个脚本执行完毕 
+  ERR   当一条命令返回非零状态时(代表命令执行不成功) 
+  DEBUG 脚本中每一条命令执行之前 
+#+end_src
+*** example
++ ERR
+#+begin_src sh
+  ERRTRAP()
+       {
+         echo "[LINE:$1] Error: Command or function exited with status $?"
+       }
+       foo()
+       {
+         return 1;
+       }
+       trap 'ERRTRAP $LINENO' ERR
+      abc
+      foo
+#+end_src
++ DEBUG
+#+begin_src sh
+  #!/bin/bash
+  trap 'echo “before execute line:$LINENO, a=$a,b=$b,c=$c”' DEBUG
+  a=1
+  if [ "$a" -eq 1 ]
+  then
+      b=2
+  else
+      b=1
+  fi
+  c=3
+  echo "end"
+#+end_src
+
+** tee command
+tee命令会从标准输入读取数据，将其内容输出到标准输出设备,同时又可将内容
+保存成文件。
+
+运行这个脚本，实际输出的却不是本机的ip地址，而是广播地址,这时我们可以借助tee命令，输出某些中间结果，将上述脚本片段修改为： 
+#+begin_src sh
+ipaddr=`/sbin/ifconfig | grep 'inet addr:' | grep -v '127.0.0.1'
+| tee temp.txt | cut -d : -f3 | awk '{print $1}'`
+echo $ipaddr
+#+end_src
+
+之后，将这段脚本再执行一遍，然后查看temp.txt文件的内容： 
+#+begin_src sh
+$ cat temp.txt
+inet addr:192.168.0.1  Bcast:192.168.0.255  Mask:255.255.255.0
+#+end_src
+
+
+
+
+
+** use debug hook
+使用DEBUG宏来控制是否要输出调试信息，在shell脚本中我们同样可以使用这样
+的机制，如下列代码所示： 
+#+begin_src sh
+if [ “$DEBUG” = “true” ]; then
+echo “debugging”  #此处可以输出调试信息
+fi
+#+end_src
+
+#+begin_src sh
+  DEBUG()
+  {
+      if [ "$DEBUG" = "true" ]; then
+          $@　　
+      fi
+  }
+  a=1
+  DEBUG echo "a=$a"
+#+end_src
+
+
+** command
+-n 只读取shell脚本，但不实际执行
+-x 进入跟踪方式，显示所执行的每一条命令
+-c "string" 从strings中读取命令 ={sh -c 'a=1;b=2;let c=$a+$b;echo "c=$c"'}=
+*** 对"-x"选项的增强
+几个shell内置的环境变量： 
+
++ $LINENO
+  代表shell脚本的当前行号，类似于C语言中的内置宏__LINE__ 
+
++ $FUNCNAME
+  函数的名字，类似于C语言中的内置宏__func__,但宏__func__只能代表当前所
+  在的函数名，而$FUNCNAME的功能更强大，它是一个数组变量，其中包含了整
+  个调用链上所有的函数的名字，故变量${FUNCNAME[0]}代表shell脚本当前正
+  在执行的函数的名字，而变量${FUNCNAME[1]}则代表调用函数${FUNCNAME[0]}
+  的函数的名字，余者可以依此类推。 
+
++ $PS4
+  $PS4的值将被显示在“-x”选项输出的每一条命令的前面
+
+#+begin_src sh
+$ export PS4='+{$LINENO:${FUNCNAME[0]}} '
+#+end_src
+
+
+
+
+
+
+* String Operators
+
 * Command
 !$
 !$是一个特殊的环境变量，它代表了上一个命令的最后一个字符串。如：你可能会这样：
