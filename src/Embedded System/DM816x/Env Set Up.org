@@ -13,12 +13,12 @@ $ export PATH=/opt/u-boot/tools:$PATH
    
 * TFTP
 ** step 1
-find the directory
+install the package and find the directory
 #+begin_src sh
-tftproot="/tftpboot"
-sudo mkdir -p $tftproot
-sudo chmod 777 $tftproot
-sudo chown nobody $tftproot
+$ sudo apt-get install xinetd tftpd tftp
+$ sudo mkdir /home/test/tftpboot
+$ sudo chmod -R 777 /home/test/tftpboot
+$ sudo chown -R nobody /home/test/tftpboot
 #+end_src
 
 ** step 2
@@ -30,20 +30,18 @@ sudo cp uimage $tftproot
 ** step 3
 create the file /etc/xinetd.d/tftp
 #+begin_src sh
-tftp() {
-    echo "
+$ sudo vim /etc/xinetd.d/tftp
+
 service tftp
 {
-protocol = udp
-port = 69
-socket_type = dgram
-wait = yes
-user = nobody
-server = /usr/sbin/in.tftpd
-server_args = $tftproot
-disable = no
-}
-" | sudo tee $tftpcfg > /dev/null
+        protocol = udp
+        port = 69
+        socket_type = dgram
+        wait = yes
+        user = nobody
+        server = /usr/sbin/in.tftpd
+        server_args = /home/test/tftpboot
+        disable = no
 }
 #+end_src
 
@@ -55,7 +53,17 @@ sudo /etc/init.d/xinetd stop
 sudo /etc/init.d/xinetd start
 #+end_src
 
-
+** step 5
+test
+#+begin_src sh
+$ ifconfig > /home/renee/test/test.txt
+$ tftp 127.0.0.1
+tftp> get text.txt
+Received 1445 bytes in 0.0 seconds
+tftp> quit
+$ ls
+test.txt
+#+end_src
 * NFS
 ** step 1
 find the location
