@@ -8,3 +8,96 @@
 #+begin_src sh
  sudo yum install fuse-libs
 #+end_src
+* NvidiaMultiMonitors[fn:1]
+** intro
+You can check your video card model by running, from terminal:
+
+=lspci | grep VGA=
+More information can be provided by running
+
+=sudo lshw -C video=
+
+** Setup
+After the system reboot, you can change your X settings by going to System->Administration->NVIDIA X Server Settings. If you installed the driver manually, it may be under Applications->System Tools->NVIDIA X Server Settings. Alternatively, run from terminal:
+
+=gksudo nvidia-settings=
+
+If the driver didn't install this (Envy/EnvyNG surely does), you can install it manually with 
+
+=sudo apt-get install nvidia-settings=
+
+
+*** Differences
+
++ TwinView
+
+one large screen shared between two monitors
+in Compiz-Fusion, it makes the "cube" appear as one large octagon
+Separate X screen
+
++ separate X screens, one on each monitor
+allows your window manager (Metacity, XFWM, Compiz, etc.) to be aware that there are two screens
+in Compiz-Fusion, each monitor has its own cube, controlled separately
+
+** Saving
+I prefer to uncheck Merge with existing file. Now click Save. If it
+gives you an error, "Unable to remove old X config backup file
+'/etc/X11/xorg.conf.backup' then click OK and open the save dialog
+again. Click Show preview..., select all and copy. Now open a terminal
+and run
+
+=gksudo gedit /etc/X11/xorg.conf
+Delete the current contents of this file and paste what is in the
+preview. Save and close.
+
+** Removing Restricted Drivers
+=sudo apt-get remove --purge nvidia-glx-new=
+* Linux loglevel
+改变console loglevel的方法有如下几种：
+1.启动时Kernel boot option：loglevel=level
+2.运行时Runtime: dmesg -n level
+（注意：demsg -n level 改变的是console上的loglevel，dmesg命令仍然会打印出所有级别的系统信息。）
+3.运行时Runtime: echo $level > /proc/sys/kernel/printk
+4.运行时Runtime:写程序使用syslog系统调用（可以man syslog）
+
+** The kernel log levels are:
+#+begin_src sh
+0 (KERN_EMERG)
+The system is unusable.
+1 (KERN_ALERT)
+Actions that must be taken care of immediately.
+2 (KERN_CRIT)
+Critical conditions.
+3 (KERN_ERR)
+Noncritical error conditions.
+4 (KERN_WARNING)
+Warning conditions that should be taken care of.
+5 (KERN_NOTICE)
+Normal, but significant events.
+6 (KERN_INFO)
+Informational messages that require no action.
+7 (KERN_DEBUG)
+Kernel debugging messages, output by the kernel if the developer enabled debugging at compile time.
+#+end_src
+** cat /proc/sys/kernel/printk
+#+begin_src sh
+cat /proc/sys/kernel/printk
+4 4 1 7
+所得到的信息是$Linux_SRC/include/linux/printk.h中定义的宏：
+#define console_loglevel (console_printk[0])
+#define default_message_loglevel (console_printk[1])
+#define minimum_console_loglevel (console_printk[2])
+#define default_console_loglevel (console_printk[3])
+依次分别为：
+控制台日志级别：优先级高于该值的消息将被打印至控制台
+缺省的消息日志级别：将用该优先级来打印没有优先级的消息
+最低的控制台日志级别：控制台日志级别可被设置的最小值（最高优先级）
+缺省的控制台日志级别：控制台日志级别的缺省值
+#+end_src
+
+
+* Footnotes
+
+[fn:1] https://help.ubuntu.com/community/NvidiaMultiMonitors
+
+
