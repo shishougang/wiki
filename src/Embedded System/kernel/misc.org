@@ -33,3 +33,29 @@ http://blog.csdn.net/heyunqi/article/details/1897108
 http://wenku.baidu.com/view/3f42beb81a37f111f1855b2a.html
 http://blog.163.com/liuqiang_mail@126/blog/static/10996887520124741925773/
 http://book.51cto.com/art/201007/213593.htm
+* likely和unlikely
+likely和unlikely是gcc扩展的跟处理器相关的宏：
+#+begin_src c
+#define   likely(x)        __builtin_expect(!!(x), 1)
+#define   unlikely(x)      __builtin_expect(!!(x), 0)
+#+end_src
+
+现在处理器都是流水线的，有些里面有多个逻辑运算单元，系统可以提前取多条指令进行并行处理，但遇到跳转时，则需要重新取指令，这相对于不用重新去指令就降低了速度。
+所以就引入了likely和unlikely，目的是增加条件分支预测的准确性，cpu会提前装载后面的指令，遇到条件转移指令时会提前预测并装载某个分支的指令。unlikely 表示你可以确认该条件是极少发生的，相反likely表示该条件多数情况下会发生。编译器会产生相应的代码来优化cpu执行效率。
+因此程序员在编写代码时可以根据判断条件发生的概率来优化处理器的取指操作。
+例如：
+
+#+begin_src c
+int x, y;
+if(unlikely(x > 0))
+y = 1;
+else
+y = -1;
+#+end_src
+上面的代码中gcc编译的指令会预先读取 y = -1 这条指令，这适合 x 的值大于 0 的概率比较小的情况。
+如果 x 的值在大部分情况下是大于 0 的，就应该用 likely(x > 0)，这样编译出的指令是预先读取 y = 1 这条指令了。这样系统在运行时就会减少重新取指了。
+
+Test:
+http://blog.man7.org/2012/10/how-much-do-builtinexpect-likely-and.html
+
+

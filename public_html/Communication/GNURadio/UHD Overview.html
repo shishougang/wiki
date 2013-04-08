@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="UHD Overview"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-01-30 15:26:40 HKT"/>
+<meta name="generated" content="2013-04-08 12:41:33 China Standard Time"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -175,16 +175,16 @@
 </p>
 
 
-<pre class="src src-c++"><span style="color: #7fffd4;">_uhd_static_fixture</span>::<span style="color: #87cefa;">_uhd_static_fixture</span>(<span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">fcn</span>)(<span style="color: #98fb98;">void</span>), <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>){
-    <span style="color: #00ffff;">try</span>{
+<pre class="example">_uhd_static_fixture::_uhd_static_fixture(void (*fcn)(void), const char *name){
+    try{
         fcn();
     }
-    <span style="color: #00ffff;">catch</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">exception</span> &amp;<span style="color: #eedd82;">e</span>){
-        <span style="color: #7fffd4;">std</span>::cerr &lt;&lt; <span style="color: #ffa07a;">"Exception in static block "</span> &lt;&lt; name &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
-        <span style="color: #7fffd4;">std</span>::cerr &lt;&lt; <span style="color: #ffa07a;">"  "</span> &lt;&lt; e.what() &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+    catch(const std::exception &amp;e){
+        std::cerr &lt;&lt; "Exception in static block " &lt;&lt; name &lt;&lt; std::endl;
+        std::cerr &lt;&lt; "  " &lt;&lt; e.what() &lt;&lt; std::endl;
     }
-    <span style="color: #00ffff;">catch</span>(...){
-        <span style="color: #7fffd4;">std</span>::cerr &lt;&lt; <span style="color: #ffa07a;">"Exception in static block "</span> &lt;&lt; name &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+    catch(...){
+        std::cerr &lt;&lt; "Exception in static block " &lt;&lt; name &lt;&lt; std::endl;
     }
 }
 </pre>
@@ -195,28 +195,28 @@
 </p>
 
 
-<pre class="src src-c++"><span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">!</span>
-<span style="color: #ff7f24;"> * Defines a function that implements the "construct on first use" idiom</span>
-<span style="color: #ff7f24;"> * \param _t the type definition for the instance</span>
-<span style="color: #ff7f24;"> * \param _x the name of the defined function</span>
-<span style="color: #ff7f24;"> * \return a reference to the lazy instance</span>
-<span style="color: #ff7f24;"> */</span>
-<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#23450;&#20041;&#19968;&#20010;staitc&#30340;&#20989;&#25968;&#65292;&#20989;&#25968;&#30340;&#36820;&#22238;&#31867;&#22411;&#26159;_t</span>
-<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">UHD_SINGLETON_FCN</span>(<span style="color: #eedd82;">_t</span>, <span style="color: #eedd82;">_x</span>) <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">_t</span> &amp;<span style="color: #87cefa;">_x</span>(){<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">_t</span> <span style="color: #eedd82;">_x</span>; <span style="color: #00ffff;">return</span> _x;}  
+<pre class="example">/*!
+ * Defines a function that implements the "construct on first use" idiom
+ * \param _t the type definition for the instance
+ * \param _x the name of the defined function
+ * \return a reference to the lazy instance
+ */
+//定义一个staitc的函数，函数的返回类型是_t
+#define UHD_SINGLETON_FCN(_t, _x) static _t &amp;_x(){static _t _x; return _x;}  
 
-<span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">!</span>
-<span style="color: #ff7f24;"> * Defines a static code block that will be called before main()</span>
-<span style="color: #ff7f24;"> * The static block will catch and print exceptions to std error.</span>
-<span style="color: #ff7f24;"> * \param _x the unique name of the fixture (unique per source)</span>
-<span style="color: #ff7f24;"> */</span>
-<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">UHD_STATIC_BLOCK</span>(<span style="color: #eedd82;">_x</span>) \
-  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">_x</span>(<span style="color: #98fb98;">void</span>); \    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#22768;&#26126;&#20989;&#25968;</span>
-<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">_uhd_static_fixture</span> <span style="color: #87cefa;">_x</span>##_fixture(&amp;_x, #_x);      \        <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">struct &#21021;&#22987;&#21270;&#65292;&#30452;&#25509;&#35843;&#29992;&#20989;&#25968;_x</span>
-<span style="color: #98fb98;">void</span> _x(<span style="color: #98fb98;">void</span>) <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#20989;&#25968;&#30340;&#23454;&#29616;</span>
+/*!
+ * Defines a static code block that will be called before main()
+ * The static block will catch and print exceptions to std error.
+ * \param _x the unique name of the fixture (unique per source)
+ */
+#define UHD_STATIC_BLOCK(_x) \
+  void _x(void); \    //声明函数
+static _uhd_static_fixture _x##_fixture(&amp;_x, #_x);      \        //struct 初始化，直接调用函数_x
+void _x(void) //函数的实现
 
-<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">! Helper for static block, constructor calls function</span>
-<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">UHD_API</span> <span style="color: #eedd82;">_uhd_static_fixture</span>{
-    <span style="color: #eedd82;">_uhd_static_fixture</span>(<span style="color: #98fb98;">void</span> (*)(<span style="color: #98fb98;">void</span>), <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *);
+//! Helper for static block, constructor calls function
+struct UHD_API _uhd_static_fixture{
+    _uhd_static_fixture(void (*)(void), const char *);
 };
 </pre>
 
@@ -233,18 +233,18 @@
 </p>
 
 
-<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">uhd</span>{
+<pre class="example">namespace uhd{
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">! Get a string representing the system's temporary directory</span>
-    UHD_API <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> <span style="color: #87cefa;">get_tmp_path</span>(<span style="color: #98fb98;">void</span>);
+    //! Get a string representing the system's temporary directory
+    UHD_API std::string get_tmp_path(void);
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">! Get a string representing the system's appdata directory</span>
-    UHD_API <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> <span style="color: #87cefa;">get_app_path</span>(<span style="color: #98fb98;">void</span>);
+    //! Get a string representing the system's appdata directory
+    UHD_API std::string get_app_path(void);
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">! Get a string representing the system's pkg data directory</span>
-    UHD_API <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> <span style="color: #87cefa;">get_pkg_data_path</span>(<span style="color: #98fb98;">void</span>);
+    //! Get a string representing the system's pkg data directory
+    UHD_API std::string get_pkg_data_path(void);
 
-} <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">namespace uhd</span>
+} //namespace uhd
 </pre>
 
 
@@ -253,77 +253,77 @@
 </p>
 
 
-<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">fs</span> = <span style="color: #7fffd4;">boost</span>::filesystem;
+<pre class="example">namespace fs = boost::filesystem;
 
-<span style="color: #ff7f24;">/***********************************************************************</span>
-<span style="color: #ff7f24;"> * Determine the paths separator</span>
-<span style="color: #ff7f24;"> **********************************************************************/</span>
-<span style="color: #b0c4de;">#ifdef</span> UHD_PLATFORM_WIN32
-    <span style="color: #00ffff;">static</span> <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">env_path_sep</span> = <span style="color: #ffa07a;">";"</span>;
-<span style="color: #b0c4de;">#else</span>
-    <span style="color: #00ffff;">static</span> <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">env_path_sep</span> = <span style="color: #ffa07a;">":"</span>;
-<span style="color: #b0c4de;">#endif</span> <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">UHD_PLATFORM_WIN32*/</span>
+/***********************************************************************
+ * Determine the paths separator
+ **********************************************************************/
+#ifdef UHD_PLATFORM_WIN32
+    static const std::string env_path_sep = ";";
+#else
+    static const std::string env_path_sep = ":";
+#endif /*UHD_PLATFORM_WIN32*/
 
-<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">path_tokenizer</span>(<span style="color: #eedd82;">inp</span>) \
-    <span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">tokenizer</span>&lt;<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">char_separator</span>&lt;<span style="color: #98fb98;">char</span>&gt; &gt; \
-    (inp, <span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">char_separator</span>&lt;<span style="color: #98fb98;">char</span>&gt;(env_path_sep.c_str()))
+#define path_tokenizer(inp) \
+    boost::tokenizer&lt;boost::char_separator&lt;char&gt; &gt; \
+    (inp, boost::char_separator&lt;char&gt;(env_path_sep.c_str()))
 
-<span style="color: #ff7f24;">/***********************************************************************</span>
-<span style="color: #ff7f24;"> * Get a list of paths for an environment variable</span>
-<span style="color: #ff7f24;"> **********************************************************************/</span>
-<span style="color: #00ffff;">static</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> <span style="color: #87cefa;">get_env_var</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">var_name</span>, <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">def_val</span> = <span style="color: #ffa07a;">""</span>){
-    <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">var_value_ptr</span> = <span style="color: #7fffd4;">std</span>::getenv(var_name.c_str());
-    <span style="color: #00ffff;">return</span> (var_value_ptr == <span style="color: #7fffd4;">NULL</span>)? def_val : var_value_ptr;
+/***********************************************************************
+ * Get a list of paths for an environment variable
+ **********************************************************************/
+static std::string get_env_var(const std::string &amp;var_name, const std::string &amp;def_val = ""){
+    const char *var_value_ptr = std::getenv(var_name.c_str());
+    return (var_value_ptr == NULL)? def_val : var_value_ptr;
 }
 
-<span style="color: #00ffff;">static</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">vector</span>&lt;<span style="color: #7fffd4;">fs</span>::path&gt; <span style="color: #87cefa;">get_env_paths</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">var_name</span>){
+static std::vector&lt;fs::path&gt; get_env_paths(const std::string &amp;var_name){
 
-    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">var_value</span> = get_env_var(var_name);
+    std::string var_value = get_env_var(var_name);
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">convert to filesystem path, filter blank paths</span>
-    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">vector</span>&lt;<span style="color: #7fffd4;">fs</span>::path&gt; <span style="color: #eedd82;">paths</span>;
-    <span style="color: #00ffff;">if</span> (var_value.empty()) <span style="color: #00ffff;">return</span> paths; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">FIXME boost tokenizer throws w/ blank strings on some platforms</span>
-    <span style="color: #eedd82;">BOOST_FOREACH</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">path_string</span>, <span style="color: #98fb98;">path_tokenizer</span>(<span style="color: #eedd82;">var_value</span>)){
-        <span style="color: #00ffff;">if</span> (path_string.empty()) <span style="color: #00ffff;">continue</span>;
-        paths.push_back(<span style="color: #7fffd4;">fs</span>::system_complete(path_string));
+    //convert to filesystem path, filter blank paths
+    std::vector&lt;fs::path&gt; paths;
+    if (var_value.empty()) return paths; //FIXME boost tokenizer throws w/ blank strings on some platforms
+    BOOST_FOREACH(const std::string &amp;path_string, path_tokenizer(var_value)){
+        if (path_string.empty()) continue;
+        paths.push_back(fs::system_complete(path_string));
     }
-    <span style="color: #00ffff;">return</span> paths;
+    return paths;
 }
 
-<span style="color: #ff7f24;">/***********************************************************************</span>
-<span style="color: #ff7f24;"> * Implement the functions in paths.hpp</span>
-<span style="color: #ff7f24;"> **********************************************************************/</span>
-<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span> <span style="color: #7fffd4;">uhd</span>::<span style="color: #87cefa;">get_tmp_path</span>(<span style="color: #98fb98;">void</span>){
-    <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">tmp_path</span> = <span style="color: #7fffd4;">NULL</span>;
+/***********************************************************************
+ * Implement the functions in paths.hpp
+ **********************************************************************/
+std::string uhd::get_tmp_path(void){
+    const char *tmp_path = NULL;
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">try the official uhd temp path environment variable</span>
-    tmp_path = <span style="color: #7fffd4;">std</span>::getenv(<span style="color: #ffa07a;">"UHD_TEMP_PATH"</span>);
-    <span style="color: #00ffff;">if</span> (tmp_path != <span style="color: #7fffd4;">NULL</span>) <span style="color: #00ffff;">return</span> tmp_path;
+    //try the official uhd temp path environment variable
+    tmp_path = std::getenv("UHD_TEMP_PATH");
+    if (tmp_path != NULL) return tmp_path;
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">try the windows function if available</span>
-<span style="color: #b0c4de;">    #ifdef</span> USE_GET_TEMP_PATH
-    <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">lpBuffer</span>[2048];
-    <span style="color: #00ffff;">if</span> (GetTempPath(<span style="color: #00ffff;">sizeof</span>(lpBuffer), lpBuffer)) <span style="color: #00ffff;">return</span> lpBuffer;
-<span style="color: #b0c4de;">    #endif</span>
+    //try the windows function if available
+    #ifdef USE_GET_TEMP_PATH
+    char lpBuffer[2048];
+    if (GetTempPath(sizeof(lpBuffer), lpBuffer)) return lpBuffer;
+    #endif
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">try windows environment variables</span>
-    tmp_path = <span style="color: #7fffd4;">std</span>::getenv(<span style="color: #ffa07a;">"TMP"</span>);
-    <span style="color: #00ffff;">if</span> (tmp_path != <span style="color: #7fffd4;">NULL</span>) <span style="color: #00ffff;">return</span> tmp_path;
+    //try windows environment variables
+    tmp_path = std::getenv("TMP");
+    if (tmp_path != NULL) return tmp_path;
 
-    tmp_path = <span style="color: #7fffd4;">std</span>::getenv(<span style="color: #ffa07a;">"TEMP"</span>);
-    <span style="color: #00ffff;">if</span> (tmp_path != <span style="color: #7fffd4;">NULL</span>) <span style="color: #00ffff;">return</span> tmp_path;
+    tmp_path = std::getenv("TEMP");
+    if (tmp_path != NULL) return tmp_path;
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">try the stdio define if available</span>
-<span style="color: #b0c4de;">    #ifdef</span> P_tmpdir
-    <span style="color: #00ffff;">if</span> (P_tmpdir != <span style="color: #7fffd4;">NULL</span>) <span style="color: #00ffff;">return</span> P_tmpdir;
-<span style="color: #b0c4de;">    #endif</span>
+    //try the stdio define if available
+    #ifdef P_tmpdir
+    if (P_tmpdir != NULL) return P_tmpdir;
+    #endif
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">try unix environment variables</span>
-    tmp_path = <span style="color: #7fffd4;">std</span>::getenv(<span style="color: #ffa07a;">"TMPDIR"</span>);
-    <span style="color: #00ffff;">if</span> (tmp_path != <span style="color: #7fffd4;">NULL</span>) <span style="color: #00ffff;">return</span> tmp_path;
+    //try unix environment variables
+    tmp_path = std::getenv("TMPDIR");
+    if (tmp_path != NULL) return tmp_path;
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">give up and use the unix default</span>
-    <span style="color: #00ffff;">return</span> <span style="color: #ffa07a;">"/tmp"</span>;
+    //give up and use the unix default
+    return "/tmp";
 }
 </pre>
 
@@ -338,17 +338,17 @@
 
 
 
-<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">UHD_API</span> <span style="color: #eedd82;">subdev_spec_pair_t</span> : boost::equality_comparable&lt;subdev_spec_pair_t&gt;{
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">! The daughterboard slot name</span>
+<pre class="example">struct UHD_API subdev_spec_pair_t : boost::equality_comparable&lt;subdev_spec_pair_t&gt;{
+    //! The daughterboard slot name
     std::string db_name;
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">! The subdevice name</span>
+    //! The subdevice name
     std::string sd_name;
 </pre>
 
 
 
-<pre class="src src-c">class <span style="color: #98fb98;">UHD_API</span> <span style="color: #eedd82;">subdev_spec_t</span> : public std::vector&lt;subdev_spec_pair_t&gt;
+<pre class="example">class UHD_API subdev_spec_t : public std::vector&lt;subdev_spec_pair_t&gt;
 </pre>
 
 </div>
@@ -362,11 +362,11 @@
 
 
 
-<pre class="src src-c"><span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">dboard registry tuple: dboard constructor, canonical name, subdev names</span>
-<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">boost</span>::tuple&lt;dboard_manager::dboard_ctor_t, std::string, prop_names_t&gt; args_t;
+<pre class="example">//dboard registry tuple: dboard constructor, canonical name, subdev names
+typedef boost::tuple&lt;dboard_manager::dboard_ctor_t, std::string, prop_names_t&gt; args_t;
 
-<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">map a dboard id to a dboard constructor</span>
-<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">uhd</span>::dict&lt;dboard_key_t, args_t&gt; id_to_args_map_t;
+//map a dboard id to a dboard constructor
+typedef uhd::dict&lt;dboard_key_t, args_t&gt; id_to_args_map_t;
 UHD_SINGLETON_FCN(id_to_args_map_t, get_id_to_args_map)
 </pre>
 
@@ -376,15 +376,15 @@ main member:
 </p>
 
 
-<pre class="src src-c">uhd::dict&lt;std::string, subdev_proxy::sptr&gt; _rx_dboards;
+<pre class="example">uhd::dict&lt;std::string, subdev_proxy::sptr&gt; _rx_dboards;
 
         _rx_dboards[subdev] = subdev_proxy::sptr(
-            <span style="color: #98fb98;">new</span> <span style="color: #eedd82;">subdev_proxy</span>(xcvr_dboard, subdev_proxy::RX_TYPE)
+            new subdev_proxy(xcvr_dboard, subdev_proxy::RX_TYPE)
         );
 
 uhd::dict&lt;std::string, subdev_proxy::sptr&gt; _tx_dboards;
         _tx_dboards[subdev] = subdev_proxy::sptr(
-            <span style="color: #98fb98;">new</span> <span style="color: #eedd82;">subdev_proxy</span>(xcvr_dboard, subdev_proxy::TX_TYPE)
+            new subdev_proxy(xcvr_dboard, subdev_proxy::TX_TYPE)
         );
 
 dboard_iface::sptr _iface;  ==&gt;_dboard_iface  (_fpga_ctrl, _fpga_i2c_ctrl....)
@@ -401,19 +401,19 @@ dboard_iface::sptr _iface;  ==&gt;_dboard_iface  (_fpga_ctrl, _fpga_i2c_ctrl....
 
 
 
-<pre class="src src-c"><span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">re-usable managed buffers</span>
+<pre class="example">//re-usable managed buffers
 std::vector&lt;e100_mmap_zero_copy_mrb&gt; _mrb_pool;
 std::vector&lt;e100_mmap_zero_copy_msb&gt; _msb_pool;
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">initialize the managed receive buffers</span>
-    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">i</span> = 0; i &lt; get_num_recv_frames(); i++){
+    //initialize the managed receive buffers
+    for (size_t i = 0; i &lt; get_num_recv_frames(); i++){
         _mrb_pool.push_back(e100_mmap_zero_copy_mrb(
             recv_buff + get_recv_frame_size()*i, (*recv_info) + i
         ));
     }
 
-    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">initialize the managed send buffers</span>
-    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">i</span> = 0; i &lt; get_num_recv_frames(); i++){
+    //initialize the managed send buffers
+    for (size_t i = 0; i &lt; get_num_recv_frames(); i++){
         _msb_pool.push_back(e100_mmap_zero_copy_msb(
             send_buff + get_send_frame_size()*i, (*send_info) + i,
             get_send_frame_size(), _fd
@@ -427,7 +427,7 @@ std::vector&lt;e100_mmap_zero_copy_msb&gt; _msb_pool;
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-01-30 15:26:40 HKT</p>
+<p class="date">Date: 2013-04-08 12:41:33 China Standard Time</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.11 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

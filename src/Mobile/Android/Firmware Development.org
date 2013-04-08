@@ -1,0 +1,296 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: Firmware
+
+http://wiki.cyanogenmod.org/w/Development#The_CyanogenMod_Dev_Center
+* Overview
+** http://www.virtuousrom.com/p/roms.html
+** CyanogenMod
+CyanogenMod is an aftermarket firmware for a number of cell phones
+based on the open-source Android operating system.
+
++ https://github.com/CyanogenMod
++ http://www.cyanogenmod.com/
++ Gerrit - http://r.cyanogenmod.com/
++ Freenote - #cyanogenmod (-dev)
++ Forum - http://forum.cyanogenmod.com/
++ Wiki - http://wiki.cyanogenmod.com/
+
+* cyanogenmode notes
+** adb intro
+http://wiki.cyanogenmod.org/w/Doc:_adb_intro
+*** What is adb?
+ADB ("adb"), or the Android Debug Bridge, is a development tool
+included with the Android SDK (Software Developer Kit), which allows
+for communication from an Android device (such as a phone or tablet)
+to a personal computer, and vice-versa. 
+*** Popular adb commands
+#+begin_src sh
+adb shell -- this command establishes a shell interface for establishing a command-line session with the device. 
+
+adb push <local> <remote> -- this command pushes a local file on the computer to a remote file on the device. You can include the full path to either the local or remote file.
+
+adb pull <remote> [<local>] -- this command will pull a remote file on the device (you can include the path) to either a specified location on the computer or, if no destination is specified, to the current directory where the command was issued.
+
+adb logcat -- this command allows you to view the device log in real time. It is also very useful for discovering and reporting bugs.
+
+adb install <file> -- this is used to "side-load" apps (in their .apk format) to the device.
+#+end_src
+*** "Device not found" errors
+Sometimes adb can't find your device. One solution is to run adb
+kill-server and then adb start-server as root or Administrator to
+restart the adb daemon with elevated privileges.
+
+
+*** Adb --help
+Android Debug Bridge version 1.0.31
+#+begin_src sh
+-d                            - directs command to the only connected USB device
+                                returns an error if more than one USB device is present.
+-e                            - directs command to the only running emulator.
+                                returns an error if more than one emulator is running.
+-s <specific device>          - directs command to the device or emulator with the given
+                                serial number or qualifier. Overrides ANDROID_SERIAL
+                                environment variable.
+-p <product name or path>     - simple product name like 'sooner', or
+                                a relative/absolute path to a product
+                                out directory like 'out/target/product/sooner'.
+                                If -p is not specified, the ANDROID_PRODUCT_OUT
+                                environment variable is used, which must
+                                be an absolute path.
+devices [-l]                  - list all connected devices
+                                ('-l' will also list device qualifiers)
+connect <host>[:<port>]       - connect to a device via TCP/IP
+                                Port 5555 is used by default if no port number is specified.
+disconnect [<host>[:<port>]]  - disconnect from a TCP/IP device.
+                                Port 5555 is used by default if no port number is specified.
+                                Using this command with no additional arguments
+                                will disconnect from all connected TCP/IP devices.
+
+device commands:
+ adb push <local> <remote>    - copy file/dir to device
+ adb pull <remote> [<local>]  - copy file/dir from device
+ adb sync [ <directory> ]     - copy host->device only if changed
+                                (-l means list but don't copy)
+                                (see 'adb help all')
+ adb shell                    - run remote shell interactively
+ adb shell <command>          - run remote shell command
+ adb emu <command>            - run emulator console command
+ adb logcat [ <filter-spec> ] - View device log
+ adb forward <local> <remote> - forward socket connections
+                                forward specs are one of: 
+                                  tcp:<port>
+                                  localabstract:<unix domain socket name>
+                                  localreserved:<unix domain socket name>
+                                  localfilesystem:<unix domain socket name>
+                                  dev:<character device name>
+                                  jdwp:<process pid> (remote only)
+ adb jdwp                     - list PIDs of processes hosting a JDWP transport
+ adb install [-l] [-r] [-s] [--algo <algorithm name> --key <hex-encoded key> --iv <hex-encoded iv>] <file>
+                              - push this package file to the device and install it
+                                ('-l' means forward-lock the app)
+                                ('-r' means reinstall the app, keeping its data)
+                                ('-s' means install on SD card instead of internal storage)
+                                ('--algo', '--key', and '--iv' mean the file is encrypted already)
+ adb uninstall [-k] <package> - remove this app package from the device
+                                ('-k' means keep the data and cache directories)
+ adb bugreport                - return all information from the device
+                                that should be included in a bug report.
+
+ adb backup [-f <file>] [-apk|-noapk] [-shared|-noshared] [-all] [-system|-nosystem] [<packages...>]
+                              - write an archive of the device's data to <file>.
+                                If no -f option is supplied then the data is written
+                                to "backup.ab" in the current directory.
+                                (-apk|-noapk enable/disable backup of the .apks themselves
+                                   in the archive; the default is noapk.)
+                                (-shared|-noshared enable/disable backup of the device's
+                                   shared storage / SD card contents; the default is noshared.)
+                                (-all means to back up all installed applications)
+                                (-system|-nosystem toggles whether -all automatically includes
+                                   system applications; the default is to include system apps)
+                                (<packages...> is the list of applications to be backed up.  If
+                                   the -all or -shared flags are passed, then the package
+                                   list is optional.  Applications explicitly given on the
+                                   command line will be included even if -nosystem would
+                                   ordinarily cause them to be omitted.)
+
+
+ adb restore <file>           - restore device contents from the <file> backup archive
+
+adb help                     - show this help message
+ adb version                  - show version num
+
+scripting:
+ adb wait-for-device          - block until device is online
+ adb start-server             - ensure that there is a server running
+ adb kill-server              - kill the server if it is running
+ adb get-state                - prints: offline | bootloader | device
+ adb get-serialno             - prints: <serial-number>
+ adb get-devpath              - prints: <device-path>
+ adb status-window            - continuously print device status for a specified device
+ adb remount                  - remounts the /system partition on the device read-write
+ adb reboot [bootloader|recovery] - reboots the device, optionally into the bootloader or recovery program
+ adb reboot-bootloader        - reboots the device into the bootloader
+ adb root                     - restarts the adbd daemon with root permissions
+ adb usb                      - restarts the adbd daemon listening on USB
+ adb tcpip <port>             - restarts the adbd daemon listening on TCP on the specified port
+
+networking:
+ adb ppp <tty> [parameters]   - Run PPP over USB.
+Note: you should not automatically start a PPP connection.
+<tty> refers to the tty for PPP stream. Eg. dev:/dev/omap_csmi_tty1
+[parameters] - Eg. defaultroute debug dump local notty usepeerdns
+
+adb sync notes: adb sync [ <directory> ]
+ <localdir> can be interpreted in several ways:
+ - If <directory> is not specified, both /system and /data partitions will be updated.
+ - If it is "system" or "data", only the corresponding partition
+   is updated.
+
+environmental variables:
+ ADB_TRACE                    - Print debug information. A comma separated list of the following values
+                                1 or all, adb, sockets, packets, rwx, usb, sync, sysdeps, transport, jdwp
+ ANDROID_SERIAL               - The serial number to connect to. -s takes priority over this if given.
+ ANDROID_LOG_TAGS             - When used with the logcat option, only these debug tags are printed.
+#+end_src
+** fastboot intro
+*** A brief introduction to fastboot
+fastboot is a small tool that comes with the Android SDK (software
+developer kit) that can be used to re-flash partitions on your device.
+It is an alternative to the recovery mode for doing installations and
+updates.
+
+ Please note that fastboot commands will ONLY work while the device is
+ in fastboot mode.
+*** Installing recovery using fastboot
+Installing ClockworkMod Recovery on the device
+1. Connect the device to the computer via USB.
+2. Make sure the fastboot binary is in your PATH or that you place the downloaded image in the same directory as fastboot.
+3. Open a terminal on your PC and reboot the device into fastboot mode by typing adb reboot bootloader or by using the hardware key combination.
+4. Once the device is in fastboot mode, verify your PC sees the device by typing fastboot devices
+     If you don't see your device serial number, and instead see "<waiting for device>", fastboot is not configured properly on your machine. See fastboot documentation for more info.
++ Flash ClockworkMod Recovery onto your device by entering the following command: fastboot flash recovery your_recovery_image.img where the latter part is the name of the file you downloaded.
++ Once the flash completes successfully, reboot the device into recovery to verify the installation.
+      Note: Some ROMs overwrite recovery at boot time so if you do not plan to immediately boot into recovery to install CyanogenMod, please be aware that this may overwrite your custom recovery with the stock one.
+
+** debugging with logcat
+*** A bit about logcat
+When Android is running, it's generating all kinds of system messages.
+You see, programmers/developers can optionally output status
+information (or errors or debugging notes) in real-time to a system
+log, and Android itself sends all kinds of useful information out that
+way.
+*** Filtering
+db logcat offers extra functionality to filter logs based on priority.
+The usage is adb logcat *:# where # is one of the following.
+
+#+begin_src sh
+ V    Verbose (show all possibly useless logs, default level)
+ D    Debug (show all reasonable debug logs)
+ I    Info (show expected logs for regular usage)
+ W    Warn (show possible issues that are not yet errors)
+ E    Error (show issues that have caused errors)
+ F    Fatal (show issues that are fatal to runtime and will often result in rebooting)
+#+end_src
+
+*** Color
++ Colored logcat by Jeff Sharkey
+  https://code.google.com/p/colored-logcat/
+  http://jsharkey.org/blog/2009/04/22/modifying-the-android-logcat-stream-for-full-color-debugging/
++ logcat-color by Marshall Culpepper
+  https://github.com/marshall/logcat-color
+
+
+
+*** Logcat for Bugtracker(On devices)
+
+On device
+
+This will generate a logcat on your sdcard which you can then attatch to a bug you want to report.
++ Open Console Application of your choice (CM comes with 'Terminal Emulator' preinstalled)
++ type logcat -d -f /sdcard/logcat.log *:V
++ alternatively the radio buffer can be viewed with logcat -b radio
+
+#+begin_src sh
+-d    makes it dump the logcat
+-f    tell it where to save the log to
+*:V   gets all Logs in Verbose mode
+#+end_src 
+** glossary
+*** Bloatware
+Software or 'apps' that you don't need, but come preinstalled to a
+device's /system partition, meaning that you cannot remove them unless
+the device has been rooted. Usually, these are apps are sponsored by a
+company and included by a carrier for profit.
+*** BFS
+Brain Fuck Scheduler for Linux was created by veteran kernel
+programmer Con Kolivas and has been reported to improve responsiveness
+on light-NUMA (non-uniform memory access) Linux mobile devices and
+desktop computers with fewer than 16 cores.
+*** SuperCID
+SuperCID is a special code, 11111111, which means that software from
+any region can be installed. See superCID:
+http://wiki.cyanogenmod.org/w/Basic_concepts#superCID
+
+*** Vanilla
+A clean, unmodified version of something. In the context of Android
+ROMs, vanilla refers to the stock ROM that came pre-installed on the
+device.
+
+*** ----------------------------------android-------------
++ 32A PVT32A handsets have 288MB total RAM (192MB usable by OS - same as Hero handsets) and use the Qualcomm MSM7200A CPU.
++ 32B PVT32B handsets have 192MB total RAM (96MB usable by OS) and use the Qualcomm MSM7201A CPU.
++ ADP Android Developer Phone. The first ADP was a "development" version of the HTC Dream. The current ADP is the Samsung Nexus S.
++ CWM Short for ClockworkMod Recovery. Not to be confused with CM (Cyanogenmod).
++ Dalvik-Cache The dalvik-cache directory holds all of the pre-compiled .dex files created from installed apps. These files are static and do not change unless the app is updated.
++ flash_image A small utility to be used on the device that allows you to re-write system partitions with image files. If you don't have it, it can be found here.
++ NANDroid A set of tools that will enable anyone who has root on their Android device to make FULL system backups, in case something goes wrong or you want to try out that new experimental ROM/theme. NANDroid will backup (and restore) /system, /data, /cache, and /boot partitions.
++ NVFlash is a low-level flash utility for nVidia based devices which gives you low level access to the system to flash, format, recover, repartition and do many more functions. It is a very powerful tool and should be used with caution. Read and follow all instruction carefully when using nvflash. See http://rootzwiki.com/topic/35086-guide-nvflash-general-users-guide-unbrickrecoverdowngradeupgrade-tf201/#entry982736
++ Recovery Mode A special environment that you can boot into for troubleshooting and upgrading purposes.
++ SPL Second Program Loader, in conjunction with the IPL comprise a
+  device's bootloader. Aside from bootstrapping Android, the
+  bootloader also fulfills various diagnostic functions. One of these
+  functions is the manipulation of data in the device's internal flash
+  ram. Depending on the SPL installed, the user might be able to flash
+  signed NBH files, flash nand images, and more. Note that the SPL is
+  installed and operates independently of the Android build that runs
+  atop it. Generally speaking, there are two variants of the SPL: Stock, which is 'locked' and is installed on most devices from the factory, and Engineering, which is 'unlocked' and has to be manually flashed - usually after 'rooting'.
++ S-OFF Usually a property of HTC devices. S-OFF allows the user to modify any partition on the device. Signature checking is disabled for zips, allowing the user to flash otapackages and custom kernels from recovery. S-ON prevents the user to allow these actions. See http://forum.xda-developers.com/showthread.php?p=26732440
++ Zipalign Reduces the amount of RAM consumed when running the application by allowing data to be mmap'd in; which causes all uncompressed data within the .apk, such as images or raw files, to be aligned on 4-byte boundaries.
+*** -------------------------Hacking Definitions---------------
+*** Aftermarket
+Aftermarket generally refers to any product or service applied or requisitioned by end-users to add usability or functionality to the original product. Many aftermarket modifications can void the manufacturer's warranty. From a manufacturer's perspective, the after-market is any goods or services offered by the manufacturer directly to end-users of a given product or service. After-market services include support for warranties, contracts, and parts and accessories sales.
+*** Exploit
+A proof of concept local root exploit utilizing hotplug. Allows installation of a "rootshell" program on many Android 1.x and 2.x devices.
+*** Flashing
+The process of applying a firmware image (or ROM) to a device. It generally entails a very specific order of steps. Failing to complete any one of these steps properly may result in bricking the device.
+*** Kang
+The process of creating a code based off someone else's code or reapplying code that someone else created into your own code (e.g. git cherry-pick). The term "kang" or "kanging" can have a pejorative connotation, especially if one adopts code from someone else without giving due credit. However the term can also be used with a certain sense of irony; sometimes one will claim to have "kanged" with some tongue-in-cheek.
+
+** HTC Desire HD / Inspire 4G
+http://wiki.cyanogenmod.org/w/Ace_Info
+
+
+** The JIRA project management system
+ https://jira.cyanogenmod.org
+
+general User's Guide for JIRA 
+https://confluence.atlassian.com/display/JIRA052/JIRA+Documentation
+** View the latest accepted changes
+http://changelog.bbqdroid.org/
+
+** using gerrit
+http://wiki.cyanogenmod.org/w/Gerrit
+
+** Basic concepts
+http://wiki.cyanogenmod.org/w/Basic_concepts
+** Build Guides
+
+http://wiki.cyanogenmod.org/w/Build_Guides
+** Building Basics
+http://wiki.cyanogenmod.org/w/Doc:_Building_Basics
+
+
+
+
+** Setting up a Virtual Machine for CyanogenMod development
+https://skydrive.live.com/?cid=b3bff0d42ae1e534&id=B3BFF0D42AE1E534%21107

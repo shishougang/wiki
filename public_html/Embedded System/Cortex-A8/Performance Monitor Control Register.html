@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="title" content="c9, Performance Monitor Control Register"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-01-30 15:26:32 HKT"/>
+<meta name="generated" content="2013-04-08 12:39:49 China Standard Time"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -151,11 +151,11 @@ somewhere in the <b>board-init</b> will do:
 
 
 
-<pre class="src src-c"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">enable user-mode access to the performance counter</span><span style="color: #ff7f24;">*/</span>
-  <span style="color: #00ffff;">asm</span> (<span style="color: #ffa07a;">"MCR p15, 0, %0, C9, C14, 0\n\t"</span> :: <span style="color: #ffa07a;">"r"</span>(1)); 
+<pre class="example">/* enable user-mode access to the performance counter*/
+  asm ("MCR p15, 0, %0, C9, C14, 0\n\t" :: "r"(1)); 
 
-  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">disable counter overflow interrupts (just in case)</span><span style="color: #ff7f24;">*/</span>
-  <span style="color: #00ffff;">asm</span> (<span style="color: #ffa07a;">"MCR p15, 0, %0, C9, C14, 2\n\t"</span> :: <span style="color: #ffa07a;">"r"</span>(0x8000000f));
+  /* disable counter overflow interrupts (just in case)*/
+  asm ("MCR p15, 0, %0, C9, C14, 2\n\t" :: "r"(0x8000000f));
 </pre>
 
 <p>
@@ -223,12 +223,12 @@ We start with a function that reads the register:
 </p>
 
 
-<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">get_cyclecount</span> (<span style="color: #98fb98;">void</span>)
+<pre class="example">static inline unsigned int get_cyclecount (void)
 {
-  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">value</span>;
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Read CCNT Register</span>
-  <span style="color: #00ffff;">asm</span> <span style="color: #00ffff;">volatile</span> (<span style="color: #ffa07a;">"MRC p15, 0, %0, c9, c13, 0\t\n"</span>: <span style="color: #ffa07a;">"=r"</span>(value));  
-  <span style="color: #00ffff;">return</span> value;
+  unsigned int value;
+  // Read CCNT Register
+  asm volatile ("MRC p15, 0, %0, c9, c13, 0\t\n": "=r"(value));  
+  return value;
 }
 </pre>
 
@@ -237,31 +237,31 @@ And you most likely want to reset and set the divider as well:
 </p>
 
 
-<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">init_perfcounters</span> (<span style="color: #98fb98;">int32_t</span> <span style="color: #eedd82;">do_reset</span>, <span style="color: #98fb98;">int32_t</span> <span style="color: #eedd82;">enable_divider</span>)
+<pre class="example">static inline void init_perfcounters (int32_t do_reset, int32_t enable_divider)
 {
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">in general enable all counters (including cycle counter)</span>
-  <span style="color: #98fb98;">int32_t</span> <span style="color: #eedd82;">value</span> = 1;
+  // in general enable all counters (including cycle counter)
+  int32_t value = 1;
 
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">peform reset:  </span>
-  <span style="color: #00ffff;">if</span> (do_reset)
+  // peform reset:  
+  if (do_reset)
   {
-    value |= 2;     <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">reset all counters to zero.</span>
-    value |= 4;     <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">reset cycle counter to zero.</span>
+    value |= 2;     // reset all counters to zero.
+    value |= 4;     // reset cycle counter to zero.
   } 
 
-  <span style="color: #00ffff;">if</span> (enable_divider)
-    value |= 8;     <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">enable "by 64" divider for CCNT.</span>
+  if (enable_divider)
+    value |= 8;     // enable "by 64" divider for CCNT.
 
   value |= 16;
 
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">program the performance-counter control-register:</span>
-  <span style="color: #00ffff;">asm</span> <span style="color: #00ffff;">volatile</span> (<span style="color: #ffa07a;">"MCR p15, 0, %0, c9, c12, 0\t\n"</span> :: <span style="color: #ffa07a;">"r"</span>(value));  
+  // program the performance-counter control-register:
+  asm volatile ("MCR p15, 0, %0, c9, c12, 0\t\n" :: "r"(value));  
 
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">enable all counters:  </span>
-  <span style="color: #00ffff;">asm</span> <span style="color: #00ffff;">volatile</span> (<span style="color: #ffa07a;">"MCR p15, 0, %0, c9, c12, 1\t\n"</span> :: <span style="color: #ffa07a;">"r"</span>(0x8000000f));  
+  // enable all counters:  
+  asm volatile ("MCR p15, 0, %0, c9, c12, 1\t\n" :: "r"(0x8000000f));  
 
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">clear overflows:</span>
-  <span style="color: #00ffff;">asm</span> <span style="color: #00ffff;">volatile</span> (<span style="color: #ffa07a;">"MCR p15, 0, %0, c9, c12, 3\t\n"</span> :: <span style="color: #ffa07a;">"r"</span>(0x8000000f));
+  // clear overflows:
+  asm volatile ("MCR p15, 0, %0, c9, c12, 3\t\n" :: "r"(0x8000000f));
 }
 </pre>
 
@@ -378,22 +378,22 @@ To access the FLAG Register, read or write CP15 with:
 
 
 
-<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">init counters:</span>
+<pre class="example">// init counters:
  init_perfcounters (1, 0); 
 
- <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">measure the counting overhead:</span>
- <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">overhead</span> = get_cyclecount();
+ // measure the counting overhead:
+ unsigned int overhead = get_cyclecount();
  overhead = get_cyclecount() - overhead;    
 
- <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span> = get_cyclecount();
+ unsigned int t = get_cyclecount();
 
- <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">do some stuff here..</span>
+ // do some stuff here..
  call_my_function();
 
  t = get_cyclecount() - t;
 
- printf (<span style="color: #ffc0cb; font-weight: bold;">"</span><span style="color: #ffa07a;">function took exactly %d cycles (including function call)</span>
-<span style="color: #ffa07a;"> "</span>, t - overhead);
+ printf ("function took exactly %d cycles (including function call)
+ ", t - overhead);
 </pre>
 
 
@@ -467,7 +467,7 @@ outsiders and use a fixed constant instead.<sup><a class="footref" name="fnr.8" 
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-01-30 15:26:32 HKT</p>
+<p class="date">Date: 2013-04-08 12:39:49 China Standard Time</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.11 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

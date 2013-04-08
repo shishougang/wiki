@@ -4,6 +4,10 @@
 
 
 * Reference
++ book POSIX.4: Programming for the Real World by Bill O. Gallmeister,
+  from O'Reilly & Associates, for in-depth discussion of the POSIX
+  real-time extensions.
+
 POSIX Threads Programming
 https://computing.llnl.gov/tutorials/pthreads/
 
@@ -16,7 +20,7 @@ http://www.cs.cf.ac.uk/Dave/C/node32.html
 POSIX thread (pthread) libraries
 http://www.yolinux.com/TUTORIALS/LinuxTutorialPosixThreads.html
 * Chapter 1: Why Threads?
-
+** Overview
 The threads model takes a process and divides it into two parts:	
 
 + One contains resources used across the whole program (the
@@ -27,3 +31,1882 @@ The threads model takes a process and divides it into two parts:
   as a program counter and a stack. This part is referred to as a
   /thread/.
 
+** Specifying Potential Parallelism in a Concurrent Programming Environment	
+  If the fork call returns to both the parent and child, why
+  don't the parent and child execute the same instructions following
+  the fork? UNIX programmers specify different code paths for parent
+  and child by examining the return value of the fork call. The fork
+  call always returns a value of 0 to the child and the child's PID to
+  the parent.
+
+ *A fork Call*
+#+begin_src c
+if ((pid = fork()) < 0 ) {	
+           /* Fork system call failed */	
+           .	
+           perror("fork"), exit(1);	
+}else if (pid == 0) {	
+           /* Child only, pid is 0 */	
+           .	
+           return 0;	
+}else {	
+           /* Parent only , pid is child's process ID */	
+           .	
+}
+#+end_src
+
+
+When looking for concurrency, then, why choose multiple threads over
+multiple processes? The overwhelming reason lies in the single largest
+benefit of multithreaded programming: threads require less program and
+system overhead to run than processes do. The operating system
+performs less work on behalf of a multithreaded program than it does
+for a multiprocess program. This translates into a performance gain
+for the multithreaded program.
+
+*** Cre ating a new thread: pthread_create
+#+begin_src c
+pthread_t       thread1;
+
+pthread_create(&thread1,	
+          NULL,	
+          (void *) do_one_thing,	
+          (void *) &r1);
+#+end_src
+
++ A pointer to a buffer to which pthread_create returns a value
+  that identifies the newly created thread. This value, or
+  handle, is of type pthread_t.
++ A pointer to a structure known as a thread attribute object.
++ A pointer to the routine at which the new thread will start
+  executing.
++ A pointer to a parameter to be passed to the routine at which
+  the new thread starts.
+
+*** Threads are peers
+** Parallel vs. Concurrent Programming
+We'll use concurrent programming in a general sense to refer to
+environments in which the tasks we define can occur in any order. One
+task can occur before or after another, and some or all tasks can be
+performed at the same time. We'll use parallel programming to
+specifically refer to the simultaneous execution of concurrent tasks
+on different processors. Thus, all parallel programming is concurrent,
+but not all concurrent programming is parallel.
+
+Whether the threads actually run in parallel is a function of the
+operating system and hardware on which they run. Because Pthreads was
+designed in this way, a Pthreads program can run without modification
+on uniprocessor as well as multiprocessor systems.
+** Synchronization
+The =pthread_join= call provides synchronization for threads similar to
+that which waitpid provides for processes, suspending its caller until
+another thread exits. Unlike waitpid, which is specifically intended
+for parent and child processes, you can use =pthread_join= between any
+two threads in a program.
+
+For this, we'll define a mutex variable (of type =pthread_mutex_t=) and
+initialize it. (Just as a thread can have a thread attribute object, a
+mutex can have a mutex attribute object that indicates its special
+characteristics. Here, too, we'll pass a value of NULL for this
+argument, indicating that we accept the default characteristics for
+the new mutex.)
+#+begin_src c
+  pthread_mutex_t r3_mutex=PTHREAD_MUTEX_INITIALIZER;
+  
+  pthread_mutex_lock(&r3_mutex);
+  pthread_mutex_unlock(&r3_mutex);
+#+end_src
+
+*** Sharing Process Resources
+Independent processes share nothing. Threads share such process
+resources as global variables and file descriptors. If one thread
+changes the value of any such resource, the change will be evident to
+any other thread in the process, if anyone cares to look. The sharing
+of process resources among threads is one of the multithreaded
+programming model's major performance advantages, as well as one of
+its most difficult programming aspects. Having all of this context
+available to all threads in the same memory facilitates communication
+between threads. However, at the same time, it makes it easy to
+introduce errors of the sort in which one thread affects the value of
+a variable used by another thread in ways the other thread did not
+expect.
+
+*** Communication
+Multiple processes can use any of the many other UNIX Interprocess
+Communication (IPC) mechanisms: sockets, shared memory, and messages,
+to name a few. The multiprocess version of our program uses shared
+memory, but the other methods are equally valid. Even the waitpid call
+in our program could be used to exchange information, if the program
+checked its return value. However, in the multiprocess world, all
+types of IPC involve a call into the operating system—to initialize
+shared memory or a message structure, for instance. This makes
+communication between processes more expensive than communication
+between threads.
+
+
+
+
+
+
+
+** Who Am I? Who Are You?
+You can save this handle and use it to determine a thread's identity
+using the pthread_self and pthread_equal function calls. 
+#+begin_src c
+    pthread_t io_thread;
+    
+    int main(void)
+    {
+      pthread_create(&io_thread, ...);
+    }
+    void routine_x(void)
+    {
+      pthread_t thread;
+      thread = pthread_self();
+      if(phtread_equal(io_thread, thread)){
+      }
+    }
+#+end_src
+** Terminating Thread Execution
+ A thread can also explicitly exit with a call to pthread_exit. You can
+ terminate another thread by calling pthread_cancel. In any of these
+ cases, the Pthreads library runs any routines in its cleanup stack
+ and any destructors in keys in which it has store values. 
+*** Exit Status and Return Values
+The Pthreads library may or may not save the exit status of a thread
+when the thread exits, depending upon whether the thread is joinable
+or detached. A joinable thread, the default state of a thread at its
+creation, does have its exit status saved; a detached thread does not.
+Detaching a thread gives the library a break and lets it immediately
+reclaim the resources associated with the thread. Because the library
+will not have an exit status for a detached thread, you cannot use a
+=pthread_join= to join it.
+
+What is the exit status of a thread? You can associate an exit status
+with a thread in either of two ways:	
++ If the thread terminates explicitly with a call to pthread_exit, the
+  argument to the call becomes its exit status.	
++ If the thread does not call pthread_exit, the return value of the
+  routine in which it started becomes its exit status.
+
+#+begin_src c
+#include <stdio.h>	
+#include <pthread.h>	
+pthread_t thread;	
+static int arg;	
+static const int internal_error = -12;	
+static const int normal_error = -10;	
+static const int success = 1;	
+void * routine_x(void *arg_in)	
+{	
+  int *arg = (int *)arg_in;	
+  .	
+  if ( /* something that shouldn't have happened */) {	
+    pthread_exit((void *) &real_bad_error);	
+  }else if ( /* normal failure */ ) {	
+    return ((void *) &normal_error);	
+  }else {	
+    return ((void *) &success);	
+  }	
+}	
+extern int	
+main(int argc, char **argv)	
+{	
+  pthread_t thread;	
+  void *statusp;	
+  .	
+  pthread_create(&thread, NULL, routine_x, &arg);	
+  pthread_join(thread, &statusp);	
+  if (*statusp == PTHREAD_CANCELED) {	
+    printf("Thread was canceled.\n");	
+  }else {	
+    printf("Thread completed and exit status is %ld.\n", *(int *)statusp);	
+  }	
+return 0;	
+}
+#+end_src
+
+A final note on pthread_join is in order. Its purpose is to allow a
+single thread to wait on another's termination. The result of having
+multiple threads concurrently call pthread_join is undefined in the
+Pthreads standard.
+** Why Use Threads Over Processes?
+Creating a new process can be expensive. It takes time. (A call into
+the operating system is needed, and if the process creation triggers
+process rescheduling activity, the operating system's
+context-switching mechanism will become involved.) It takes memory.
+(The entire process must be replicated.) Add to this the cost of
+interprocess communication and synchronization of shared data, which
+also may involve calls into the operating system kernel, and threads
+provide an attractive alternative.
+
+Threads can be created without replicating an entire process.
+Furthermore, some, if not all, of the work of creating a thread is
+done in user space rather than kernel space. When processes
+synchronize, they usually have to issue system calls, a relatively
+expensive operation that involves trapping into the kernel. But
+threads can synchronize by simply monitoring a variable—in other
+words, staying within the user address space of the program.
+
+
+** A Structured Programming Environment
+** Choosing Which Applications to Thread
+* Chapter 2 - Designing Threaded Programs
+** Some Common Problems
+The basic rule for managing shared resources is simple and twofold:	
++ Obtain a lock before accessing the resource.	
++ Release the lock when you are finished with the resource.
+** Performance
++ The memory and CPU cycles required to manage each thread, including
+  the structures the operating system uses to manage them, plus the
+  overhead for the Pthreads library and any special code in the
+  operating system that supports the library.
++ The CPU cycles spent for synchronization calls that enforce orderly
+  access to shared data. These calls cost in CPU cycles to execute the
+  calls.
++ The time during which the application is inactive while one thread
+  is waiting on another thread. This cost results from too many
+  dependencies among threads and can be allayed by improved program
+  design.
+
+
+** Example: An ATM Server
+*** Dynamically detaching a thread
+The pthread_detach function notifies the Pthreads library that we
+don't want to join our worker threads: that is, we will never request
+their exit status. If we don't explicitly tell the Pthreads library
+that we don't care about a thread's exit status, it'll keep the shadow
+of the thread alive indefinitely after the thread terminates (in the
+same way that UNIX keeps the status of zombie processes around).
+Detaching our worker threads frees the Pthreads library from storing
+this information, thus saving space and time. We are still responsible
+for freeing any space we dynamically allocated to hold the pthread_t
+itself.
+
+* Chapter 3 - Synchronizing Pthreads
+** Overview
+Similarly, to make threads share data safely, we must ensure that
+threads that would otherwise behave independently access shared data
+in an orderly and controlled way. This concept is called
+synchronization.
+
+In a race condition, two or more threads access the same resource at
+the same time.
+
+** Selecting the Right Synchronization Tool
+*** pthread_join functions
+pthread_join allows one thread to suspend execution until another has
+terminated.
+
+*** Mutex variable functions
+A mutex variable acts as a mutually exclusive lock, allowing threads
+to control access to data. The threads agree that only one thread at a
+time can hold the lock and access the data it protects. 
+*** Condition variable functions
+A condition variable provides a way of naming an event in which
+threads have a general interest. An event can be something as simple
+as a counter's reaching a particular value or a flag being set or
+cleared; it may be something more complex, involving a specific
+coincidence of multiple events. Threads are interested in these
+events, because such events signify that some condition has been met
+that allows them to proceed with some particular phase of their
+execution. The Pthreads library provides ways for threads both to
+express their interest in a condition and to signal that an awaited
+condition has been met. 
+*** pthread_once function
+pthread_once is a specialized synchronization tool that ensures that
+initialization routines get executed once and only once when called by
+multiple threads.
+*** Some of the common synchronization mechanisms are:
++ Reader/writer exclusion Reader/writer locks allow multiple threads
+  to read data concurrently but ensure that any thread writing to the data has exclusive access.
++ hreadsafe data structures	You may find it useful to build
+  synchronization primitives into a complex data structure so that
+  each time you access it you don't need to make a separate call to
+  synchronize concurrent access. 
++ Semaphores	If your platform supports POSIX real-time extensions
+  (POSIX.1b), you can take advantage of yet another common
+  synchronization primitive for concurrent environments—semaphores. A
+  counting semaphore is like a mutex but is associated with a counter.
+
+** Mutex Variables
+To protect a shared resource from a race condition, we use a type of
+synchronization called mutual exclusion, or mutex for short.
+
+However, we could take a different perspective and provide exclusive
+access to the code paths or routines that access data. We call that
+piece of code that must be executed atomically a critical section.
+
+Using mutex variables in Pthreads is quite simple. Here's what you do:	
+1. Create and initialize a mutex for each resource you want to
+   protect, like a record in a database.	
+2. When a thread must access the resource, use pthread_mutex_lock to
+   lock the resource's mutex. The Pthreads library makes sure that
+   only one thread at a time can lock the mutex; all other calls to
+   the pthread_mutex_lock function for the same mutex must wait until
+   the thread currently holding the mutex releases it.	
+3. When the thread is finished with the resource, unlock the mutex by
+   calling pthread_mutex_unlock.
+
+*** Using Mutexes 
++ static 
+=pthread_mutex_t global_data_mutex = PTHREAD_MUTEX_INITIALIZER;=
++ dynamic
+#+begin_src c
+  pthread_mutex_t *mutexp;        
+    .     
+  mutexp=(pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));    
+  pthread_mutex_init(mutexp, NULL);
+#+end_src
+
+*** Using pthread_mutex_trylock
+Somewhat more acceptable is the specialized use of
+pthread_mutex_trylock by real-time programmers to poll for state
+changes. This practice may be inefficient, but it does allow real-time
+programs to respond quickly to a condition that warrants speed.
+
+Another situation in which a pthread_mutex_trylock is often used is in
+detecting and avoiding deadlock in locking hierarchies and priority
+inversion situations.
+*** Some Shortcomings of Mutexes
+read and write lock
+
+In some circumstances, it would be useful if we could define a
+recursivelock: that is a lock that can be relocked any number of times
+by its current holder. It would be nice if we could specify this
+ability in a mutex attribute object. We can imagine the Pthreads
+library associating an internal counter with a recursive mutex to
+count the number of times its current holder has called
+pthread_mutex_lock. Each time the current holder calls
+pthread_mutex_unlock, the library would decrement this counter. The
+lock would not be released until the call that brings the count down
+to zero is issued.
+
+A recursive mutex is useful for a thread that makes a number of nested
+calls to a routine that locks and manipulates a resource. You lock the
+mutex recursively each time the thread enters the routine and unlock
+it at all exit points. If the thread already holds the lock, the calls
+merely increase and decrease the recursive count and don't deadlock
+the thread. If you did not use a recursive mutex, you'd need to
+distinguish somehow between the times when the thread already holds
+the lock when it calls the routine and those when it needs to make a
+prior mutex lock call.
+
+*** Contention for a Mutex
+If more than one thread is waiting for a locked mutex, which thread is
+the first to be granted the lock once it's released? The choice is
+made according to the scheduling priorities of the individual threads.
+
+The use of priorities in a multithreaded program can lead to a classic
+multiprocessing problem: priority inversion. Priority inversion
+involves a low priority thread that holds a lock that a higher
+priority thread wants. Because the higher priority thread cannot
+continue until the lower priority thread releases the lock, each
+thread is actually treated as if it had the inverse of its intended
+priority.
+*** Sharing a Mutex Among Processes
+If your platform allows you to set the process-shared attribute, the
+compile-time constant _POSIX_THREAD_PROCESS_SHARED will be TRUE.
+
+To set the process-shared attribute, supply the PTHREAD_PROCESS_SHARED
+constant in a pthread_mutexattr_setshared call. To revert to a
+process-private mutex, specify the PTHREAD_PROCESS_PRIVATE constant.
+Processes that share a mutex must be able to access it in shared
+memory (created through System V shared memory mechanisms or through
+mmap calls). 
+
+#+begin_src c
+	#include <stdlib.h>	
+#include <stdio.h>	
+#include <unistd.h>	
+#include <string.h>	
+#include <sys/types.h>	
+#include <sys/ipc.h>	
+#include <sys/shm.h>	
+#include <sys/wait.h>	
+#ifndef _POSIX_THREAD_PROCESS_SHARED	
+#error "This platform does not support process shared mutex"	
+#endif	
+int   shared_mem_id;	
+int   *shared_mem_ptr;	
+pthread_mutex_t *mptr;	
+pthread_mutex_attr_t mutex_shared_attr;	
+extern int	
+main(void)	
+{	
+  pid_t  child_pid;	
+  int  status;	
+  /* initialize shared memory segment */	
+  shared_mem_id = shmget(IPC_PRIVATE, 1*sizeof(pthread_mutex_t), 0660);	
+  shared_mem_ptr = (int *)shmat(shared_mem_id, (void *)0, 0);	
+  mptr = shared_mem_ptr;	
+  pthread_mutexattr_init(&mutex_shared_attr);	
+  pthread_mutexattr_setshared(&mutex_shared_attr, PTHREAD_PROCESS_SHARED);	
+  pthread_mutex_init(mptr, &mutex_shared_attr);	
+  if ((child_pid = fork()) == 0) {	
+  /* child */	
+           /* create more threads */	
+           pthread_mutex_lock(mptr);	
+           .	
+  } else {	
+  /* parent */	
+           /* create more threads */	
+           pthread_mutex_lock(mptr);	
+           .	
+}
+#+end_src
+
+
+
+** Condition Variables
+#+begin_src c
+#include <stdio.h>	
+#include <pthread.h>	
+#define TCOUNT 10	
+#define WATCH_COUNT 12	
+int count = 0;	
+pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;	
+pthread_cond_t count_threshold_cv = PTHREAD_COND_INITIALIZER;	
+int  thread_ids[3] = {0,1,2};	
+extern int	
+main(void)	
+{	
+     int      i;	
+     pthread_t threads[3];	
+     pthread_create(&threads[0],NULL,inc_count, &thread_ids[0]);	
+     pthread_create(&threads[1],NULL,inc_count, &thread_ids[1]);	
+     pthread_create(&threads[2],NULL,watch_count, &thread_ids[2]);	
+     for (i = 0; i < 3; i++) {	
+              pthread_join(threads[i], NULL);	
+     }	
+     return 0;	
+}	
+void watch_count(int *idp)	
+{	
+     pthread_mutex_lock(&count_mutex)	
+     while (count <= WATCH_COUNT) {	
+              pthread_cond_wait(&count_threshold_cv,	
+                               &count_mutex);	
+              printf("watch_count(): Thread %d,Count is %d\n",	
+                   *idp, count);	
+     }	
+     pthread_mutex_unlock(&count_mutex);	
+}	
+void inc_count(int *idp)	
+{	
+     for (i =0; i < TCOUNT; i++) {	
+              pthread_mutex_lock(&count_mutex);	
+              count++;	
+              printf("inc_count(): Thread %d, old count %d,\	
+                   new count %d\n", *idp, count - 1, count );	
+              if (count == WATCH_COUNT)	
+                   pthread_cond_signal(&count_threshold_cv);	
+              pthread_mutex_unlock(&count_mutex);	
+     }	
+}
+#+end_src
+
+A condition variable has a data type of pthread_cond_t. You can
+initialize it statically as we do in Example 3-7, or you can
+initialize it dynamically by calling pthread_cond_init, as
+follows:	
+
+=pthread_cond_init(&count_threshold_cv, NULL);=
+
+If count is not the desired value, the thread calls pthread_cond_wait
+to put itself into a wait on the count_threshold_cv condition
+variable. The pthread_cond_wait function releases the count mutex
+while the thread is waiting so other threads have the opportunity to
+modify count.
+
+*** The thread can wait on the condition variable.
+To wait on a condition variable, a thread calls pthread_cond_wait or
+pthread_cond_timedwait. 
+*** it can signal other threads waiting on the condition variable.
+To release threads that are waiting on a condition variable, a thread
+calls pthread_cond_signal or pthread_cond_broadcast.
+
+*** Using a Mutex with a Condition Variable
+It is important to use condition variables and mutexes together
+properly.
+
+A call to pthread_cond_wait requires that a locked mutex be passed in
+along with the condition variable. The system releases the mutex on
+the caller's behalf when the wait for the condition begins. In concert
+with the actions of the waiting thread, the thread that issues the
+pthread_cond_signal or pthread_cond_broadcast call holds the mutex at
+the time of the call but must release it after the call. Then, when
+the system wakes it up, a waiting thread can regain control of the
+mutex. It too must release the mutex when it's finished with
+it.	
+
+*** When Many Threads Are Waiting
+If all waiting threads are of the same priority, they are released in
+a first-in first-out order for each pthread_cond_signal call that's
+issued
+
+The pthread_cond_broadcast function releases all threads at once from
+their waits on the condition variable, but there is a hitch.
+
+ It does so by applying the same criterion it uses when selecting the
+ thread it wakes when a phread_cond_signal call signals a
+ condition—scheduling order.The other threads are moved to the queue
+ of threads that are waiting to acquire the mutex.
+*** Checking the Condition on Wake Up: Spurious Wake Ups
+Well, we check the event one more time primarily to ensure
+correctness: if multiple threads were waiting on the same condition
+variable, another thread could have already been awakened, perhaps
+decrementing the count, before our thread was able to run. Second, we
+want to guard against a condition known as a spurious wake up. 
+*** Condition Variable Attributes
+A Pthreads condition variable attribute object is of data type
+=pthread_condattr_t=.You initialize and deinitialize the condition
+variable attribute object by calling =pthread_condattr_init= and
+=pthread_condattr_destroy=, respectively.
+
+
+
+
+
+
+
+** Reader/Writer Locks
+We'll start by defining a reader/writer variable of type
+=pthread_rdwr_t= and by creating the functions that operate on it
+*** Reader/Writer Lock Functions
+#+begin_src sh
+pthread_rdwr_init_np	Initialize reader/writer lock	
+pthread_rdwr_rlock_np	Obtain read lock	
+pthread_rdwr_wlock_np	Obtain write lock	
+pthread_rdwr_runlock_np	Release read lock	
+pthread_rdwr_wunlock_np	Release write lock
+#+end_src
+*** implement
+#+begin_src c
+//initialize
+int pthread_rdwr_init_np(pthread_rdwr_t *rdwrp, pthread_rdwrattr_t  *attrp )	
+{	
+          rdwrp->readers_reading = 0;	
+          rdwrp->writer_writing = 0;	
+          pthread_mutex_init(&(rdwrp->mutex), NULL);	
+          pthread_cond_init(&(rdwrp->lock_free), NULL);	
+          return 0;	
+}
+
+//read locking a read/write lock
+int pthread_rdwr_rlock_np(pthread_rdwr_t_np *rdwrp)	
+{	
+          pthread_mutex_lock(&(rdwrp->mutex));	
+          while(rdwrp->writer_writing) {	
+                  pthread_cond_wait(&(rdwrp->lock_free), &(rdwrp->mutex));	
+          }	
+          rdwrp->readers_reading++;	
+          pthread_mutex_unlock(&(rdwrp->mutex));	
+          return 0;	
+}
+//write locking a read/write lock
+	int pthread_rdwr_wlock_np(pthread_rdwr_t_np *rdwrp)	
+{	
+          pthread_mutex_lock(&(rdwrp->mutex));	
+          while (rdwrp->writer_writing || rdwrp->readers_reading) {	
+                   pthread_cond_wait(&(rdwrp->lock_free), &(rdwrp->mutex));	
+          }	
+          rdwrp->writer_writing++;	
+          pthread_mutex_unlock(&(rdwrp->mutex));	
+          return 0;	
+}
+//read unlocking a read/write lock
+	int pthread_rdwr_runlock_np(pthread_rdwr_t_np *rdwrp) {	
+          pthread_mutex_lock(&(rdwrp->mutex));	
+          if (rdwrp->readers_reading == 0) {	
+                    pthread_mutex_unlock(&(rdwrp->mutex));	
+                    return -1;	
+          } else {	
+                    rdwrp->readers_reading--;	
+                    if (rdwrp->readers_reading == 0)	
+                              pthread_cond_signal(&(rdwrp->lock_free));	
+                    pthread_mutex_unlock(&(rdwrp->mutex));	
+                    return 0;	
+          }	
+}
+//write unlocking a reader/write lock
+	int pthread_rdwr_wunlock_np(pthread_rdwr_t_np *rdwrp) {	
+          pthread_mutex_lock(&(rdwrp->mutex));	
+          if (rdwrp->writer_writing == 0) {	
+                    pthread_mutex_unlock(&(rdwrp->mutex));	
+                    return -1;	
+          } else {	
+                    rdwrp->writer_writing = 0;	
+                    pthread_cond_broadcast(&(rdwrp->lock_free));	
+                    pthread_mutex_unlock(&(rdwrp->mutex));	
+                    return 0;	
+          }	
+}
+
+#+end_src
+
+
+
+*** issue
+ If the lock is currently held by a reader and a writer is already
+ waiting, any reader that comes along next will get the lock before
+ the waiting writer. As long as one or more readers are waiting for
+ the lock, regardless of when they made their requests or where in the
+ waiting lists they're queued relative to any potential writers, the
+ lock will continue to be held for reading.
+
+The decision of how to handle incoming reads versus pending writes
+depends on the priorities of a given system.	
+
+** Synchronization in the ATM Server
+** Thread Pools
+but it can slow our server in a couple of different ways:	
++ We don't reuse idle threads to handle new requests. Rather, we
+  create—and destroy—a thread for each request we receive.
+  Consequently, our server spends a lot of time in the Pthreads
+  library.
++ We've added to each request's processing time (a request's latency,
+  to use a term from an engineering design spec) the time it takes to
+  create a thread. No wonder our ATM customers keep tapping the Enter
+  button and scowling at the camera!
+
+* Chapter 4 - Managing Pthreads
+** Setting Thread Attributes
+we'd perform the following steps:	
+1. Define an attribute object of type pthread_attr_t.	
+2. Call pthread_attr_init to declare and initialize the attribute object.	
+3. Make calls to specific Pthreads functions to set individual attributes in the object.	
+4. Specify the fully initialized attribute object to the
+   pthread_create call that creates the thread.
+   
+*** Setting a Thread's Stack Size
+ a process stack normally starts in high memory and works its way down
+ in memory without anything in its way until it reaches 0. For a
+ process with individual threads, one thread's stack is bounded by the
+ start of the next thread's stack, even if the next thread isn't using
+ all of its stack space.
+
+To set a thread's stack size, we call pthread_attr_init to declare and
+initialize a custom thread attribute object (pthread_attr_t)
+
+#+begin_src c
+  #define MIN_REQ_SSIZE 81920     
+  size_t default_stack_size;      
+  pthread_attr_t stack_size_custom_attr;
+  
+  pthread_attr_init(&stack_size_custom_attr);
+  
+  #ifdef _POSIX_THREAD_ATTR_STACKSIZE     
+  pthread_attr_getstacksize(&stack_size_custom_attr,      
+                 &default_stack_size);    
+  if (default_stack_size < MIN_REQ_SSIZE) {;
+    pthread_attr_setstacksize(&stack_size_custom_attr,	
+                   (size_t)MIN_REQ_SSIZE);	
+}	
+#endif
+
+#+end_src
+*** Setting a Thread's Detached State
+Detaching from a thread informs the Pthreads library that no other
+thread will use the pthread_join mechanism to synchronize with the
+thread's exiting. Because the library doesn't preserve the exit status
+of a detached thread, it can operate more efficiently and make the
+library resources that were associated with a thread available for
+reuse more quickly. If no other thread cares when a particular thread
+in your program exits, consider detaching that thread.
+
+#+begin_src c
+pthread_attr_t detached_attr;
+pthread_attr_setdetachedstate(&detached_attr, PTHREAD_CREATE_DETACHED);
+pthread_create(&thread, &detached_attr, ...);
+#+end_src
+** The pthread_once Mechanism
+The pthread_once mechanism is the tool of choice for these situations.
+It, like mutexes and condition variables, is a synchronization tool,
+but its specialty is handling synchronization among threads at
+initialization time. 
+
+Remember, our library's multithreaded. How do we know whether or not
+another thread might be trying to initialize the same objects
+simultaneously?
+
+*** Example: The ATM Server's Communication Module
+Thread A checks the value of srv_comm_inited and finds FALSE. Thread B
+checks the value and also finds it FALSE. Then they both go forward
+and call srv_comm_init.	
+
+We'll consider two viable solutions:	
++ Adding a mutex to protect the srv_comm_inited flag and
+  server_comm_init routine. Using PTHREAD_MUTEX_INITIALIZER, we'll
+  statically initialize this mutex.	
++ Designating that the entire routine needs special synchronization
+  handling by calling the pthread_once function.
+
+*** Using the pthread_once mechanism
+If we use the server_comm_init routine only through the pthread_once
+mechanism, we can make the following synchronization guarantees:
++ No matter how many times it is invoked by one or more threads, the
+  routine will be executed only once by its first caller.
++ No caller will exit from the <emphasis>pthread_once</emphasis>
+  mechanism until the routine's first caller has returned
+#+begin_src c
+pthread_once_t      srv_comm_inited_once = PTHREAD_ONCE_INIT;	
+
+pthread_once(&srv_comm_inited_once, server_comm_init);
+#+end_src
+
+no longer has to test a flag to determine whether to proceed with
+initialization. Instead, it calls pthread_once, specifying the once
+block and the routine
+
+You can declare multiple once blocks in a program, associating each
+with a different routine. Be careful, though. Once you associate a
+routine with the pthread_once mechanism, you must always call it
+through a pthread_once call, using the same once block. You cannot
+call the routine directly elsewhere in your program without subverting
+the synchronization the pthread_once mechanism is meant to provide
+
+Notice that the pthread_once interface does not allow you to pass
+arguments to the routine that is protected by the once block. If
+you're trying to fit a predefined routine with arguments into the
+pthread_once mechanism, you'll have to fiddle a bit with global
+variables, wrapper routines, or environment variables to get it to
+work properly.
+
+
+** Keys: Using Thread-Specific Data
+*** Overview
+To maintain long-lived data associated with a thread, we normally have two options:	
++ Pass the data as an argument to each call the thread makes.	
++ Store the data in a global variable associated with the thread.
+
+ Most likely you don't have the option of redefining the library's
+  call arguments. Because you don't necessarily know at compile time
+  how many threads will be making library calls, it's very difficult
+  to define an adequate number of global variables with the right
+  amount of storage. Fortunately, the Pthreads standard provides a
+  clever way of maintaining thread-specific data in such cases.
+
+Certain applications also use thread-specific data with keys to
+associate special properties with a thread in one routine and then
+retrieve them in another. Some examples include:
++ A resource management module (such as a memory manager or a file
+  manager) could use a key to point to a record of the resources that
+  have been allocated for a given thread. When the thread makes a call
+  to allocate more resources, the module uses the key to retrieve the
+  thread's record and process its request.
++ A performance statistics module for threads could use a key to point
+  to a location where it saves the starting time for a calling thread.
++ A debugging module that maintains mutex statistics could use a key
+  to point to a per-thread count of mutex locks and unlocks.
++ A thread-specific exception-handling module, when servicing a try
+  call (which starts execution of the normal code path), could use a
+  key to point to a location to which to jump in case the thread
+  encounters an exception. The occurrence of an exception triggers a
+  catch call to the module. The module checks the key to determine
+  where to unwind the thread's execution.
++ A random number generation module could use a key to point to a
+  location where it maintains a unique seed value and number stream
+  for each thread that calls it to obtain random numbers.
+
+These examples share some common characteristics:	
++ They are libraries with internal state.	
++ They don't require their callers to provide context in interface
+  arguments. They don't burden the caller with maintaining this type
+  of context in the global environment.
++ In a nonthreaded environment, the data to which the key refers would
+  normally be stored as static data.
+
+Note that thread-specific data is not a distinct data section like
+global, heap, and stack. It offers no special system protection or
+performance guarantees; it's as private or shared as other data in the
+same data section. There are no special advantages to using
+thread-specific data if you aren't writing a library and if you know
+exactly how many threads will be in your program at a given time. If
+this is the case, just allocate a global array with an element for
+each known thread and store each thread's data in a separate element.
+
+
+*** Initializing a Key: pthread_key_create
+#+begin_src c
+	static pthread_key_t conn_key;
+     pthread_key_create(&conn_key, (void *)free_conn);
+void free_conn(int *connp)	
+{	
+       free(connp);	
+}
+#+end_src
+
+The pthread_key_create call takes two arguments: the key and a
+destructor routine. 
+
+	When you're done with a key, call pthread_key_delete to allow
+	the library to recover resources associated with the key
+	itself.
+*** Associating Data with a Key
+You must always use =pthread_setspecific= and =pthread_getspecific= to
+refer to any data item that is being managed by a key.
+#+begin_src c
+int *connp;
+connp = (int *)malloc(sizeof(int));
+pthread_setspecific(conn_key, (void *)connp);
+#+end_src
+
+The pthread_setspecific routine takes, as an argument, a pointer to
+the data to be associated with the key—not the data itself. 
+
+*** Retrieving Data from a Key
+ Each routine uses a pointer, saved_connp, to point to the connection
+ identifier, 
+#+begin_src c
+int *saved_connp;
+pthread_getspecific(conn_key, (void **)&saved_connp);	
+write(*saved_connp,...);
+#+end_src
+
+*** Destructors
+** Cancellation
+Cancellation allows one thread to terminate another.
+
+Now you must reckon whether the thread you've targeted can be canceled
+at all. The ability of a thread to go away or not go away when asked
+by another thread is known as its cancelability state. Now you must
+consider when it might go away—maybe immediately, maybe a bit later.
+The degree to which a thread persists after it has been asked to go
+away is known as its cancelability type
+
+*** The Complication with Cancellation
+The simplest approach is to restrict the use of cancellation to
+threads that execute only in simple routines that do not hold locks or
+ever put shared data in an inconsistent state. Another option is to
+restrict cancellation to certain points at which a thread is known to
+have neither locks nor resources. Lastly, you could create a cleanup
+stack for the thread that is to be canceled; it can then use the
+cleanup stack to release locks and reset the state of shared data.
+
+*** Cancelability Types and States
+Because canceling a thread that holds locks and manipulates shared
+data can be a tricky procedure, the Pthreads standard provides a
+mechanism by which you can set a given thread's cancel ability 
+
+A thread can set its own cancel ability only at run time, dynamically,
+by calling into the Pthreads library.
+
+*** Cancellation Points: More on Deferred Cancellation
+These pending cancellations are delivered to a thread at defined
+locations in its code path. These locations are known as cancellation
+points, and they come in two flavors:
+
++ Automatic cancellation points
+  (pthread_cond_wait,pthread_cond_timedwait, and pthread_join). The
+  Pthreads library defines these function calls as cancellation points
+  because they can block the calling thread. Rather than maintain the
+  overhead of a blocked routine that's destined to be canceled, the
+  Pthreads library considers these calls to be a license to kill the
+  thread. Note that, if the thread for which the cancellation is
+  pending does not call any of these functions, it may never actually
+  be terminated. This is one of the reasons you may need to consider
+  using a programmer-defined cancellation point.
++ Programmer-defined cancellation points (pthread_testcancel).To force
+  a pending cancellation to be delivered at a particular point ina
+  thread's code path, insert a call to pthread_testcancel. The
+  pthread_testcancel function causes any pending cancellation to be
+  delivered to the thread at the program location where it occurs. If
+  no cancellation is pending on the thread, nothing happens. Thus, you
+  can freely insert this call at those places in a thread's code path
+  where it's safe for the thread to terminate. It's also prudent to
+  call pthread_testcancel before a thread starts a time-consuming
+  operation. If a cancellation is pending on the thread, it's better
+  to terminate it as soon as possible, rather than have it continue
+  and consume system resources needlessly.
+
+
+*** A Simple Cancellation Example
+#+begin_src c
+//main:
+
+  /**** cancel each thread ****/	
+  for (i = 0; i < NUM_THREADS; i++) {;	
+    pthread_cancel(threads[i]);	
+  }
+//1.
+int last_state;
+pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &last_state);
+
+//2.
+int last_state, last_type;
+pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &last_state);
+pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, &last_type);
+pthread_testcancel();
+
+//3.
+pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &last_type);	
+pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &last_state);
+#+end_src
+*** Cleanup Stacks
+Pthreads associates a cleanup stack with each thread.
+
+A cleanup stack contains pointers to routines to be executed just
+before the thread terminates.By default the stack is empty; you use
+pthread_cleanup_push to add routines to the stack, and
+pthread_cleanup_pop to remove them. When the library processes a
+thread's termination, the thread executes routines from the cleanup
+stack in last-in first-out order.
+
+#+begin_src c
+ /*	
+ Cleanup routine: last_breath	
+ */	
+void last_breath(char *messagep)	
+{	
+  printf("\n\n%s last_breath cleanup routine: freeing 0x%x\n\n", messagep,	
+          messagep);	
+  free(messagep);	
+}
+
+pthread_cleanup_push((void *)last_breath, (void *)messagep);
+#+end_src
+
+First, pthread_cleanup_pop takes a single argument—an integer that can have either of two values:	
++ If the value of this argument is 1, the thread that called
+  pthread_cleanup_pop executes the cleanup routine whose pointer is
+  being removed from the cleanup stack. Afterwards, the thread resumes
+  at the line following its pthread_cleanup_pop call. This allows a
+  thread to execute a cleanup routine whether or not it is actually
+  being terminated.
++ If the value of this argument is 0, the pointer to the routine is
+  popped off the cleanup stack, but the routine itself does not
+  execute.
+
+Second, the Pthreads standard requires that there be one
+pthread_cleanup_pop for each pthread_cleanup_push within a given
+lexical scope of code.
+
+**** Cancellation in the ATM Server
+** Scheduling Pthreads
+If your system supports the scheduling programming interface, the
+compile-time constant _POSIX_THREAD_PRIORITY_SCHEDULING will be TRUE.
+
+*** Scheduling Priority and Policy
+The eligibility of any given thread for special scheduling treatment
+is determined by the settings of two thread-specific attributes:
++ Scheduling priority	A thread's scheduling priority, in relation to
+  that of other threads, determines which thread gets preferential
+  access to the available CPUs at any given time.
++ Scheduling policy	A thread's scheduling policy is a way of
+  expressing how threads of the same priority run and share the
+  available CPUs.
+*** Scheduling Scope and Allocation Domains
+#+begin_src c
+pthread_attr_t custom_sched_attr;
+pthread_attr_init(&custom_sched_attr);
+pthread_attr_setscope(&custom_sched_attr, PTHREAD_SCOPE_SYSTEM);	
+pthread_create(&thread, &custom_sched_attr, ...);
+#+end_src
+
+The pthread_attr_setscope function sets the scheduling-scope attribute
+in a thread attribute object to either system-scope scheduling
+(PTHREAD_SCOPE_SYSTEM), or process-scope scheduling
+(PTHREAD_SCOPE_PROCESS).
+
+
++ When we say pool of threads, we mean:	
+  In process scope: all other threads in the same process	
+  In system scope: all threads of all processes in the same allocation domain	
+
++ When we say scheduler, we mean:	
+  In process scope: the Pthreads library and/or the scheduler in the operating system's kernel	
+  In system scope: the scheduler in the operating system's kernel	
+
++ When we say processing slot, we mean:	
+  In process scope: the portion of CPU time allocated to the process as a whole within its allocation domain	
+  In system scope: the portion of CPU time allocated to a specific thread within its allocation domain
+
+*** Runnable and Blocked Threads
+*** Scheduling Policy
+The two main scheduling policies are SCHED_FIFO and SCHED-RR:
++ SCHED_FIFO	This policy (first-in first-out) lets a thread run
+  until it either exits or blocks. As soon as it becomes unblocked, a
+  blocked thread that has given up its processing slot is placed at
+  the end of its priority queue.
++ SCHED_RR	This policy (round robin) allows a thread to run for
+  only a fixed amount of time before it must yield its processing slot
+  to another thread of the same priority. This fixed amount of time is
+  usually referred to as a quantum. When a thread is interrupted, it
+  is placed at the end of its priority queue.
+*** Using Priorities and Policies
+*** Setting Scheduling Policy and Priority
+We specify it in calls to pthread_attr_setschedpolicy to set the
+scheduling policy and pthread_attr_setschedparam to set the scheduling
+priority
+#+begin_src c
+pthread_attr_t custom_sched_attr;	
+int fifo_max_prio, fifo_min_prio;	
+struct sched_param fifo_param;	
+.	
+.	
+  pthread_attr_init(&custom_sched_attr);	
+  pthread_attr_setinheritsched(&custom_sched_attr, PTHREAD_EXPLICIT_SCHED);	
+  pthread_attr_setschedpolicy(&custom_sched_attr, SCHED_FIFO);	
+  fifo_max_prio = sched_get_priority_max(SCHED_FIFO);	
+  fifo_min_prio = sched_get_priority_min(SCHED_FIFO);	
+  fifo_mid_prio = (fifo_min_prio + fifo_max_prio)/2;	
+  fifo_param.sched_priority = fifo_mid_prio;	
+  pthread_attr_setschedparam(&custom_sched_attr, &fifo_param);	
+  pthread_create(&(threads[i]), &custom_sched_attr, ....);
+#+end_src
+
+The pthread_attr_setschedparam function takes two arguments: the first is a thread attribute object, the second is a curious thing defined in the POSIX.1b standard and known as a struct sched_param. It looks like this:	
+
+#+begin_src c
+struct sched_param {;	
+          int sched_priority;	
+}
+#+end_src
+
+The absolute values and actual range of the priorities depend upon the
+implementation, but one thing's for certain—you can use
+sched_get_priority_max and sched_get_priority_min to get a handle on
+them.
+
+Setting Policy and Priority Dynamically (sched.c)	
+
+#+begin_src c
+fifo_sched_param.sched_priority = fifo_min_prio;	
+pthread_setschedparam(threads[i], SCHED_FIFO, &fifo_min_prio)
+#+end_src
+
+the pthread_setschedparam call sets both policy and priority at the
+same time. 
+
+
+*** Inheritance
+Instead, you can specify that each thread should inherit its
+scheduling characteristics from the thread that created it. Like other
+per-thread scheduling attributes, the inheritance attribute is
+specified in the attribute object used at thread creation
+
+
+#+begin_src c
+pthread_attr_t custom_sched_attr;	
+        .	
+pthread_attr_init(&custom_sched_attr);	
+pthread_attr_setinheritsched(&custom_sched_attr, PTHREAD_INHERIT_SCHED)	
+        .	
+pthread_create(&thread, &custom_sched_attr, ...);
+#+end_src
+
+The pthread_attr_setinheritsched function takes a thread attribute
+object as its first argument and as its second argument either the
+PTHREAD_INHERIT_SCHED flag or the PTHREAD_EXPLICIT_SCHED flag. You can
+obtain the current inheritance attribute from an attribute object by
+calling pthread_attr_getinheritsched
+
+
+
+** Mutex Scheduling Attributes
+The Pthreads standard allows (but does not require) implementations to
+design mutexes that can give a priority boost to low priority threads
+that hold them. We can associate a mutex with either of two priority
+protocols that provide this feature: priority ceiling or priority
+inheritance. 
+
+*** Priority Ceiling
+The priority ceiling protocol associates a scheduling priority with a
+mutex. Thus equipped, a mutex can assign its holder an effective
+priority equal to its own, if the mutex holder has a lower priority to
+begin with.
+
+If your platform supports the priority ceiling protocol, the
+compile-time constant _POSIX_THREAD_PRIO_PROTECT will be defined.
+#+begin_src c
+pthread_mutex_t m1;	
+pthread_mutexattr_t mutexattr_prioceiling;	
+int mutex_protocol, high_prio;	
+.	
+high_prio = sched_get_priority_max(SCHED_FIFO);	
+.	
+pthread_mutexattr_init(&mutexattr_prioceiling);	
+pthread_mutexattr_getprotocol(&mutexattr_prioceiling, &mutex_protocol);	
+pthread_mutexattr_setprotocol(&mutexattr_prioceiling, PTHREAD_PRIO_PROTECT);	
+pthread_mutexattr_setprioceiling(&mutexattr_prioceiling, high_prio);	
+pthread_mutex_init(&m1, &mutexattr_prioceiling);
+#+end_src
+
+The priority protocol attribute can have one of three values:	
++ PTHREAD_PRIO_NONE	 The mutex uses no priority protocol.	
++ PTHREAD_PRIO_PROTECT	 The mutex uses the priority ceiling protocol.	
++ PTHREAD_PRIO_INHERIT   The mutex uses the priority inheritance
+  protocol.
+
+
+*** Priority Inheritance
+	The priority inheritance protocol lets a mutex elevate the
+	priority of its holder to that of the waiting thread with the
+	highest priority.
+
+Because the priority inheritance protocol awards a priority boost to a
+mutex holder only when it's absolutely needed, it can be more
+efficient than the priority ceiling protocol.
+
+	If your platform supports the priority inheritance feature,
+	the compile-time constant _POSIX_THREAD_PRIO_INHERIT will be
+	TRUE
+
+#+begin_src c
+pthread_mutex_t m1;	
+pthread_mutexattr_t mutexattr_prioinherit;	
+int mutex_procotol;	
+.	
+pthread_mutexattr_init(&mutexattr_prioinherit);	
+pthread_mutexattr_getprotocol(&mutexattr_prioinherit, &mutex_protocol);	
+if (mutex_protocol != PTHREAD_PRIO_INHERIT) {;	
+    pthread_mutexattr_setprotocol(&mutexattr_prioinherit, PTHREAD_PRIO_INHERIT);	
+}	
+pthread_mutex_init(&m1, &mutexattr_prioinherit);	
+#+end_src
+
+* Chapter 5 - Pthreads and UNIX
+** Overview
++ Threadsafe libraries 
+	Most system libraries maintain internal data for the currently
+        executing process in internal data. To allow multiple threads
+        from the same process to execute library routines
+        simultaneously, library implementors must somehow protect this
+        data from unsynchronized accesses by otherwise cooperative
+        threads. Libraries that eliminate such race conditions are
+        known as threadsafe libraries. 
+
++ Cancellation-safe library functions 
+	If a thread is canceled while in the middle of a library call
+  that is modifying a library's internal data, it may exit, leaving
+  the data in an inconsistent or corrupted state. A library function
+  in which a thread can be canceled safely is known as a
+  cancellation-safe library routine.
+
+** Threads and Signals
+This presented the Pthreads standard committee with three chief
+challenges: 	
++ A thread should be able to send and receive signals, yet, to
+       allow this, a Pthreads implementation cannot subvert a
+       single-threaded process's ability to process signals in the
+       way it always has.
++ When a signal is delivered to a multithreaded process, a Pthreads
+  implementation must select one of the threads to perform the
+  required action. 
++ What can a thread do, while in a signal handler, that won't
+       interfere with its mainline execution?
+*** Traditional Signal Processing
+A process may choose to:
++ Ignore the signal (SIG_IGN)	
++ Use the default action (SIG_DFL)
++ Catch the signal, and execute a user-specified handler routine
+
+The arrival of a signal interrupts a process at its current point of
+execution and transfers execution to a signal-handling routine. When
+the signal handler returns, the process resumes at its prior execution
+point. 
+
+*** Signal Processing in a Multithreaded World
+If multiple threads are executing within a process when a signal is
+delivered to it, the system must select a thread to process it. At the
+highest level, the selection of the thread is dictated by how the
+signal was generated, what action caused the signal, and what the
+effective target of the signal is. 
+**** Synchronously generated signals
+The system is sending the process a signal because one of its threads
+tried to divide by zero (SIGFPE), touch forbidden memory in the wrong
+way (SIGSEGV), use a broken pipe (SIGPIPE), or do something else that
+triggered an exception. 
+
+	The other type of synchronously generated signal results from
+	one thread in a process calling pthread_kill to send a signal
+	to another thread in the same process. 
+
+Note that you shouldn't use pthread_kill in place of cancellation or
+condition variables
+
+**** Asynchronously generated signals
+The arrival of these signals is asynchronous to the activities of any
+and all threads within the process. They are typically job control
+signals—SIGALRM, SIGHUP, SIGINT, and SIGKILL—or the user-defined
+signals—SIGUSR1 and SIGUSR2. They are sent to the process by a kill
+call and can be handled by almost any of its threads. 
+**** Per-thread signal masks
+By default, the first thread in a child process inherits its signal
+mask from the thread in its parent that called fork. Additional
+threads inherit the signal mask of the thread that issued the
+pthread_create that created them. Use the pthread_sigmask call to
+block and unblock signals in the mask.
+
+When an asynchronously generated signal arrives at a process, it is
+handled once by exactly one thread in the process. The system selects
+this thread by referring to the collection of per-thread signal masks
+of all the threads. If more than one thread has the signal unblocked,
+the system arbitrarily selects one of them.
+
+
+
+**** Per-process signal actions
+Although each thread has its own signal mask, all threads in a process
+must share the process's own signal action (sigaction) structure.
+Consequently, if a process specifies that a given signal should be
+ignored, it will be ignored, regardless of to which thread in the
+process the system delivers it. Similarly, if a process's sigaction
+structure deems that a certain signal should be subjected to the
+default action (whatever that might be for the signal) or processed by
+a signal handler, the specified action will be carried out when the
+signal is delivered to any of the process's threads. 
+
+Any thread can make a sigaction call to set the action for a signal.
+If a thread calls sigaction to set the SIG_IGN action for the SIGTERM
+signal, any other thread in the same process that does not block this
+signal is prepared to ignore a SIGTERM should one be delivered to it.
+If a thread assigns the ei-e-io signal handler to the SIGIO signal,
+any thread selected to handle SIGIO will call ei-e-io. 
+
+**** Putting it all together
+*** Threads in Signal Handlers
+But where are the Pthreads calls? They're not in either of these
+lists! In fact, the Pthreads standard specifies that the behavior of
+all Pthreads functions is undefined when the function is called from a
+signal handler.
+
+
+
+To make our program take an action when a signal arrives we can use sigwait as follows: 	
++ Mask the interesting signals in all threads so that their arrival is made pending. The sigwait call will detect these signals. 	
++ Create a dedicated thread that waits specifically for interesting signals to arrive. 	
++ Insert a simple loop in the dedicated thread's code that calls
+  sigwait, indicating the signals that it will handle. Add the action
+  routine that executes when the sigwait call returns. 
+
+*** A Simple Example
+
+#+begin_src c
+pthread_t stats_thread;	
+pthread_mutex_t stats_lock = PTHREAD_MUTEX_INITIALIZER;	
+extern int	
+main(void)	
+{	
+.	
+sigset_t sigs_to_block;	
+.	
+/* Set main thread's signal mask to block SIGUSR1.	
+All other threads will inherit mask and have it blocked too	
+*/	
+sigemptyset(&sigs_to_block);	
+sigaddset(&sigs_to_block, SIGUSR1);	
+pthread_sigmask(SIG_BLOCK, &sigs_to_block, NULL);	
+.	
+pthread_create(&stats_thread, NULL, report_stats, NULL);	
+}
+
+void * report_stats(void *p)	
+{	
+sigset_t sigs_to_catch;	
+int caught;	
+sigemptyset(&sigs_to_catch);	
+sigaddset(&sigs_to_catch, SIGUSR1);	
+for (;;) {	
+      sigwait(&sigs_to_catch, &caught);	
+      /* Proceed to lock mutex and display statistics */	
+      pthread_mutex_lock(&stats_lock);	
+      display_stats();	
+      pthread_mutex_unlock(&stats_lock);	
+      }	
+return NULL;	
+}
+#+end_src
+
+** Threadsafe Library Functions and System Calls
+*** Threadsafe and Reentrant Functions
+The degree to which a library function or routine allows itself to
+have multiple instances of itself in progress at the same time is
+known as its reentrancy. 
+*** Functions That Return Pointers to Static Data
+*** Using Thread-Unsafe Functions in a Multithreaded Program
+** Cancellation-Safe Library Functions and System Calls
+*** Cancellation Points in System and Library Calls
+we know of four Pthreads function calls that act as cancellation
+points: they are pthread_testcancel, pthread_cond_wait,
+pthread_cond_timedwait, and pthread_join. 
+** Thread-Blocking Library Functions and System Calls
+** Threads and Process Management
+*** Calling fork from a Thread
+In a Pthreads-compliant implementation, the fork call always creates a
+new child process with a single thread, regardless of how many threads
+its parent may have had at the time of the call. Furthermore, the
+child's thread is a replica of the thread in the parent that called
+fork—including a process address space shared by all of its parent's
+threads and its parent thread's per-thread stack. 
+
+Consider the headaches: 	
++ The new single-threaded child process could inherit held locks from
+  threads in the parent that don't exist in the child. It may have no
+  idea what these locks mean, let alone realize that it holds one of
+  them. Confusion and deadlock are in the forecast. 	
++ The child process could inherit heap areas that were allocated by
+  threads in the parent that don't exist in the child. Here we see
+  memory leaks, data loss, and bug reports. 	
+
+The Pthreads standard defines the pthread_atfork call to help you
+manage these problems. The pthread_atfork function allows a parent
+process to specify preparation and cleanup routines that parent and
+child processes run as part of the fork operation. Using these
+routines a parent or child process can manage the release and
+reacquisition of locks and resources before and after the fork. 
+
+**** Fork-handling stacks
+To perform its magic, the pthread_atfork call pushes addresses of preparation and cleanup routines on any of three fork-handling stacks: 	
++ Routines placed on the prepare stack are run in the parent before the fork. 	
++ Routines placed on the parent stack are run in the parent after the fork. 	
++ Routines placed on the child stack are run in the child after the
+  fork.
+
+Before pursuing this course, you should consider a less complex alternative: 	
++ If possible, fork before you've created any threads. 	Instead of
+  forking, create a new thread. If you are forking to exec a binary
+  image, can you convert the image to a callable shared library to
+  which you could simply link? 	
+
++ Consider the surrogate parent model. 	 In the surrogate parent
+  model, a program forks a child process at initialization time. The
+  sole purpose of the child is to serve as a sort of "surrogate
+  parent" for the original process should it ever need to fork another
+  child. After initialization, the original parent can proceed to
+  create its additional threads. When it wants to exec an image, it
+  communicates this to its child (which has remained single-threaded).
+  The child then performs the fork and exec on behalf of the original
+  process.
+
+*** Calling exec from a Thread
+With this in mind, the Pthreads standard specifies that an exec call
+from any thread must terminate all threads in the process and start a
+single new thread at main in the new image. 
+
+*** Process Exit and Threads
+Regardless of whether or not a process contains multiple threads, it can be terminated when: 	
++ Any thread in it makes an exit system call. 	
++ The thread running the main routine completes its execution. 	
++ A fatal signal is delivered. 
+
+** Multiprocessor Memory Synchronization
+
+The functions that must synchronize memory operations include: 	
+
+#+begin_src sh
+pthread_cond_broadcast	
+pthread_mutex_unlock	
+pthread_cond_signal	
+sem_post	
+pthread_cond_timedwait	
+sem_trywait	
+pthread_cond_wait	
+sem_wait	
+pthread_create	
+fork	
+pthread_join	
+wait	
+pthread_mutex_trylock	
+waitpid	
+pthread_mutex_lock	
+#+end_src
+* Chapter 6: Practical Considerations
+** Understanding Pthreads Implementation
+Pthreads implementations fall into three basic categories: 
++ Based on pure user space. 	
++ Based on pure kernel thread. 	
++ Implementations somewhere between the two. These hybrid
+  implementations are referred to variously as two-level schedulers,
+  lightweight processes (LWPs), or activations
+
+** Debugging
+*** Overview
+First of all, you'll investigate types of programming errors that
+result from thread synchronization problems, namely deadlocks and race
+conditions. Second, once you've seen a problem (for instance, some
+data corruption or a hang), you'll discover you may have a hard time
+duplicating it. Because the alignment of events among threads that run
+concurrently is largely left up to chance, errors, once found, may be
+unrepeatable. Finally, because threads are a new technology, many
+vendors have yet to upgrade their debuggers to operate well on
+threaded programs. 
+
+*** Deadlock
+** Performance
+* Appendix C: Pthreads Quick Reference
+
+#+begin_src sh
+pthread_atfork ( )	
+
+int pthread_atfork (	
+void (*prepare)(void),	
+void (*parent)(void),	
+void (*child)(void));	
+ 
+Declares procedures to be called before and after a fork call. The prepare fork handler runs in the parent process before the fork. After the fork, the parent handler runs in the parent process, and the child handler runs in the child process. 	
+
+pthread_attr_destroy( )	
+
+int pthread_attr_destroy (	
+pthread_attr_t *attr);	
+ 
+Destroys a thread attribute object. 	
+
+pthread_attr_getdetachstate( )	
+
+int pthread_attr_getdetachstate (	
+const pthread_attr_t *attr,	
+int *detachstate);	
+ 
+Obtains the setting of the detached state of a thread. 	
+
+pthread_attr_getinheritsched( )	
+
+int pthread_attr_getinheritsched (	
+const pthread_attr_t *attr,	
+int *inheritsched);	
+Obtains the setting of the scheduling inheritance of a thread. 	
+
+pthread_attr_getschedparam( )	
+
+int pthread_attr_getschedparam (	
+const pthread_attr_t *attr,	
+struct sched_param *param);	
+ 
+Obtains the parameters (for instance, the scheduling priority) associated with the scheduling policy attribute of a thread. 	
+
+pthread_attr_getschedpolicy( )	
+
+int pthread_attr_getschedpolicy (	
+const pthread_attr_t *attr,	
+int *policy);	
+ 
+Obtains the setting of the scheduling policy of a thread. 	
+
+pthread_attr_getscope( )	
+
+int pthread_attr_getscope (	
+const pthread_attr_t *attr,	
+int *scope);	
+ 
+Obtains the setting of the scheduling scope of a thread. 	
+
+pthread_attr_getstackaddr( )	
+
+int pthread_attr_getstackaddr (	
+const pthread_attr_t *attr,	
+void **stackaddr);	
+ 
+Obtains the stack address of a thread. 	
+
+pthread_attr_getstacksize( )	
+
+int pthread_attr_getstacksize (	
+const pthread_attr_t *attr,	
+size_t *stacksize);	
+ 
+Obtains the stack size of a thread.	
+
+pthread_attr_init( )	
+
+int pthread_attr_init (	
+pthread_attr_t *attr);	
+ 
+Initializes a thread attribute object. A thread specifies a thread attribute object in its calls to pthread_create to set the characteristics of newly created threads. 	
+
+pthread_attr_setdetachstate( )	
+
+int pthread_attr_setdetachstate (	
+pthread_attr_t *attr,	
+int detachstate);	
+ 
+Adjusts the detached state of a thread. A thread's detached state can be joinable (PTHREAD_CREATE_JOINABLE) or it can be detached (PTHREAD_CREATE_DETACHED).	
+
+pthread_attr_setinheritsched( )	
+
+int pthread_attr_setinheritsched (	
+pthread_attr_t *attr,	
+int inherit);	
+ 
+Adjusts the scheduling inheritance of a thread. A thread can inherit the scheduling policy and the parameters of its creator thread (PTHREAD_INHERIT_SCHED) or obtain them from the thread attribute object specified in the pthread_create call (PTHREAD_EXPLICIT_SCHED). 	
+
+pthread_attr_setschedparam( )	
+
+int pthread_attr_setschedparam (	
+pthread_attr_t *attr,	
+const struct sched_param *param);	
+ 
+Adjusts the parameters (for instance, the scheduling priority) associated with the scheduling policy of a thread. The scheduling priority parameter (as specified in the struct sched_param) depends upon the selected scheduling policy (SCHED_FIFO, SCHED_RR, or SCHED_OTHER). Use sched_get_priority_max and sched_get_priority_min to obtain the maximum and minimum priority settings for a given policy. 	
+
+pthread_attr_setschedpolicy( )	
+
+int pthread_attr_setschedpolicy (	
+pthread_attr_t *attr,	
+int policy);	
+ 
+Adjusts the scheduling policy of a thread. Pthreads defines the SCHED_FIFO, SCHED_RR, and SCHED_OTHER policies. 	
+
+pthread_attr_setscope( )	
+
+int pthread_attr_setscope (	
+pthread_attr_t *attr,	
+int scope);	
+ 
+Adjusts the scheduling scope of a thread. A thread can use system-scope scheduling (PTHREAD_SCOPE_SYSTEM), in which case the operating system compares the priorities of all runnable threads of all processes systemwide in order to select a thread to run on an available CPU. Alternatively, it can use process-scope scheduling (PTHREAD_SCOPE_PROCESS), in which case only the highest priority runnable thread in a process competes against the highest priority threads of other processes in the system's scheduling activity. 	
+
+pthread_attr_setstackaddr( )	
+
+int pthread_attr_setstackaddr (	
+pthread_attr_t *attr,	
+void *stackaddr);	
+ 
+Adjusts the stack address of a thread. 	
+
+pthread_attr_setstacksize( )	
+
+int pthread_attr_setstacksize (	
+pthread_attr_t *attr,	
+size_t stacksize);	
+ 
+Adjusts the stack size of a thread. The stack size must be greater than or equal to PTHREAD_STACK_MIN. 	
+
+pthread_cancel( )	
+
+int pthread_cancel (	
+pthread_t thread);	
+ 
+Cancels the specified thread. 	
+
+pthread_cleanup_pop( )	
+
+void pthread_cleanup_pop (	
+int execute);	
+ 
+Removes the routine from the top of a thread's cleanup stack, and if execute is nonzero, runs it. 	
+
+pthread_cleanup_push( )	
+
+void pthread_cleanup_push (	
+void (*routine)(void *),	
+void *arg);	
+ 
+Places a routine on the the top of a thread's cleanup stack, and  when the routine is called, ensures that the specified argument is passed to it. 	
+
+pthread_condattr_destroy( )	
+
+int pthread_condattr_destroy (	
+pthread_condattr_t *attr);	
+ 
+Destroys a condition variable attribute object. 	
+
+pthread_condattr_getpshared( )	
+
+int pthread_condattr_getpshared (	
+pthread_condattr_t *attr,	
+int *pshared);	
+ 
+Obtains the process-shared setting of a condition variable attribute object. 	
+
+pthread_condattr_init( )	
+
+int pthread_condattr_init (	
+pthread_condattr_t *attr);	
+ 
+Initializes a condition variable attribute object. A thread specifies a condition variable attribute object in its calls to pthread_cond_init to set the characteristics of new condition variables. 	
+
+pthread_condattr_setpshared( )	
+
+int pthread_condattr_setpshared (	
+pthread_condattr_t *attr,	
+int pshared);	
+ 
+Sets the process-shared attribute in a condition variable attribute object to either PTHREAD_PROCESS_SHARED or PTHREAD_PROCESS_PRIVATE. 	
+
+pthread_cond_broadcast( )	
+
+int pthread_cond_broadcast (	
+pthread_cond_t *cond);	
+ 
+Unblocks all threads that are waiting on a condition variable. 	
+
+pthread_cond_destroy( )	
+
+int pthread_cond_destroy (	
+pthread_cond_t *cond);	
+ 
+Destroys a condition variable. 	
+
+pthread_cond_init( )	
+
+int pthread_cond_init (	
+pthread_cond_t *cond,	
+const pthread_condattr_t *attr);	
+ 
+Initializes a condition variable with the attributes specified in the specified condition variable attribute object. If attr is NULL, the default attributes are used. 	
+
+pthread_cond_signal( )	
+
+int pthread_cond_signal(	
+pthread_cond_t *cond);	
+ 
+Unblocks at least one thread waiting on a condition variable. The scheduling priority determines which thread is awakened. 	
+
+pthread_cond_timedwait( )	
+
+int pthread_cond_timedwait (	
+pthread_cond_t *cond,	
+pthread_mutex_t *mutex,	
+const struct timespec *abstime);	
+ 
+Atomically unlocks the specified mutex, and places the calling thread into a wait state. When the specified condition variable is signaled or broadcast, or the system time is greater than or equal to abstime, this function reacquires the mutex and resumes its caller. 	
+
+pthread_cond_wait( )	
+
+int pthread_cond_wait (	
+pthread_cond_t *cond,	
+pthread_mutex_t *mutex);	
+ 
+Atomically unlocks the specified mutex, and places the calling thread into a wait state. When the specified condition variable is signaled or broadcasted, this function reacquires the mutex and resumes its caller. 	
+
+pthread_create( )	
+
+int pthread_create (	
+pthread_t *thread,	
+const pthread_attr_t *attr,	
+void *(*start_routine)(void *),	
+void *arg);	
+ 
+Creates a thread with the attributes specified in attr. If attr is NULL, the default attributes are used. The thread argument receives a thread handle for the new thread. The new thread starts execution in start_routine and is passed the single specified argument. 	
+
+pthread_detach( )	
+
+int pthread_detach (	
+pthread_t thread);	
+ 
+Marks a thread's internal data structures for deletion. When a detached thread terminates, the system reclaims the storage used for its thread object. 	
+
+pthread_equal( )	
+
+int pthread_equal (	
+pthread_t t1,	
+pthread_t t2);	
+ 
+Compares one thread handle to another thread handle. 	
+
+pthread_exit( )	
+
+void pthread_exit (	
+void *value);	
+ 
+Terminates the calling thread, returning the specified value to any thread that may have previously issued a pthread_join on the thread. 	
+
+pthread_getschedparam( )	
+
+int pthread_getschedparam (	
+pthread_t thread,	
+int *policy,	
+struct sched_param *param);	
+ 
+Obtains both the scheduling policy and scheduling parameters of an existing thread. (This function differs from the pthread_attr_getschedpolicy function and the pthread_attr_getschedparam function in that the latter functions return the policy and parameters that will be used whenever a new thread is created.) 	
+
+pthread_getspecific( )	
+
+void *pthread_getspecific (	
+pthread_key_t key);	
+ 
+Obtains the thread-specific data value associated with the specified key in the calling thread. 	
+
+pthread_join( )	
+
+int pthread_join (	
+pthread_t thread,	
+void **value_ptr);	
+ 
+Causes the calling thread to wait for the specified thread's termination. The value_ptr parameter receives the return value of the terminating thread. 	
+
+pthread_key_create( )	
+
+int pthread_key_create (	
+pthread_key_t *key,	
+void (*destructor)(void *));	
+ 
+Generates a unique thread-specific key that's visible to all threads in a process. Although different threads can use the same key, the value any thread associates with the key (by calling pthread_specific) are specific to that thread alone and persist for the life of that thread. When a thread terminates, its thread-specific data value is destroyed (but the key persists until pthread_key_destroy is called). If a destructor routine was specified for the key in the pthread_key_create call, it's then called in the thread's context with the thread-specific data value associated with the key as an argument. 	
+
+pthread_key_delete( )	
+
+int pthread_key_delete (	
+pthread_key_t key);	
+ 
+Deletes a thread-specific key. 	
+
+pthread_kill( )	
+
+int pthread_kill (	
+pthread_t thread,	
+int sig);	
+ 
+Delivers a signal to the specified thread. 	
+
+pthread_mutexattr_destroy( )	
+
+int pthread_mutexattr_destroy (	
+pthread_mutexattr_t *attr);	
+ 
+Destroys a mutex attribute object. 	
+
+pthread_mutexattr_getprioceiling( )	
+
+int pthread_mutexattr_getprioceiling (	
+pthread_mutexattr_t *attr,	
+int *prioceiling);	
+ 
+Obtains the priority ceiling of a mutex attribute object. 	
+
+pthread_mutexattr_getprotocol( )	
+
+int pthread_mutexattr_getprotocol(	
+pthread_mutexattr_t *attr,	
+int *protocol);	
+ 
+Obtains the protocol of a mutex attribute object. 	
+
+pthread_mutexattr_getpshared( )	
+
+int pthread_mutexattr_getpshared(	
+pthread_mutexattr_t *attr,	
+int *pshared);	
+ 
+Obtains the process-shared setting of a mutex attribute object. 	
+
+pthread_mutexattr_init( )	
+
+int pthread_mutexattr_init (	
+pthread_mutexattr_t *attr);	
+ 
+Initializes a mutex attribute object. A thread specifies a mutex attribute object in its calls to pthread_mutex_init to set the characteristics of new mutexes. 	
+
+pthread_mutexattr_setprioceiling( )	
+
+int pthread_mutexattr_setprioceiling (	
+pthread_mutexattr_t *attr,	
+int prioceiling);	
+ 
+Sets the priority ceiling attribute of a mutex attribute object. 	
+
+pthread_mutexattr_setprotocol( )	
+
+int pthread_mutexattr_setprotocol(	
+pthread_mutexattr_t *attr,	
+int protocol);	
+ 
+Sets the protocol attribute of a mutex attribute object. There are three valid settings: PTHREAD_PRIO_INHERIT, PTHREAD_PRIO_PROTECT, or PTHREAD_PRIO_NONE. 	
+
+pthread_mutexattr_setpshared( )	
+
+int pthread_mutexattr_setpshared(	
+pthread_mutexattr_t *attr,	
+int pshared);	
+ 
+Sets the process-shared attribute of a mutex attribute object to PTHREAD_PROCESS_SHARED or PTHREAD_PROCESS_PRIVATE. 	
+
+pthread_mutex_destroy( )	
+
+int pthread_mutex_destroy (	
+pthread_mutex_t *mutex);	
+ 
+Destroys a mutex. 	
+
+pthread_mutex_init( )	
+
+int pthread_mutex_init (	
+pthread_mutex_t *mutex,	
+const pthread_mutexattr_t *attr);	
+ 
+Initializes a mutex with the attributes specified in the specified mutex attribute object. If attr is NULL, the default attributes are used. 	
+
+pthread_mutex_lock( )	
+
+int pthread_mutex_lock (	
+pthread_mutex_t *mutex);	
+ 
+Locks an unlocked mutex. If the mutex is already locked, the calling thread blocks until the thread that currently holds the mutex releases it. 	
+
+pthread_mutex_trylock( )	
+
+int pthread_mutex_trylock (	
+pthread_mutex_t *mutex);	
+ 
+Tries to lock a mutex. If the mutex is already locked, the calling thread returns without waiting for the mutex to be freed. 	
+
+pthread_mutex_unlock( )	
+
+int pthread_mutex_unlock (	
+pthread_mutex_t *mutex);	
+ 
+Unlocks a mutex. The scheduling priority determines which blocked thread is resumed. The resumed thread may or may not succeed in its next attempt to lock the mutex, depending upon whether another thread has locked the mutex in the interval between the thread's being resumed and its issuing the pthread_mutex_lock call. 	
+
+pthread_once( )	
+
+int pthread_once (	
+pthread_once_t *once_block,	
+void (*init_routine) (void);	
+ 
+Ensures that init_routine will run just once regardless of how many threads in a process call it. All threads issue calls to the routine by making identical pthread_once calls (with the same once_block and init_routine). The thread that first makes the pthread_once call succeeds in running the routine; subsequent pthread_once calls from other threads do not run the routine. 	
+
+pthread_self( )	
+
+pthread_t pthread_self (	
+void);	
+ 
+Obtains the thread handle of the calling thread. 	
+
+pthread_setcancelstate( )	
+
+int pthread_setcancelstate (	
+int state,	
+int *oldstate);	
+ 
+Sets a thread's cancelability state. You can enable a thread's cancellation by specifying the PTHREAD_CANCEL_ENABLE state, or disable it by specifying PTHREAD_CANCEL_DISABLE. 	
+
+pthread_setcanceltype( )	
+
+int pthread_setcanceltype (	
+int type,	
+int *oldtype);	
+ 
+Sets a thread's cancelability type. To allow a thread to receive cancellation orders only at defined cancellation points, you can specify the PTHREAD_CANCEL_DEFERRED type; this is the default. To allow a thread to be canceled at any point during its execution, you can specify PTHREAD_CANCEL_ASYNCHRONOUS. 	
+
+pthread_setschedparam( )	
+
+int pthread_setschedparam (	
+pthread_t thread,	
+int policy,	
+const struct sched_param *param);	
+ 
+Adjusts the scheduling policy and scheduling parameters of an existing thread. (This function differs from the functions pthread_attr_setschedpolicy and pthread_attr_setschedparam in that they set the policy and parameters that will be used whenever a new thread is created.) 	
+
+pthread_setspecific( )	
+
+int pthread_setspecific (	
+pthread_key_t key,	
+void *value);	
+ 
+Sets the thread-specific data value associated with the specified key in the calling thread. 	
+
+pthread_sigmask( )	
+
+int pthread_sigmask (	
+int how,	
+const sigset_t *set,	
+sigset_t *oset);	
+ 
+Examines or changes the calling thread's signal mask.	
+
+pthread_testcancel( )	
+
+void pthread_testcancel (void);	
+ 
+Requests that any pending cancellation request be delivered to the calling thread.
+#+end_src

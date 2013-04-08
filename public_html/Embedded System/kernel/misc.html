@@ -1,13 +1,13 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
                "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Misc</title>
-<meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Misc"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-01-30 15:26:14 HKT"/>
+<meta name="generated" content="2013-04-08 12:36:45 China Standard Time"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -108,6 +108,7 @@
 <li><a href="#sec-2"><code>__init, __initdata</code></a></li>
 <li><a href="#sec-3"><code>container_of</code></a></li>
 <li><a href="#sec-4"><code>subsys_initcall</code></a></li>
+<li><a href="#sec-5">likely和unlikely</a></li>
 </ul>
 </div>
 </div>
@@ -121,10 +122,10 @@
 
 
 
-<pre class="src src-c"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">PAGE_SHIFT determines the page size </span><span style="color: #ff7f24;">*/</span>
-<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PAGE_SHIFT</span>              12
-<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PAGE_SIZE</span>               (_AC(1,UL) &lt;&lt; PAGE_SHIFT)
-<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PAGE_MASK</span>               (~(PAGE_SIZE-1))
+<pre class="example">/* PAGE_SHIFT determines the page size */
+#define PAGE_SHIFT              12
+#define PAGE_SIZE               (_AC(1,UL) &lt;&lt; PAGE_SHIFT)
+#define PAGE_MASK               (~(PAGE_SIZE-1))
 </pre>
 
 
@@ -171,11 +172,53 @@
 <a href="http://blog.163.com/liuqiang_mail@126/blog/static/10996887520124741925773/">http://blog.163.com/liuqiang_mail@126/blog/static/10996887520124741925773/</a>
 <a href="http://book.51cto.com/art/201007/213593.htm">http://book.51cto.com/art/201007/213593.htm</a>
 </p></div>
+
+</div>
+
+<div id="outline-container-5" class="outline-2">
+<h2 id="sec-5">likely和unlikely</h2>
+<div class="outline-text-2" id="text-5">
+
+<p>likely和unlikely是gcc扩展的跟处理器相关的宏：
+</p>
+
+
+<pre class="example">#define   likely(x)        __builtin_expect(!!(x), 1)
+#define   unlikely(x)      __builtin_expect(!!(x), 0)
+</pre>
+
+
+<p>
+现在处理器都是流水线的，有些里面有多个逻辑运算单元，系统可以提前取多条指令进行并行处理，但遇到跳转时，则需要重新取指令，这相对于不用重新去指令就降低了速度。
+所以就引入了likely和unlikely，目的是增加条件分支预测的准确性，cpu会提前装载后面的指令，遇到条件转移指令时会提前预测并装载某个分支的指令。unlikely 表示你可以确认该条件是极少发生的，相反likely表示该条件多数情况下会发生。编译器会产生相应的代码来优化cpu执行效率。
+因此程序员在编写代码时可以根据判断条件发生的概率来优化处理器的取指操作。
+例如：
+</p>
+
+
+
+<pre class="example">int x, y;
+if(unlikely(x &gt; 0))
+y = 1;
+else
+y = -1;
+</pre>
+
+<p>
+上面的代码中gcc编译的指令会预先读取 y = -1 这条指令，这适合 x 的值大于 0 的概率比较小的情况。
+如果 x 的值在大部分情况下是大于 0 的，就应该用 likely(x &gt; 0)，这样编译出的指令是预先读取 y = 1 这条指令了。这样系统在运行时就会减少重新取指了。
+</p>
+<p>
+Test:
+<a href="http://blog.man7.org/2012/10/how-much-do-builtinexpect-likely-and.html">http://blog.man7.org/2012/10/how-much-do-builtinexpect-likely-and.html</a>
+</p>
+
+</div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-01-30 15:26:14 HKT</p>
+<p class="date">Date: 2013-04-08 12:36:45 China Standard Time</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.11 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

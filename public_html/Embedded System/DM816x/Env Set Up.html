@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="title" content="Env Set up"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-01-30 15:26:27 HKT"/>
+<meta name="generated" content="2013-04-08 12:39:14 China Standard Time"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -115,6 +115,7 @@
 <li><a href="#sec-2-2">step 2</a></li>
 <li><a href="#sec-2-3">step 3</a></li>
 <li><a href="#sec-2-4">step 4</a></li>
+<li><a href="#sec-2-5">step 5</a></li>
 </ul>
 </li>
 <li><a href="#sec-3">NFS</a>
@@ -145,8 +146,8 @@
 
 
 
-<pre class="src src-sh">$ export <span style="color: #eedd82;">PATH</span>=/opt/toolchain/2009-q1/bin:$<span style="color: #eedd82;">PATH</span>
-$ export <span style="color: #eedd82;">PATH</span>=/opt/u-boot/tools:$<span style="color: #eedd82;">PATH</span>
+<pre class="example">$ export PATH=/opt/toolchain/2009-q1/bin:$PATH
+$ export PATH=/opt/u-boot/tools:$PATH
 </pre>
 
 
@@ -166,14 +167,14 @@ $ export <span style="color: #eedd82;">PATH</span>=/opt/u-boot/tools:$<span styl
 <h3 id="sec-2-1">step 1</h3>
 <div class="outline-text-3" id="text-2-1">
 
-<p>find the directory
+<p>install the package and find the directory
 </p>
 
 
-<pre class="src src-sh"><span style="color: #eedd82;">tftproot</span>=<span style="color: #ffa07a;">"/tftpboot"</span>
-sudo mkdir -p $<span style="color: #eedd82;">tftproot</span>
-sudo chmod 777 $<span style="color: #eedd82;">tftproot</span>
-sudo chown nobody $<span style="color: #eedd82;">tftproot</span>
+<pre class="example">$ sudo apt-get install xinetd tftpd tftp
+$ sudo mkdir /home/test/tftpboot
+$ sudo chmod -R 777 /home/test/tftpboot
+$ sudo chown -R nobody /home/test/tftpboot
 </pre>
 
 
@@ -189,7 +190,7 @@ sudo chown nobody $<span style="color: #eedd82;">tftproot</span>
 </p>
 
 
-<pre class="src src-sh">sudo cp uimage $<span style="color: #eedd82;">tftproot</span>
+<pre class="example">sudo cp uimage $tftproot
 </pre>
 
 
@@ -205,20 +206,18 @@ sudo chown nobody $<span style="color: #eedd82;">tftproot</span>
 </p>
 
 
-<pre class="src src-sh"><span style="color: #87cefa;">tftp</span>() {
-    <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"</span>
-<span style="color: #ffa07a;">service tftp</span>
-<span style="color: #ffa07a;">{</span>
-<span style="color: #ffa07a;">protocol = udp</span>
-<span style="color: #ffa07a;">port = 69</span>
-<span style="color: #ffa07a;">socket_type = dgram</span>
-<span style="color: #ffa07a;">wait = yes</span>
-<span style="color: #ffa07a;">user = nobody</span>
-<span style="color: #ffa07a;">server = /usr/sbin/in.tftpd</span>
-<span style="color: #ffa07a;">server_args = $tftproot</span>
-<span style="color: #ffa07a;">disable = no</span>
-<span style="color: #ffa07a;">}</span>
-<span style="color: #ffa07a;">"</span> | sudo tee $<span style="color: #eedd82;">tftpcfg</span> &gt; /dev/null
+<pre class="example">$ sudo vim /etc/xinetd.d/tftp
+
+service tftp
+{
+        protocol = udp
+        port = 69
+        socket_type = dgram
+        wait = yes
+        user = nobody
+        server = /usr/sbin/in.tftpd
+        server_args = /home/test/tftpboot
+        disable = no
 }
 </pre>
 
@@ -235,12 +234,32 @@ sudo chown nobody $<span style="color: #eedd82;">tftproot</span>
 </p>
 
 
-<pre class="src src-sh">sudo /etc/init.d/xinetd stop
+<pre class="example">sudo /etc/init.d/xinetd stop
 
 sudo /etc/init.d/xinetd start
 </pre>
 
 
+</div>
+
+</div>
+
+<div id="outline-container-2-5" class="outline-3">
+<h3 id="sec-2-5">step 5</h3>
+<div class="outline-text-3" id="text-2-5">
+
+<p>test
+</p>
+
+
+<pre class="example">$ ifconfig &gt; /home/renee/test/test.txt
+$ tftp 127.0.0.1
+tftp&gt; get text.txt
+Received 1445 bytes in 0.0 seconds
+tftp&gt; quit
+$ ls
+test.txt
+</pre>
 
 </div>
 </div>
@@ -263,8 +282,8 @@ sudo /etc/init.d/xinetd start
 
 
 
-<pre class="src src-sh"><span style="color: #eedd82;">dst</span>=<span style="color: #ffa07a;">"${HOME}/targetfs"</span>
-mkdir -p $<span style="color: #eedd82;">dst</span>
+<pre class="example">dst="${HOME}/targetfs"
+mkdir -p $dst
 </pre>
 
 </div>
@@ -280,12 +299,12 @@ mkdir -p $<span style="color: #eedd82;">dst</span>
 
 
 
-<pre class="src src-sh"><span style="color: #eedd82;">me</span>=<span style="color: #ffa07a;">'whoami'</span>
-<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">if exist the old filesystem, then sudo rm -rf $dst</span>
-sudo tar xzf xxx.tar.gz -C $<span style="color: #eedd82;">dst</span>
+<pre class="example">me='whoami'
+#if exist the old filesystem, then sudo rm -rf $dst
+sudo tar xzf xxx.tar.gz -C $dst
 
-sudo chown $<span style="color: #eedd82;">me</span>:$<span style="color: #eedd82;">me</span> $<span style="color: #eedd82;">dst</span>
-sudo chown -R $<span style="color: #eedd82;">me</span>:$<span style="color: #eedd82;">me</span> $<span style="color: #eedd82;">dst</span>/home $<span style="color: #eedd82;">dst</span>/usr $<span style="color: #eedd82;">dst</span>/etc $<span style="color: #eedd82;">dst</span>/lib $<span style="color: #eedd82;">dst</span>/opt $<span style="color: #eedd82;">dst</span>/boot
+sudo chown $me:$me $dst
+sudo chown -R $me:$me $dst/home $dst/usr $dst/etc $dst/lib $dst/opt $dst/boot
 </pre>
 
 
@@ -301,8 +320,8 @@ sudo chown -R $<span style="color: #eedd82;">me</span>:$<span style="color: #eed
 </p>
 
 
-<pre class="src src-sh">sudo chmod 666 /etc/exports
-sudo echo <span style="color: #ffa07a;">"$dst *(rw,nohide,insecure,no_subtree_check,async,no_root_squash)"</span> &gt;&gt; /etc/exports
+<pre class="example">sudo chmod 666 /etc/exports
+sudo echo "$dst *(rw,nohide,insecure,no_subtree_check,async,no_root_squash)" &gt;&gt; /etc/exports
 sudo chmod 644 /etc/exports
 </pre>
 
@@ -319,7 +338,7 @@ sudo chmod 644 /etc/exports
 </p>
 
 
-<pre class="src src-sh">sudo /etc/init.d/nfs-kernel-server stop
+<pre class="example">sudo /etc/init.d/nfs-kernel-server stop
 
 sudo /etc/init.d/nfs-kernel-server start
 </pre>
@@ -330,7 +349,7 @@ sudo /etc/init.d/nfs-kernel-server start
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-01-30 15:26:27 HKT</p>
+<p class="date">Date: 2013-04-08 12:39:14 China Standard Time</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator">Org version 7.8.11 with Emacs version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
