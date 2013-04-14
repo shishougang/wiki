@@ -1,0 +1,226 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: HTC Desire HD
+
+
+* Overview
+http://forum.xda-developers.com/wiki/HTC_Desire_HD
+
+http://forum.xda-developers.com/forumdisplay.php?f=765
+
+http://wiki.cyanogenmod.org/w/Ace_Info
+
+* A high-level DHD/Inspire manual S-OFF hack concept for advanced users
+http://tau.shadowchild.nl/attn1/?cat=6%7C
+
+* Building for HTC Desire HD(ICS)
+http://blog.david-reid.com/2012/03/02/building-for-htc-desire-hd/
+** set up
+#+begin_src sh
+cd work
+mkdir bin
+curl https://dl-ssl.google.com/dl/googlesource/git-repo/repo > bin/repo
+chmod a+x bin/repo
+mkdir android/system
+cd android/system/
+repo init -u git://github.com/CyanogenMod/android.git -b ics
+#+end_src
+
+Before starting the long first sync, we need to add some extra
+repositories to the build as presently the Desire HD isn’t included
+“out of the box”.
+** set htc 
+Create a file, .repo/local_manifest.xml with the following contents
+#+begin_src sh
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="CyanogenMod/android_device_htc_ace"
+           path="device/htc/ace" remote="github" />
+  <project name="CyanogenMod/android_device_htc_common"
+           path="device/htc/common"
+           revision="refs/heads/gingerbread"/>
+  <project name="CyanogenMod/android_device_htc_msm7x30-common"
+           path="device/htc/msm7x30-common" remote="github" />
+  <project name="koush/proprietary_vendor_htc"
+           path="vendor/htc" />
+</manifest>
+#+end_src
+** repo sync
+#+begin_src sh
+repo sync -j16
+# get some prebuilt files
+cd vendor/cm/
+./get-prebuilts
+cd ../..
+#+end_src
+
+
+** patches
+At this point the codebase will build but will not boot. To fix this,
+you need to edit the file device/htc/ace/media_profiles.xml as
+follows.
+
+#+begin_src sh
+Insert @ line 77:
+< !ATTLIST VideoEditorCap maxPrefetchYUVFrames CDATA #REQUIRED>
+Change line 250 from
+        maxOutputFrameHeight="720"/>
+to
+        maxOutputFrameHeight="720" maxPrefetchYUVFrames="10"/>
+#+end_src
+
+** build 
+#+begin_src sh
+. build/envsetup.sh
+brunch ace
+#+end_src
+
+
+* How to Build CyanogenMod for Desire HD / Inspire 4G (codename: ace)
+http://wiki.cyanogenmod.org/w/Build_for_ace
+** Install the SDK
+http://developer.android.com/sdk/index.html
+** Install the Build Packages
+#+begin_src sh
+For 32-bit & 64-bit systems, you'll need:
+sudo apt-get install git-core gnupg flex bison gperf libsdl1.2-dev libesd0-dev libwxgtk2.8-dev squashfs-tools build-essential zip curl libncurses5-dev zlib1g-dev openjdk-6-jre openjdk-6-jdk pngcrush schedtool libxml2 xsltproc
+
+For 64-bit only systems, get these:
+g++-multilib lib32z1-dev lib32ncurses5-dev lib32readline-gplv2-dev gcc-4.7-multilib g++-4.5-multilib
+#+end_src
+** Create the directories
+#+begin_src sh
+$ mkdir -p ~/bin
+$ mkdir -p ~/android/system
+#+end_src
+** Install the repo command
+#+begin_src sh
+$ curl https://dl-ssl.google.com/dl/googlesource/git-repo/repo > ~/bin/repo
+$ chmod a+x ~/bin/repo
+$ export PATH=${PATH}:~/bin
+#+end_src
+** Initialize the CyanogenMod source repository
+#+begin_src sh
+$ cd ~/android/system/
+$ repo init -u git://github.com/CyanogenMod/android.git -b gingerbread
+#+end_src
+** Download the source code
+#+begin_src sh
+$ repo sync
+#+end_src
+** Get prebuilt Rom Manager
+#+begin_src sh
+$ cd ~/android/system/vendor/cyanogen
+$ ./get-rommanager
+#+end_src
+You won't see any confirmation- just another prompt. But this should
+cause the Rom Manager apps to be loaded and installed into the source
+code. Once completed, this does not need to be done again.
+** Prepare the device-specific code
+After the source downloads, ensure you are in the root of the source
+code (cd ~/android/system), then type:
+
+#+begin_src sh
+$ source build/envsetup.sh
+$ lunch
+#+end_src
+You should see a list of devices, including something like
+cm_ace-userdebug. Select it by typing its number. It is possible that
+lunch does not display your device. In that case try
+#+begin_src sh
+$ lunch cm_ace-userdebug
+or
+$ lunch full_ace-userdebug
+#+end_src
+If all goes well, you should see that ace-specific directories are
+downloaded automatically.
+** Extract proprietary blobs
+Now ensure that your Desire HD / Inspire 4G is connected to your
+computer via the USB cable and that you are in the
+~/android/system/device/htc/ace directory (you can cd
+~/android/system/device/htc/ace if necessary). Then run the
+extract-files.sh script:
+#+begin_src sh
+$ ./extract-files.sh
+#+end_src
+You should see the proprietary files (aka “blobs”) get pulled from
+the device and moved to the right place in the vendor directory. 
+
+Note:
+
+It’s important that these proprietary files are properly extracted
+and moved to the *vendor* directory. Without them, CyanogenMod will
+build without error, but you’ll be missing important functionality,
+such as the ability to see anything!
+
+** Turn on caching to speed up build
+#+begin_src sh
+If you want to speed up subsequent builds after this one, type:
+$ export USE_CCACHE=1
+#+end_src
+
+Instead of typing cd ~/android/system every time you want to return
+back to the root of the source code, here’s a short command that will
+do it for you: croot . To use this command, as with brunch, you must
+first do “. build/envsetup.sh” from ~/android/system. Notice there
+is a period and space (“. ”) in that command.
+
+** Start the build
+#+begin_src sh
+$ croot
+$ brunch ace
+#+end_src
+Helpful Tip
+
+If the build doesn't start, try lunch and choose your device from the
+menu. If that doesn't work, try breakfast and choose from the menu.
+The command make ace should then work.
+
+Helpful Tip
+
+A second, bonus tip! If you get a command not found error for croot or
+brunch or lunch, be sure you’ve done the “ . build/envsetup.sh”
+command in this Terminal session from the ~/android/system directory.
+
+** If the build breaks...
+If you experience this not-enough-memory-related error...
+=ERROR: signapk.jar failed: return code 1make: *** [out/target/product/ace/cm_ace-ota-eng.root.zip] Error 1=
+
+...you may want to make the following change to:
+=$ system/build/tools/releasetools/common.py=
+=Change: java -Xmx2048m to java -Xmx1024m or java -Xmx512m=
+
+Then start the build again (with brunch).
+** Install the build
+Assuming the build completed without error (it will be obvious when it
+finishes), type:
+#+begin_src sh
+# cd $OUT
+#+end_src
+in the same terminal window that you did the build. Here you’ll find
+all the files that were created. The stuff that will go in =/system= is
+in a folder called system. The stuff that will become your ramdisk is
+in a folder called =root=. And your kernel is called... =kernel=.
+
+But that’s all just background info. The two files we are interested
+in are (1) =recovery.img=, which contains ClockworkMod recovery, and (2)
+=cm-[something].zip=, which contains CyanogenMod.
+
+** Install CyanogenMod
+
+** FAQ
+*** Duplicate device 'CyanogenMod/android_device_htc_ace' found in local manifest
+#+begin_src sh
+lunch htc_ace-eng
+
+Device ace not found. Attempting to retrieve device repository from CyanogenMod Github (http://github.com/CyanogenMod).
+Found repository: android_device_htc_ace
+Duplicate device 'CyanogenMod/android_device_htc_ace' found in local manifest
+build/core/product_config.mk:196: *** _nic.PRODUCTS.[[vendor/cyanogen/products/cyanogen_anzu.mk]]: "device/semc/anzu/device_anzu.mk" does not exist.  Stop.
+#+end_src
+
+
+
+* dd
+
+#+begin_src sh
+#+end_src

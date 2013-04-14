@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Linux Things"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-04-08 12:33:07 China Standard Time"/>
+<meta name="generated" content="2013-04-14T18:55+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -62,6 +62,30 @@
 </style><link rel="stylesheet" href="./assets/stylesheet.css" type="text/css"/>
 <link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
 <script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
 <!--/*--><![CDATA[/*><!--*/
  function CodeHighlightOn(elem, id)
  {
@@ -105,53 +129,708 @@
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">VMware-Tools Fails To Start On Fedora</a></li>
-<li><a href="#sec-2">NvidiaMultiMonitors</a>
+<li><a href="#sec-1">VM</a>
 <ul>
-<li><a href="#sec-2-1">intro</a></li>
-<li><a href="#sec-2-2">Setup</a></li>
-<li><a href="#sec-2-3">Saving</a></li>
-<li><a href="#sec-2-4">Removing Restricted Drivers</a></li>
+<li><a href="#sec-1-1"><code>overcommit_ratio</code></a></li>
+<li><a href="#sec-1-2"><code>vm.overcommit_ratio</code></a></li>
+<li><a href="#sec-1-3"><code>vm.min_free_kbytes = 65536</code></a></li>
+<li><a href="#sec-1-4"><code>vm.swappiness = 0</code></a></li>
+<li><a href="#sec-1-5"><code>vm.overcommit_memory=1</code></a></li>
 </ul>
 </li>
-<li><a href="#sec-3">Linux loglevel</a>
+<li><a href="#sec-2">linux 下 强制回收内存</a>
 <ul>
-<li><a href="#sec-3-1">The kernel log levels are:</a></li>
-<li><a href="#sec-3-2">cat /proc/sys/kernel/printk</a></li>
+<li><a href="#sec-2-1">drop<sub>caches</sub></a></li>
+<li><a href="#sec-2-2">vm in /etc/sysctl.conf</a></li>
+<li><a href="#sec-2-3">more soft configuration in /etc/sysctl.conf</a></li>
 </ul>
 </li>
-<li><a href="#sec-4">Virtual Box - Failed to access the USB subsystem</a></li>
-<li><a href="#sec-5">install Oracle VM VirtualBox Extension Pack</a></li>
-<li><a href="#sec-6">eclipse提示框黑色背景色的修改方法</a></li>
+<li><a href="#sec-3">Linux TCP Tuning</a>
+<ul>
+<li><a href="#sec-3-1">How to achieve Gigabit speeds with Linux</a></li>
+<li><a href="#sec-3-2">Linux TCP Tuning</a></li>
+<li><a href="#sec-3-3">Effect of TxqueueLen on High Bandwidth Delay Product Network</a></li>
+<li><a href="#sec-3-4">high speed tuning</a></li>
+<li><a href="#sec-3-5">Increase TCP performance for gigabit network</a></li>
+<li><a href="#sec-3-6">Linux Tune Network Stack (Buffers Size) To Increase Networking Performance</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">Generic ipv4 Setting</a>
+<ul>
+<li><a href="#sec-4-1">net.ipv4.route.flush</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">Scheduling Jobs With cron on OpenWrt </a></li>
+<li><a href="#sec-6">GFP<sub>KERNEL</sub> and GFP<sub>ATOMIC</sub></a></li>
+<li><a href="#sec-7">BUG: scheduling while atomic: swapper /0x00000103/0, CPU#0</a></li>
+<li><a href="#sec-8">VMware-Tools Fails To Start On Fedora</a></li>
+<li><a href="#sec-9">NvidiaMultiMonitors</a>
+<ul>
+<li><a href="#sec-9-1">intro</a></li>
+<li><a href="#sec-9-2">Setup</a></li>
+<li><a href="#sec-9-3">Saving</a></li>
+<li><a href="#sec-9-4">Removing Restricted Drivers</a></li>
+</ul>
+</li>
+<li><a href="#sec-10">Linux loglevel</a>
+<ul>
+<li><a href="#sec-10-1">The kernel log levels are:</a></li>
+<li><a href="#sec-10-2">cat /proc/sys/kernel/printk</a></li>
+</ul>
+</li>
+<li><a href="#sec-11">Virtual Box - Failed to access the USB subsystem</a></li>
+<li><a href="#sec-12">install Oracle VM VirtualBox Extension Pack</a></li>
+<li><a href="#sec-13">eclipse提示框黑色背景色的修改方法</a></li>
+<li><a href="#sec-14">swapper: page allocation failure</a></li>
 </ul>
 </div>
 </div>
 
 <div id="outline-container-1" class="outline-2">
-<h2 id="sec-1">VMware-Tools Fails To Start On Fedora</h2>
+<h2 id="sec-1">VM</h2>
 <div class="outline-text-2" id="text-1">
 
-<p><code>blocking file system failed</code>
+<p><a href="https://www.kernel.org/doc/Documentation/sysctl/vm.txt">https://www.kernel.org/doc/Documentation/sysctl/vm.txt</a>
 </p>
+<p>
+<a href="http://russ.garrett.co.uk/2009/01/01/linux-kernel-tuning/">http://russ.garrett.co.uk/2009/01/01/linux-kernel-tuning/</a>
+</p>
+</div>
+
+<div id="outline-container-1-1" class="outline-3">
+<h3 id="sec-1-1"><code>overcommit_ratio</code></h3>
+<div class="outline-text-3" id="text-1-1">
+
+<p>Which happened to be 50. And the machine just happened to have about
+5GB of RAM. Well look there, 5×50 is 250GB
+</p>
+<p>
+ If a process tries to malloc() more memory than available it will get
+ an error right away. This mode is set by changing the sysctl value
+ vm.overcommit<sub>memory</sub> to 2.
+</p></div>
+
+</div>
+
+<div id="outline-container-1-2" class="outline-3">
+<h3 id="sec-1-2"><code>vm.overcommit_ratio</code></h3>
+<div class="outline-text-3" id="text-1-2">
 
 
-<pre class="example">sudo yum install fuse-libs
-</pre>
 
+</div>
+
+</div>
+
+<div id="outline-container-1-3" class="outline-3">
+<h3 id="sec-1-3"><code>vm.min_free_kbytes = 65536</code></h3>
+<div class="outline-text-3" id="text-1-3">
+
+<p>This tells the kernel to try and keep 64MB of RAM free at all times. It’s useful in two main cases:
+</p>
+<ul>
+<li>Swap-less machines, where you don’t want incoming network traffic to
+  overwhelm the kernel and force an OOM before it has time to flush
+  any buffers.
+
+</li>
+<li>x86 machines, for the same reason: the x86 architecture only allows
+  DMA transfers below approximately 900MB of RAM. So you can end up
+  with the bizarre situation of an OOM error with tons of RAM free.
+</li>
+</ul>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-1-4" class="outline-3">
+<h3 id="sec-1-4"><code>vm.swappiness = 0</code></h3>
+<div class="outline-text-3" id="text-1-4">
+
+<p>It’s said that altering swappiness can help you when you’re running
+under high memory pressure with software that tries to do its own
+memory management (i.e. MySQL). We’ve had limited success with this
+and I’d much prefer to use software which doesn’t pretend to know more
+about your hardware than the OS (i.e. PostgreSQL). Not that I’m
+bitter.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-1-5" class="outline-3">
+<h3 id="sec-1-5"><code>vm.overcommit_memory=1</code></h3>
+<div class="outline-text-3" id="text-1-5">
+
+<p>The overcommit<sub>memory</sub> sysctl isn’t something you’ll usually have to
+change if your software isn’t insane, but our netboot setup uses it so
+I thought I’d mention it. From the documentation:
+</p>
+<ol>
+<li>- Heuristic overcommit handling. Obvious overcommits of address
+   space are refused. Used for a typical system. It ensures a
+   seriously wild allocation fails while allowing overcommit to reduce
+   swap usage. root is allowed to allocate slighly more memory in this
+   mode. This is the default.
+</li>
+<li>- Always overcommit. Appropriate for some scientific applications.
+</li>
+<li>- Don’t overcommit. The total address space commit for the system
+   is not permitted to exceed swap + a configurable percentage
+   (default is 50) of physical RAM. Depending on the percentage you
+   use, in most situations this means a process will not be killed
+   while accessing pages but will receive errors on memory allocation
+   as appropriate.
+</li>
+</ol>
+
+
+<p>
+For more info on this, see the overcommit accounting documentation.
+<a href="https://www.kernel.org/doc/Documentation/sysctl/vm.txt">https://www.kernel.org/doc/Documentation/sysctl/vm.txt</a>
+</p>
+</div>
 </div>
 
 </div>
 
 <div id="outline-container-2" class="outline-2">
-<h2 id="sec-2">NvidiaMultiMonitors<sup><a class="footref" name="fnr.1" href="#fn.1">1</a></sup></h2>
+<h2 id="sec-2">linux 下 强制回收内存</h2>
 <div class="outline-text-2" id="text-2">
 
 
 </div>
 
 <div id="outline-container-2-1" class="outline-3">
-<h3 id="sec-2-1">intro</h3>
+<h3 id="sec-2-1">drop<sub>caches</sub></h3>
 <div class="outline-text-3" id="text-2-1">
+
+<p>通过修改proc系统的drop<sub>caches清理free的cache</sub>
+$echo 3 &gt; /proc/sys/vm/drop<sub>caches</sub>
+</p>
+<p>
+drop<sub>caches的详细文档如下：</sub>
+Writing to this will cause the kernel to drop clean caches, dentries and inodes from memory, causing that memory to become free.
+</p>
+
+
+<pre class="src src-sh">To free pagecache:
+ <span style="color: #b0c4de;">echo</span> 1 &gt; /proc/sys/vm/drop_caches
+To free dentries and inodes:
+ <span style="color: #b0c4de;">echo</span> 2 &gt; /proc/sys/vm/drop_caches
+To free pagecache, dentries and inodes:
+ <span style="color: #b0c4de;">echo</span> 3 &gt; /proc/sys/vm/drop_caches
+</pre>
+
+<p>
+As this is a non-destructive operation, and dirty objects are notfreeable, the user should run "sync" first in order to make sure allcached objects are freed.
+This tunable was added in 2.6.16.
+</p></div>
+
+</div>
+
+<div id="outline-container-2-2" class="outline-3">
+<h3 id="sec-2-2">vm in /etc/sysctl.conf</h3>
+<div class="outline-text-3" id="text-2-2">
+
+<p>修改/etc/sysctl.conf 添加如下选项后就不会内存持续增加
+</p>
+
+
+<pre class="src src-sh">vm.dirty_ratio = 1
+vm.dirty_background_ratio=1
+vm.dirty_writeback_centisecs=2
+vm.dirty_expire_centisecs=3
+vm.drop_caches=3
+vm.swappiness =100
+vm.vfs_cache_pressure=163
+vm.overcommit_memory=2
+vm.lowmem_reserve_ratio=32 32 8
+kern.maxvnodes=3
+</pre>
+
+<p>
+上面的设置比较粗暴，使cache的作用基本无法发挥。需要根据机器的状况进行
+适当的调节寻找最佳的折衷。
+</p>
+<ul>
+<li id="sec-2-2-1"><code>min_free_kbytes</code><br/>
+
+<p>
+Regarding min<sub>free</sub><sub>kbytes</sub>, faster networking means kernel buffers get
+full faster and you need more headroom to be able to allocate them.
+You need to have enough to last until the vm manages to free up more
+memory, and at high transfer speeds you have high buffer filling
+speeds too. This will eat memory though, memory that will not be
+available for normal processes or file cache.
+</p>
+<p>
+If you see stuff like "swapper: page allocation failure. order:0,
+mode:0x20" you definately need to increase min<sub>free</sub><sub>kbytes</sub> for the vm.
+</p>
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-2"><code>/proc/sys/vm/dirty_ratio</code><br/>
+这个参数控制文件系统的文件系统写缓冲区的大小，单位是百分比，表示系统内
+存的百分比，表示当写缓冲使用到系统内存多少的时候，开始向磁盘写出数 据。
+增大之会使用更多系统内存用于磁盘写缓冲，也可以极大提高系统的写性能。但
+是，当你需要持续、恒定的写入场合时，应该降低其数值，一般启动上缺省是
+10。设1加速程序速度
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-3"><code>/proc/sys/vm/dirty_background_ratio</code><br/>
+这个参数控制文件系统的pdflush进程，在何时刷新磁盘。单位是百分比，表示
+系统内存的百分比，意思是当写缓冲使用到系统内存多少的时 候，pdflush开始
+向磁盘写出数据。增大之会使用更多系统内存用于磁盘写缓冲，也可以极大提高
+系统的写性能。但是，当你需要持续、恒定的写入场合时， 应该降低其数值，
+一般启动上缺省是 5
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-4"><code>/proc/sys/vm/dirty_writeback_centisecs</code><br/>
+这个参数控制内核的脏数据刷新进程pdflush的运行间隔。单位是 1/100 秒。缺
+省数值是500，也就是 5 秒。如果你的系统是持续地写入动作，那么实际上还是
+降低这个数值比较好，这样可以把尖峰的写操作削平成多次写操
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-5"><code>/proc/sys/vm/dirty_expire_centisecs</code><br/>
+这个参数声明Linux内核写缓冲区里面的数据多“旧”了之后，pdflush进程就开始
+考虑写到磁盘中去。单位是 1/100秒。缺省是 30000，也就是 30 秒的数据就算
+旧了，将会刷新磁盘。对于特别重载的写操作来说，这个值适当缩小也是好的，
+但也不能缩小太多，因为缩小太多也会导致IO提高太快。建议设置为 1500，也
+就是15秒算旧。 
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-6"><code>/proc/sys/vm/drop_caches</code><br/>
+释放已经使用的cache
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-7"><code>/proc/sys/vm/page-cluster</code><br/>
+该文件表示在写一次到swap区的时候写入的页面数量，0表示1页，1表示2页，2
+表示4页。
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-8">/proc/sys/vm/swapiness<br/>
+该文件表示系统进行交换行为的程度，数值（0-100）越高，越可能发生磁盘交换。
+</li>
+</ul>
+<ul>
+<li id="sec-2-2-9"><code>/proc/sys/vm/vfs_cache_pressure</code><br/>
+该文件表示内核回收用于directory和inode cache内存的倾向
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-2-3" class="outline-3">
+<h3 id="sec-2-3">more soft configuration in /etc/sysctl.conf</h3>
+<div class="outline-text-3" id="text-2-3">
+
+
+
+
+<pre class="src src-sh">/etc/sysctl.conf
+vm.dirty_ratio=1
+vm.dirty_background_ratio=1
+vm.dirty_writeback_centisecs=1
+vm.dirty_expire_centisecs=3
+vm.drop_caches=3
+vm.swapiness=100
+vm.vfs_cache_pressure=133
+
+vm.dirty_ratio = 5    <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">dft 20  %</span>
+vm.dirty_background_ratio =5 <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">dft 10 %</span>
+vm.dirty_writeback_centisecs=100 <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">dft 500 is 5s</span>
+vm.dirty_expire_centisecs=300    <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">dft 30000 is 30s</span>
+vm.drop_caches=3  <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">dft  0</span>
+vm.swappiness=100  <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">dft 60</span>
+vm.vfs_cache_pressure=133  <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">dft 100</span>
+
+vm.min_free_kbytes=204800
+
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">200M mem</span>
+
+save simple sysctl -w net.ipv4.route.flush=1
+</pre>
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">Linux TCP Tuning</h2>
+<div class="outline-text-2" id="text-3">
+
+
+</div>
+
+<div id="outline-container-3-1" class="outline-3">
+<h3 id="sec-3-1">How to achieve Gigabit speeds with Linux</h3>
+<div class="outline-text-3" id="text-3-1">
+
+<p><a href="http://datatag.web.cern.ch/datatag/howto/tcp.html">http://datatag.web.cern.ch/datatag/howto/tcp.html</a>
+</p>
+<ul>
+<li id="sec-3-1-1">3.1 if txtqueue length high<br/>
+There are two queues to consider, the txqueuelen; which is related to the transmit queue size, and the netdev<sub>backlog</sub>; which determines the recv queue size.
+
+<p>
+To set the length of the transmit queue of the device. It is useful to set this to small values for slower devices with a high latency (modem links, ISDN) to prevent fast bulk transfers from disturbing interactive traffic like telnet too much.
+</p>
+<p>
+Users can manually set this queue size using the ifconfig command on the required device. Eg.
+</p>
+<p>
+/sbin/ifconfig eth2 txqueuelen 2000
+</p>
+<p>
+The default of 100 is inadequate for long distance, high throughput
+pipes. For example, on a network with a rtt of 120ms and at Gig rates,
+a txqueuelen of at least 10000 is recommended.
+</p>
+</li>
+</ul>
+<ul>
+<li id="sec-3-1-2">kernel receiver backlog<br/>
+
+<p>
+For the receiver side, we have a similar queue for incoming packets. This queue will build up in size when an interface receives packets faster than the kernel can process them. If this queue is too small (default is 300), we will begin to loose packets at the receiver, rather than on the network. One can set this value by:
+/sbin/sysctl -w sys.net.core.netdev<sub>max</sub><sub>backlog</sub>=2000
+</p>
+</li>
+</ul>
+<ul>
+<li id="sec-3-1-3">socket buffer memory queue limits r|w mem (default and max)<br/>
+
+<p>
+If your program asks for more socket buffer memory than the kernel is configured to give you, the program won't get it. You can adjust the maximum value of socket buffer memory by:
+/sbin/sysctl -w net.core.rmem<sub>max</sub>= VALUE
+</p>
+<p>
+Where VALUE should enough for your socket buffer size.
+</p>
+<p>
+you should also set the "write" value.
+</p>
+<p>
+/sbin/sysctl -w net.core.wmem<sub>max</sub>= VALUE
+</p>
+<p>
+/sbin/sysctl -w net.ipv4.tcp<sub>mem</sub>= MIN DEFAULT MAX
+</p>
+<p>
+This should be done both in the sender and the receiver.
+</p>
+</li>
+</ul>
+<ul>
+<li id="sec-3-1-4">autotuning in 2.4 kernels<br/>
+
+<p>
+If you don't set the socket buffer options in your program, linux will attempt to auto-tune your tcp connection. This means that it will allocate as less memory as possible for your TCP connection without wasting memory whilst maintaining high performance.
+/sbin/sysctl -w net.ipv4.tcp<sub>rmem</sub>= MIN DEFAULT MAX
+</p>
+<p>
+/sbin/sysctl -w net.ipv4.tcp<sub>wmem</sub>= MIN DEFAULT MAX
+</p>
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-3-2" class="outline-3">
+<h3 id="sec-3-2">Linux TCP Tuning</h3>
+<div class="outline-text-3" id="text-3-2">
+
+<p><a href="http://kaivanov.blogspot.hk/2010/09/linux-tcp-tuning.html">http://kaivanov.blogspot.hk/2010/09/linux-tcp-tuning.html</a>
+</p><ul>
+<li id="sec-3-2-1">To increase TCP max buffer size setable using setsockopt():<br/>
+net.core.rmem<sub>max</sub> = 33554432
+net.core.wmem<sub>max</sub> = 33554432
+
+</li>
+</ul>
+<ul>
+<li id="sec-3-2-2">To increase Linux autotuning TCP buffer limits min, default, and max number of bytes to use set max to 16MB for 1GE, and 32M or 54M for 10GE:<br/>
+net.ipv4.tcp<sub>rmem</sub> = 4096 87380 33554432
+net.ipv4.tcp<sub>wmem</sub> = 4096 65536 33554432
+</li>
+</ul>
+<ul>
+<li id="sec-3-2-3">txqueuelen<br/>
+Another thing you can to help increase TCP throughput with 1000BT NICs is to increase the size of the interface queue. For paths with more than 50 ms RTT, a value of 5000-10000 is recommended. To increase txqueuelen, do the following:
+
+<p>
+[root@server1 ~] ifconfig eth0 txqueuelen 5000
+</p>
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-3-3" class="outline-3">
+<h3 id="sec-3-3">Effect of TxqueueLen on High Bandwidth Delay Product Network</h3>
+<div class="outline-text-3" id="text-3-3">
+
+<p><a href="http://www.hep.ucl.ac.uk/~ytl/tcpip/linux/txqueuelen/datatag-tcp/">http://www.hep.ucl.ac.uk/~ytl/tcpip/linux/txqueuelen/datatag-tcp/</a>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-3-4" class="outline-3">
+<h3 id="sec-3-4">high speed tuning</h3>
+<div class="outline-text-3" id="text-3-4">
+
+<p><a href="http://fasterdata.es.net/host-tuning/linux/">http://fasterdata.es.net/host-tuning/linux/</a>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-3-5" class="outline-3">
+<h3 id="sec-3-5">Increase TCP performance for gigabit network</h3>
+<div class="outline-text-3" id="text-3-5">
+
+<p><a href="http://www.acc.umu.se/~maswan/linux-netperf.txt">http://www.acc.umu.se/~maswan/linux-netperf.txt</a>
+</p><ul>
+<li id="sec-3-5-1">TCP performance tuning - how to tune linux<br/>
+
+<p>
+The short summary:
+The default Linux tcp window sizing parameters sucks.
+The short fix [wirespeed for gigE within 5 ms RTT and fastE within 50 ms RTT]:
+vim /etc/sysctl.conf
+net/core/rmem<sub>max</sub> = 8738000
+net/core/wmem<sub>max</sub> = 6553600
+net/ipv4/tcp<sub>rmem</sub> = 8192 873800 8738000
+net/ipv4/tcp<sub>wmem</sub> = 4096 655360 6553600
+</p>
+<p>
+It might also be a good idea to increase vm/min<sub>free</sub><sub>kbytes</sub>, especially if you have e1000 with NAPI or similar. A sensible value is 16M or 64M:
+vm/min<sub>free</sub><sub>kbytes</sub> = 65536
+If you run an ancient kernel, increase the txqueuelen to at least 1000:
+ifconfig ethN txqueuelen 1000
+</p>
+<p>
+If you are seeing "TCP: drop open request" for real load (not a DDoS),
+you need to increase tcp<sub>max</sub><sub>syn</sub><sub>backlog</sub> (8192 worked much better than
+1024 on heavy webserver load).
+</p></li>
+</ul>
+<ul>
+<li id="sec-3-5-2">The background:<br/>
+
+<p>
+TCP performance is limited by latency and window size (and overhead,
+which reduces the effective window size) by window<sub>size</sub>/RTT (this is
+how much data that can be "in transit" over the link at any given
+moment).
+</p>
+<p>
+To get the actual transfer speeds possible you have to divide the
+resulting window by the latency (in seconds):
+</p>
+<p>
+The overhead is: window/2<sup>tcp</sup><sub>adv</sub><sub>win</sub><sub>scale</sub> (tcp<sub>adv</sub><sub>win</sub><sub>scale</sub> default
+is 2)
+</p>
+<p>
+So for linux default parameters for the recieve window (tcp<sub>rmem</sub>):
+87380 - (87380 / 2<sup>2</sup>) = 65536.
+</p>
+<p>
+Given a transatlantic link (150 ms RTT), the maximum performance ends
+up at: 65536/0.150 = 436906 bytes/s or about 400 kbyte/s, which is
+really slow today.
+</p>
+<p>
+With the increased default size: (873800 - 873800/2<sup>2</sup>)/0.150 = 4369000
+bytes/s, or about 4Mbytes/s, which is resonable for a modern network.
+And note that this is the default, if the sender is configured with a
+larger window size it will happily scale up to 10 times this
+(8738000*0.75/0.150 = ~40Mbytes/s), pretty good for a modern network.
+</p>
+<p>
+For the txqueuelen, this is mostly relevant for gigE, but should not
+hurt anything else. Old kernels have shipped with a default txqueuelen
+of 100, which is definately too low and hurts performance.
+</p>
+<p>
+net/core/[rw]mem<sub>max</sub> is in bytes, and the largest possible window
+size. net/ipv4/tcp<sub>[rw]mem</sub> is in bytes and is "min default max" for
+the tcp windows, this is negotiated between both sender and reciever.
+"r" is for when this machine is on the recieving end, "w" when the
+connection is initiated from this machine.
+</p>
+<p>
+There are more tuning parameters, for the Linux kernel they are
+documented in Documentation/networking/ip-sysctl.txt, but in our
+experience only the parameters above need tuning to get good tcp
+performance..
+</p>
+
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-3-6" class="outline-3">
+<h3 id="sec-3-6">Linux Tune Network Stack (Buffers Size) To Increase Networking Performance</h3>
+<div class="outline-text-3" id="text-3-6">
+
+<p><a href="http://www.cyberciti.biz/faq/linux-tcp-tuning/">http://www.cyberciti.biz/faq/linux-tcp-tuning/</a>
+</p>
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-4" class="outline-2">
+<h2 id="sec-4">Generic ipv4 Setting</h2>
+<div class="outline-text-2" id="text-4">
+
+<p><a href="http://lartc.org/howto/lartc.kernel.obscure.html">http://lartc.org/howto/lartc.kernel.obscure.html</a>
+</p>
+
+</div>
+
+<div id="outline-container-4-1" class="outline-3">
+<h3 id="sec-4-1">net.ipv4.route.flush</h3>
+<div class="outline-text-3" id="text-4-1">
+
+<p>Writing to this file results in a flush of the routing cache.
+</p>
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-5" class="outline-2">
+<h2 id="sec-5">Scheduling Jobs With cron on OpenWrt <sup><a class="footref" name="fnr-.1" href="#fn-.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-5">
+
+
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">1. Create crontab Directory </span>
+ mkdir /etc/crontabs
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">2. Create crontab File </span>
+ touch /etc/crontabs/root
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">3. Create Init Script </span>
+/etc/init.d/S60cron
+
+ <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/bin/sh</span>
+ <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">start crond</span>
+ /usr/sbin/crond -c /etc/crontabs  -L /dev/null
+
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">4. make the script executable: </span>
+ chmod 755 /etc/init.d/S60cron
+
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">5. add an entry to /etc/crontabs/root for each task that you want periodically executed. </span>
+  <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">run this script every hour</span>
+  01 * * * * /path/scriptname &gt; /dev/null
+
+      The time and date fields are:
+
+              field          allowed values
+              -----          --------------
+              minute         0-59
+              hour           0-23
+              day of month   1-31
+              month          1-12 (or names, see below)
+              day of week    0-7 (0 or 7 is Sun, or use names)
+everytime use */1
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-6" class="outline-2">
+<h2 id="sec-6">GFP<sub>KERNEL</sub> and GFP<sub>ATOMIC</sub></h2>
+<div class="outline-text-2" id="text-6">
+
+<p>GFP<sub>ATOMIC</sub> is used when (a) you are inside a completion handler, an
+interrupt, bottom half, tasklet or timer, or (b) you are holding a
+spinlock or rwlock (does not apply to semaphores), or (c)
+current-&gt;state != TASK<sub>RUNNING</sub>, this is the case only after you've
+changed it.
+</p>
+<p>
+Changed to GPF<sub>ATOMIC</sub> and syslog is quiet!!! 
+</p></div>
+
+</div>
+
+<div id="outline-container-7" class="outline-2">
+<h2 id="sec-7">BUG: scheduling while atomic: swapper /0x00000103/0, CPU#0</h2>
+<div class="outline-text-2" id="text-7">
+
+<p>"Scheduling while atomic" indicates that you've tried to sleep
+somewhere that you shouldn't - like within a spinlock-protected
+critical section or an interrupt handler.
+</p>
+<p>
+Exactly as said in 1st answer , scheduling while atomic happen when
+the scheduler get confused and therfore unable to work properly and
+this because the scheduler tried to perform a "schedule()" in a
+section that contains a schedulable code inside of a non schedulable
+one . for example using sleeps inside of a section protected by a
+spinlock. trying to use another lock(semaphores,mutexes..) inside of a
+spinlock-proteced code may also disturb the scheduler. In addition
+using spinlocks in user space can drive the scheduler to beahve as
+such. hope this helps
+</p>
+
+</div>
+
+</div>
+
+<div id="outline-container-8" class="outline-2">
+<h2 id="sec-8">VMware-Tools Fails To Start On Fedora</h2>
+<div class="outline-text-2" id="text-8">
+
+<p><code>blocking file system failed</code>
+</p>
+
+
+<pre class="src src-sh">sudo yum install fuse-libs
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-9" class="outline-2">
+<h2 id="sec-9">NvidiaMultiMonitors<sup><a class="footref" name="fnr-.2" href="#fn-.2">2</a></sup></h2>
+<div class="outline-text-2" id="text-9">
+
+
+</div>
+
+<div id="outline-container-9-1" class="outline-3">
+<h3 id="sec-9-1">intro</h3>
+<div class="outline-text-3" id="text-9-1">
 
 <p>You can check your video card model by running, from terminal:
 </p>
@@ -166,9 +845,9 @@ More information can be provided by running
 
 </div>
 
-<div id="outline-container-2-2" class="outline-3">
-<h3 id="sec-2-2">Setup</h3>
-<div class="outline-text-3" id="text-2-2">
+<div id="outline-container-9-2" class="outline-3">
+<h3 id="sec-9-2">Setup</h3>
+<div class="outline-text-3" id="text-9-2">
 
 <p>After the system reboot, you can change your X settings by going to System-&gt;Administration-&gt;NVIDIA X Server Settings. If you installed the driver manually, it may be under Applications-&gt;System Tools-&gt;NVIDIA X Server Settings. Alternatively, run from terminal:
 </p>
@@ -183,7 +862,7 @@ If the driver didn't install this (Envy/EnvyNG surely does), you can install it 
 </p>
 
 <ul>
-<li id="sec-2-2-1">Differences<br/>
+<li id="sec-9-2-1">Differences<br/>
 
 <ul>
 <li>TwinView
@@ -210,9 +889,9 @@ in Compiz-Fusion, each monitor has its own cube, controlled separately
 
 </div>
 
-<div id="outline-container-2-3" class="outline-3">
-<h3 id="sec-2-3">Saving</h3>
-<div class="outline-text-3" id="text-2-3">
+<div id="outline-container-9-3" class="outline-3">
+<h3 id="sec-9-3">Saving</h3>
+<div class="outline-text-3" id="text-9-3">
 
 <p>I prefer to uncheck Merge with existing file. Now click Save. If it
 gives you an error, "Unable to remove old X config backup file
@@ -229,9 +908,9 @@ preview. Save and close.
 
 </div>
 
-<div id="outline-container-2-4" class="outline-3">
-<h3 id="sec-2-4">Removing Restricted Drivers</h3>
-<div class="outline-text-3" id="text-2-4">
+<div id="outline-container-9-4" class="outline-3">
+<h3 id="sec-9-4">Removing Restricted Drivers</h3>
+<div class="outline-text-3" id="text-9-4">
 
 <p><code>sudo apt-get remove --purge nvidia-glx-new</code>
 </p></div>
@@ -239,9 +918,9 @@ preview. Save and close.
 
 </div>
 
-<div id="outline-container-3" class="outline-2">
-<h2 id="sec-3">Linux loglevel</h2>
-<div class="outline-text-2" id="text-3">
+<div id="outline-container-10" class="outline-2">
+<h2 id="sec-10">Linux loglevel</h2>
+<div class="outline-text-2" id="text-10">
 
 <p>改变console loglevel的方法有如下几种：
 1.启动时Kernel boot option：loglevel=level
@@ -253,28 +932,28 @@ preview. Save and close.
 
 </div>
 
-<div id="outline-container-3-1" class="outline-3">
-<h3 id="sec-3-1">The kernel log levels are:</h3>
-<div class="outline-text-3" id="text-3-1">
+<div id="outline-container-10-1" class="outline-3">
+<h3 id="sec-10-1">The kernel log levels are:</h3>
+<div class="outline-text-3" id="text-10-1">
 
 
 
 
-<pre class="example">0 (KERN_EMERG)
+<pre class="src src-sh"><span style="color: #87cefa;">0</span> (KERN_EMERG)
 The system is unusable.
-1 (KERN_ALERT)
+<span style="color: #87cefa;">1</span> (KERN_ALERT)
 Actions that must be taken care of immediately.
-2 (KERN_CRIT)
+<span style="color: #87cefa;">2</span> (KERN_CRIT)
 Critical conditions.
-3 (KERN_ERR)
+<span style="color: #87cefa;">3</span> (KERN_ERR)
 Noncritical error conditions.
-4 (KERN_WARNING)
+<span style="color: #87cefa;">4</span> (KERN_WARNING)
 Warning conditions that should be taken care of.
-5 (KERN_NOTICE)
+<span style="color: #87cefa;">5</span> (KERN_NOTICE)
 Normal, but significant events.
-6 (KERN_INFO)
+<span style="color: #87cefa;">6</span> (KERN_INFO)
 Informational messages that require no action.
-7 (KERN_DEBUG)
+<span style="color: #87cefa;">7</span> (KERN_DEBUG)
 Kernel debugging messages, output by the kernel if the developer enabled debugging at compile time.
 </pre>
 
@@ -282,25 +961,25 @@ Kernel debugging messages, output by the kernel if the developer enabled debuggi
 
 </div>
 
-<div id="outline-container-3-2" class="outline-3">
-<h3 id="sec-3-2">cat /proc/sys/kernel/printk</h3>
-<div class="outline-text-3" id="text-3-2">
+<div id="outline-container-10-2" class="outline-3">
+<h3 id="sec-10-2">cat /proc/sys/kernel/printk</h3>
+<div class="outline-text-3" id="text-10-2">
 
 
 
 
-<pre class="example">cat /proc/sys/kernel/printk
+<pre class="src src-sh">cat /proc/sys/kernel/printk
 4 4 1 7
-所得到的信息是$Linux_SRC/include/linux/printk.h中定义的宏：
-#define console_loglevel (console_printk[0])
-#define default_message_loglevel (console_printk[1])
-#define minimum_console_loglevel (console_printk[2])
-#define default_console_loglevel (console_printk[3])
-依次分别为：
-控制台日志级别：优先级高于该值的消息将被打印至控制台
-缺省的消息日志级别：将用该优先级来打印没有优先级的消息
-最低的控制台日志级别：控制台日志级别可被设置的最小值（最高优先级）
-缺省的控制台日志级别：控制台日志级别的缺省值
+&#25152;&#24471;&#21040;&#30340;&#20449;&#24687;&#26159;$<span style="color: #eedd82;">Linux_SRC</span>/include/linux/printk.h&#20013;&#23450;&#20041;&#30340;&#23439;&#65306;
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">define console_loglevel (console_printk[0])</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">define default_message_loglevel (console_printk[1])</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">define minimum_console_loglevel (console_printk[2])</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">define default_console_loglevel (console_printk[3])</span>
+&#20381;&#27425;&#20998;&#21035;&#20026;&#65306;
+&#25511;&#21046;&#21488;&#26085;&#24535;&#32423;&#21035;&#65306;&#20248;&#20808;&#32423;&#39640;&#20110;&#35813;&#20540;&#30340;&#28040;&#24687;&#23558;&#34987;&#25171;&#21360;&#33267;&#25511;&#21046;&#21488;
+&#32570;&#30465;&#30340;&#28040;&#24687;&#26085;&#24535;&#32423;&#21035;&#65306;&#23558;&#29992;&#35813;&#20248;&#20808;&#32423;&#26469;&#25171;&#21360;&#27809;&#26377;&#20248;&#20808;&#32423;&#30340;&#28040;&#24687;
+&#26368;&#20302;&#30340;&#25511;&#21046;&#21488;&#26085;&#24535;&#32423;&#21035;&#65306;&#25511;&#21046;&#21488;&#26085;&#24535;&#32423;&#21035;&#21487;&#34987;&#35774;&#32622;&#30340;&#26368;&#23567;&#20540;&#65288;&#26368;&#39640;&#20248;&#20808;&#32423;&#65289;
+&#32570;&#30465;&#30340;&#25511;&#21046;&#21488;&#26085;&#24535;&#32423;&#21035;&#65306;&#25511;&#21046;&#21488;&#26085;&#24535;&#32423;&#21035;&#30340;&#32570;&#30465;&#20540;
 </pre>
 
 
@@ -309,23 +988,23 @@ Kernel debugging messages, output by the kernel if the developer enabled debuggi
 
 </div>
 
-<div id="outline-container-4" class="outline-2">
-<h2 id="sec-4">Virtual Box - Failed to access the USB subsystem</h2>
-<div class="outline-text-2" id="text-4">
+<div id="outline-container-11" class="outline-2">
+<h2 id="sec-11">Virtual Box - Failed to access the USB subsystem</h2>
+<div class="outline-text-2" id="text-11">
 
 
 
 
-<pre class="example">sudo usermod -a -G vboxusers username
+<pre class="src src-sh">sudo usermod -a -G vboxusers username
 </pre>
 
 </div>
 
 </div>
 
-<div id="outline-container-5" class="outline-2">
-<h2 id="sec-5">install Oracle VM VirtualBox Extension Pack</h2>
-<div class="outline-text-2" id="text-5">
+<div id="outline-container-12" class="outline-2">
+<h2 id="sec-12">install Oracle VM VirtualBox Extension Pack</h2>
+<div class="outline-text-2" id="text-12">
 
 <p><a href="http://www.oracle.com/technetwork/server-storage/virtualbox/downloads/index.html#extpack">http://www.oracle.com/technetwork/server-storage/virtualbox/downloads/index.html#extpack</a>
 </p>
@@ -333,14 +1012,14 @@ Kernel debugging messages, output by the kernel if the developer enabled debuggi
 
 </div>
 
-<div id="outline-container-6" class="outline-2">
-<h2 id="sec-6">eclipse提示框黑色背景色的修改方法</h2>
-<div class="outline-text-2" id="text-6">
+<div id="outline-container-13" class="outline-2">
+<h2 id="sec-13">eclipse提示框黑色背景色的修改方法</h2>
+<div class="outline-text-2" id="text-13">
 
 
 
 
-<pre class="example">cd /usr/share/themes/Radiance
+<pre class="src src-sh"><span style="color: #b0c4de;">cd</span> /usr/share/themes/Radiance
 sudo gedit gtk-2.0/gtkrc
 
 tooltip_fg_color:#ffffff
@@ -349,15 +1028,56 @@ tooltip_bg_color:#000000
 tooltip_fg_color:#000000
 tooltip_bg_color:#f2edbc
 
-打开系统外观配置，切换一下主题，当切换回来的时候，修改的效果就生效了。
+&#25171;&#24320;&#31995;&#32479;&#22806;&#35266;&#37197;&#32622;&#65292;&#20999;&#25442;&#19968;&#19979;&#20027;&#39064;&#65292;&#24403;&#20999;&#25442;&#22238;&#26469;&#30340;&#26102;&#20505;&#65292;&#20462;&#25913;&#30340;&#25928;&#26524;&#23601;&#29983;&#25928;&#20102;&#12290;
 </pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-14" class="outline-2">
+<h2 id="sec-14">swapper: page allocation failure</h2>
+<div class="outline-text-2" id="text-14">
+
+
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">change value for this boot</span>
+sysctl -w vm.min_free_kbytes=xxxx
+
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">change value for subsequent boots</span>
+<span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"vm.min_free_kbytes=xxxx"</span> &gt;&gt; /etc/sysctl.conf
+</pre>
+
+
+<p>
+This tells the kernel to try and keep 64MB of RAM free at all times. It’s useful in two main cases:
+</p>
+<ul>
+<li>Swap-less machines, where you don’t want incoming network traffic to
+  overwhelm the kernel and force an OOM before it has time to flush
+  any buffers.
+
+</li>
+<li>x86 machines, for the same reason: the x86 architecture only allows
+  DMA transfers below approximately 900MB of RAM. So you can end up
+  with the bizarre situation of an OOM error with tons of RAM free.
+</li>
+</ul>
 
 
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
-<p class="footnote"><sup><a class="footnum" name="fn.1" href="#fnr.1">1</a></sup> <a href="https://help.ubuntu.com/community/NvidiaMultiMonitors">https://help.ubuntu.com/community/NvidiaMultiMonitors</a>
-</p></div>
+<p class="footnote"><sup><a class="footnum" name="fn-.1" href="#fnr-.1">1</a></sup> <a href="http://martybugs.net/wireless/openwrt/cron.cgi">http://martybugs.net/wireless/openwrt/cron.cgi</a>
+</p>
+
+
+<p class="footnote"><sup><a class="footnum" name="fn-.2" href="#fnr-.2">2</a></sup> <a href="https://help.ubuntu.com/community/NvidiaMultiMonitors">https://help.ubuntu.com/community/NvidiaMultiMonitors</a>
+</p>
+
+
+</div>
 </div>
 
 </div>
@@ -365,9 +1085,9 @@ tooltip_bg_color:#f2edbc
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-04-08 12:33:07 China Standard Time</p>
+<p class="date">Date: 2013-04-14T18:55+0800</p>
 <p class="author">Author: Shi Shougang</p>
-<p class="creator">Org version 7.8.11 with Emacs version 24</p>
+<p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
 
 </div>

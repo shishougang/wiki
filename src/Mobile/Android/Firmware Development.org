@@ -1,5 +1,6 @@
-#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
-#+TITLE: Firmware
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Firmware Development
+#+OPTIONS: num:nil
 
 http://wiki.cyanogenmod.org/w/Development#The_CyanogenMod_Dev_Center
 * Overview
@@ -15,7 +16,44 @@ based on the open-source Android operating system.
 + Forum - http://forum.cyanogenmod.com/
 + Wiki - http://wiki.cyanogenmod.com/
 
+** Blog
++ http://www.androidenea.com/2009/08/init-process-and-initrc.html
+
+* The init process and init.rc
+http://www.androidenea.com/2009/08/init-process-and-initrc.html
+
+
+* Some commands
+#+beign_src sh
+$ adb reboot bootloader
+
+
+#+end_src
 * cyanogenmode notes
+** External Android Development Resources (Master List) – The Internet Helps You Learn. Free links that teach Java, C, C++, and all things Android
+http://wiki.cyanogenmod.org/w/Doc:_Development_Resources
+
+*** Learn about the build system (GNU Make)
++ Android Build System
+  http://www.kandroid.org/online-pdk/guide/build_system.html
+
++ GNU Make manual http://www.gnu.org/software/make/manual/make.html
+
++ The Android-Building Group
+  https://groups.google.com/forum/?fromgroups#!forum/android-building
+
+*** Learn about the Android kernel (based on the Linux kernel)
++ How To Build A Kernel
+  http://source.android.com/source/building-kernels.html
+
+*** Learn about the Android Frameworks
++ The official Android Developer Site
+  http://developer.android.com/index.html
+
++ Android classes http://developer.android.com/reference/classes.html
+
+** Team member
+http://wiki.cyanogenmod.org/w/Devs
 ** adb intro
 http://wiki.cyanogenmod.org/w/Doc:_adb_intro
 *** What is adb?
@@ -266,8 +304,238 @@ The process of applying a firmware image (or ROM) to a device. It generally enta
 *** Kang
 The process of creating a code based off someone else's code or reapplying code that someone else created into your own code (e.g. git cherry-pick). The term "kang" or "kanging" can have a pejorative connotation, especially if one adopts code from someone else without giving due credit. However the term can also be used with a certain sense of irony; sometimes one will claim to have "kanged" with some tongue-in-cheek.
 
-** HTC Desire HD / Inspire 4G
-http://wiki.cyanogenmod.org/w/Ace_Info
+** Envsetup help
+http://wiki.cyanogenmod.org/w/Envsetup_help
+
+Invoking "$ source build/envsetup.sh"
+
+#+begin_src sh
+mka	 Builds using SCHED_BATCH on all processors
+lunch	 lunch <vendor_name>_<product_name>-<build_variant>
+breakfast	 breakfast <product_name>
+brunch	 brunch <product_name>
+omnom	 omnom <product_name>
+tapas	 tapas [<App1> <App2> ...] [arm|x86|mips] [eng|userdebug|user]
+croot	 Changes directory to the top of the tree
+m	 Makes from the top of the tree
+mm	 Builds all of the modules in the current directory
+mmp	 Builds all of the modules in the current directory and pushes them to the device
+mmm	 Builds all of the modules in the supplied directories
+mmmp	 Builds all of the modules in the supplied directories and pushes them to the device
+cgrep	 Greps on all local C/C++ files
+jgrep	 Greps on all local Java files
+resgrep	 Greps on all local res/*.xml files
+godir	 Go to the directory containing a file
+cmremote	 Add git remote for CM Gerrit Review
+cmgerrit	 A Git wrapper that fetches/pushes patch from/to CM Gerrit Review
+cmrebase	 Rebase a Gerrit change and push it again
+aospremote	 Add git remote for matching AOSP repository
+mkap	 Builds the module(s) using mka and pushes them to the device
+cmka	 Cleans and builds using mka
+reposync	 Parallel repo sync using ionice and SCHED_BATCH
+installboot	 Installs a boot.img to the connected device
+installrecovery	 Installs a recovery.img to the connected device
+#+end_src
+*** lunch
+Unlike breakfast, lunch makes no assumptions with regard to device
+configuration locations and formats, so it will scan the entire tree
+for matching options (depending on the number of locally available
+devices, this may take a significant amount of time). To build after
+running lunch, simply issue the command mka. No bacon here
+
+*** brunch
+Defined simply, brunch is equivalent to
+
+$ breakfast [device name] && mka bacon
+
+This means that it sets up your build environment to be configured for
+your device, and then commences the build process. mka bacon is just
+CyanogenMods’s way of saying build the code for your device. It’s
+generally only used for officially supported devices
+
+** Basic concepts
+http://wiki.cyanogenmod.org/w/Basic_concepts
+*** S-OFF (Security OFF) Mode
+Some bootloaders include a "Security ON" (AKA "S-ON") mode, whereby
+certain operational restrictions are imposed on the boot. On some
+devices (such as the T-Mobile G2), the S-ON bootloader may put the
+operating system partition in a "read-only" mode. For others, S-ON may
+cause the device to adopt behavior similar to a fully-locked
+bootloader.
+
+Switching the bootloader to S-OFF mode is therefore a prerequisite on
+some devices to allow the operating system to be modified or replaced.
+
+** All About Recovery Images
+http://wiki.cyanogenmod.org/w/All_About_Recovery_Images
+*** Overview
+  recovery mode is, is a special "second boot" mode, independent of the
+  normal boot, that you can start into that allows you to troubleshoot
+  or update your device. Recovery mode lets you re-flash an entirely
+  new operating system, clear out problematic cache partitions, and can
+  "factory reset" your device, clearing out non-system data. The
+  recovery can also let you back up and restore your Android
+  installation. As if that wasn't enough, the recovery mode often will
+  allow you to access your device from your computer via adb.
+*** Popular Recoveries
++ ClockworkMod Recovery: https://github.com/koush
++ TWRP: http://teamw.in/project/twrp2  https://github.com/Dees-Troy
+
+** Doc: more concepts
+http://wiki.cyanogenmod.org/w/Doc:_more_concepts
+*** Common Partitions and directories
++ /boot This partition stores the kernel and ramdisk. The kernel can
+  be thought of as the "core" of the device's software. It is what
+  allows the hardware to "talk" to the software, and vice versa. It
+  also controls other aspects of the operating system on the device,
+  such as what file formats the device is able to support. The ramdisk
+  contains the very first bits of Android that are loaded. It's the
+  software that loads everything else.
+
++ /recovery This partition holds the device's recovery software, which
+  gives the user access to special functions, such as upgrading the
+  operating system or making a backup of the device's software.
+
++ /system This is the main directory where the device's essential
+  software, the operating system itself, is stored. When CyanogenMod
+  is installed, this is where it goes. Generally speaking, this
+  partition is loaded into "read only" mode so that you don't
+  accidentally overwrite portions of Android, and it's only able to be
+  modified under special circumstances.
+
++ /cache This directory stores temporary files used by Android.
+  Generally, files on this partition are not usually critical to the
+  operation of the device, and can be "cleared out" by wiping its
+  contents, especially during every major upgrade.
+
++ /data This directory is where much of your personal data is stored.
+  So if you download an app from the Android Market, it goes here. If
+  you change a setting, that change is also stored here. If you
+  receive a SMS, it too is stored here.
+
+** Building Basics
+http://wiki.cyanogenmod.org/w/Doc:_Building_Basics
+*** The $OUT directory
++ /system -- this contains all the stuff that will become the /system
+  folder on Android.
+
++ /root -- these files contain the files that are turned into the ram
+  disk loaded and run by the kernel. The first program to be run by
+  the kernel is called init, and it uses the init.rc and
+  init.CODENAME.rc files to determine what happens next. See an
+  discussion of that here.
+
++ /recovery/root The ramdisk that contains the recovery mode is here.
+
+*** Commands
+Make
++ make modules -- this command will show all available targets. You
+  can build a single one by make my_target.
+
++ make showcommands -- this command will enable the verbose build
+  mode.
+
+ADB
++ adb remount -- If you've gotten errors trying to push files to
+  /system due to it being in read-only mode, adb remount will remount
+  /system into read-write mode--- provided that the shell has the
+  correct root permissions to do so. This replaces having to type a
+  longer command by hand such as mount -o rw,remount /system (as root)
+  or something.
+
++ adb sync system -- assuming you have adb installed, this
+  little-known, but powerful command will sync the contents of
+  $OUT/system with the /system directory on your device. It does
+  require that you have write access to /system. This command is very
+  useful for making and testing quick changes to your device. Note
+  though that adb sync system sometimes has problems with permissions
+  and symlinks.
+
+
+** using gerrit
+http://wiki.cyanogenmod.org/w/Gerrit
+*** Submitting to Gerrit
+1. Setup an account on Gerrit, you can register at
+   review.cyanogenmod.com
+2. If you already have SSH keys set up (e.g. for Github), skip the
+   following steps
+*** Uploading your changes
+1. First, you need to start a topic branch.
+   =repo start <branch name> <project path>=
+2. After you make your changes, you can commit them just as you would
+   normally:
+#+begin_src sh
+git add <file you edited>
+git commit
+ctop (Same as moving to top/root of tree using cd)
+#+end_src
+
+3. upload your changes to the CyanogenMod server:
+   =repo upload <project path>=
+
+*** example
+#+begin_src sh
+#Add AWEXT Support
+cd ~/android/system/
+repo start mychanges-wpa_supplicant external/wpa_supplicant
+cd ~/android/system/project
+#Make changes, edit a few files, add new drivers.. etc.
+git add *
+git commit -am 'Added AWEXT drivers'
+cd ~/android/system
+repo upload external/wpa_supplicant
+#+end_src
+
+
+** Doc: eclipse
+http://wiki.cyanogenmod.org/w/Doc:_eclipse
+
+=cp ~/android/system/development/ide/eclipse/.classpath
+~/android/system=
+
+Open Eclipse
+1. Click the File menu » new » java project
+2. Give a project name of CyanogenMod
+3. Uncheck use default location
+4. Point the location to ~/android/system/
+5. Keep all other defaults
+6. Click finis
+
+more : http://source.android.com/source/using-eclipse.html
+
+** About local manifests – Add, remove, or replace source code repositories with local_manifest.xml
+http://wiki.cyanogenmod.org/w/Doc:_Using_local_manifests
+*** Overriding the manifest
+create a folder called local_manifests and put that inside the .repo
+directory, then put your XML inside that directory. You can place as
+many override files in .repo/local_manifests as you like and repo will
+pick them up during the next sync. You can call the files anything you
+like as long as they end in .xml.
+
+#+begin_src sh
+<?xml version="1.0" encoding="UTF-8"?>
+   <manifest>
+     <remote name="omap" fetch="git://git.omapzoom.org/" />
+     <remove-project name="CyanogenMod/android_hardware_ti_omap3" />
+     <project path="hardware/ti/omap3" name="repo/android/hardware/ti/omap3" remote="omap" revision="jellybean"/>
+   </manifest>
+#+end_src
+
+Note that when adding new projects, there are at least three parts defined:
++ remote -- the name of the remote. this can be one that was defined in either the regular manifest or local_manifest.xml.
++ name -- the name of the git project-- for github it has the format account_name/project_name
++ path -- where the git repository should go in your local copy of the source code.
++ revision -- (OPTIONAL) which branch or tag to use in the repository.
+
+** Recreating CM Releases with Manifests – How to build for your device exactly like the buildbots do.
+http://wiki.cyanogenmod.org/w/Doc:_manifests
+** "make clean" vs. "make clobber"
+http://wiki.cyanogenmod.org/w/Doc:_make_clean_vs_make_clobber
+
+
+** Doc: the cm source
+http://wiki.cyanogenmod.org/w/Doc:_the_cm_source
+
 
 
 ** The JIRA project management system
@@ -278,19 +546,64 @@ https://confluence.atlassian.com/display/JIRA052/JIRA+Documentation
 ** View the latest accepted changes
 http://changelog.bbqdroid.org/
 
-** using gerrit
-http://wiki.cyanogenmod.org/w/Gerrit
 
-** Basic concepts
-http://wiki.cyanogenmod.org/w/Basic_concepts
-** Build Guides
 
-http://wiki.cyanogenmod.org/w/Build_Guides
-** Building Basics
-http://wiki.cyanogenmod.org/w/Doc:_Building_Basics
 
+
+** After You Build
+http://wiki.cyanogenmod.org/w/After_You_Build
+** porting intro
+http://wiki.cyanogenmod.org/w/Doc:_porting_intro
 
 
 
 ** Setting up a Virtual Machine for CyanogenMod development
 https://skydrive.live.com/?cid=b3bff0d42ae1e534&id=B3BFF0D42AE1E534%21107
+
+* android open source project[fn:1]
+
+** more
+http://source.android.com/source/initializing.html
+** Version Control with Repo and Git
+http://source.android.com/source/version-control.html
+
+Repo is a repository management tool that we built on top of Git. Repo
+unifies the many Git repositories when necessary, does the uploads to
+our revision control system, and automates parts of the Android
+development workflow. Repo is not meant to replace Git, only to make
+it easier to work with Git in the context of Android. The repo command
+is an executable Python script that you can put anywhere in your
+path. 
+
+Gerrit is a web-based code review system for projects that use git.
+
+*** Basic Workflow
+#+begin_src sh
+Use repo start to start a new topic branch.
+Edit the files.
+Use git add to stage changes.
+Use git commit to commit changes.
+Use repo upload to upload changes to the review server.
+#+end_src
+*** Task reference
+#+begin_src sh
+$ repo sync
+$ repo sync PROJECT0 PROJECT1 PROJECT2 ...
+$ repo start BRANCH_NAM
+$ repo status
+$ repo start BRANCH_NAME PROJECT
+$ repo branches
+$ repo diff
+$ repo upload
+
+$ repo prune
+#+end_src
+
+** Using Eclipse
+http://source.android.com/source/using-eclipse.html
+
+
+* Footnotes
+
+[fn:1] http://source.android.com/
+

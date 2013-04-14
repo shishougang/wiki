@@ -3,6 +3,359 @@
 #+OPTIONS: num:nil H:2
 
 
+* VM
+https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+
+http://russ.garrett.co.uk/2009/01/01/linux-kernel-tuning/
+** =overcommit_ratio=
+Which happened to be 50. And the machine just happened to have about
+5GB of RAM. Well look there, 5×50 is 250GB
+
+ If a process tries to malloc() more memory than available it will get
+ an error right away. This mode is set by changing the sysctl value
+ vm.overcommit_memory to 2.
+** =vm.overcommit_ratio=
+
+
+** =vm.min_free_kbytes = 65536=
+This tells the kernel to try and keep 64MB of RAM free at all times. It’s useful in two main cases:
+
++ Swap-less machines, where you don’t want incoming network traffic to
+  overwhelm the kernel and force an OOM before it has time to flush
+  any buffers.
+
++ x86 machines, for the same reason: the x86 architecture only allows
+  DMA transfers below approximately 900MB of RAM. So you can end up
+  with the bizarre situation of an OOM error with tons of RAM free.
+
+** =vm.swappiness = 0=
+It’s said that altering swappiness can help you when you’re running
+under high memory pressure with software that tries to do its own
+memory management (i.e. MySQL). We’ve had limited success with this
+and I’d much prefer to use software which doesn’t pretend to know more
+about your hardware than the OS (i.e. PostgreSQL). Not that I’m
+bitter.
+
+** =vm.overcommit_memory=1=
+The overcommit_memory sysctl isn’t something you’ll usually have to
+change if your software isn’t insane, but our netboot setup uses it so
+I thought I’d mention it. From the documentation:
+
+0. - Heuristic overcommit handling. Obvious overcommits of address
+   space are refused. Used for a typical system. It ensures a
+   seriously wild allocation fails while allowing overcommit to reduce
+   swap usage. root is allowed to allocate slighly more memory in this
+   mode. This is the default.
+1. - Always overcommit. Appropriate for some scientific applications.
+2. - Don’t overcommit. The total address space commit for the system
+   is not permitted to exceed swap + a configurable percentage
+   (default is 50) of physical RAM. Depending on the percentage you
+   use, in most situations this means a process will not be killed
+   while accessing pages but will receive errors on memory allocation
+   as appropriate.
+
+For more info on this, see the overcommit accounting documentation.
+https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+
+* linux 下 强制回收内存
+** drop_caches
+通过修改proc系统的drop_caches清理free的cache
+$echo 3 > /proc/sys/vm/drop_caches
+
+drop_caches的详细文档如下：
+Writing to this will cause the kernel to drop clean caches, dentries and inodes from memory, causing that memory to become free.
+#+begin_src sh
+To free pagecache:
+ echo 1 > /proc/sys/vm/drop_caches
+To free dentries and inodes:
+ echo 2 > /proc/sys/vm/drop_caches
+To free pagecache, dentries and inodes:
+ echo 3 > /proc/sys/vm/drop_caches
+#+end_src
+As this is a non-destructive operation, and dirty objects are notfreeable, the user should run "sync" first in order to make sure allcached objects are freed.
+This tunable was added in 2.6.16.
+** vm in /etc/sysctl.conf
+修改/etc/sysctl.conf 添加如下选项后就不会内存持续增加
+#+begin_src sh 
+vm.dirty_ratio = 1
+vm.dirty_background_ratio=1
+vm.dirty_writeback_centisecs=2
+vm.dirty_expire_centisecs=3
+vm.drop_caches=3
+vm.swappiness =100
+vm.vfs_cache_pressure=163
+vm.overcommit_memory=2
+vm.lowmem_reserve_ratio=32 32 8
+kern.maxvnodes=3
+#+end_src
+上面的设置比较粗暴，使cache的作用基本无法发挥。需要根据机器的状况进行
+适当的调节寻找最佳的折衷。
+
+*** =min_free_kbytes=
+
+Regarding min_free_kbytes, faster networking means kernel buffers get
+full faster and you need more headroom to be able to allocate them.
+You need to have enough to last until the vm manages to free up more
+memory, and at high transfer speeds you have high buffer filling
+speeds too. This will eat memory though, memory that will not be
+available for normal processes or file cache.
+
+If you see stuff like "swapper: page allocation failure. order:0,
+mode:0x20" you definately need to increase min_free_kbytes for the vm.
+
+*** =/proc/sys/vm/dirty_ratio=
+这个参数控制文件系统的文件系统写缓冲区的大小，单位是百分比，表示系统内
+存的百分比，表示当写缓冲使用到系统内存多少的时候，开始向磁盘写出数 据。
+增大之会使用更多系统内存用于磁盘写缓冲，也可以极大提高系统的写性能。但
+是，当你需要持续、恒定的写入场合时，应该降低其数值，一般启动上缺省是
+10。设1加速程序速度
+*** =/proc/sys/vm/dirty_background_ratio=
+这个参数控制文件系统的pdflush进程，在何时刷新磁盘。单位是百分比，表示
+系统内存的百分比，意思是当写缓冲使用到系统内存多少的时 候，pdflush开始
+向磁盘写出数据。增大之会使用更多系统内存用于磁盘写缓冲，也可以极大提高
+系统的写性能。但是，当你需要持续、恒定的写入场合时， 应该降低其数值，
+一般启动上缺省是 5
+
+*** =/proc/sys/vm/dirty_writeback_centisecs=
+这个参数控制内核的脏数据刷新进程pdflush的运行间隔。单位是 1/100 秒。缺
+省数值是500，也就是 5 秒。如果你的系统是持续地写入动作，那么实际上还是
+降低这个数值比较好，这样可以把尖峰的写操作削平成多次写操
+
+*** =/proc/sys/vm/dirty_expire_centisecs=
+这个参数声明Linux内核写缓冲区里面的数据多“旧”了之后，pdflush进程就开始
+考虑写到磁盘中去。单位是 1/100秒。缺省是 30000，也就是 30 秒的数据就算
+旧了，将会刷新磁盘。对于特别重载的写操作来说，这个值适当缩小也是好的，
+但也不能缩小太多，因为缩小太多也会导致IO提高太快。建议设置为 1500，也
+就是15秒算旧。 
+
+*** =/proc/sys/vm/drop_caches=
+释放已经使用的cache
+*** =/proc/sys/vm/page-cluster=
+该文件表示在写一次到swap区的时候写入的页面数量，0表示1页，1表示2页，2
+表示4页。
+
+*** /proc/sys/vm/swapiness
+该文件表示系统进行交换行为的程度，数值（0-100）越高，越可能发生磁盘交换。
+*** =/proc/sys/vm/vfs_cache_pressure=
+该文件表示内核回收用于directory和inode cache内存的倾向
+
+** more soft configuration in /etc/sysctl.conf
+#+begin_src sh
+/etc/sysctl.conf
+vm.dirty_ratio=1
+vm.dirty_background_ratio=1
+vm.dirty_writeback_centisecs=1
+vm.dirty_expire_centisecs=3
+vm.drop_caches=3
+vm.swapiness=100
+vm.vfs_cache_pressure=133
+
+vm.dirty_ratio = 5    #dft 20  %
+vm.dirty_background_ratio =5 #dft 10 %
+vm.dirty_writeback_centisecs=100 #dft 500 is 5s
+vm.dirty_expire_centisecs=300    #dft 30000 is 30s
+vm.drop_caches=3  #dft  0
+vm.swappiness=100  #dft 60
+vm.vfs_cache_pressure=133  #dft 100
+
+vm.min_free_kbytes=204800
+
+#200M mem
+
+save simple sysctl -w net.ipv4.route.flush=1
+#+end_src
+* Linux TCP Tuning
+** How to achieve Gigabit speeds with Linux
+http://datatag.web.cern.ch/datatag/howto/tcp.html
+
+*** 3.1 if txtqueue length high
+There are two queues to consider, the txqueuelen; which is related to the transmit queue size, and the netdev_backlog; which determines the recv queue size.
+
+To set the length of the transmit queue of the device. It is useful to set this to small values for slower devices with a high latency (modem links, ISDN) to prevent fast bulk transfers from disturbing interactive traffic like telnet too much.
+
+Users can manually set this queue size using the ifconfig command on the required device. Eg.
+
+/sbin/ifconfig eth2 txqueuelen 2000
+
+The default of 100 is inadequate for long distance, high throughput
+pipes. For example, on a network with a rtt of 120ms and at Gig rates,
+a txqueuelen of at least 10000 is recommended.
+
+*** kernel receiver backlog
+
+For the receiver side, we have a similar queue for incoming packets. This queue will build up in size when an interface receives packets faster than the kernel can process them. If this queue is too small (default is 300), we will begin to loose packets at the receiver, rather than on the network. One can set this value by:
+/sbin/sysctl -w sys.net.core.netdev_max_backlog=2000
+
+*** socket buffer memory queue limits r|w mem (default and max)
+
+If your program asks for more socket buffer memory than the kernel is configured to give you, the program won't get it. You can adjust the maximum value of socket buffer memory by:
+/sbin/sysctl -w net.core.rmem_max= VALUE
+
+Where VALUE should enough for your socket buffer size.
+
+you should also set the "write" value.
+
+/sbin/sysctl -w net.core.wmem_max= VALUE
+
+/sbin/sysctl -w net.ipv4.tcp_mem= MIN DEFAULT MAX
+
+This should be done both in the sender and the receiver.
+
+*** autotuning in 2.4 kernels
+
+If you don't set the socket buffer options in your program, linux will attempt to auto-tune your tcp connection. This means that it will allocate as less memory as possible for your TCP connection without wasting memory whilst maintaining high performance.
+/sbin/sysctl -w net.ipv4.tcp_rmem= MIN DEFAULT MAX
+
+/sbin/sysctl -w net.ipv4.tcp_wmem= MIN DEFAULT MAX
+
+** Linux TCP Tuning
+http://kaivanov.blogspot.hk/2010/09/linux-tcp-tuning.html
+*** To increase TCP max buffer size setable using setsockopt():
+net.core.rmem_max = 33554432
+net.core.wmem_max = 33554432
+
+*** To increase Linux autotuning TCP buffer limits min, default, and max number of bytes to use set max to 16MB for 1GE, and 32M or 54M for 10GE:
+net.ipv4.tcp_rmem = 4096 87380 33554432
+net.ipv4.tcp_wmem = 4096 65536 33554432
+*** txqueuelen
+Another thing you can to help increase TCP throughput with 1000BT NICs is to increase the size of the interface queue. For paths with more than 50 ms RTT, a value of 5000-10000 is recommended. To increase txqueuelen, do the following:
+
+[root@server1 ~] ifconfig eth0 txqueuelen 5000
+
+** Effect of TxqueueLen on High Bandwidth Delay Product Network
+http://www.hep.ucl.ac.uk/~ytl/tcpip/linux/txqueuelen/datatag-tcp/
+
+** high speed tuning
+http://fasterdata.es.net/host-tuning/linux/
+
+** Increase TCP performance for gigabit network
+http://www.acc.umu.se/~maswan/linux-netperf.txt
+*** TCP performance tuning - how to tune linux
+
+The short summary:
+The default Linux tcp window sizing parameters sucks.
+The short fix [wirespeed for gigE within 5 ms RTT and fastE within 50 ms RTT]:
+vim /etc/sysctl.conf
+net/core/rmem_max = 8738000
+net/core/wmem_max = 6553600
+net/ipv4/tcp_rmem = 8192 873800 8738000
+net/ipv4/tcp_wmem = 4096 655360 6553600
+
+It might also be a good idea to increase vm/min_free_kbytes, especially if you have e1000 with NAPI or similar. A sensible value is 16M or 64M:
+vm/min_free_kbytes = 65536
+If you run an ancient kernel, increase the txqueuelen to at least 1000:
+ifconfig ethN txqueuelen 1000
+
+If you are seeing "TCP: drop open request" for real load (not a DDoS),
+you need to increase tcp_max_syn_backlog (8192 worked much better than
+1024 on heavy webserver load).
+*** The background:
+
+TCP performance is limited by latency and window size (and overhead,
+which reduces the effective window size) by window_size/RTT (this is
+how much data that can be "in transit" over the link at any given
+moment).
+
+To get the actual transfer speeds possible you have to divide the
+resulting window by the latency (in seconds):
+
+The overhead is: window/2^tcp_adv_win_scale (tcp_adv_win_scale default
+is 2)
+
+So for linux default parameters for the recieve window (tcp_rmem):
+87380 - (87380 / 2^2) = 65536.
+
+Given a transatlantic link (150 ms RTT), the maximum performance ends
+up at: 65536/0.150 = 436906 bytes/s or about 400 kbyte/s, which is
+really slow today.
+
+With the increased default size: (873800 - 873800/2^2)/0.150 = 4369000
+bytes/s, or about 4Mbytes/s, which is resonable for a modern network.
+And note that this is the default, if the sender is configured with a
+larger window size it will happily scale up to 10 times this
+(8738000*0.75/0.150 = ~40Mbytes/s), pretty good for a modern network.
+
+For the txqueuelen, this is mostly relevant for gigE, but should not
+hurt anything else. Old kernels have shipped with a default txqueuelen
+of 100, which is definately too low and hurts performance.
+
+net/core/[rw]mem_max is in bytes, and the largest possible window
+size. net/ipv4/tcp_[rw]mem is in bytes and is "min default max" for
+the tcp windows, this is negotiated between both sender and reciever.
+"r" is for when this machine is on the recieving end, "w" when the
+connection is initiated from this machine.
+
+There are more tuning parameters, for the Linux kernel they are
+documented in Documentation/networking/ip-sysctl.txt, but in our
+experience only the parameters above need tuning to get good tcp
+performance..
+
+
+
+** Linux Tune Network Stack (Buffers Size) To Increase Networking Performance
+http://www.cyberciti.biz/faq/linux-tcp-tuning/
+
+* Generic ipv4 Setting
+http://lartc.org/howto/lartc.kernel.obscure.html
+
+** net.ipv4.route.flush
+Writing to this file results in a flush of the routing cache.
+
+* Scheduling Jobs With cron on OpenWrt [fn:2]
+#+begin_src sh
+#1. Create crontab Directory 
+ mkdir /etc/crontabs
+#2. Create crontab File 
+ touch /etc/crontabs/root
+#3. Create Init Script 
+/etc/init.d/S60cron
+
+ #!/bin/sh
+ # start crond
+ /usr/sbin/crond -c /etc/crontabs  -L /dev/null
+
+#4. make the script executable: 
+ chmod 755 /etc/init.d/S60cron
+
+#5. add an entry to /etc/crontabs/root for each task that you want periodically executed. 
+  # run this script every hour
+  01 * * * * /path/scriptname > /dev/null
+
+      The time and date fields are:
+
+	      field	     allowed values
+	      -----	     --------------
+	      minute	     0-59
+	      hour	     0-23
+	      day of month   1-31
+	      month	     1-12 (or names, see below)
+	      day of week    0-7 (0 or 7 is Sun, or use names)
+everytime use */1
+#+end_src
+* GFP_KERNEL and GFP_ATOMIC
+GFP_ATOMIC is used when (a) you are inside a completion handler, an
+interrupt, bottom half, tasklet or timer, or (b) you are holding a
+spinlock or rwlock (does not apply to semaphores), or (c)
+current->state != TASK_RUNNING, this is the case only after you've
+changed it.
+
+Changed to GPF_ATOMIC and syslog is quiet!!! 
+* BUG: scheduling while atomic: swapper /0x00000103/0, CPU#0
+"Scheduling while atomic" indicates that you've tried to sleep
+somewhere that you shouldn't - like within a spinlock-protected
+critical section or an interrupt handler.
+
+Exactly as said in 1st answer , scheduling while atomic happen when
+the scheduler get confused and therfore unable to work properly and
+this because the scheduler tried to perform a "schedule()" in a
+section that contains a schedulable code inside of a non schedulable
+one . for example using sleeps inside of a section protected by a
+spinlock. trying to use another lock(semaphores,mutexes..) inside of a
+spinlock-proteced code may also disturb the scheduler. In addition
+using spinlocks in user space can drive the scheduler to beahve as
+such. hope this helps
+
+
 * VMware-Tools Fails To Start On Fedora
 =blocking file system failed=
 #+begin_src sh
@@ -115,8 +468,29 @@ tooltip_bg_color:#f2edbc
 
 打开系统外观配置，切换一下主题，当切换回来的时候，修改的效果就生效了。
 #+end_src
+* swapper: page allocation failure
+#+begin_src sh
+#change value for this boot
+sysctl -w vm.min_free_kbytes=xxxx
+
+#change value for subsequent boots
+echo "vm.min_free_kbytes=xxxx" >> /etc/sysctl.conf
+#+end_src
+
+This tells the kernel to try and keep 64MB of RAM free at all times. It’s useful in two main cases:
+
++ Swap-less machines, where you don’t want incoming network traffic to
+  overwhelm the kernel and force an OOM before it has time to flush
+  any buffers.
+
++ x86 machines, for the same reason: the x86 architecture only allows
+  DMA transfers below approximately 900MB of RAM. So you can end up
+  with the bizarre situation of an OOM error with tons of RAM free.
+
 * Footnotes
 
 [fn:1] https://help.ubuntu.com/community/NvidiaMultiMonitors
+
+[fn:2] http://martybugs.net/wireless/openwrt/cron.cgi
 
 
