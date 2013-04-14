@@ -19,10 +19,23 @@ based on the open-source Android operating system.
 ** Blog
 + http://www.androidenea.com/2009/08/init-process-and-initrc.html
 
-* The init process and init.rc
+* Note
+device/<vendor>/<codename>
+
+kernel/<vendor>/<codename>
+
+vendor/<vendor>/<codename>
+
+
+* Blog
+** The init process and init.rc
 http://www.androidenea.com/2009/08/init-process-and-initrc.html
 
+** Android project build system
+http://ericdev.blogspot.hk/2010/06/cc-closer-look-at-android-project-build.html
 
+** Android Build System
+http://elinux.org/Android_Build_System
 * Some commands
 #+beign_src sh
 $ adb reboot bootloader
@@ -30,6 +43,62 @@ $ adb reboot bootloader
 
 #+end_src
 * cyanogenmode notes
+** The "edify" scripting language – how .zip files work
+   http://wiki.cyanogenmod.org/w/Doc:_About_Edify
+*** Overview
+edify is a simple scripting language that is used to install
+CyanogenMod (and other software) from a .zip file. The edify script
+does not necessarily need to be used to flash a firmware however. 
+
+Typically, the edify script is run in recovery mode when the user
+chooses to "flash a zip".
+
+*** edify files
+There are typically two parts to an edify script. These two files are
+usually found within the .zip file in the /META-INF/com/google/android
+directory.
++ update-binary -- the binary interpreter that is executed when the
+  user selects the .zip to be flashed, typically from recovery mode.
+  This binary loads the updater-script into memory and follows the
+  instructions contained within.
++ updater-script -- the script itself, which is a text file.
+
+*** Play with existing Scripts
+One way to learn about edify is by examining and modifying existing
+edify scripts. By looking at the scripts themselves, you may be able
+to figure out how they work. Then, by modifying the code right on the
+.zip and flashing it to your device, you can test your custom scripts.
+
+*** Read the edify source code
++ The main tool used to generate the edify scripts is
+  https://github.com/CyanogenMod/android_build/blob/cm-10.1/tools/releasetools/edify_generator.py
+
++ the source for the language interpreter is 
+    https://github.com/CyanogenMod/android_bootable_recovery/tree/jellybean/edify
+
++  README
+   https://github.com/CyanogenMod/android_bootable_recovery/blob/cm-10.1/edify/README
+
+*** Additional resources
++ Intro to edify - Free Your Android's introduction to the edify
+  scripting language
+  http://www.freeyourandroid.com/guide/introdution_to_edify
+
++ XDA's wiki page
+  http://forum.xda-developers.com/wiki/Edify_script_language
+
++ edify scripts in CWM recovery - an XDA thread discussing edify
+  syntax
+  http://forum.xda-developers.com/showthread.php?t=1187313
+
++ Intro to edify-updater - another XDA thread about edify
+  http://forum.xda-developers.com/showthread.php?t=1669489
++ edify scripting creation - an XDA tutorial with syntax notes. Be
+  sure to read about how to sign .zips, if you're not familiar with it
+  already (and if it's necessary)
+  http://forum.xda-developers.com/showpost.php?p=25136429&postcount=2
+
+
 ** External Android Development Resources (Master List) – The Internet Helps You Learn. Free links that teach Java, C, C++, and all things Android
 http://wiki.cyanogenmod.org/w/Doc:_Development_Resources
 
@@ -531,10 +600,198 @@ Note that when adding new projects, there are at least three parts defined:
 http://wiki.cyanogenmod.org/w/Doc:_manifests
 ** "make clean" vs. "make clobber"
 http://wiki.cyanogenmod.org/w/Doc:_make_clean_vs_make_clobber
+*** make clean
+=make clean= deletes all of the output and intermediate files for this
+configuration. This is the same as:
 
+=rm -rf $OUT= (where $OUT is set to the build directory of your device
+in =out/target/product/[CODENAME])=
+
+*** make clobber
+make clobber deletes all of the output and intermediate files for all configurations. This is the same as:
+=rm -rf out/=
+
+(So this removes not only =out/target/product/CODENAME= but the entire
+=/out directory=.)
+
+*** When to do a make clobber
+You might want to do make clobber when you want to be absolutely,
+positively sure you are starting a fresh build from scratch. One time
+you almost certainly want to do this is if changes are made to the
+BoardConfig.mk file in device/asus/grouper.
+
+Some Makefiles such as BoardConfig.mk may contain flags in it that
+actually affect the build system-wide, and the Makefile system doesn't
+really check the actual source code to see if a variable change in one
+place may affect the build in the code somewhere else.
 
 ** Doc: the cm source
 http://wiki.cyanogenmod.org/w/Doc:_the_cm_source
+*** bionic/
+bionic/ is the Android mobile-friendly version of libc
+*** build/
+The scripts and various files that are used for the actual build
+process. Take a look in here if you're curious what steps are taken to
+make all the parts of Android compile, as well as various "make"
+commands
+*** bootable/
+Among other things, the source for ClockworkMod recovery is in here.
+*** dalvik/
+This is the virtual machine that runs the java apps. It's how you can
+write an app and it'll run on any android machine, regardless of the
+underlying architecture.
+*** device/
+device/ contains part (if not all) of the board support package for a
+device, and is organized as device/<vendor>/<codename>. So the files
+for Nexus 7 are under device/asus/grouper/, the files for Nexus 4 are
+under device/lge/mako/.
+*** docs/
+Contains the source code for the Android Open Source website.
+*** external/
+This is where non-android specific utilities go. Lots of the stuff in
+here are just regular open source projects that are used by Android
+(or CyanogenMod) and just have the Android.mk make files to work with
+the Android build system.
+*** frameworks/
+This refers to the core Android frameworks. It's the stuff that makes
+Android, Android. The frameworks contain the Android user experience
+and the abstracted "hooks" that programmers use to build Android apps.
+So, for example, this folder contains the Java windows-manipulation
+and activity stuff and java sound support and Android graphics layers
+and Android media stuff and UI as well as services and basically the
+Android API in general. There are also some platform-specific
+optimization here as well that CyanogenMod adds for Qualcomm, OMAP,
+and other manufacturers to get the best performance out of specific
+architectures.
+*** hardware/
+Platform/hardware-specific libraries and such go in this folder.
+*** kernel/
+Like device/ ,kernel/ is organized like kernel/<vendor>/>codename> and
+inside there you'll find the source for the kernel. This source may be
+downloaded "on the fly" by the CyanogenMod build system.
+*** ndk/
+See here. Tools for allowing cross-platform C code to be included in
+Android apps (as JNI shared libraries, apparently). Used if you're
+writing C-based apps, but I've never used any of this or even poked my
+nose in there. See /ndk/docs/OVERVIEW.html for more.
+*** out/
+The output of your build will go in here by default. When you type cd
+$OUT after building, you're actually getting a shortcut to
+out/target/product/<devicename>. This is the only folder that should
+have stuff added to it (or changed) when you're doing a build.
+*** packages/
+packages/apps/ is where Android standalone apps, such as the Settings
+app, the Browser, the Launcher (in CM10's case it's called
+Trebuchet), 
+*** prebuilt/ (and prebuilts/)
+These folders contain prebuilt toolchains for cross-compiling on linux
+and darwin (MacOS X) and a few tools for Windows. Cross-compiling
+allows you to build Android for an architecture (such as ARM-based
+CPU) from another architecture (such as x86_64).
+*** system/
+Lower-level linuxy system stuff such as netd, fastboot support, the
+shell (which you can use to type commands into your device), etc. are
+here.
+*** vendor/
+The /vendor folder contains stuff particular to a vendor build such as
+CyanogenMod. It's also the place where proprietary blobs are extracted
+from the device, again using the same vendor/device codename
+convention as under device/.
+
+
+
+** After You Build
+http://wiki.cyanogenmod.org/w/After_You_Build
+
++ Build with other toolchains
++ Add a translation 
+   You can generally find the strings that need to be added or changed
+  within the apps in packages/apps/[APP NAME]/res/. The strings.xml
+  files for these apps contain the bits of text that contain
+  translations.
+  
+  If you want to translate Android itself (as opposed to apps that run
+  in Android), you will need to look in the frameworks directory.run
+  from ~/android/system/frameworks. =$ find . | grep strings.xml=
++ Make Other Original Modifications
+  mm -B to rebuild all the files for this module and send the results
+  to $OUT.
++ Start a port to a new device!
+
+
+
+
+** adding your own app
+http://wiki.cyanogenmod.org/w/Doc:_adding_your_own_app
+*** The "easy" way-- Add it to the zip manually
+One way to do this is to simply add the .apk into the .zip and then
+edit the recovery installation script (written in a simple scripting
+language called "edify") to copy the file from the .zip to the
+device.
+
+*** The "right" way: Make a part of the build repository so it auto-builds
+**** Add app source to /packages/apps
+You can do this manually, or you can do it via the
+.repo/local_manifests/*.xml. If you do it this way, a repo sync will
+update the source to your app from whatever git repository you name in
+the local manifest.
+
+**** Determine the name of the project from Android.mk
+Regardless of how you put the source in packages/apps/, assuming that
+the source for the app has an Android.mk Makefile
+
+LOCAL_PACKAGE_NAME := PackageName
+
+**** Add the project to device.mk (or whatever .mk) in the device folder
+Then just add that project to be built in the
+/device/[MANUFACTURER]/[CODENAME]/device.mk file.
+
+Now you have a choice. If PRODUCT_PACKAGES was previously defined, you
+can add a value like this:
+
+PRODUCT_PACKAGES += MyPackageName
+
+official doc:http://www.kandroid.org/ndk/docs/ANDROID-MK.html
+
+
+
+
+** porting intro
+http://wiki.cyanogenmod.org/w/Doc:_porting_intro
+
+
+** Integrated Kernel Building – some info about CM's automatic kernel-building.
+http://wiki.cyanogenmod.org/w/Doc:_integrated_kernel_building
+
+
+** Submitting A Port – How to get your port to a new device accepted as "official"
+http://wiki.cyanogenmod.org/w/Doc:_Submitting_A_Port
+
+
+** Configure SSH access on your device (Legacy - CM7) – How-to setup SSH on your device.
+http://wiki.cyanogenmod.org/w/Doc:_dropbear
+
+** Some Tips – how to skip gerrit and push straight to the repo.
+http://wiki.cyanogenmod.org/w/Doc:_device_maintainers
+
+Say you have a bunch of changes and want to skip gerrit's interface entirely, pushing directly to the repository. For this you will need special privileges.
+
+This is a summary of the user-upload feature, described in detail
+here
+http://gerrit.googlecode.com/svn/documentation/2.0/user-upload.html
+
+*** To bypass Gerrit:
+1. repo sync
+2. branch the repository to anything.
+3. In the new branch, add your commits (or merge from another branch, git pull from AOSP, or whatever gets your changes in)
+4. Next, enter cmremote. This command will add the remote (use git remote -v to see it.)
+5. To bypass gerrit, type git push cmremote HEAD:refs/heads/cm-10.1 (assuming cm-10.1 is the branch to which you are pushing.
+*** To mass-push commits to Gerrit for review
+1. Repeat steps 1-4 above.
+2. Then, to mass-push TO Gerrit, use refs/for/branch instead of refs/heads/branch
+*** To create a new remote branch (on github)
+1. Repeat steps 1-4 above.
+2. Then, to create a new (remote) branch, type git push -u cmremote HEAD:refs/heads/new-branch-name
 
 
 
@@ -550,14 +807,12 @@ http://changelog.bbqdroid.org/
 
 
 
-** After You Build
-http://wiki.cyanogenmod.org/w/After_You_Build
-** porting intro
-http://wiki.cyanogenmod.org/w/Doc:_porting_intro
 
 
 
-** Setting up a Virtual Machine for CyanogenMod development
+
+
+* Setting up a Virtual Machine for CyanogenMod development
 https://skydrive.live.com/?cid=b3bff0d42ae1e534&id=B3BFF0D42AE1E534%21107
 
 * android open source project[fn:1]
@@ -602,8 +857,16 @@ $ repo prune
 ** Using Eclipse
 http://source.android.com/source/using-eclipse.html
 
+** Android.mk file syntax specification
+http://www.kandroid.org/ndk/docs/ANDROID-MK.html
+
+* XDA's wiki page[fn:2]
+
+
 
 * Footnotes
 
 [fn:1] http://source.android.com/
+
+[fn:2] http://forum.xda-developers.com/wiki/
 
