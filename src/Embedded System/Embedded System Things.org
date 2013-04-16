@@ -1,0 +1,117 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: Embedded System Things
+#+OPTIONS: num:nil H:2
+
+* optimize or reduce RAM size in embedded system software[fn:1
+Unlike speed optimisation, RAM optimisation might be something that
+requires "a little bit here, a little bit there" all through the code.
+On the other hand, there may turn out to be some "low hanging fruit".
+
+** Arrays and Lookup Tables
+#+begin_src c
+const my_struct_t * param_lookup[] = {...};  // Table is in RAM!
+my_struct_t * const param_lookup[] = {...};  // In ROM
+const char * const strings[] = {...};    // Two const may be needed; also in ROM
+#+end_src
+** Stack and heap
+Perhaps your linker config reserves large amounts of RAM for heap and
+stack, larger than necessary for your application.
+** Other
+*** Global vs local variables
+Check for unnecessary use of static or global variables, where a local
+variable (on the stack) can be used instead. I've seen code that
+needed a small temporary array in a function, which was declared
+static, evidently because "it would take too much stack space".
+*** Smaller variables
+Variables that can be smaller, e.g. int16_t (short) or int8_t (char)
+instead of int32_t (int).
+*** Enum variable size
+enum variable size may be bigger than necessary. I can't remember what
+ARM compilers typically do, but some compilers I've used in the past
+by default made enum variables 2 bytes even though the enum definition
+really only required 1 byte to store its range. Check compiler
+settings.
+*** Algorithm implementation
+Rework your algorithms. Some algorithms have have a range of possible
+implementations with a speed/memory trade-off. E.g. AES encryption can
+use an on-the-fly key calculation which means you don't have to have
+the entire expanded key in memory. That saves memory, but it's slower.
+
+*** MISC1
++ Start with the obvious: squeeze 32-bit words into 16s where
+  possible, rearrange structures to eliminate padding, cut down on
+  slack in any arrays. If you've got any arrays of more than eight
+  structures, it's worth using bitfields to pack them down tighter.
+
++ Do away with dynamic memory allocation and use static pools. A
+  constant memory footprint is much easier to optimize and you'll be
+  sure of having no leaks.
+
++ Scope local allocations tightly so that they don't stay on stack
+  longer than they have to. Some compilers are very bad at recognizing
+  when you're done with a variable, and will leave it on the stack
+  until the function returns. This can be bad with large objects in
+  outer functions that then eat up persistent memory they don't have
+  to as the outer function calls deeper into the tree.
+
++ alloca() doesn't clean up until a function returns, so can waste
+  stack longer than you expect.
+
++ Enable function body and constant merging in the compiler, so that
+  if it sees eight different consts with the same value, it'll put
+  just one in the text segment and alias them with the linker.
+
++ Optimize executable code for size. If you've got a hard realtime
+  deadline, you know exactly how fast your code needs to run, so if
+  you've any spare performance you can make speed/size tradeoffs until
+  you hit that point. Roll loops, pull common code into functions,
+  etc. In some cases you may actually get a space improvement by
+  inlining some functions, if the prolog/epilog overhead is larger
+  than the function body.
+
+*** MISC2
+1. Make sure that the number of parameters passed to a functions is
+   deeply analysed. On ARM architectures as per AAPCS(ARM arch
+   Procedure Call standard), maximum of 4 parameters can be passed
+   using the registers and rest of the parameters would be pushed into
+   the stack.
+
+2. Also consider the case of using a global rather than passing the
+   data to a function which is most frequently called with the same
+   parameter.
+
+3. The deeper the function calls, the heavier is the use of the stack.
+   use any static analysis tool, to get to know worst cast function
+   call path and look for venues to reduce it. When function A is
+   calling function B, B is calling C, which in turn calls D, which in
+   turn calls E and goes deeper. In this case registers can't be at
+   all levels to pass the parameters and so obviously stack will be
+   used.
+
+4. Try for venues for clubbing the two parameters into one wherever
+   applicable. remember that all the registers are of 32bit in ARM and
+   so further optimisation is also possible. void abc(bool a, bool b,
+   uint16_t c, uint32_t d, uint8_t e)// makes use of registers and
+   stack void abc(uint8 ab, uint16_t c, uint32_t d, uint8_t e)//first
+   2 params can be clubbed. so total of 4 parameters can be passed
+   using registers
+
+5. Have a re-look on nested interrupt vectors. In any architecture, we
+   use to have scratch-pad registers and preserved registers.
+   Preserved registers are something which needs to be saved before
+   the servicing the interrupt. In case of nested interrupts it will
+   be needing huge stack space to back up the preserved registers to
+   and from the stack.
+
+6. if objects of type such as structure is passed to the function by
+   value, then it pushes so much of data(depending on the struct size)
+   which will eat up stack space easily. This can be changed to pass
+   by reference.
+
+
+
+* Footnotes
+
+[fn:1] http://stackoverflow.com/questions/5685454/how-to-optimize-or-reduce-ram-size-in-embedded-system-software
+
+

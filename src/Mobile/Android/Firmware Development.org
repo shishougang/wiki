@@ -20,13 +20,45 @@ based on the open-source Android operating system.
 + http://www.androidenea.com/2009/08/init-process-and-initrc.html
 
 * Note
+** port devices
 device/<vendor>/<codename>
 
 kernel/<vendor>/<codename>
 
 vendor/<vendor>/<codename>
+** CM IRC channels
+http://wiki.cyanogenmod.org/w/IRC
+*** Register an alias/nickname on NickServ
+1. click on the following link to connect to irc.freenode.net. Use a unique nick while joining.
+    Freenode Web Chat: http://webchat.freenode.net/
+2. Enter the following command in the message bar:
+    =/msg NickServ register <password> <email-address>=
+3. You should now recieve an e-mail from NickServ at the email address
+   you provided. Follow the instructions in that email.
 
+4. For future logins you can enter the following command to authenticate your registered nick
+    =/msg NickServ identify <password>=
+5. To join a new channel
+    =/join #<channel name>=
+     eg to join #cyanogenmod use: =/join #cyanogenmod=
+*** CyanogenMod-related channel list
++ #cyanogenmod
++ #cyanogenmod-dev
++ #cm-wiki
+*** Other channels with ties to CM
++ #teamhacksung-support
++ #cyanogenmod-touchpad
++ #nookcolor
++ #nook-tablet
++ #koush
++ #teamwin
++ #android-root
 
+** Some commands
+#+beign_src sh
+$ adb reboot bootloader
+
+#+end_src
 * Blog
 ** The init process and init.rc
 http://www.androidenea.com/2009/08/init-process-and-initrc.html
@@ -36,12 +68,6 @@ http://ericdev.blogspot.hk/2010/06/cc-closer-look-at-android-project-build.html
 
 ** Android Build System
 http://elinux.org/Android_Build_System
-* Some commands
-#+beign_src sh
-$ adb reboot bootloader
-
-
-#+end_src
 * cyanogenmode notes
 ** The "edify" scripting language – how .zip files work
    http://wiki.cyanogenmod.org/w/Doc:_About_Edify
@@ -717,8 +743,6 @@ http://wiki.cyanogenmod.org/w/After_You_Build
   to $OUT.
 + Start a port to a new device!
 
-
-
 ** adding your own app
 http://wiki.cyanogenmod.org/w/Doc:_adding_your_own_app
 *** The "easy" way-- Add it to the zip manually
@@ -774,31 +798,524 @@ definitions for various parameters and settings used by Android.
   be your device *codename*. 
 + Note: Sometimes a device is identified in other parameters such as
   =ro.product.board=
+
+Keep the build.prop file handy, as you may refer to it later.
 *** Examine boot.img and recovery.img
+Note:
+
+The ramdisk is a tiny group of files and directories that are loaded
+into memory along with the kernel. The kernel then runs one of the
+files in the ramdisk called init, which then runs a script (init.rc,
+init.[codename].rc, etc.) that in turns loads the rest of Android. The
+ramdisk and kernel can be packaged together in a number of different
+ways using tools with names like mkbootimg, mkimage, and other
+methods.
+*** Determine the partition scheme
+It is important to ascertain the *partition scheme* of the device.
+know which partitions are assigned to /system, /data, /cache, and
+/sdcard.
+
+You want to know which partitions exist, on what device, how they are
+mounted, as well as the size of the partitions. This information may
+be transferred later to the BoardConfig.mk file in your /vendor
+directory.
+
+If you're lucky, a recovery.fstab file can be located in a
+recovery.img file, speeding up the process of figuring out what goes
+where. Also, the init.[codename].rc file in the ramdisk may have the
+information. Look for the lines near the top where the partitions are
+mounted.
+
+Also, the command:
+=$ cat /proc/partitions=
+
+from a running device can also help you identify the partitions. Also
+see =/proc/emmc=, =/proc/mounts= or =/proc/mtd=. You may also get some
+information from the command mount (run as root).
+
+Also check =/cache/recovery.log= or =/tmp/recovery.log=.
+
+Finally, if you have source code to the *bootloader*, , you will
+likely find the information there as well.
+*** Set up three new directories
+1. =device/[vendor]/[codename]/= -- this is where the installation files
+   specific to your device will go. The device/ directory contain
+   99-100% of the configuration settings and other code for particular
+   devices. You'll get to know this directory pretty well.
+2. =vendor/[vendor]/[codename]/= -- The vendor/ directory contains
+   proprietary, binary "blobs" that are backed up from the original
+   device
+3. =kernel/[vendor]/[codename]/= -- the kernel source goes here. When
+   you first start your porting effort, you may wish to simplify
+   things by using a pre-built kernel (such as the one that came with
+   the stock installation) rather than building the kernel from
+   scratch. The trick to that will be extracting the kernel out of the
+   stock system from whatever format it may be in, and then
+   re-packaging it, along with a new ramdisk, into a form that your
+   device can use.
+**** Method 1: Use =mkvendor.sh= to generate skeleton files
+Use the =mkvendor.sh= script in =build/tools/devices/= to
+automatically generate the directories.
+
+Note:
+The mkvendor script only works with devices that use a standard
+boot.img file, using the standard Android conventions and headers. It
+won't work for devices that deviate from this standard (Nook Color,
+Touchpad, etc.).
+
+This script accepts three parameters: vendor, codename, and a boot.img file.
+
+Example usage:
+#+begin_src sh
+$ ./build/tools/device/mkvendor.sh samsung i9300 ~/Desktop/i9300boot.img
+#+end_src
+
+The command above should create a /device/samsung/i9300/ folder within
+your CyanogenMod source repo structure. And inside the folder, the
+files AndroidBoard.mk, AndroidProducts.mk, BoardConfig.mk, cm.mk,
+device_[codename].mk, kernel (the binary), recovery.fstab, etc.
+
+This will not build the kernel/ directory. You will need to do that
+later, when you are ready to build the kernel.
+
+**** Method 2: Fork a similar device's git repository
+**** Method 3: create the directories and files manually
+*** Customize the files
+There are many files in the device/ folders. We will start by focusing
+on four files BoardConfig.mk, device_[codename].mk, cm.mk,
+recovery.fstab, and kernel to get recovery working for your device.
+
+**** BoardConfig.mk 
+The following parameters must be set properly in BoardConfig to
+compile a working recovery image:
+#+begin_src sh
+TARGET_ARCH: set to arm for almost all current Android devices.
+BOARD_KERNEL_CMDLINE: not all devices pass boot parameters however if your device does this must be filled out properly in order to boot successfully.
+BOARD_KERNEL_PAGESIZE: the pagesize of the stock boot.img and must be set properly in order to boot. Typical values for this are 2048 and 4096 and this information can be extracted from the stock kernel.
+BOARD_BOOTIMAGE_PARTITION_SIZE: the number of bytes allocated to the kernel image partition.
+BOARD_RECOVERYIMAGE_PARTITION_SIZE: the number of bytes allocated to the recovery image partition.
+BOARD_SYSTEMIMAGE_PARTITION_SIZE: the number of bytes allocated to the Android system filesystem partition.
+BOARD_USERDATAIMAGE_PARTITION_SIZE: the number of bytes allocated to the Android data filesystem partition.
+BOARD_HAS_NO_SELECT_BUTTON: (optional), use this if your device needs to use its Power button to confirm selections in recovery.
+BOARD_FORCE_RAMDISK_ADDRESS / BOARD_MKBOOTIMG_ARGS: (optional), use these to force a specific address for the ramdisk. This is usually needed on larger partitions in order for the ramdisk to be loaded properly where it's expected to exist. This value can be obtained from the stock kernel. The former is deprecated as of Android 4.2.x and the latter will now be used in 4.2.x and beyond.
+#+end_src
+Note:
+The above information can be obtained by multiplying the size from
+/proc/partitions by the block size, typically 1024.
+
+**** device_[codename].mk
+The device_codename.mk makefile contains instructions about which
+Android packages to build, and where to copy specific files and
+packages, or specific properties to set during your compilation.
+
+This file can be used to copy vital files into the ramdisk at compilation time.
+
++ =PRODUCT_COPY_FILES=: used to copy files during compilation into the
+  ramdisk, which will be located at $OUT/recovery/root.
+  Example:
+  =$(LOCAL_PATH)/sbin/offmode_charging:recovery/root/sbin/offmode_charging \=
+  This will copy the file offmode_charging binary into the sbin folder within the ramdisk.
++ =PRODUCT_NAME / PRODUCT_DEVICE=: used for setting the value of your
+  codename. This is the name of the device you load with Lunch.
+**** kernel
+This is simply the prebuilt kernel image or a kernel you built
+yourself used to boot the device. The format of the kernel may be in a
+zImage or uImage, depending on the requirements of the architecture of
+your device.
+**** cm.mk
+You'll need to make a few changes to this file to integrate with the
+lunch, brunch, and breakfast commands, so that your device shows up on
+the list and builds properly. You'll also set some variables (see
+other devices) to indicate what size splash animation should be used,
+whether this is a tablet or phone, etc.
+**** recovery.fstab
+recovery.fstab defines the file system mount point, file system type,
+and block device for each of the partitions in your device. It works
+almost exactly like /etc/fstab in a standard Linux operating system.
+
+Example:
+#+begin_src sh
+/system		ext4		/dev/block/mmcblk0p32 
+#+end_src
+This sets the block device at mmcblk0p32 to be mounted on /system as
+filesystem type ext4
+
+*** Then build a test recovery image
+To build only the recovery, set up lunch as with a regular build, and
+say =make recoveryimage=
+*** Adjust recovery_ui.cpp if necessary
+You may discover that although the recovery image runs, some of the
+hardware buttons, such as the volume buttons or power buttons, which
+would normally be used to scroll through the options, don't work.
+
+You may need to adjust the GPIO values to get the buttons to be
+recognized. Similarly, you may wish to include/exclude options or
+modify other UI elements.
+
+To do this, you may wish to create and edit the
+=/device/[vendor]/[codename]/recovery/recovery_ui.cpp=. You can find
+ample examples of this file, the associated =recovery/Android.mk= file
+that builds it, and how it is used.
+
+Helpful Tip: The GPIO values for your device may be found in the kernel source.
+*** Put your device folder in github, and use a local manifest to automatically sync it with repo sync
+When naming your repository, use the format
+=android_device_VENDOR_CODENAME=, where VENDOR and CODENAME use the new
+device's values. So, let's say your GitHub account name is "fat-tire"
+and your device codename is "encore", manufactured by Barnes and
+Noble. You should call your repository android_device_bn_encore. It
+would be accessible at
+https://github.com/fat-tire/android_device_bn_encore. Similarly, the
+kernel repository would be called android_kernel_bn_encore. It would
+be accessible at https://github.com/fat-tire/android_kernel_bn_encore.
 
 
+The last thing to do is create a local manifest for other people to
+use to automatically download and their keep up-to-date with your
+changes. Here's an example, using the above scenario:
 
+#+begin_src sh
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <project name="fat-tire/android_device_bn_encore" path="device/bn/encore" remote="github" revision="cm-10.1" />
+  <project name="fat-tire/android_kernel_bn_encore" path="kernel/bn/encore" remote="github" revision="cm-10.1" />
+</manifest>
+#+end_src
+*** Add the blobs to the vendor/ directory
+This requires three steps:
 
+1. Create =extract-files.sh= and =setup-makefiles.sh= scripts to pull
+   those blob files from the device using adb and put them in the
+   right /vendor/ directory. There are plenty of examples available
+   for other devices.
 
+2. Create an .mk Makefile to copy those files to the $OUT folder
+   during the build process and put them in the right place. Again,
+   use other devices as a guide for what this Makefile should look
+   like. An example filename might be BoardConfigVendor.mk
 
+3. Make sure that the Makefile you just created is included from your
+   main BoardConfig.mk via a command such as =-include
+   vendor/[vendor]/[codename]/BoardConfigVendor.mk=. Again, existing
+   devices can illustrate how this is done.
+*** Now revise the device/ directory
+Since you have a working recovery, go back and start modifying the
+files in the device/ folder. As always, use other similar devices as a
+reference.
+*** Getting help from the manufacturers & vendors
++ Google  Google's Git Repository https://android.googlesource.com/ ,
+  Nexus binary blobs https://developers.google.com/android/nexus/drivers
++ HTC	Dev Center http://www.htcdev.com/devcenter/
++ Nvidia	 Tegra	Tegra's GitWeb http://nv-tegra.nvidia.com/gitweb/
++ Qualcomm	 MSM/QSD	www.codeaurora.org
++ Texas Instruments	 OMAP	www.omapzoom.com , Omappedia:
+  http://www.omappedia.org/wiki/Main_Page
+*** Adding XML Overlays
+It's very likely in your =device_[codename].mk= file, there's a line that looks like this:
+#+begin_src sh
+DEVICE_PACKAGE_OVERLAYS := \
+    device/[vendor]/[codename]/overlay
+#+end_src
 
+What this does is set the overlay/ folder to allow you to override any
+XML file used by Android frameworks or apps, just for this device. To
+do so, create a directory structure which mirrors the path leading to
+an XML file, starting from the root of your source. Then replace the
+file you want to overlay.
 
+Example: Let's say you want to override some standard Android
+settings. Look at the file in
+=frameworks/base/core/res/res/values/config.xml=. Then copy it to
+=device/[vendor]/[codename]/overlay/frameworks/base/core/res/res/values/config.xml=.
+Now YOUR version will be used instead of the other one. You only need
+to include the settings you wish to override-- not all of them, so you
+can pare down the file to those few that change from the default.
+
+You can overlay any XML file, affecting layouts, settings,
+preferences, translations, and more.
+
+** Android-Porting -- the official Google Group on this topic
+https://groups.google.com/forum/?fromgroups#!forum/android-porting
 
 ** Integrated Kernel Building – some info about CM's automatic kernel-building.
 http://wiki.cyanogenmod.org/w/Doc:_integrated_kernel_building
 
+*** Deploying the kernel source at the proper location
+The minimal requirement is that the kernel's source tree for that
+device be present at =kernel/vendor-name/device-name=.
+
+**** Officially supported devices
+For devices which are part of mainline CyanogenMod and have their
+kernels in CM's github, this can be accomplished by usage of
+CyanogenMod's roomservice feature. Create a cm.dependencies file (if
+it doesn't exist yet) at the root of your device tree, with the
+following syntax:
+#+begin_src sh
+[
+ {
+   "repository": "name-of-repository-in-the-CyanogenMod-github",
+   "target_path": "kernel/<vendorname>/<devicename>",
+   "branch": "name-of-branch"
+ }
+]
+#+end_src
+
+**** Work-in-progress, unofficial, or otherwise non-integrated devices
+For devices which don't have their kernel source at the CM github,
+usage of =local_manifest.xml= is recommended in order to deploy the
+source at the right location, and keeping it synchronized.
+
+**** Devices using shared kernel repositories
+If your device shares a kernel with others, the default
+kernel/devicename path will lead to unnecessary duplication of source
+trees, so usage of the TARGET_KERNEL_SOURCE configuration variable is
+advised. All devices sharing that source should have the following
+line in their =BoardConfig.mk= files:
+
+#+begin_src sh
+TARGET_KERNEL_SOURCE := kernel/vendor-name/unique-shared-source-name=
+#+end_src
+*** Configuring the device to build the kernel
+Just add the TARGET_KERNEL_CONFIG variable to your =BoardConfig.mk=
+file, pointing to the configuration file name for your device (as
+present in =arch/arm/configs=). For example:
+#+begin_src sh
+TARGET_KERNEL_CONFIG := cyanogenmod_mydevice_defconfig
+#+end_src
+
+Any modules built will be deployed at =/system/lib/modules/= in the
+final image
+
+If your device requires uImage, also ensure the following is present
+in your '=BoardConfig.mk='
+#+begin_src sh
+BOARD_USES_UBOOT := true
+#+end_src
+*** Building out-of-tree kernel modules
+To build these modules, the =TARGET_KERNEL_MODULES= variable can be
+used, pointing to a =make target= that will build and install such
+modules. Definition of such a target is the device author's
+responsibility, the only restriction is that it is a normal makefile
+recipe. To include, for example, the TI WLAN modules, this can be
+used:
+#+begin_src sh
+TIWLAN_MODULES:
+       make -C hardware/ti/wlan/wl1283/platforms/os/linux/ KERNEL_DIR=$(KERNEL_OUT) ARCH="arm" CROSS_COMPILE="arm-eabi-" TNETW=1273 RANDOM_MAC=n REPORT_LOG=n
+       mv hardware/ti/wlan/wl1283/platforms/os/linux/tiwlan_drv.ko $(KERNEL_MODULES_OUT)
+       make -C hardware/ti/wlan/wl1283_softAP/platforms/os/linux/ KERNEL_DIR=$(KERNEL_OUT) ARCH="arm" CROSS_COMPILE="arm-eabi-" TNETW=1273 REPORT_LOG=n
+       mv hardware/ti/wlan/wl1283_softAP/platforms/os/linux/tiap_drv.ko $(KERNEL_MODULES_OUT)
+    
+TARGET_KERNEL_MODULES := TIWLAN_MODULES
+#+end_src
+you can just paste your current standalone build commands into a make
+recipe, replacing the kernel source path with the $(KERNEL_OUT)
+variable.
+*** Fallback to prebuilts
+If for some reason the kernel source can't be present, you can still
+fall back to prebuilt binaries, by defining the =TARGET_PREBUILT_KERNEL=
+variable, like this:
+#+begin_src sh
+TARGET_PREBUILT_KERNEL := device/<vendor>/<device>/kernel
+#+end_src
+*** Full example
+The following is the p920's configuration, which attempts to build the
+kernel, uses external modules, and has a prebuilt fallback:
+#+begin_src sh
+# Try to build the kernel
+TARGET_KERNEL_CONFIG := cyanogenmod_cosmo_defconfig
+# Keep this as a fallback
+TARGET_PREBUILT_KERNEL := device/lge/p920/kernel
+
+KERNEL_EXTERNAL_MODULES:
+	make -C hardware/ti/wlan/wl1283/platforms/os/linux/ KERNEL_DIR=$(KERNEL_OUT) ARCH="arm" CROSS_COMPILE="arm-eabi-" TNETW=1273 RANDOM_MAC=n REPORT_LOG=n
+	mv hardware/ti/wlan/wl1283/platforms/os/linux/tiwlan_drv.ko $(KERNEL_MODULES_OUT)
+	make -C hardware/ti/wlan/wl1283_softAP/platforms/os/linux/ KERNEL_DIR=$(KERNEL_OUT) ARCH="arm" CROSS_COMPILE="arm-eabi-" TNETW=1273 REPORT_LOG=n
+	mv hardware/ti/wlan/wl1283_softAP/platforms/os/linux/tiap_drv.ko $(KERNEL_MODULES_OUT)
+
+TARGET_KERNEL_MODULES := KERNEL_EXTERNAL_MODULES
+#+end_src
+
+
 
 ** Submitting A Port – How to get your port to a new device accepted as "official"
 http://wiki.cyanogenmod.org/w/Doc:_Submitting_A_Port
+*** Prerequisites
++ Full hardware support -- Everything-- every peripheral, every
+  wireless feature-- that is supported by stock *must* be supported by
+  CyanogenMod.
+
++ Passed the CTS -- The Android Compatibility Test
+  Suite(http://source.android.com/compatibility/cts-intro.html) will
+  ensure that your port is functional. If it doesn't pass, get back to
+  work until it does.
+
++ Stability -- Nothing should crash. Ever. CyanogenMod has a reputation for stability and your port must be rock-solid. This means no "sleep of deaths" either.
++ No overclock by default -- While overclocking options in the Performance menu is well and good, leave the default speeds at stock.
++ Do not over-volt either -- Do not go outside of the spec for power consumption. If you want to provide sysfs methods for upping the voltage, that's up to you. But it must not be a default setting.
++ You have designated at least one device maintainer and at least one
+  person to be responsible for the device's wiki information. The
+  former will evaluate submissions to the device's repositories. The
+  latter will ensure that the information/documentation about the
+  device on the wiki is always up-to-date and correct. These people
+  must be identified when applying for official recognition.
+*** Submitting your device
+ Send an email to devrel@cyanogenmod.org
++ This email must contain links to your github repositories for your device
++ This email must contain gtalk and email addresses for contacting you
++ If a team worked on your device, all team members must be listed in
+  the email
 
 
-** Configure SSH access on your device (Legacy - CM7) – How-to setup SSH on your device.
+
+** Configure SSH access on your device (Legacy - CM7)
 http://wiki.cyanogenmod.org/w/Doc:_dropbear
+*** Dropbear
+http://matt.ucc.asn.au/dropbear/dropbear.html
+Dropbear is a relatively small SSH server and client.
+*** Create a SSH key for logging in
+In linux:
+
+=ssh-keygen -t rsa=
+The output should look something like this:
+#+begin_src sh
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/user/.ssh/id_rsa):
+Enter passphrase (empty for no passphrase):
+Enter same passphrase again:
+Your identification has been saved in <Filename>.
+Your public key has been saved in <Filename>.
+adb push <Filename> /sdcard/authorized_keys
+#+end_src
+
+In Windows: If using puttygen, paste the string from the puttygen
+window (looks like "=ssh-rsa AAAAB3...hclQ==rsa-key-20100227=") in
+authorized_keys.
+
+*** Prepare the Android Device
+On the computer, open terminal and run the following commands:
+#+begin_src sh
+adb shell
+mkdir /data/dropbear
+chmod 755 /data/dropbear
+mkdir /data/dropbear/.ssh
+chmod 700 /data/dropbear/.ssh
+mv /sdcard/authorized_keys /data/dropbear/.ssh/
+chown root: /data/dropbear/.ssh/authorized_keys
+chmod 600 /data/dropbear/.ssh/authorized_keys
+dropbearkey -t rsa -f /data/dropbear/dropbear_rsa_host_key
+dropbearkey -t dss -f /data/dropbear/dropbear_dss_host_key
+#+end_src
+
+The end result should look something like this:
+#+begin_src sh
+# ls -la /data/dropbear
+drwxr-xr-x    1 root     root          2048 Sep  5 14:55 .
+drwxrwx--x    1 system   system        2048 Sep  5 14:08 ..
+drwx------    1 root     root          2048 Sep  5 14:51 .ssh
+-rw-------    1 root     root           458 Sep  5 14:09 dropbear_dss_host_key
+-rw-------    1 root     root           427 Sep  5 14:09 dropbear_rsa_host_key
+# ls -la /data/dropbear/.ssh
+drwx------    1 root     root          2048 Sep  5 14:51 .
+drwxr-xr-x    1 root     root          2048 Sep  5 14:55 ..
+-rw-------    1 root     root           406 Sep  5 14:01
+authorized_keys
+#+end_src
+Creating directories and generating rsa/dsa keys is required even if
+you plan to use password login.
+*** Finding the IP address of your Android device
+=ifconfig eth0=
+=ifconfig rmnet0=
+
+If that doesn't work run cat /proc/net/dev to see the possible interfaces and use ifconfig with the appropriate interface.
+
+*** Testing Dropbear
+ Use either adb shell or terminal emulator to do the following.
+
+=dropbear -s -v -F=
+
+(You can use the -Y option to specify a master password for login into any account, if not using key based authentication)
+
+The output should look something like this:
+#+begin_src sh
+...
+TRACE (3220): listening on ':22'
+TRACE (3220): enter dropbear_listen
+TRACE (3220): dropbear_listen: all interfaces
+TRACE (3220): bind(22) failed
+TRACE (3220): leave dropbear_listen: success, 1 socks bound
+[3220] Sep 05 15:16:43 Not backgrounding
+#+end_src
+
+Now, on the computer, we will try to login to the Android device.
+Replace the path to your SSH private key and IP address as
+appropriate. On the computer's terminal, do the following.
+
+=ssh -i ./The previously selected name for this key -l root 192.168.1.64=
+The output should look something like this:
+#+begin_src sh
+Enter passphrase for key '/home/user/<Filename>':
+TRACE (3229): entering fake-getpwnam
+TRACE (3229): leaving fake-getpwnam
+TRACE (3229): enter sign_key_free
+TRACE (3229): enter dsa_key_free
+TRACE (3229): leave dsa_key_free
+TRACE (3229): enter rsa_key_free
+TRACE (3229): leave rsa_key_free
+TRACE (3229): leave sign_key_free
+#+end_src
+
+If it didn't run ssh with the -v option to get verbose debugging output to try and see what went wrong.
+
+If you get authentication errors, run this to show the device's public rsa key
+
+=dropbearkey -y -f /data/dropbear/dropbear_rsa_host_key=
+
++ the key is formatted like 'ssh-rsa Som3Rand0mStr1n6 root@localhost'
++ copy and paste it to your PCs known_hosts file, ~/.ssh/known_hosts
++ and try connecting from your PC again
+
+Assuming everything worked, dropbear can be turned off by running:
+
+=killall dropbear=
+
+NOTE: For Windows (PuTTY with SSH keyfile) you need to configure putty as follows:
++ Connection » Data » Auto-login Username = root
++ Connection » SSH » Auth » Private key file = Previously selected key file
+
+*** Running dropbear normally
+To run dropbear, from the Android device, run:
+#+begin_src sh
+su
+dropbear -s
+#+end_src
+
+Dropbear can be turned off by running:
+
+=killall dropbear=
+*** Automatic startup of the sshd-server on your device
+To modify the file in /system/etc/ you need to remount the partition to read/write mode using
+
+=mount -o remount,rw /system=
+
+To run Dropbear on start up, edit the =/etc/init.local.rc= file (Your
+preferred editor can be used, as long as it doesn't introduce
+Windows/DOS line breaks), and add the following snippet to the end of
+the file
+#+begin_src sh
+# start Dropbear (ssh server) service on boot
+service sshd /system/xbin/dropbear -s
+   user  root
+   group root
+   oneshot
+#+end_src
+The `oneshot` option instructs Android that the service should not be restarted if it is killed. For a full understanding of the Android Init system see here.
 
 ** Some Tips – how to skip gerrit and push straight to the repo.
 http://wiki.cyanogenmod.org/w/Doc:_device_maintainers
 
-Say you have a bunch of changes and want to skip gerrit's interface entirely, pushing directly to the repository. For this you will need special privileges.
+Say you have a bunch of changes and want to skip gerrit's interface
+entirely, pushing directly to the repository. For this you will need
+special privileges.
 
 This is a summary of the user-upload feature, described in detail
 here
@@ -826,15 +1343,6 @@ general User's Guide for JIRA
 https://confluence.atlassian.com/display/JIRA052/JIRA+Documentation
 ** View the latest accepted changes
 http://changelog.bbqdroid.org/
-
-
-
-
-
-
-
-
-
 
 * Setting up a Virtual Machine for CyanogenMod development
 https://skydrive.live.com/?cid=b3bff0d42ae1e534&id=B3BFF0D42AE1E534%21107
