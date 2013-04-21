@@ -287,6 +287,7 @@ Fragment instance with findFragmentById(), then directly call the
 fragment's public methods.
 
 * Saving Data
+http://developer.android.com/training/basics/data-storage/files.html#GetFreeSpace
 ** Saving Key-Value Sets
 *** Get a Handle to a SharedPreferences
 + getSharedPreferences() — Use this if you need multiple shared
@@ -342,10 +343,783 @@ External storage:
   files from here only if you save them in the directory from
   getExternalFilesDir().
 
+*** Obtain Permissions for External Storage
+#+begin_src sh
+<manifest ...>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    ...
+</manifest>
+#+end_src
+*** Save a File on Internal Storage
++ getFilesDir()
+  Returns a File representing an internal directory for your app.
++ getCacheDir()
+  Returns a File representing an internal directory for your app's temporary cache files. 
+
+#+begin_src java
+File file = new File(context.getFilesDir(), filename);
+
+String filename = "myfile";
+String string = "Hello world!";
+FileOutputStream outputStream;
+
+try {
+  outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
+  outputStream.write(string.getBytes());
+  outputStream.close();
+} catch (Exception e) {
+  e.printStackTrace();
+}
+#+end_src
+Or, if you need to cache some files, you should instead use
+createTempFile().
+
+*** Save a File on External Storage
+#+begin_src java
+/* Checks if external storage is available for read and write */
+public boolean isExternalStorageWritable() {
+    String state = Environment.getExternalStorageState();
+    if (Environment.MEDIA_MOUNTED.equals(state)) {
+        return true;
+    }
+    return false;
+}
+
+/* Checks if external storage is available to at least read */
+public boolean isExternalStorageReadable() {
+    String state = Environment.getExternalStorageState();
+    if (Environment.MEDIA_MOUNTED.equals(state) ||
+        Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+        return true;
+    }
+    return false;
+}
+#+end_src
+
+If you want to save public files on the external storage, use the
+getExternalStoragePublicDirectory() method to get a File representing
+the appropriate directory on the external storage. 
+#+begin_src java
+public File getAlbumStorageDir(String albumName) {
+    // Get the directory for the user's public pictures directory. 
+    File file = new File(Environment.getExternalStoragePublicDirectory(
+            Environment.DIRECTORY_PICTURES), albumName);
+    if (!file.mkdirs()) {
+        Log.e(LOG_TAG, "Directory not created");
+    }
+    return file;
+}
+#+end_src
+If you want to save files that are private to your app, you can
+acquire the appropriate directory by calling =getExternalFilesDir()= and
+passing it a name indicating the type of directory you'd like. 
+
+*** Query Free Space
+calling getFreeSpace() or getTotalSpace(). 
+
+*** Delete a File
+#+begin_src java
+myFile.delete();
+//If the file is saved on internal storage, you can also ask the Context to locate and delete a file by calling deleteFile():
+myContext.deleteFile(fileName);
+#+end_src
+
+
+** Saving Data in SQL Databases
+The APIs you'll need to use a database on Android are available in the
+=android.database.sqlite= package
+*** Define a Schema and Contract
+Note: By implementing the BaseColumns interface, your inner class can
+inherit a primary key field called _ID that some Android classes such
+as cursor adaptors will expect it to have. It's not required, but this
+can help your database work harmoniously with the Android framework.
+
+#+begin_src java
+public static abstract class FeedEntry implements BaseColumns {
+    public static final String TABLE_NAME = "entry";
+    public static final String COLUMN_NAME_ENTRY_ID = "entryid";
+    public static final String COLUMN_NAME_TITLE = "title";
+    public static final String COLUMN_NAME_SUBTITLE = "subtitle";
+    ...
+}
+#+end_src
+*** Create a Database Using a SQL Helper
+#+begin_src java
+private static final String TEXT_TYPE = " TEXT";
+private static final String COMMA_SEP = ",";
+private static final String SQL_CREATE_ENTRIES =
+    "CREATE TABLE " + FeedReaderContract.FeedEntry.TABLE_NAME + " (" +
+    FeedReaderContract.FeedEntry._ID + " INTEGER PRIMARY KEY," +
+    FeedReaderContract.FeedEntry.COLUMN_NAME_ENTRY_ID + TEXT_TYPE + COMMA_SEP +
+    FeedReaderContract.FeedEntry.COLUMN_NAME_TITLE + TEXT_TYPE + COMMA_SEP +
+    ... // Any other options for the CREATE command
+    " )";
+
+private static final String SQL_DELETE_ENTRIES =
+    "DROP TABLE IF EXISTS " + TABLE_NAME_ENTRIES;
+#+end_src
+
+A useful set of APIs is available in the SQLiteOpenHelper class.
+
+Note: Because they can be long-running, be sure that you call
+getWritableDatabase() or getReadableDatabase() in a background thread,
+such as with AsyncTask or IntentService.
+
+To use SQLiteOpenHelper, create a subclass that overrides the
+onCreate(), onUpgrade() and onOpen() callback methods.
+#+begin_src java
+public class FeedReaderDbHelper extends SQLiteOpenHelper {
+    // If you change the database schema, you must increment the database version.
+    public static final int DATABASE_VERSION = 1;
+    public static final String DATABASE_NAME = "FeedReader.db";
+
+    public FeedReaderDbHelper(Context context) {
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    }
+    public void onCreate(SQLiteDatabase db) {
+        db.execSQL(SQL_CREATE_ENTRIES);
+    }
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        // This database is only a cache for online data, so its upgrade policy is
+        // to simply to discard the data and start over
+        db.execSQL(SQL_DELETE_ENTRIES);
+        onCreate(db);
+    }
+    public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        onUpgrade(db, oldVersion, newVersion);
+    }
+}
+
+//To access your database, instantiate your subclass of SQLiteOpenHelper:
+FeedReaderDbHelper mDbHelper = new FeedReaderDbHelper(getContext());
+#+end_src
+
+*** Put Information into a Database
+Insert data into the database by passing a ContentValues object to the
+insert() method:
+#+begin_src java
+// Gets the data repository in write mode
+SQLiteDatabase db = mDbHelper.getWritableDatabase();
+
+// Create a new map of values, where column names are the keys
+ContentValues values = new ContentValues();
+values.put(FeedReaderContract.FeedEntry.COLUMN_NAME_ENTRY_ID, id);
+values.put(FeedReaderContract.FeedEntry.COLUMN_NAME_TITLE, title);
+values.put(FeedReaderContract.FeedEntry.COLUMN_NAME_CONTENT, content);
+
+// Insert the new row, returning the primary key value of the new row
+long newRowId;
+newRowId = db.insert(
+         FeedReaderContract.FeedEntry.TABLE_NAME,
+         FeedReaderContract.FeedEntry.COLUMN_NAME_NULLABLE,
+         values);
+#+end_src
+
+*** Read Information from a Database
+To read from a database, use the query() method, passing it your
+selection criteria and desired columns. 
+#+begin_src java
+SQLiteDatabase db = mDbHelper.getReadableDatabase();
+
+// Define a projection that specifies which columns from the database
+// you will actually use after this query.
+String[] projection = {
+    FeedReaderContract.FeedEntry._ID,
+    FeedReaderContract.FeedEntry.COLUMN_NAME_TITLE,
+    FeedReaderContract.FeedEntry.COLUMN_NAME_UPDATED,
+    ...
+    };
+
+// How you want the results sorted in the resulting Cursor
+String sortOrder =
+    FeedReaderContract.FeedEntry.COLUMN_NAME_UPDATED + " DESC";
+
+Cursor c = db.query(
+    FeedReaderContract.FeedEntry.TABLE_NAME,  // The table to query
+    projection,                               // The columns to return
+    selection,                                // The columns for the WHERE clause
+    selectionArgs,                            // The values for the WHERE clause
+    null,                                     // don't group the rows
+    null,                                     // don't filter by row groups
+    sortOrder                                 // The sort order
+    );
+
+cursor.moveToFirst();
+long itemId = cursor.getLong(
+    cursor.getColumnIndexOrThrow(FeedReaderContract.FeedEntry._ID)
+);
+#+end_src
+
+*** Delete Information from a Database
+#+begin_src java
+// Define 'where' part of query.
+String selection = FeedReaderContract.FeedEntry.COLUMN_NAME_ENTRY_ID + " LIKE ?";
+// Specify arguments in placeholder order.
+String[] selectionArgs = { String.valueOf(rowId) };
+// Issue SQL statement.
+db.delete(table_name, selection, selectionArgs);
+#+end_src
+*** Update a Database
+#+begin_src java
+SQLiteDatabase db = mDbHelper.getReadableDatabase();
+
+// New value for one column
+ContentValues values = new ContentValues();
+values.put(FeedReaderContract.FeedEntry.COLUMN_NAME_TITLE, title);
+
+// Which row to update, based on the ID
+String selection = FeedReaderContract.FeedEntry.COLUMN_NAME_ENTRY_ID + " LIKE ?";
+String[] selectionArgs = { String.valueOf(rowId) };
+
+int count = db.update(
+    FeedReaderDbHelper.FeedEntry.TABLE_NAME,
+    values,
+    selection,
+    selectionArgs);
+#+end_src
 
 
 
 
+
+* Interacting with Other Apps
+** Sending the User to Another App
+*** Build an Implicit Intent
+If your data is a Uri, there's a simple Intent() constructor you can
+use define the action and data.
+#+begin_src java
+//View a map:
+// Map point based on address
+Uri location = Uri.parse("geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+California");
+// Or map point based on latitude/longitude
+// Uri location = Uri.parse("geo:37.422219,-122.08364?z=14"); // z param is zoom level
+Intent mapIntent = new Intent(Intent.ACTION_VIEW, location);
+
+//View a web page:
+Uri webpage = Uri.parse("http://www.android.com");
+Intent webIntent = new Intent(Intent.ACTION_VIEW, webpage);
+
+//Send an email with an attachment:
+Intent emailIntent = new Intent(Intent.ACTION_SEND);
+// The intent does not have a URI, so declare the "text/plain" MIME type
+emailIntent.setType(HTTP.PLAIN_TEXT_TYPE);
+emailIntent.putExtra(Intent.EXTRA_EMAIL, new String[] {"jon@example.com"}); // recipients
+emailIntent.putExtra(Intent.EXTRA_SUBJECT, "Email subject");
+emailIntent.putExtra(Intent.EXTRA_TEXT, "Email message text");
+emailIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("content://path/to/email/attachment"));
+// You can also attach multiple items by passing an ArrayList of Uris
+
+//Create a calendar event:
+Intent calendarIntent = new Intent(Intent.ACTION_INSERT, Events.CONTENT_URI);
+Calendar beginTime = Calendar.getInstance().set(2012, 0, 19, 7, 30);
+Calendar endTime = Calendar.getInstance().set(2012, 0, 19, 10, 30);
+calendarIntent.putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, beginTime.getTimeInMillis());
+calendarIntent.putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endTime.getTimeInMillis());
+calendarIntent.putExtra(Events.TITLE, "Ninja class");
+calendarIntent.putExtra(Events.EVENT_LOCATION, "Secret dojo");
+#+end_src
+
+*** Verify There is an App to Receive the Intent
+#+begin_src java
+PackageManager packageManager = getPackageManager();
+List<ResolveInfo> activities = packageManager.queryIntentActivities(intent, 0);
+boolean isIntentSafe = activities.size() > 0;
+#+end_src
+*** Start an Activity with the Intent
+#+begin_src java
+// Build the intent
+Uri location = Uri.parse("geo:0,0?q=1600+Amphitheatre+Parkway,+Mountain+View,+California");
+Intent mapIntent = new Intent(Intent.ACTION_VIEW, location);
+
+// Verify it resolves
+PackageManager packageManager = getPackageManager();
+List<ResolveInfo> activities = packageManager.queryIntentActivities(mapIntent, 0);
+boolean isIntentSafe = activities.size() > 0;
+  
+// Start an activity if it's safe
+if (isIntentSafe) {
+    startActivity(mapIntent);
+}
+#+end_src
+*** Show an App Chooser
+#+begin_src java
+Intent intent = new Intent(Intent.ACTION_SEND);
+...
+
+// Always use string resources for UI text. This says something like "Share this photo with"
+String title = getResources().getText(R.string.chooser_title);
+// Create and start the chooser
+Intent chooser = Intent.createChooser(intent, title);
+startActivity(chooser);
+#+end_src
+
+
+** Getting a Result from an Activity
+To receive a result, call =startActivityForResult()= (instead of
+=startActivity()=).
+*** Start the Activity
+#+begin_src java
+static final int PICK_CONTACT_REQUEST = 1;  // The request code
+...
+private void pickContact() {
+    Intent pickContactIntent = new Intent(Intent.ACTION_PICK, Uri.parse("content://contacts"));
+    pickContactIntent.setType(Phone.CONTENT_TYPE); // Show user only contacts w/ phone numbers
+    startActivityForResult(pickContactIntent, PICK_CONTACT_REQUEST);
+}
+#+end_src
+
+*** Receive the Result
+the system calls your activity's onActivityResult() method. This
+method includes three arguments:
+
++ The request code you passed to startActivityForResult().
++ A result code specified by the second activity. This is either RESULT_OK if the operation was successful or RESULT_CANCELED if the user backed out or the operation failed for some reason.
++ An Intent that carries the result data.
+#+begin_src java
+@Override
+protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    // Check which request we're responding to
+    if (requestCode == PICK_CONTACT_REQUEST) {
+        // Make sure the request was successful
+        if (resultCode == RESULT_OK) {
+            // The user picked a contact.
+            // The Intent's data Uri identifies which contact was selected.
+
+            // Do something with the contact here (bigger example below)
+        }
+    }
+}
+#+end_src
+*** Bonus: Read the contact data
+#+begin_src java
+@Override
+protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    // Check which request it is that we're responding to
+    if (requestCode == PICK_CONTACT_REQUEST) {
+        // Make sure the request was successful
+        if (resultCode == RESULT_OK) {
+            // Get the URI that points to the selected contact
+            Uri contactUri = data.getData();
+            // We only need the NUMBER column, because there will be only one row in the result
+            String[] projection = {Phone.NUMBER};
+
+            // Perform the query on the contact to get the NUMBER column
+            // We don't need a selection or sort order (there's only one result for the given URI)
+            // CAUTION: The query() method should be called from a separate thread to avoid blocking
+            // your app's UI thread. (For simplicity of the sample, this code doesn't do that.)
+            // Consider using CursorLoader to perform the query.
+            Cursor cursor = getContentResolver()
+                    .query(contactUri, projection, null, null, null);
+            cursor.moveToFirst();
+
+            // Retrieve the phone number from the NUMBER column
+            int column = cursor.getColumnIndex(Phone.NUMBER);
+            String number = cursor.getString(column);
+
+            // Do something with the phone number...
+        }
+    }
+}
+#+end_src
+
+
+** Allowing Other Apps to Start Your Activity
+To allow other apps to start your activity, you need to add an
+<intent-filter> element in your manifest file for the corresponding
+<activity> element.
+
+*** Add an Intent Filter
++ Action A string naming the action to perform. Usually one of the
+  platform-defined values such as ACTION_SEND or ACTION_VIEW. Specify
+  this in your intent filter with the <action> element.
++ Data A description of the data associated with the intent. Specify
+  this in your intent filter with the <data> element.
++ Category Provides an additional way to characterize the activity
+  handling the intent, all implicit intents are defined with
+  CATEGORY_DEFAULT by default.
+#+begin_src sh
+<activity android:name="ShareActivity">
+    <!-- filter for sending text; accepts SENDTO action with sms URI schemes -->
+    <intent-filter>
+        <action android:name="android.intent.action.SENDTO"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:scheme="sms" />
+        <data android:scheme="smsto" />
+    </intent-filter>
+    <!-- filter for sending text or images; accepts SEND action and text or image data -->
+    <intent-filter>
+        <action android:name="android.intent.action.SEND"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <data android:mimeType="image/*"/>
+        <data android:mimeType="text/plain"/>
+    </intent-filter>
+</activity>
+#+end_src
+
+*** Handle the Intent in Your Activity
+call getIntent() to retrieve the Intent that started the activity.  t
+you should generally do so during early callbacks such as onCreate()
+or onStart().
+
+#+begin_src java
+@Override
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+
+    setContentView(R.layout.main);
+
+    // Get the intent that started this activity
+    Intent intent = getIntent();
+    Uri data = intent.getData();
+
+    // Figure out what to do based on the intent type
+    if (intent.getType().indexOf("image/") != -1) {
+        // Handle intents with image data ...
+    } else if (intent.getType().equals("text/plain")) {
+        // Handle intents with text ...
+    }
+}
+#+end_src
+*** Return a Result
+call setResult() to specify the result code and result Intent. call
+finish() to close (and destroy) your activity
+#+begin_src java
+// Create intent to deliver some kind of result data
+Intent result = new Intent("com.example.RESULT_ACTION", Uri.parse("content://result_uri");
+setResult(Activity.RESULT_OK, result);
+finish();
+#+end_src
+
+* Sharing Content
+using =Intent APIs= and the =ActionProvider= object.
+** Sending Content to Other Apps
+*** Send Text Content
+#+begin_src java
+Intent sendIntent = new Intent();
+sendIntent.setAction(Intent.ACTION_SEND);
+sendIntent.putExtra(Intent.EXTRA_TEXT, "This is my text to send.");
+sendIntent.setType("text/plain");
+startActivity(sendIntent);
+
+//or
+startActivity(Intent.createChooser(sendIntent, getResources().getText(R.string.send_to)));
+#+end_src
+Optionally, you can set some standard extras for the intent:
+EXTRA_EMAIL, EXTRA_CC, EXTRA_BCC, EXTRA_SUBJECT. 
+
+*** Send Binary Content
+#+begin_src java
+Intent shareIntent = new Intent();
+shareIntent.setAction(Intent.ACTION_SEND);
+shareIntent.putExtra(Intent.EXTRA_STREAM, uriToImage);
+shareIntent.setType("image/jpeg");
+startActivity(Intent.createChooser(shareIntent, getResources().getText(R.string.send_to)));
+#+end_src
+
+The receiving application needs permission to access the data the Uri
+points to. There are a number of ways to handle this:
+
++ Write the data to a file on external/shared storage (such as the SD card), which all apps can read. Use Uri.fromFile() to create the Uri that can be passed to the share intent. However, keep in mind that not all applications process a file:// style Uri.
++ Write the data to a file in your own application directory using openFileOutput() with mode MODE_WORLD_READABLE after which getFileStreamPath() can be used to return a File. As with the previous option, Uri.fromFile() will create a file:// style Uri for your share intent.
++ Media files like images, videos and audio can be scanned and added to the system MediaStore using scanFile(). The onScanCompleted() callback returns a content:// style Uri suitable for including in your share intent.
++ Images can be inserted into the system MediaStore using insertImage() which will return a content:// style Uri suitable for including in a share intent.
++ Store the data in your own ContentProvider, make sure that other apps have the correct permission to access your provider (or use per-URI permissions).
+
+*** Send Multiple Pieces of Content
+use the ACTION_SEND_MULTIPLE action together with a list of URIs
+pointing to the content
+
+#+begin_src java
+ArrayList<Uri> imageUris = new ArrayList<Uri>();
+imageUris.add(imageUri1); // Add your image URIs here
+imageUris.add(imageUri2);
+
+Intent shareIntent = new Intent();
+shareIntent.setAction(Intent.ACTION_SEND_MULTIPLE);
+shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, imageUris);
+shareIntent.setType("image/*");
+startActivity(Intent.createChooser(shareIntent, "Share images to.."));
+#+end_src
+
+
+
+** Receiving Content from Other Apps
+*** Update Your Manifest
+#+begin_src java
+<activity android:name=".ui.MyActivity" >
+    <intent-filter>
+        <action android:name="android.intent.action.SEND" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="image/*" />
+    </intent-filter>
+    <intent-filter>
+        <action android:name="android.intent.action.SEND" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="text/plain" />
+    </intent-filter>
+    <intent-filter>
+        <action android:name="android.intent.action.SEND_MULTIPLE" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="image/*" />
+    </intent-filter>
+</activity>
+#+end_src
+*** Handle the Incoming Content
+#+begin_src java
+void onCreate (Bundle savedInstanceState) {
+    ...
+    // Get intent, action and MIME type
+    Intent intent = getIntent();
+    String action = intent.getAction();
+    String type = intent.getType();
+
+    if (Intent.ACTION_SEND.equals(action) && type != null) {
+        if ("text/plain".equals(type)) {
+            handleSendText(intent); // Handle text being sent
+        } else if (type.startsWith("image/")) {
+            handleSendImage(intent); // Handle single image being sent
+        }
+    } else if (Intent.ACTION_SEND_MULTIPLE.equals(action) && type != null) {
+        if (type.startsWith("image/")) {
+            handleSendMultipleImages(intent); // Handle multiple images being sent
+        }
+    } else {
+        // Handle other intents, such as being started from the home screen
+    }
+    ...
+}
+
+void handleSendText(Intent intent) {
+    String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
+    if (sharedText != null) {
+        // Update UI to reflect text being shared
+    }
+}
+
+void handleSendImage(Intent intent) {
+    Uri imageUri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
+    if (imageUri != null) {
+        // Update UI to reflect image being shared
+    }
+}
+
+void handleSendMultipleImages(Intent intent) {
+    ArrayList<Uri> imageUris = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+    if (imageUris != null) {
+        // Update UI to reflect multiple images being shared
+    }
+}
+#+end_src
+
+** Adding an Easy Share Action
+ActionProvider in Android 4.0 (API Level 14)
+*** Update Menu Declarations
+To get started with ShareActionProviders, define the
+android:actionProviderClass attribute for the corresponding <item> in
+your menu resource file:
+#+begin_src sh
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/menu_item_share"
+        android:showAsAction="ifRoom"
+        android:title="Share"
+        android:actionProviderClass="android.widget.ShareActionProvider" />
+    ...
+</menu>
+#+end_src
+*** Set the Share Intent
+#+begin_src java
+private ShareActionProvider mShareActionProvider;
+...
+
+@Override
+public boolean onCreateOptionsMenu(Menu menu) {
+    // Inflate menu resource file.
+    getMenuInflater().inflate(R.menu.share_menu, menu);
+
+    // Locate MenuItem with ShareActionProvider
+    MenuItem item = menu.findItem(R.id.menu_item_share);
+
+    // Fetch and store ShareActionProvider
+    mShareActionProvider = (ShareActionProvider) item.getActionProvider();
+
+    // Return true to display menu
+    return true;
+}
+
+// Call to update the share intent
+private void setShareIntent(Intent shareIntent) {
+    if (mShareActionProvider != null) {
+        mShareActionProvider.setShareIntent(shareIntent);
+    }
+}
+#+end_src
+
+
+* Managing Audio Playback
+** Controlling Your App’s Volume and Playback
+*** Identify Which Audio Stream to Use
+Android maintains a separate audio stream for playing music, alarms,
+notifications, the incoming call ringer, system sounds, in-call
+volume, and DTMF tones. This is done primarily to allow users to
+control the volume of each stream independently.
+
+Most of these streams are restricted to system events, so unless your
+app is a replacement alarm clock, you’ll almost certainly be playing
+your audio using the STREAM_MUSIC stream.
+*** Use Hardware Volume Keys to Control Your App’s Audio Volume
+call it within the onCreate() method (of the Activity or Fragment that
+controls your media). This ensures that whenever your app is visible,
+the volume controls function as the user expects.
+
+=setVolumeControlStream(AudioManager.STREAM_MUSIC);=
+*** Use Hardware Playback Control Keys to Control Your App’s Audio Playback
++ Whenever a user presses one of these hardware keys, the system
+  broadcasts an intent with the ACTION_MEDIA_BUTTON action.
++ To respond to media button clicks, you need to register a
+  BroadcastReceiver in your manifest that listens for this action
+  broadcast 
+#+begin_src sh
+<receiver android:name=".RemoteControlReceiver">
+    <intent-filter>
+        <action android:name="android.intent.action.MEDIA_BUTTON" />
+    </intent-filter>
+</receiver>
+#+end_src
+
+The Intent includes this under the EXTRA_KEY_EVENT key, while the
+KeyEvent class includes a list KEYCODE_MEDIA_* static constants that
+represents each of the possible media buttons, such as
+KEYCODE_MEDIA_PLAY_PAUSE and KEYCODE_MEDIA_NEXT.
+#+begin_src java
+public class RemoteControlReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (Intent.ACTION_MEDIA_BUTTON.equals(intent.getAction())) {
+            KeyEvent event = (KeyEvent)intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
+            if (KeyEvent.KEYCODE_MEDIA_PLAY == event.getKeyCode()) {
+                // Handle key press.
+            }
+        }
+    }
+}
+#+end_src
+
+The following code can be used within your app to register and
+de-register your media button event receiver using the AudioManager.
+When registered, your broadcast receiver is the exclusive receiver of
+all media button broadcasts.
+#+begin_src java
+AudioManager am = mContext.getSystemService(Context.AUDIO_SERVICE);
+...
+
+// Start listening for button presses
+am.registerMediaButtonEventReceiver(RemoteControlReceiver);
+...
+
+// Stop listening for button presses
+am.unregisterMediaButtonEventReceiver(RemoteControlReceiver);
+#+end_src
+
+** Managing Audio Focus
+*** Request the Audio Focus
+, it should hold the audio focus for the stream it will be using. This
+is done with a call to requestAudioFocus() which returns
+AUDIOFOCUS_REQUEST_GRANTED if your request is successful.
+
+The following snippet requests permanent audio focus on the music audio stream. 
+#+begin_src java
+AudioManager am = mContext.getSystemService(Context.AUDIO_SERVICE);
+...
+
+// Request audio focus for playback
+int result = am.requestAudioFocus(afChangeListener,
+                                 // Use the music stream.
+                                 AudioManager.STREAM_MUSIC,
+                                 // Request permanent focus.
+                                 AudioManager.AUDIOFOCUS_GAIN);
+   
+if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+    am.unregisterMediaButtonEventReceiver(RemoteControlReceiver);
+    // Start playback.
+}
+#+end_src
+
+abandoning transient focus, this allows any interupted app to continue
+playback.
+#+begin_src java
+// Abandon audio focus when playback complete    
+am.abandonAudioFocus(afChangeListener);
+#+end_src
+
+When requesting transient audio focus you have an additional option:
+whether or not you want to enable "ducking."
+#+begin_src java
+// Request audio focus for playback
+int result = am.requestAudioFocus(afChangeListener,
+                             // Use the music stream.
+                             AudioManager.STREAM_MUSIC,
+                             // Request permanent focus.
+                             AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+   
+if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+    // Start playback.
+}
+#+end_src
+
+*** Handle the Loss of Audio Focus
+The onAudioFocusChange() callback method of they audio focus change
+listener you registered when requesting audio focus receives a
+parameter that describes the focus change event. 
+
+In the following code snippet, we pause the playback or our media
+player object if the audio loss is transient and resume it when we
+have regained the focus. If the loss is permanent, it unregisters our
+media button event receiver and stops monitoring audio focus changes.
+#+begin_src java
+OnAudioFocusChangeListener afChangeListener = new OnAudioFocusChangeListener() {
+    public void onAudioFocusChange(int focusChange) {
+        if (focusChange == AUDIOFOCUS_LOSS_TRANSIENT
+            // Pause playback
+        } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
+            // Resume playback 
+        } else if (focusChange == AudioManager.AUDIOFOCUS_LOSS) {
+            am.unregisterMediaButtonEventReceiver(RemoteControlReceiver);
+            am.abandonAudioFocus(afChangeListener);
+            // Stop playback
+        }
+    }
+};
+#+end_src
+*** Duck!
+#+begin_src java
+OnAudioFocusChangeListener afChangeListener = new OnAudioFocusChangeListener() {
+    public void onAudioFocusChange(int focusChange) {
+        if (focusChange == AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
+            // Lower the volume
+        } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
+            // Raise it back to normal
+        }
+    }
+};
+#+end_src
+** Dealing with Audio Output Hardware
+*** Check What Hardware is Being Used
+You can query the AudioManager to determine if the audio is currently
+being routed to the device speaker, wired headset, or attached
+Bluetooth device as shown in the following snippet:
+
+#+begin_src java
+if (isBluetoothA2dpOn()) {
+    // Adjust output for Bluetooth.
+} else if (isSpeakerphoneOn()) {
+    // Adjust output for Speakerphone.
+} else if (isWiredHeadsetOn()) {
+    // Adjust output for headsets
+} else { 
+    // If audio plays and noone can hear it, is it still playing?
+}
+#+end_src
+*** Handle Changes in the Audio Output Hardware
 
 
 
@@ -388,7 +1162,7 @@ http://developer.android.com/tools/testing/index.html
 http://sharesdk.cn/
 
 * dd
-#+begin_src sh
+#+begin_src java
 
 #+end_src
 * FAQ
