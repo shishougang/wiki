@@ -1120,10 +1120,255 @@ if (isBluetoothA2dpOn()) {
 }
 #+end_src
 *** Handle Changes in the Audio Output Hardware
+#+begin_src java
+private class NoisyAudioStreamReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) {
+            // Pause the playback
+        }
+    }
+}
+
+private IntentFilter intentFilter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+
+private void startPlayback() {
+    registerReceiver(myNoisyAudioStreamReceiver(), intentFilter);
+}
+
+private void stopPlayback() {
+    unregisterReceiver(myNoisyAudioStreamReceiver);
+}
+#+end_src
 
 
 
 
+* Capturing Photos
+** Taking Photos Simply
+*** Request Camera Permission
+#+begin_src sh
+<manifest ... >
+    <uses-feature android:name="android.hardware.camera" />
+    ...
+</manifest ... >
+#+end_src
+*** Take a Photo with the Camera App
+invokes an intent to capture a photo.
+#+begin_src java
+private void dispatchTakePictureIntent(int actionCode) {
+    Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+    startActivityForResult(takePictureIntent, actionCode);
+}
+#+end_src
+
+Here is a function to check whether an app can handle your intent:
+#+begin_src java
+public static boolean isIntentAvailable(Context context, String action) {
+    final PackageManager packageManager = context.getPackageManager();
+    final Intent intent = new Intent(action);
+    List<ResolveInfo> list =
+            packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+    return list.size() > 0;
+}
+#+end_src
+*** View the Photo
+#+begin_src java
+private void handleSmallCameraPhoto(Intent intent) {
+    Bundle extras = intent.getExtras();
+    mImageBitmap = (Bitmap) extras.get("data");
+    mImageView.setImageBitmap(mImageBitmap);
+}
+#+end_src
+*** Save the Photo
+#+begin_src java
+storageDir = new File(
+    Environment.getExternalStoragePublicDirectory(
+        Environment.DIRECTORY_PICTURES
+    ), 
+    getAlbumName()
+);    
+#+end_src
+**** Set the file name
+#+begin_src java
+private File createImageFile() throws IOException {
+    // Create an image file name
+    String timeStamp = 
+        new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+    String imageFileName = JPEG_FILE_PREFIX + timeStamp + "_";
+    File image = File.createTempFile(
+        imageFileName, 
+        JPEG_FILE_SUFFIX, 
+        getAlbumDir()
+    );
+    mCurrentPhotoPath = image.getAbsolutePath();
+    return image;
+}
+#+end_src
+**** Append the file name onto the Intent
+#+begin_src java
+File f = createImageFile();
+takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(f));
+#+end_src
+*** Add the Photo to a Gallery
+#+begin_src java
+private void galleryAddPic() {
+    Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+    File f = new File(mCurrentPhotoPath);
+    Uri contentUri = Uri.fromFile(f);
+    mediaScanIntent.setData(contentUri);
+    this.sendBroadcast(mediaScanIntent);
+}
+#+end_src
+*** Decode a Scaled Image
+#+begin_src java
+private void setPic() {
+    // Get the dimensions of the View
+    int targetW = mImageView.getWidth();
+    int targetH = mImageView.getHeight();
+  
+    // Get the dimensions of the bitmap
+    BitmapFactory.Options bmOptions = new BitmapFactory.Options();
+    bmOptions.inJustDecodeBounds = true;
+    BitmapFactory.decodeFile(mCurrentPhotoPath, bmOptions);
+    int photoW = bmOptions.outWidth;
+    int photoH = bmOptions.outHeight;
+  
+    // Determine how much to scale down the image
+    int scaleFactor = Math.min(photoW/targetW, photoH/targetH);
+  
+    // Decode the image file into a Bitmap sized to fill the View
+    bmOptions.inJustDecodeBounds = false;
+    bmOptions.inSampleSize = scaleFactor;
+    bmOptions.inPurgeable = true;
+  
+    Bitmap bitmap = BitmapFactory.decodeFile(mCurrentPhotoPath, bmOptions);
+    mImageView.setImageBitmap(bitmap);
+}
+#+end_src
+
+** Recording Videos Simply
+*** Request Camera Permission
+#+begin_src sh
+<manifest ... >
+    <uses-feature android:name="android.hardware.camera" />
+    ...
+</manifest ... >
+#+end_src
+*** Record a Video with a Camera App
+ invoke an Intent 
+#+begin_src java
+private void dispatchTakeVideoIntent() {
+    Intent takeVideoIntent = new Intent(MediaStore.ACTION_VIDEO_CAPTURE);
+    startActivityForResult(takeVideoIntent, ACTION_TAKE_VIDEO);
+}
+#+end_src
+*** View the Video
+#+begin_src java
+private void handleCameraVideo(Intent intent) {
+    mVideoUri = intent.getData();
+    mVideoView.setVideoURI(mVideoUri);
+}
+#+end_src
+
+** Controlling the Camera
+*** Open the Camera Object
+Calling Camera.open() throws an exception if the camera is already in
+use by another application, so we wrap it in a try block.
+#+begin_src java
+private boolean safeCameraOpen(int id) {
+    boolean qOpened = false;
+  
+    try {
+        releaseCameraAndPreview();
+        mCamera = Camera.open(id);
+        qOpened = (mCamera != null);
+    } catch (Exception e) {
+        Log.e(getString(R.string.app_name), "failed to open Camera");
+        e.printStackTrace();
+    }
+
+    return qOpened;    
+}
+
+private void releaseCameraAndPreview() {
+    mPreview.setCamera(null);
+    if (mCamera != null) {
+        mCamera.release();
+        mCamera = null;
+    }
+}
+#+end_src
+
+*** Create the Camera Preview
+**** Preview Class
+To get started with displaying a preview, you need preview class. The
+preview requires an implementation of the
+android.view.SurfaceHolder.Callback interface, which is used to pass
+image data from the camera hardware to the application.
+#+begin_src java
+class Preview extends ViewGroup implements SurfaceHolder.Callback {
+
+    SurfaceView mSurfaceView;
+    SurfaceHolder mHolder;
+
+    Preview(Context context) {
+        super(context);
+
+        mSurfaceView = new SurfaceView(context);
+        addView(mSurfaceView);
+
+        // Install a SurfaceHolder.Callback so we get notified when the
+        // underlying surface is created and destroyed.
+        mHolder = mSurfaceView.getHolder();
+        mHolder.addCallback(this);
+        mHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+    }
+...
+}
+#+end_src
+
+**** Set and Start the Preview
+A camera instance and its related preview must be created in a
+specific order, with the camera object being first. In the snippet
+below, the process of initializing the camera is encapsulated so that
+Camera.startPreview() is called by the setCamera() method, whenever
+the user does something to change the camera. 
+#+begin_src java
+public void setCamera(Camera camera) {
+    if (mCamera == camera) { return; }
+    
+    stopPreviewAndFreeCamera();
+    
+    mCamera = camera;
+    
+    if (mCamera != null) {
+        List<Size> localSizes = mCamera.getParameters().getSupportedPreviewSizes();
+        mSupportedPreviewSizes = localSizes;
+        requestLayout();
+      
+        try {
+            mCamera.setPreviewDisplay(mHolder);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+      
+        /*
+          Important: Call startPreview() to start updating the preview surface. Preview must 
+          be started before you can take a picture.
+          */
+        mCamera.startPreview();
+    }
+}
+#+end_src
+*** Modify Camera Settings
+
+
+
+
+#+begin_src java
+
+#+end_src
 * Activities
 ** Fragments
 ** Loaders

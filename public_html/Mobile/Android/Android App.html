@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Android App"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-04-21T22:38+0800"/>
+<meta name="generated" content="2013-04-24T21:36+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -198,41 +198,48 @@ for the JavaScript code in this tag.
 <li><a href="#sec-10-3">Dealing with Audio Output Hardware</a></li>
 </ul>
 </li>
-<li><a href="#sec-11">Activities</a>
+<li><a href="#sec-11">Capturing Photos</a>
 <ul>
-<li><a href="#sec-11-1">Fragments</a></li>
-<li><a href="#sec-11-2">Loaders</a></li>
-<li><a href="#sec-11-3">Tasks and Back Stack</a></li>
+<li><a href="#sec-11-1">Taking Photos Simply</a></li>
+<li><a href="#sec-11-2">Recording Videos Simply</a></li>
+<li><a href="#sec-11-3">Controlling the Camera</a></li>
 </ul>
 </li>
-<li><a href="#sec-12">Providing Resources</a></li>
-<li><a href="#sec-13">Handling Runtime Changes</a></li>
-<li><a href="#sec-14">Localization</a></li>
-<li><a href="#sec-15">Layouts</a></li>
-<li><a href="#sec-16">Styles and Themes</a></li>
-<li><a href="#sec-17">Data Storage</a>
+<li><a href="#sec-12">Activities</a>
 <ul>
-<li><a href="#sec-17-1">Storage Options</a></li>
-<li><a href="#sec-17-2">Data Backup</a></li>
-<li><a href="#sec-17-3">App Install Location</a></li>
+<li><a href="#sec-12-1">Fragments</a></li>
+<li><a href="#sec-12-2">Loaders</a></li>
+<li><a href="#sec-12-3">Tasks and Back Stack</a></li>
 </ul>
 </li>
-<li><a href="#sec-18">Design</a>
+<li><a href="#sec-13">Providing Resources</a></li>
+<li><a href="#sec-14">Handling Runtime Changes</a></li>
+<li><a href="#sec-15">Localization</a></li>
+<li><a href="#sec-16">Layouts</a></li>
+<li><a href="#sec-17">Styles and Themes</a></li>
+<li><a href="#sec-18">Data Storage</a>
 <ul>
-<li><a href="#sec-18-1">Iconography</a></li>
+<li><a href="#sec-18-1">Storage Options</a></li>
+<li><a href="#sec-18-2">Data Backup</a></li>
+<li><a href="#sec-18-3">App Install Location</a></li>
 </ul>
 </li>
-<li><a href="#sec-19">Testing</a></li>
-<li><a href="#sec-20">other component</a>
+<li><a href="#sec-19">Design</a>
 <ul>
-<li><a href="#sec-20-1">social</a></li>
+<li><a href="#sec-19-1">Iconography</a></li>
 </ul>
 </li>
-<li><a href="#sec-21">dd</a></li>
-<li><a href="#sec-22">FAQ</a>
+<li><a href="#sec-20">Testing</a></li>
+<li><a href="#sec-21">other component</a>
 <ul>
-<li><a href="#sec-22-1">permission denied: ant</a></li>
-<li><a href="#sec-22-2">Description Resource Path Location Type Unexpected namespace prefix "xmlns" found for tag RelativeLayout activity<sub>a</sub>.xml</a></li>
+<li><a href="#sec-21-1">social</a></li>
+</ul>
+</li>
+<li><a href="#sec-22">dd</a></li>
+<li><a href="#sec-23">FAQ</a>
+<ul>
+<li><a href="#sec-23-1">permission denied: ant</a></li>
+<li><a href="#sec-23-2">Description Resource Path Location Type Unexpected namespace prefix "xmlns" found for tag RelativeLayout activity<sub>a</sub>.xml</a></li>
 </ul>
 </li>
 </ul>
@@ -2058,6 +2065,29 @@ Bluetooth device as shown in the following snippet:
 
 
 
+<pre class="src src-java"><span style="color: #00ffff;">private</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">NoisyAudioStreamReceiver</span> <span style="color: #00ffff;">extends</span> <span style="color: #98fb98;">BroadcastReceiver</span> {
+    <span style="color: #7fffd4;">@Override</span>
+    <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">onReceive</span>(<span style="color: #98fb98;">Context</span> <span style="color: #eedd82;">context</span>, <span style="color: #98fb98;">Intent</span> <span style="color: #eedd82;">intent</span>) {
+        <span style="color: #00ffff;">if</span> (<span style="color: #7fffd4;">AudioManager</span>.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) {
+            <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Pause the playback</span>
+        }
+    }
+}
+
+<span style="color: #00ffff;">private</span> <span style="color: #98fb98;">IntentFilter</span> <span style="color: #eedd82;">intentFilter</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">IntentFilter</span>(<span style="color: #7fffd4;">AudioManager</span>.ACTION_AUDIO_BECOMING_NOISY);
+
+<span style="color: #00ffff;">private</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">startPlayback</span>() {
+    registerReceiver(myNoisyAudioStreamReceiver(), intentFilter);
+}
+
+<span style="color: #00ffff;">private</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">stopPlayback</span>() {
+    unregisterReceiver(myNoisyAudioStreamReceiver);
+}
+</pre>
+
+
+
+
 
 </li>
 </ul>
@@ -2067,41 +2097,390 @@ Bluetooth device as shown in the following snippet:
 </div>
 
 <div id="outline-container-11" class="outline-2">
-<h2 id="sec-11">Activities</h2>
+<h2 id="sec-11">Capturing Photos</h2>
 <div class="outline-text-2" id="text-11">
 
 
 </div>
 
 <div id="outline-container-11-1" class="outline-3">
-<h3 id="sec-11-1">Fragments</h3>
+<h3 id="sec-11-1">Taking Photos Simply</h3>
 <div class="outline-text-3" id="text-11-1">
 
+<ul>
+<li id="sec-11-1-1">Request Camera Permission<br/>
+
+
+
+<pre class="src src-sh">&lt;manifest ... &gt;
+    &lt;uses-feature android:<span style="color: #eedd82;">name</span>=<span style="color: #ffa07a;">"android.hardware.camera"</span> /&gt;
+    ...
+&lt;/manifest ... &gt;
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-11-1-2">Take a Photo with the Camera App<br/>
+invokes an intent to capture a photo.
+
+
+
+<pre class="src src-java"><span style="color: #00ffff;">private</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">dispatchTakePictureIntent</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">actionCode</span>) {
+    <span style="color: #98fb98;">Intent</span> <span style="color: #eedd82;">takePictureIntent</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Intent</span>(<span style="color: #7fffd4;">MediaStore</span>.ACTION_IMAGE_CAPTURE);
+    startActivityForResult(takePictureIntent, actionCode);
+}
+</pre>
+
+
+<p>
+Here is a function to check whether an app can handle your intent:
+</p>
+
+
+<pre class="src src-java"><span style="color: #00ffff;">public</span> <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">boolean</span> <span style="color: #87cefa;">isIntentAvailable</span>(<span style="color: #98fb98;">Context</span> <span style="color: #eedd82;">context</span>, <span style="color: #98fb98;">String</span> <span style="color: #eedd82;">action</span>) {
+    <span style="color: #00ffff;">final</span> <span style="color: #98fb98;">PackageManager</span> <span style="color: #eedd82;">packageManager</span> = context.getPackageManager();
+    <span style="color: #00ffff;">final</span> <span style="color: #98fb98;">Intent</span> <span style="color: #eedd82;">intent</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Intent</span>(action);
+    List&lt;ResolveInfo&gt; list =
+            packageManager.queryIntentActivities(intent, <span style="color: #7fffd4;">PackageManager</span>.MATCH_DEFAULT_ONLY);
+    <span style="color: #00ffff;">return</span> list.size() &gt; 0;
+}
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-11-1-3">View the Photo<br/>
+
+
+
+<pre class="src src-java"><span style="color: #00ffff;">private</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">handleSmallCameraPhoto</span>(<span style="color: #98fb98;">Intent</span> <span style="color: #eedd82;">intent</span>) {
+    <span style="color: #98fb98;">Bundle</span> <span style="color: #eedd82;">extras</span> = intent.getExtras();
+    mImageBitmap = (<span style="color: #98fb98;">Bitmap</span>) extras.get(<span style="color: #ffa07a;">"data"</span>);
+    mImageView.setImageBitmap(mImageBitmap);
+}
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-11-1-4">Save the Photo<br/>
+
+
+
+<pre class="src src-java">storageDir = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">File</span>(
+    Environment.getExternalStoragePublicDirectory(
+        <span style="color: #7fffd4;">Environment</span>.DIRECTORY_PICTURES
+    ), 
+    getAlbumName()
+);    
+</pre>
+
+<ul>
+<li id="sec-11-1-4-1">Set the file name<br/>
+
+
+
+<pre class="src src-java"><span style="color: #00ffff;">private</span> <span style="color: #98fb98;">File</span> <span style="color: #87cefa;">createImageFile</span>() <span style="color: #00ffff;">throws</span> <span style="color: #98fb98;">IOException</span> {
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Create an image file name</span>
+    <span style="color: #98fb98;">String</span> <span style="color: #eedd82;">timeStamp</span> = 
+        <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">SimpleDateFormat</span>(<span style="color: #ffa07a;">"yyyyMMdd_HHmmss"</span>).format(<span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Date</span>());
+    <span style="color: #98fb98;">String</span> <span style="color: #eedd82;">imageFileName</span> = JPEG_FILE_PREFIX + timeStamp + <span style="color: #ffa07a;">"_"</span>;
+    <span style="color: #98fb98;">File</span> <span style="color: #eedd82;">image</span> = File.createTempFile(
+        imageFileName, 
+        JPEG_FILE_SUFFIX, 
+        getAlbumDir()
+    );
+    mCurrentPhotoPath = image.getAbsolutePath();
+    <span style="color: #00ffff;">return</span> image;
+}
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-11-1-4-2">Append the file name onto the Intent<br/>
+
+
+
+<pre class="src src-java"><span style="color: #98fb98;">File</span> <span style="color: #eedd82;">f</span> = createImageFile();
+takePictureIntent.putExtra(<span style="color: #7fffd4;">MediaStore</span>.EXTRA_OUTPUT, Uri.fromFile(f));
+</pre>
+
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li id="sec-11-1-5">Add the Photo to a Gallery<br/>
+
+
+
+<pre class="src src-java"><span style="color: #00ffff;">private</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">galleryAddPic</span>() {
+    <span style="color: #98fb98;">Intent</span> <span style="color: #eedd82;">mediaScanIntent</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Intent</span>(<span style="color: #7fffd4;">Intent</span>.ACTION_MEDIA_SCANNER_SCAN_FILE);
+    <span style="color: #98fb98;">File</span> <span style="color: #eedd82;">f</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">File</span>(mCurrentPhotoPath);
+    <span style="color: #98fb98;">Uri</span> <span style="color: #eedd82;">contentUri</span> = Uri.fromFile(f);
+    mediaScanIntent.setData(contentUri);
+    <span style="color: #00ffff;">this</span>.sendBroadcast(mediaScanIntent);
+}
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-11-1-6">Decode a Scaled Image<br/>
+
+
+
+<pre class="src src-java"><span style="color: #00ffff;">private</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">setPic</span>() {
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Get the dimensions of the View</span>
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">targetW</span> = mImageView.getWidth();
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">targetH</span> = mImageView.getHeight();
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Get the dimensions of the bitmap</span>
+    <span style="color: #7fffd4;">BitmapFactory</span>.<span style="color: #98fb98;">Options</span> <span style="color: #eedd82;">bmOptions</span> = <span style="color: #00ffff;">new</span> <span style="color: #7fffd4;">BitmapFactory</span>.<span style="color: #98fb98;">Options</span>();
+    bmOptions.inJustDecodeBounds = <span style="color: #7fffd4;">true</span>;
+    BitmapFactory.decodeFile(mCurrentPhotoPath, bmOptions);
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">photoW</span> = bmOptions.outWidth;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">photoH</span> = bmOptions.outHeight;
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Determine how much to scale down the image</span>
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">scaleFactor</span> = Math.min(photoW/targetW, photoH/targetH);
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Decode the image file into a Bitmap sized to fill the View</span>
+    bmOptions.inJustDecodeBounds = <span style="color: #7fffd4;">false</span>;
+    bmOptions.inSampleSize = scaleFactor;
+    bmOptions.inPurgeable = <span style="color: #7fffd4;">true</span>;
+
+    <span style="color: #98fb98;">Bitmap</span> <span style="color: #eedd82;">bitmap</span> = BitmapFactory.decodeFile(mCurrentPhotoPath, bmOptions);
+    mImageView.setImageBitmap(bitmap);
+}
+</pre>
+
+
+</li>
+</ul>
 </div>
 
 </div>
 
 <div id="outline-container-11-2" class="outline-3">
-<h3 id="sec-11-2">Loaders</h3>
+<h3 id="sec-11-2">Recording Videos Simply</h3>
 <div class="outline-text-3" id="text-11-2">
 
+<ul>
+<li id="sec-11-2-1">Request Camera Permission<br/>
+
+
+
+<pre class="src src-sh">&lt;manifest ... &gt;
+    &lt;uses-feature android:<span style="color: #eedd82;">name</span>=<span style="color: #ffa07a;">"android.hardware.camera"</span> /&gt;
+    ...
+&lt;/manifest ... &gt;
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-11-2-2">Record a Video with a Camera App<br/>
+ invoke an Intent 
+
+
+
+<pre class="src src-java"><span style="color: #00ffff;">private</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">dispatchTakeVideoIntent</span>() {
+    <span style="color: #98fb98;">Intent</span> <span style="color: #eedd82;">takeVideoIntent</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Intent</span>(<span style="color: #7fffd4;">MediaStore</span>.ACTION_VIDEO_CAPTURE);
+    startActivityForResult(takeVideoIntent, ACTION_TAKE_VIDEO);
+}
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-11-2-3">View the Video<br/>
+
+
+
+<pre class="src src-java"><span style="color: #00ffff;">private</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">handleCameraVideo</span>(<span style="color: #98fb98;">Intent</span> <span style="color: #eedd82;">intent</span>) {
+    mVideoUri = intent.getData();
+    mVideoView.setVideoURI(mVideoUri);
+}
+</pre>
+
+
+</li>
+</ul>
 </div>
 
 </div>
 
 <div id="outline-container-11-3" class="outline-3">
-<h3 id="sec-11-3">Tasks and Back Stack</h3>
+<h3 id="sec-11-3">Controlling the Camera</h3>
 <div class="outline-text-3" id="text-11-3">
 
+<ul>
+<li id="sec-11-3-1">Open the Camera Object<br/>
+Calling Camera.open() throws an exception if the camera is already in
+use by another application, so we wrap it in a try block.
 
+
+
+<pre class="src src-java"><span style="color: #00ffff;">private</span> <span style="color: #98fb98;">boolean</span> <span style="color: #87cefa;">safeCameraOpen</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id</span>) {
+    <span style="color: #98fb98;">boolean</span> <span style="color: #eedd82;">qOpened</span> = <span style="color: #7fffd4;">false</span>;
+
+    <span style="color: #00ffff;">try</span> {
+        releaseCameraAndPreview();
+        mCamera = Camera.open(id);
+        qOpened = (mCamera != <span style="color: #7fffd4;">null</span>);
+    } <span style="color: #00ffff;">catch</span> (<span style="color: #98fb98;">Exception</span> <span style="color: #eedd82;">e</span>) {
+        Log.e(getString(R.string.app_name), <span style="color: #ffa07a;">"failed to open Camera"</span>);
+        e.printStackTrace();
+    }
+
+    <span style="color: #00ffff;">return</span> qOpened;    
+}
+
+<span style="color: #00ffff;">private</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">releaseCameraAndPreview</span>() {
+    mPreview.setCamera(<span style="color: #7fffd4;">null</span>);
+    <span style="color: #00ffff;">if</span> (mCamera != <span style="color: #7fffd4;">null</span>) {
+        mCamera.release();
+        mCamera = <span style="color: #7fffd4;">null</span>;
+    }
+}
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-11-3-2">Create the Camera Preview<br/>
+<ul>
+<li id="sec-11-3-2-1">Preview Class<br/>
+To get started with displaying a preview, you need preview class. The
+preview requires an implementation of the
+android.view.SurfaceHolder.Callback interface, which is used to pass
+image data from the camera hardware to the application.
+
+
+
+<pre class="src src-java"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Preview</span> <span style="color: #00ffff;">extends</span> <span style="color: #98fb98;">ViewGroup</span> <span style="color: #00ffff;">implements</span> <span style="color: #7fffd4;">SurfaceHolder</span>.<span style="color: #98fb98;">Callback</span> {
+
+    <span style="color: #98fb98;">SurfaceView</span> <span style="color: #eedd82;">mSurfaceView</span>;
+    <span style="color: #98fb98;">SurfaceHolder</span> <span style="color: #eedd82;">mHolder</span>;
+
+    Preview(<span style="color: #98fb98;">Context</span> <span style="color: #eedd82;">context</span>) {
+        <span style="color: #00ffff;">super</span>(context);
+
+        mSurfaceView = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">SurfaceView</span>(context);
+        addView(mSurfaceView);
+
+        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Install a SurfaceHolder.Callback so we get notified when the</span>
+        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">underlying surface is created and destroyed.</span>
+        mHolder = mSurfaceView.getHolder();
+        mHolder.addCallback(<span style="color: #00ffff;">this</span>);
+        mHolder.setType(<span style="color: #7fffd4;">SurfaceHolder</span>.SURFACE_TYPE_PUSH_BUFFERS);
+    }
+...
+}
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-11-3-2-2">Set and Start the Preview<br/>
+A camera instance and its related preview must be created in a
+specific order, with the camera object being first. In the snippet
+below, the process of initializing the camera is encapsulated so that
+Camera.startPreview() is called by the setCamera() method, whenever
+the user does something to change the camera. 
+
+
+
+<pre class="src src-java"><span style="color: #00ffff;">public</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">setCamera</span>(<span style="color: #98fb98;">Camera</span> <span style="color: #eedd82;">camera</span>) {
+    <span style="color: #00ffff;">if</span> (mCamera == camera) { <span style="color: #00ffff;">return</span>; }
+
+    stopPreviewAndFreeCamera();
+
+    mCamera = camera;
+
+    <span style="color: #00ffff;">if</span> (mCamera != <span style="color: #7fffd4;">null</span>) {
+        List&lt;Size&gt; localSizes = mCamera.getParameters().getSupportedPreviewSizes();
+        mSupportedPreviewSizes = localSizes;
+        requestLayout();
+
+        <span style="color: #00ffff;">try</span> {
+            mCamera.setPreviewDisplay(mHolder);
+        } <span style="color: #00ffff;">catch</span> (<span style="color: #98fb98;">IOException</span> <span style="color: #eedd82;">e</span>) {
+            e.printStackTrace();
+        }
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">          Important: Call startPreview() to start updating the preview surface. Preview must </span>
+<span style="color: #ff7f24;">          be started before you can take a picture.</span>
+<span style="color: #ff7f24;">          */</span>
+        mCamera.startPreview();
+    }
+}
+</pre>
+
+</li>
+</ul>
+</li>
+</ul>
+<ul>
+<li id="sec-11-3-3">Modify Camera Settings<br/>
+
+
+
+
+
+
+
+<pre class="src src-java"></pre>
+
+</li>
+</ul>
 </div>
 </div>
 
 </div>
 
 <div id="outline-container-12" class="outline-2">
-<h2 id="sec-12">Providing Resources</h2>
+<h2 id="sec-12">Activities</h2>
 <div class="outline-text-2" id="text-12">
+
+
+</div>
+
+<div id="outline-container-12-1" class="outline-3">
+<h3 id="sec-12-1">Fragments</h3>
+<div class="outline-text-3" id="text-12-1">
+
+</div>
+
+</div>
+
+<div id="outline-container-12-2" class="outline-3">
+<h3 id="sec-12-2">Loaders</h3>
+<div class="outline-text-3" id="text-12-2">
+
+</div>
+
+</div>
+
+<div id="outline-container-12-3" class="outline-3">
+<h3 id="sec-12-3">Tasks and Back Stack</h3>
+<div class="outline-text-3" id="text-12-3">
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-13" class="outline-2">
+<h2 id="sec-13">Providing Resources</h2>
+<div class="outline-text-2" id="text-13">
 
 <p><a href="http://developer.android.com/guide/topics/resources/providing-resources.html">http://developer.android.com/guide/topics/resources/providing-resources.html</a>
 </p>
@@ -2109,9 +2488,9 @@ Bluetooth device as shown in the following snippet:
 
 </div>
 
-<div id="outline-container-13" class="outline-2">
-<h2 id="sec-13">Handling Runtime Changes</h2>
-<div class="outline-text-2" id="text-13">
+<div id="outline-container-14" class="outline-2">
+<h2 id="sec-14">Handling Runtime Changes</h2>
+<div class="outline-text-2" id="text-14">
 
 <p><a href="http://developer.android.com/guide/topics/resources/runtime-changes.html">http://developer.android.com/guide/topics/resources/runtime-changes.html</a>
 </p>
@@ -2120,9 +2499,9 @@ Bluetooth device as shown in the following snippet:
 
 </div>
 
-<div id="outline-container-14" class="outline-2">
-<h2 id="sec-14">Localization</h2>
-<div class="outline-text-2" id="text-14">
+<div id="outline-container-15" class="outline-2">
+<h2 id="sec-15">Localization</h2>
+<div class="outline-text-2" id="text-15">
 
 <p><a href="http://developer.android.com/guide/topics/resources/localization.html">http://developer.android.com/guide/topics/resources/localization.html</a>
 </p>
@@ -2130,9 +2509,9 @@ Bluetooth device as shown in the following snippet:
 
 </div>
 
-<div id="outline-container-15" class="outline-2">
-<h2 id="sec-15">Layouts</h2>
-<div class="outline-text-2" id="text-15">
+<div id="outline-container-16" class="outline-2">
+<h2 id="sec-16">Layouts</h2>
+<div class="outline-text-2" id="text-16">
 
 <p><a href="http://developer.android.com/guide/topics/ui/declaring-layout.html">http://developer.android.com/guide/topics/ui/declaring-layout.html</a>
 </p>
@@ -2140,59 +2519,42 @@ Bluetooth device as shown in the following snippet:
 
 </div>
 
-<div id="outline-container-16" class="outline-2">
-<h2 id="sec-16">Styles and Themes</h2>
-<div class="outline-text-2" id="text-16">
+<div id="outline-container-17" class="outline-2">
+<h2 id="sec-17">Styles and Themes</h2>
+<div class="outline-text-2" id="text-17">
 
 <p><a href="http://developer.android.com/guide/topics/ui/themes.html">http://developer.android.com/guide/topics/ui/themes.html</a>
 </p></div>
 
 </div>
 
-<div id="outline-container-17" class="outline-2">
-<h2 id="sec-17">Data Storage</h2>
-<div class="outline-text-2" id="text-17">
+<div id="outline-container-18" class="outline-2">
+<h2 id="sec-18">Data Storage</h2>
+<div class="outline-text-2" id="text-18">
 
 <p><a href="http://developer.android.com/guide/topics/data/index.html">http://developer.android.com/guide/topics/data/index.html</a>
 </p>
 </div>
 
-<div id="outline-container-17-1" class="outline-3">
-<h3 id="sec-17-1">Storage Options</h3>
-<div class="outline-text-3" id="text-17-1">
-
-</div>
-
-</div>
-
-<div id="outline-container-17-2" class="outline-3">
-<h3 id="sec-17-2">Data Backup</h3>
-<div class="outline-text-3" id="text-17-2">
-
-</div>
-
-</div>
-
-<div id="outline-container-17-3" class="outline-3">
-<h3 id="sec-17-3">App Install Location</h3>
-<div class="outline-text-3" id="text-17-3">
-
-
-</div>
-</div>
-
-</div>
-
-<div id="outline-container-18" class="outline-2">
-<h2 id="sec-18">Design</h2>
-<div class="outline-text-2" id="text-18">
-
-
-</div>
-
 <div id="outline-container-18-1" class="outline-3">
-<h3 id="sec-18-1">Iconography</h3>
+<h3 id="sec-18-1">Storage Options</h3>
 <div class="outline-text-3" id="text-18-1">
+
+</div>
+
+</div>
+
+<div id="outline-container-18-2" class="outline-3">
+<h3 id="sec-18-2">Data Backup</h3>
+<div class="outline-text-3" id="text-18-2">
+
+</div>
+
+</div>
+
+<div id="outline-container-18-3" class="outline-3">
+<h3 id="sec-18-3">App Install Location</h3>
+<div class="outline-text-3" id="text-18-3">
 
 
 </div>
@@ -2201,8 +2563,25 @@ Bluetooth device as shown in the following snippet:
 </div>
 
 <div id="outline-container-19" class="outline-2">
-<h2 id="sec-19">Testing</h2>
+<h2 id="sec-19">Design</h2>
 <div class="outline-text-2" id="text-19">
+
+
+</div>
+
+<div id="outline-container-19-1" class="outline-3">
+<h3 id="sec-19-1">Iconography</h3>
+<div class="outline-text-3" id="text-19-1">
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-20" class="outline-2">
+<h2 id="sec-20">Testing</h2>
+<div class="outline-text-2" id="text-20">
 
 <p><a href="http://developer.android.com/tools/testing/index.html">http://developer.android.com/tools/testing/index.html</a>
 </p>
@@ -2211,16 +2590,16 @@ Bluetooth device as shown in the following snippet:
 
 </div>
 
-<div id="outline-container-20" class="outline-2">
-<h2 id="sec-20">other component</h2>
-<div class="outline-text-2" id="text-20">
+<div id="outline-container-21" class="outline-2">
+<h2 id="sec-21">other component</h2>
+<div class="outline-text-2" id="text-21">
 
 
 </div>
 
-<div id="outline-container-20-1" class="outline-3">
-<h3 id="sec-20-1">social</h3>
-<div class="outline-text-3" id="text-20-1">
+<div id="outline-container-21-1" class="outline-3">
+<h3 id="sec-21-1">social</h3>
+<div class="outline-text-3" id="text-21-1">
 
 <p><a href="http://sharesdk.cn/">http://sharesdk.cn/</a>
 </p>
@@ -2229,9 +2608,9 @@ Bluetooth device as shown in the following snippet:
 
 </div>
 
-<div id="outline-container-21" class="outline-2">
-<h2 id="sec-21">dd</h2>
-<div class="outline-text-2" id="text-21">
+<div id="outline-container-22" class="outline-2">
+<h2 id="sec-22">dd</h2>
+<div class="outline-text-2" id="text-22">
 
 
 
@@ -2242,16 +2621,16 @@ Bluetooth device as shown in the following snippet:
 
 </div>
 
-<div id="outline-container-22" class="outline-2">
-<h2 id="sec-22">FAQ</h2>
-<div class="outline-text-2" id="text-22">
+<div id="outline-container-23" class="outline-2">
+<h2 id="sec-23">FAQ</h2>
+<div class="outline-text-2" id="text-23">
 
 
 </div>
 
-<div id="outline-container-22-1" class="outline-3">
-<h3 id="sec-22-1">permission denied: ant</h3>
-<div class="outline-text-3" id="text-22-1">
+<div id="outline-container-23-1" class="outline-3">
+<h3 id="sec-23-1">permission denied: ant</h3>
+<div class="outline-text-3" id="text-23-1">
 
 <p>folder <code>adt-bundle-linux-x86-20130219/sdk/tools/ant</code> 
 </p>
@@ -2259,9 +2638,9 @@ Bluetooth device as shown in the following snippet:
 
 </div>
 
-<div id="outline-container-22-2" class="outline-3">
-<h3 id="sec-22-2">Description Resource Path Location Type Unexpected namespace prefix "xmlns" found for tag RelativeLayout activity<sub>a</sub>.xml</h3>
-<div class="outline-text-3" id="text-22-2">
+<div id="outline-container-23-2" class="outline-3">
+<h3 id="sec-23-2">Description Resource Path Location Type Unexpected namespace prefix "xmlns" found for tag RelativeLayout activity<sub>a</sub>.xml</h3>
+<div class="outline-text-3" id="text-23-2">
 
 <p>The codes were running absolutely fine in the past but now they are showing these errors&hellip;.
 </p>
@@ -2279,7 +2658,7 @@ Go to the Project Tab at the tab Click on the tab Select the
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-04-21T22:38+0800</p>
+<p class="date">Date: 2013-04-24T21:36+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
