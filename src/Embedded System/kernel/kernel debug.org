@@ -4,3 +4,31 @@
 
 http://hi.baidu.com/yanyulou/blog/item/1355718d8d193f17b31bbaae.html
 
+
+* objdump看内核源码
+1. 修改源代码的顶层  Makefile
+   CC =$(CROSSCOM_PILE)gcc            -->
+   CC =$(CROSSCOM_PILE)gcc   -g
+   使成生的vmlinux中含有debug信息
+2. 所有生成.o的rule中再加一条     /*其他参数除了-c外抄生成.o文件用的参数*/
+   CC   -E  -dD -C $< > /preprocessing/$(shell pwd)/$<
+   生成预处理文件从这个文件里面能很容易找到c源文件的宏定义
+3. objdump -h vmlinux > vmlinux.txt
+   显示  linux 内核段信息，如段的开始虚拟地址，段的长度
+4. objdump -S -l -z vmlinux > vmlinux.txt
+   反汇编vmlinux到vmlinux.txt，vmlinux.txt含有汇编和c源文件的混合代码，
+5. objdump -S -l -z -j xxxx(section name) vmlinux > vmlinux.txt
+   反汇编linux内核段xxxx到文件vmlinux.txt中。
+6. objdump -x vmlinux > x.txt
+   vmliux中所有段的头信息，其中包口vmlinux的入口地址等
+7. objdump --debugging vmlinux > debugging.txt
+   很多有用的debug信息，如函数名，结构体定义等
+8. objdump params
+  -S尽可能反汇编出源代码，尤其当编译的时候指定了-g这种调试参数时，效果比较明显。隐含了-d参数。
+  -l用文件名和行号标注相应的目标代码，仅仅和-d、-D或者-r一起使用使用-ld和使用-d的区别不是很大，在源码级调试的时候有用，要求编译时使用了-g之类的调试编译选项。
+  + [-l | --line-numbers]
+  + [-S | --source]    混合汇编
+  + [-z | --disassemble-zeroes]
+  + [-j section | --section=section]
+  + [--prefix-addresses]
+
