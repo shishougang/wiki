@@ -3,11 +3,11 @@
                "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<title>FileSystem</title>
+<title>FileSystem Things</title>
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
-<meta name="title" content="FileSystem"/>
+<meta name="title" content="FileSystem Things"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-05-05T10:13+0800"/>
+<meta name="generated" content="2013-05-10T22:44+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -121,7 +121,7 @@ for the JavaScript code in this tag.
 </div>
 
 <div id="content">
-<h1 class="title">FileSystem</h1>
+<h1 class="title">FileSystem Things</h1>
 
 
 
@@ -129,7 +129,13 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">seq<sub>file</sub></a></li>
+<li><a href="#sec-1">seq<sub>file</sub></a>
+<ul>
+<li><a href="#sec-1-1"><code>seq_printf(will not overflow)</code></a></li>
+<li><a href="#sec-1-2"><code>seq_read small and large file</code></a></li>
+<li><a href="#sec-1-3">seq iteration method</a></li>
+</ul>
+</li>
 </ul>
 </div>
 </div>
@@ -137,6 +143,13 @@ for the JavaScript code in this tag.
 <div id="outline-container-1" class="outline-2">
 <h2 id="sec-1">seq<sub>file</sub></h2>
 <div class="outline-text-2" id="text-1">
+
+
+</div>
+
+<div id="outline-container-1-1" class="outline-3">
+<h3 id="sec-1-1"><code>seq_printf(will not overflow)</code></h3>
+<div class="outline-text-3" id="text-1-1">
 
 
 
@@ -162,11 +175,263 @@ EXPORT_SYMBOL(seq_printf);
 </pre>
 
 </div>
+
+</div>
+
+<div id="outline-container-1-2" class="outline-3">
+<h3 id="sec-1-2"><code>seq_read small and large file</code></h3>
+<div class="outline-text-3" id="text-1-2">
+
+<p><a href="./Files/Makefile">Makefile</a> and <a href="./Files/seq_test.c">seq test.c</a>
+</p>
+
+
+<pre class="src src-c"><span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * Simple demonstratino of the seq_file interface</span>
+<span style="color: #ff7f24;"> * Felix SHI &lt;<a href="mailto:shishougang&#64;gmail.com">shishougang&#64;gmail.com</a>&gt;</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/init.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/module.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/proc_fs.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/fs.h&gt;</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">everything... </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/seq_file.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/kernel.h&gt;</span>    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">printk() </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/slab.h&gt;</span>        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">kmalloc() </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/types.h&gt;</span>       <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">size_t </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/list.h&gt;</span>
+
+MODULE_AUTHOR(<span style="color: #ffa07a;">"Felix Shi"</span>);
+MODULE_LICENSE(<span style="color: #ffa07a;">"Dual BSD/GPL"</span>);
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span> {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">list</span>;
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">info</span>[10];
+};
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">LIST_HEAD</span>(<span style="color: #eedd82;">data_list</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">empty_list</span>(<span style="color: #98fb98;">void</span>)
+{
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span> *<span style="color: #eedd82;">p</span>, *<span style="color: #eedd82;">ptmp</span>;
+  <span style="color: #eedd82;">list_for_each_entry_safe</span>(p, ptmp, &amp;data_list, list){
+    list_del(p);
+    kfree(p);
+  }
+}
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">The procfs read entry point </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">static int proctest_read(char *page, char **start, off_t offset,</span>
+<span style="color: #ff7f24;">                         int count, int *eof, void *data)</span>
+<span style="color: #ff7f24;">{</span>
+<span style="color: #ff7f24;">  int i = 0;</span>
+<span style="color: #ff7f24;">  off_t len = 0;</span>
+<span style="color: #ff7f24;">  struct info_struct *p;</span>
+
+<span style="color: #ff7f24;">  list_for_each_entry(p, &amp;data_list, list) {</span>
+<span style="color: #ff7f24;">    len += sprintf(page + len, p-&gt;info);</span>
+<span style="color: #ff7f24;">  }</span>
+
+<span style="color: #ff7f24;">  *eof = 1;</span>
+<span style="color: #ff7f24;">  return len;</span>
+<span style="color: #ff7f24;">}</span><span style="color: #ff7f24;">*/</span>
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">proctest_large_read</span>(<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">page</span>, <span style="color: #98fb98;">char</span> **<span style="color: #eedd82;">start</span>, <span style="color: #98fb98;">off_t</span> <span style="color: #eedd82;">offset</span>,
+                               <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">eof</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>)
+{
+  <span style="color: #98fb98;">off_t</span> <span style="color: #eedd82;">start_point</span> = 0;
+  <span style="color: #98fb98;">off_t</span> <span style="color: #eedd82;">len</span> = 0;
+
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span> *<span style="color: #eedd82;">p</span>;
+
+  <span style="color: #eedd82;">list_for_each_entry</span>(p, &amp;data_list, list){
+    len += sprintf(page + len, p-&gt;info);
+
+    <span style="color: #00ffff;">if</span>(start_point + len &lt;= offset){
+      start_point += len;
+      len = 0;
+    }<span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span>(start_point + len &gt;= offset + count){
+      <span style="color: #00ffff;">break</span>;
+    }
+  }
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Actual start </span><span style="color: #ff7f24;">*/</span>
+  *start = page + (offset - start_point);
+
+  len -= (offset - start_point);
+  <span style="color: #00ffff;">if</span>(len &gt; count)
+    len = count;
+  <span style="color: #00ffff;">else</span>
+    *eof = 1;
+  <span style="color: #00ffff;">return</span> len;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">seq_test_init</span>(<span style="color: #98fb98;">void</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> *<span style="color: #eedd82;">entry</span> = <span style="color: #7fffd4;">NULL</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span> *<span style="color: #eedd82;">pinfo</span>;
+  entry = create_proc_entry(<span style="color: #ffa07a;">"seqtest"</span>, 0, <span style="color: #7fffd4;">NULL</span>);
+  <span style="color: #00ffff;">if</span>(entry)
+    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">entry-&gt;read_proc = proctest__read;</span>
+    entry-&gt;read_proc = proctest_large_read;
+
+  <span style="color: #00ffff;">for</span>(i = 0; i &lt; 500; ++i){
+    pinfo = kmalloc(<span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span>), GFP_ATOMIC);
+    <span style="color: #00ffff;">if</span>(!pinfo){
+      empty_list();
+      <span style="color: #00ffff;">return</span> ENOMEM;
+    }
+    sprintf(pinfo-&gt;info, <span style="color: #ffa07a;">"Node No: %d\n"</span>, i);
+    list_add_tail(&amp;pinfo-&gt;list, &amp;data_list);
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">seq_test_exit</span>(<span style="color: #98fb98;">void</span>)
+{
+  remove_proc_entry(<span style="color: #ffa07a;">"seqtest"</span>,<span style="color: #7fffd4;">NULL</span>);
+  empty_list();
+}
+module_init(seq_test_init);
+module_exit(seq_test_exit);
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-1-3" class="outline-3">
+<h3 id="sec-1-3">seq iteration method</h3>
+<div class="outline-text-3" id="text-1-3">
+
+<p><a href="./Files/Makefile">Makefile</a> and <a href="./Files/seq_iter_test.c">seq iter test.c</a>
+</p>
+
+
+<pre class="src src-c"><span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * Simple demonstratino of the seq_file interface</span>
+<span style="color: #ff7f24;"> * Felix SHI &lt;<a href="mailto:shishougang&#64;gmail.com">shishougang&#64;gmail.com</a>&gt;</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/init.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/module.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/proc_fs.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/fs.h&gt;</span>   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">everything... </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/seq_file.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/kernel.h&gt;</span>    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">printk() </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/slab.h&gt;</span>        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">kmalloc() </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/types.h&gt;</span>       <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">size_t </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/list.h&gt;</span>
+
+MODULE_AUTHOR(<span style="color: #ffa07a;">"Felix Shi"</span>);
+MODULE_LICENSE(<span style="color: #ffa07a;">"Dual BSD/GPL"</span>);
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span> {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">list</span>;
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">info</span>[10];
+};
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">LIST_HEAD</span>(<span style="color: #eedd82;">data_list</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">empty_list</span>(<span style="color: #98fb98;">void</span>)
+{
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span> *<span style="color: #eedd82;">p</span>, *<span style="color: #eedd82;">ptmp</span>;
+  <span style="color: #eedd82;">list_for_each_entry_safe</span>(p, ptmp, &amp;data_list, list){
+    list_del(p);
+    kfree(p);
+  }
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> *
+<span style="color: #87cefa;">seq_iter_seq_start</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">seq_file</span> *<span style="color: #eedd82;">seq</span>, <span style="color: #98fb98;">loff_t</span> *<span style="color: #eedd82;">pos</span>)
+{
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span> *<span style="color: #eedd82;">p</span>;
+  <span style="color: #98fb98;">loff_t</span> <span style="color: #eedd82;">loff</span> = 0;
+  printk(<span style="color: #ffa07a;">"start"</span>);
+  <span style="color: #eedd82;">list_for_each_entry</span>(p, &amp;data_list, list){
+    <span style="color: #00ffff;">if</span>(*pos == loff++) <span style="color: #00ffff;">return</span> p;
+  }
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> *
+<span style="color: #87cefa;">seq_iter_seq_next</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">seq_file</span> *<span style="color: #eedd82;">seq</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">loff_t</span> *<span style="color: #eedd82;">pos</span>)
+{
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">n</span> = ((<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span> *)v)-&gt;list.next;
+  ++*pos;
+  <span style="color: #00ffff;">return</span> (n != &amp;data_list) ? list_entry(n, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span>, list) : <span style="color: #7fffd4;">NULL</span>;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span>
+<span style="color: #87cefa;">seq_iter_seq_show</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">seq_file</span> *<span style="color: #eedd82;">seq</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">v</span>)
+{
+  <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span> *<span style="color: #eedd82;">p</span> = v;
+  seq_printf(seq, p-&gt;info);
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span>
+<span style="color: #87cefa;">seq_iter_seq_stop</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">seq_file</span> *<span style="color: #eedd82;">seq</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">v</span>)
+{
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">seq_operations</span> <span style="color: #eedd82;">seq_iter_seq_ops</span> = {
+  .start = seq_iter_seq_start,
+  .next = seq_iter_seq_next,
+  .stop = seq_iter_seq_stop,
+  .show = seq_iter_seq_show
+};
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">seq_iter_seq_open</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inode</span> *<span style="color: #eedd82;">inode</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *<span style="color: #eedd82;">file</span>)
+{
+  <span style="color: #00ffff;">return</span> seq_open(file, &amp;seq_iter_seq_ops);
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_operations</span> <span style="color: #eedd82;">seq_iter_proc_fops</span> = {
+  .owner = THIS_MODULE,
+  .open = seq_iter_seq_open, <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">User supplied </span><span style="color: #ff7f24;">*/</span>
+  .read = seq_read,
+  .llseek = seq_lseek,
+  .release = seq_release
+};
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">seq_test_init</span>(<span style="color: #98fb98;">void</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> *<span style="color: #eedd82;">entry</span> = <span style="color: #7fffd4;">NULL</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span> *<span style="color: #eedd82;">pinfo</span>;
+  entry = create_proc_entry(<span style="color: #ffa07a;">"seqitertest"</span>, 0, <span style="color: #7fffd4;">NULL</span>);
+  printk(<span style="color: #ffa07a;">"init"</span>);
+  <span style="color: #00ffff;">if</span>(entry)
+    entry-&gt;proc_fops = &amp;seq_iter_proc_fops;
+
+  <span style="color: #00ffff;">for</span>(i = 0; i &lt; 500; ++i){
+    pinfo = kmalloc(<span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">info_struct</span>), GFP_ATOMIC);
+    <span style="color: #00ffff;">if</span>(!pinfo){
+      empty_list();
+      <span style="color: #00ffff;">return</span> ENOMEM;
+    }
+    sprintf(pinfo-&gt;info, <span style="color: #ffa07a;">"Node No: %d\n"</span>, i);
+    list_add_tail(&amp;pinfo-&gt;list, &amp;data_list);
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">seq_test_exit</span>(<span style="color: #98fb98;">void</span>)
+{
+  printk(<span style="color: #ffa07a;">"exit"</span>);
+  remove_proc_entry(<span style="color: #ffa07a;">"seqtest"</span>,<span style="color: #7fffd4;">NULL</span>);
+  empty_list();
+}
+module_init(seq_test_init);
+module_exit(seq_test_exit);
+</pre>
+
+</div>
+</div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-05-05T10:13+0800</p>
+<p class="date">Date: 2013-05-10T22:44+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

@@ -163,6 +163,179 @@ vm.min_free_kbytes=204800
 
 save simple sysctl -w net.ipv4.route.flush=1
 #+end_src
+* Linux Kernel Route Cache
+To display the “Route Cache”, one could simply issue the =“ip route
+show cache”= command.
+
+#+begin_src sh
+[ kernel network subsystem ] —-> Route Cache || [ If no match ] —-> RPDB || [ If no match ] —-> Route Table
+#+end_src
+When the routing subsystem of the kernel is initialized, an exec of
+ip_rt_init is initiated
+=(source: linux/net/ipv4/ip_output.c)=
+#+begin_src c
+void __init ip_init(void)
+{
+	ip_rt_init();
+	inet_initpeers();
+
+#if defined(CONFIG_IP_MULTICAST) && defined(CONFIG_PROC_FS)
+	igmp_mc_proc_init();
+#endif
+}
+#+end_src
+
+Part of ip_rt_init is to allocate the memory set to be used to cache
+the network routes but also to initialize global variables such as
+rt_hash_table and rt_hash_rnd and many others.
+
+You can view the details of the ip_rt_init function in /net/ipv4/route.c
+
+rt_hash_table defines a hash table of the route cache with
+rt_hash_mask holding its size. An easy way to check the size of the
+routing cache table is to look in dmesg, by grepping “IP route”
+
+#+begin_src sh
+aabbas@mig:~$ dmesg |grep “IP route”
+[    1.814492] IP route cache hash table entries: 262144 (order: 9,2097152 bytes)
+#+end_src
+
+The max size of the route cache is configurable through
+/proc/sys/net/ipv4/route/max_size. furthermore to prevent the size of
+the hash to exceed the max_size, the kernel makes use of a garbage
+collector gc_tresh
+
+When an interface goes down/up or a new changes take place which would
+affect the routing cache, the kernel executes rt_cache_flush which in
+returns executes rt_run_flush. Many events such as IP removal, removal
+of interfaces etc… trigger the route cache to be flushed, however keep
+in mind, that periodically it will be flushed based on the value of
+rt_secret_timer. The time value is configurable in
+=/proc/sys/net/ipv4/route/secret_interval=.
+
+To trigger a route cache flush, issue
+#+begin_src sh
+echo -1 > /proc/sys/net/ipv4/route/flush or ip route flush cache
+#+end_src
+
+ip_rt_min_delay and ip_rt_max_delay define the time within which the
+flush would occur, setting the ip_rt_min_delay value to 0 would
+immediately ensure that the cache is flushed when rt_run_flush is
+triggered.
+
+* Linux CPU Load
+** Load Average is caused by two things
+1. Cpu it self is busy/overloaded  in processing things
+2. Processes  (typically called Blocking process) in run queue,
+   waiting for I/O
+
+In fact, it is precisely the CPU load that is measured, because load
+averages do not include any processes or threads waiting on I/O,
+networking, databases or anything else not demanding the CPU. It
+narrowly focuses on what is actively demanding CPU time. This differs
+greatly from the CPU percentage. The CPU percentage is the amount of a
+time interval (that is, the sampling interval) that the system's
+processes were found to be active on the CPU. [fn:3]
+
+The load averages differ from CPU percentage in two significant
+ways: 1) load averages measure the trend in CPU utilization not only
+an instantaneous snapshot, as does percentage, and 2) load averages
+include all demand for the CPU not only how much was active at the
+time of measurement.
+
+** Calculate the load [fn:3]
+   When the quantum timer pops, timer.c is entered at a function in the
+kernel called timer.c:do_timer(). Here, all interrupts are disabled so
+the code is not working with moving targets. The jiffies counter is
+incremented by 1, and the load-average calculation is checked to see
+if it should be computed. 
+
+The calculation code uses the HZ value to determine the calculation
+frequency. Specifically, the timer.c:calc_load() function will run the
+averaging algorithm every 5 * HZ, or roughly every five seconds. 
+#+begin_src c
+ unsigned long avenrun[3];
+
+   static inline void calc_load(unsigned long ticks)
+   {
+      unsigned long active_tasks; /* fixed-point */
+      static int count = LOAD_FREQ;
+
+      count -= ticks;
+      if (count < 0) {
+         count += LOAD_FREQ;
+         active_tasks = count_active_tasks();
+         CALC_LOAD(avenrun[0], EXP_1, active_tasks);
+         CALC_LOAD(avenrun[1], EXP_5, active_tasks);
+         CALC_LOAD(avenrun[2], EXP_15, active_tasks);
+      }
+   }
+
+extern unsigned long avenrun[];	/* Load averages */
+
+   #define FSHIFT   11		/* nr of bits of precision */
+   #define FIXED_1  (1<<FSHIFT)	/* 1.0 as fixed-point */
+   #define LOAD_FREQ (5*HZ)	/* 5 sec intervals */
+   #define EXP_1  1884		/* 1/exp(5sec/1min) as fixed-point */
+   #define EXP_5  2014		/* 1/exp(5sec/5min) */
+   #define EXP_15 2037		/* 1/exp(5sec/15min) */
+
+   #define CALC_LOAD(load,exp,n) \
+      load *= exp; \
+      load += n*(FIXED_1-exp); \
+      load >>= FSHIFT;
+#+end_src
+The =calc_load()= function is called by =update_times()=, also found in
+timer.c, and is the code responsible for supplying the calc_load()
+function with the ticks parameter. 
+
+The macro takes in three parameters: the load-average bucket (one of
+the three elements in avenrun[]), a constant exponent and the number
+of running/uninterruptible processes currently on the run queue. The
+possible exponent constants are listed above: =EXP_1= for the 1-minute
+average, =EXP_5= for the 5-minute average and =EXP_15= for the 15-minute
+average. The important point to notice is that the value decreases
+with age. The constants are magic numbers that are calculated by the
+mathematical function shown below:
+
+[[./Files/calcload.jpg]]
+
+When x=1, then y=1884; when x=5, then y=2014; and when x=15, then
+y=2037. The purpose of the magical numbers is that it allows the
+=CALC_LOAD= macro to use precision fixed-point representation of
+fractions. The magic numbers are then nothing more than multipliers
+used against the running load average to make it a moving average.
+(The mathematics of fixed-point representation)
+
+** To diagnose which process causing this just run a command
+#+begin_src sh
+ps faux
+
+and look ‘D’ under 8th column STAT one. There may be lots of R and S as well.
+D —> Waiting for either (CPU, Disk I/O, Network I/O)
+R —-> Running
+S —–> Sleeping
+
+ps axo stat,pid | grep D
+to find the process with stat D
+#+end_src
+
+** top or uptime
+#+begin_src sh
+load average: 0.09, 0.05, 0.01
+#+end_src
+the three numbers represent averages over progressively longer periods
+of time (one, five, and fifteen minute averages)
+
+On multi-processor system, the load is relative to the number of
+processor cores available. The "100% utilization" mark is 1.00 on a
+single-core system, 2.00, on a dual-core, 4.00 on a quad-core, etc.
+
+** how many cores my system has
+=grep 'model name' /proc/cpuinfo | wc -l=
+** Monitoring Linux CPU Load with Scout
+https://scoutapp.com/
+
 * Linux TCP Tuning
 ** How to achieve Gigabit speeds with Linux
 http://datatag.web.cern.ch/datatag/howto/tcp.html
@@ -498,5 +671,7 @@ This tells the kernel to try and keep 64MB of RAM free at all times. It’s usef
 [fn:1] https://help.ubuntu.com/community/NvidiaMultiMonitors
 
 [fn:2] http://martybugs.net/wireless/openwrt/cron.cgi
+
+[fn:3] http://www.linuxjournal.com/article/9001
 
 

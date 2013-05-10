@@ -1,0 +1,86 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Kernel Techniques
+#+OPTIONS: num:nil H:2
+
+
+* Kernel Locking Techniques
+** Atomic Operators
+#+begin_src c
+atomic_t v;
+atomic_set(&v, 5);  /* v = 5 (atomically) */
+atomic_add(3, &v);  /* v = v + 3 (atomically) */
+atomic_dec(&v);             /* v = v - 1 (atomically) */
+printf("This will print 7: %d\n", atomic_read(&v));
+#+end_src
+** Spinlocks
+The most common locking primitive in the kernel is the spinlock,
+defined in include/asm/spinlock.h and include/linux/spinlock.h.
+
+#+begin_src c
+spinlock_t mr_lock = SPIN_LOCK_UNLOCKED;
+unsigned long flags;
+spin_lock_irqsave(&mr_lock, flags);
+/* critical section ... */
+spin_unlock_irqrestore(&mr_lock, flags);
+
+spinlock_t mr_lock = SPIN_LOCK_UNLOCKED;
+spin_lock_irq(&mr_lock);
+/* critical section ... */
+spin_unlock_irq(&mr_lock);
+#+end_src
+A final variation of the spinlock is spin_lock_bh() that implements
+the standard spinlock as well as disables softirqs. This is needed
+when you have code outside a softirq that is also used inside a
+softirq. The corresponding unlock function is naturally
+spin_unlock_bh().
+** Semaphores
+Semaphores in Linux are sleeping locks. Because they cause a task to
+sleep on contention, instead of spin, they are used in situations
+where the lock-held time may be long. 
+
+In Linux, semaphores are represented by a structure, struct semaphore,
+which is defined in include/asm/semaphore.h. The structure contains a
+pointer to a wait queue and a usage count. The wait queue is a list of
+processes blocking on the semaphore. The usage count is the number of
+concurrently allowed holders. If it is negative, the semaphore is
+unavailable and the absolute value of the usage count is the number of
+processes blocked on the wait queue. The usage count is initialized at
+runtime via sema_init(), typically to 1 (in which case the semaphore
+is called a mutex).
+#+begin_src c
+struct semaphore mr_sem;
+sema_init(&mr_sem, 1);      /* usage count is 1 */
+if (down_interruptible(&mr_sem))
+  /* semaphore not acquired; received a signal ... */
+/* critical region (semaphore acquired) ... */
+up(&mr_sem);
+#+end_src
+** Reader/Writer Locks
+
+#+begin_src c
+rwlock_t mr_rwlock = RW_LOCK_UNLOCKED;
+read_lock(&mr_rwlock);
+/* critical section (read only) ... */
+read_unlock(&mr_rwlock);
+write_lock(&mr_rwlock);
+/* critical section (read and write) ... */
+write_unlock(&mr_rwlock);
+
+struct rw_semaphore mr_rwsem;
+init_rwsem(&mr_rwsem);
+down_read(&mr_rwsem);
+/* critical region (read only) ... */
+up_read(&mr_rwsem);
+down_write(&mr_rwsem);
+/* critical region (read and write) ... */
+up_write(&mr_rwsem);
+
+#+end_src
+
+
+
+
+
+#+begin_src c
+
+#+end_src
