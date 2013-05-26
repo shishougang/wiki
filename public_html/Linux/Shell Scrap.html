@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Shell Scrap"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-05-10T22:22+0800"/>
+<meta name="generated" content="2013-05-26T09:46+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -166,8 +166,24 @@ for the JavaScript code in this tag.
 <li><a href="#sec-6-5">command</a></li>
 </ul>
 </li>
-<li><a href="#sec-7">String Operators</a></li>
-<li><a href="#sec-8">Command</a></li>
+<li><a href="#sec-7">Parameter expansion</a>
+<ul>
+<li><a href="#sec-7-1">Simple usage</a></li>
+<li><a href="#sec-7-2">Indirection</a></li>
+<li><a href="#sec-7-3">Case modification</a></li>
+<li><a href="#sec-7-4">expansion</a></li>
+</ul>
+</li>
+<li><a href="#sec-8">String Operators</a></li>
+<li><a href="#sec-9">Command</a></li>
+<li><a href="#sec-10">getopts</a></li>
+<li><a href="#sec-11">positional parameters</a>
+<ul>
+<li><a href="#sec-11-1">loop through the positional parameters</a></li>
+<li><a href="#sec-11-2">mass usage</a></li>
+<li><a href="#sec-11-3">Range Of Positional Parameters</a></li>
+</ul>
+</li>
 </ul>
 </div>
 </div>
@@ -777,7 +793,6 @@ DEBUG echo <span style="color: #ffa07a;">"a=$a"</span>
 
 
 
-
 </li>
 </ul>
 </div>
@@ -786,17 +801,94 @@ DEBUG echo <span style="color: #ffa07a;">"a=$a"</span>
 </div>
 
 <div id="outline-container-7" class="outline-2">
-<h2 id="sec-7">String Operators</h2>
+<h2 id="sec-7">Parameter expansion</h2>
 <div class="outline-text-2" id="text-7">
 
 
 </div>
 
+<div id="outline-container-7-1" class="outline-3">
+<h3 id="sec-7-1">Simple usage</h3>
+<div class="outline-text-3" id="text-7-1">
+
+
+
+
+<pre class="src src-sh">$<span style="color: #eedd82;">PARAMETER</span>
+${<span style="color: #eedd82;">PARAMETER</span>}
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-2" class="outline-3">
+<h3 id="sec-7-2">Indirection</h3>
+<div class="outline-text-3" id="text-7-2">
+
+<p><code>${PARAMETER}</code>
+The referenced parameter is not PARAMETER itself, but the parameter
+whose name is stored as the value of PARAMETER. If the parameter
+PARAMETER has the value "TEMP", then <code>${!PARAMETER}</code> will expand to the
+value of the parameter named TEMP
+</p></div>
+
+</div>
+
+<div id="outline-container-7-3" class="outline-3">
+<h3 id="sec-7-3">Case modification</h3>
+<div class="outline-text-3" id="text-7-3">
+
+
+
+
+<pre class="src src-sh">${<span style="color: #eedd82;">PARAMETER</span>^} <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">modifies the first character to uppercase,</span>
+${<span style="color: #eedd82;">PARAMETER</span>^^} <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">all characters are converted</span>
+${<span style="color: #eedd82;">PARAMETER</span>,} <span style="color: #ff7f24;">#  </span><span style="color: #ff7f24;">, operator to lowercase</span>
+${<span style="color: #eedd82;">PARAMETER</span>,,}
+${<span style="color: #eedd82;">PARAMETER</span>~} <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">~ reverses the case of first letter of words in the variabl</span>
+${<span style="color: #eedd82;">PARAMETER</span>~~}
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-7-4" class="outline-3">
+<h3 id="sec-7-4">expansion</h3>
+<div class="outline-text-3" id="text-7-4">
+
+
+
+
+<pre class="src src-sh">Arithmetic expansion
+$(( EXPRESSION ))
+$[ EXPRESSION ]
+Command substitution
+$( COMMAND )
+<span style="color: #fa8072;">` COMMAND `</span>
+</pre>
+
+
+
+
+</div>
+</div>
+
 </div>
 
 <div id="outline-container-8" class="outline-2">
-<h2 id="sec-8">Command</h2>
+<h2 id="sec-8">String Operators</h2>
 <div class="outline-text-2" id="text-8">
+
+</div>
+
+</div>
+
+<div id="outline-container-9" class="outline-2">
+<h2 id="sec-9">Command</h2>
+<div class="outline-text-2" id="text-9">
 
 <p>!$
 !$是一个特殊的环境变量，它代表了上一个命令的最后一个字符串。如：你可能会这样：
@@ -871,12 +963,145 @@ python -m SimpleHTTPServer
 history | awk '{CMD[$2]++;count++;} END { for (a in CMD )print CMD[a] " " CMD[a]/count*100 "% " a }' | grep -v "./" | column -c3 -s " " -t | sort -nr | nl | head -n10
 (陈皓注：有点复杂了，history|awk ‘{print $2}’|awk ‘BEGIN {FS=”|”} {print $1}’|sort|uniq -c|sort -rn|head -10)
 这行脚本能输出你最常用的十条命令，由此甚至可以洞察你是一个什么类型的程序员。
-</p></div>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-10" class="outline-2">
+<h2 id="sec-10">getopts</h2>
+<div class="outline-text-2" id="text-10">
+
+<p>Note that getopts is not able to parse GNU-style long options
+(&ndash;myoption) or XF86-style long options (-myoption)!
+</p>
+<ul>
+<li>OPTIND       Holds the index to the next argument to be processed. This is
+  how getopts "remembers" its own status between invocations. Also
+  usefull to shift the positional parameters after processing with
+  getopts. OPTIND is initially set to 1, and needs to be re-set to 1
+  if you want to parse anything again with getopts
+</li>
+<li>OPTARG        This variable is set to any argument for an option
+  found by getopts. It also contains the option flag of an unknown
+  option.
+</li>
+<li>OPTERR        (Values 0 or 1) Indicates if Bash should display error
+  messages generated by the getopts builtin. The value is initialized
+  to 1 on every shell startup - so be sure to always set it to 0 if
+  you don't want to see annoying messages!
+</li>
+</ul>
+
+
+
+
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">The base-syntax for getopts is:</span>
+<span style="color: #b0c4de;">getopts</span> OPTSTRING VARNAME [ARGS...]
+
+OPTSTRING tells getopts which options to expect and where to expect arguments (see below)
+VARNAME tells getopts which shell-variable to use for option reporting
+ARGS    tells getopts to parse these optional words instead of the positional parameters
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-11" class="outline-2">
+<h2 id="sec-11">positional parameters</h2>
+<div class="outline-text-2" id="text-11">
+
+
+
+
+<pre class="src src-sh">$<span style="color: #eedd82;">FUNCNAME</span>        the <span style="color: #00ffff;">function</span> <span style="color: #87cefa;">name</span> (attention: inside a <span style="color: #00ffff;">function</span>, $<span style="color: #eedd82;">0</span> is still the $<span style="color: #eedd82;">0</span> of the shell, not the <span style="color: #00ffff;">function</span> <span style="color: #87cefa;">name</span>)
+$<span style="color: #eedd82;">1</span> &#8230; $<span style="color: #eedd82;">9</span>        the argument list elements from 1 to 9
+${<span style="color: #eedd82;">10</span>} &#8230; ${<span style="color: #eedd82;">N</span>}   the argument list elements beyond 9 (note the parameter expansion syntax!)
+$<span style="color: #eedd82;">*</span>      all positional parameters except $<span style="color: #eedd82;">0</span>
+$<span style="color: #eedd82;">@</span>      all positional parameters except $<span style="color: #eedd82;">0</span>
+$<span style="color: #eedd82;">#</span>      the number of arguments, not counting $<span style="color: #eedd82;">0</span>
+</pre>
+
+
+</div>
+
+<div id="outline-container-11-1" class="outline-3">
+<h3 id="sec-11-1">loop through the positional parameters</h3>
+<div class="outline-text-3" id="text-11-1">
+
+
+
+
+<pre class="src src-sh"><span style="color: #eedd82;">numargs</span>=$<span style="color: #eedd82;">#</span>
+<span style="color: #00ffff;">for</span> ((<span style="color: #eedd82;">i</span>=1 ; i &lt;= numargs ; i++))
+<span style="color: #00ffff;">do</span>
+    <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"$1"</span>
+    <span style="color: #b0c4de;">shift</span>
+<span style="color: #00ffff;">done</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">or</span>
+<span style="color: #00ffff;">for</span> arg
+<span style="color: #00ffff;">do</span>
+    <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"$arg"</span>
+<span style="color: #00ffff;">done</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">while but it has the disadvantage to stop when $1 is empty (null-string)</span>
+<span style="color: #00ffff;">while</span> [ <span style="color: #ffa07a;">"$1"</span> ]
+<span style="color: #00ffff;">do</span>
+    <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"$1"</span>
+    <span style="color: #b0c4de;">shift</span>
+<span style="color: #00ffff;">done</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">run as long as $1 is defined</span>
+<span style="color: #00ffff;">while</span> [ <span style="color: #ffa07a;">"${1+defined}"</span> ]; <span style="color: #00ffff;">do</span>
+  <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"$1"</span>
+  <span style="color: #b0c4de;">shift</span>
+<span style="color: #00ffff;">done</span>
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-11-2" class="outline-3">
+<h3 id="sec-11-2">mass usage</h3>
+<div class="outline-text-3" id="text-11-2">
+
+
+
+
+<pre class="src src-sh">$<span style="color: #eedd82;">*</span>      $<span style="color: #eedd82;">1</span> $<span style="color: #eedd82;">2</span> $<span style="color: #eedd82;">3</span> &#8230; ${<span style="color: #eedd82;">N</span>}
+$<span style="color: #eedd82;">@</span>      $<span style="color: #eedd82;">1</span> $<span style="color: #eedd82;">2</span> $<span style="color: #eedd82;">3</span> &#8230; ${<span style="color: #eedd82;">N</span>}
+<span style="color: #ffa07a;">"$*"</span>    <span style="color: #ffa07a;">"$1c$2c$3c&#8230;c${N}"</span> <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">where 'c' is the first character of IFS.</span>
+<span style="color: #ffa07a;">"$@"</span>    <span style="color: #ffa07a;">"$1"</span> <span style="color: #ffa07a;">"$2"</span> <span style="color: #ffa07a;">"$3"</span> &#8230; <span style="color: #ffa07a;">"${N}"</span>
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-11-3" class="outline-3">
+<h3 id="sec-11-3">Range Of Positional Parameters</h3>
+<div class="outline-text-3" id="text-11-3">
+
+
+
+
+<pre class="src src-sh">${<span style="color: #eedd82;">@</span>:START:COUNT}
+${<span style="color: #eedd82;">*</span>:START:COUNT}
+<span style="color: #ffa07a;">"${@:START:COUNT}"</span>
+<span style="color: #ffa07a;">"${*:START:COUNT}"</span>
+</pre>
+
+
+
+</div>
+</div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-05-10T22:22+0800</p>
+<p class="date">Date: 2013-05-26T09:46+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

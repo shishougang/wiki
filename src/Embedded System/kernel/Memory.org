@@ -1,0 +1,184 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Memory
+#+OPTIONS: num:nil H:2
+
+* Kernel memory handling[fn:1]
+** Kernel memory allocation
+*** Buddy system
+The kernel uses a buddy system with power-of-two sizes. For order 0,
+1, 2, ..., 9 it has lists of areas containing 2^order pages. If a
+small area is needed and only a larger area is available, the larger
+area is split into two halves (buddies), possibly repeatedly.
+*** get_free_page
+The routine =__get_free_page()= will give us a page. The routine
+=__get_free_pages()= will give a number of consecutive pages. (A power
+of two, from 1 to 512 or so. The above buddy system is used.)
+*** kmalloc
+The routine kmalloc() is good for an area of unknown, arbitrary,
+smallish length, in the range 32-131072 (more precisely: 1/128 of a
+page up to 32 pages), preferably below 4096. For the sizes, see
+=<linux/kmalloc_sizes.h>=. Because of fragmentation, it will be
+difficult to get large consecutive areas from kmalloc(). These days
+kmalloc() returns memory from one of a series of slab caches (see
+below) with names like "size-32", ..., "size-131072".
+
+*** Priority
+there is a bit specifying whether we would like a hot or a cold page
+(that is, a page likely to be in the CPU cache, or a page not likely
+to be there). If the page will be used by the CPU, a hot page will be
+faster. If the page will be used for device DMA the CPU cache would be
+invalidated anyway, and a cold page does not waste precious cache
+contents.
+
+#+begin_src c
+//linux/gfp.h
+/* Zone modifiers in GFP_ZONEMASK (see linux/mmzone.h - low four bits) */
+#define __GFP_DMA       0x01
+
+/* Action modifiers - doesn't change the zoning */
+#define __GFP_WAIT      0x10    /* Can wait and reschedule? */
+#define __GFP_HIGH      0x20    /* Should access emergency pools? */
+#define __GFP_IO        0x40    /* Can start low memory physical IO? */
+#define __GFP_FS        0x100   /* Can call down to low-level FS? */
+#define __GFP_COLD      0x200   /* Cache-cold page required */
+
+#define GFP_NOIO        (__GFP_WAIT)
+#define GFP_NOFS        (__GFP_WAIT | __GFP_IO )
+#define GFP_ATOMIC      (__GFP_HIGH)
+#define GFP_USER        (__GFP_WAIT | __GFP_IO | __GFP_FS)
+#define GFP_KERNEL      (__GFP_WAIT | __GFP_IO | __GFP_FS)
+#+end_src
+
+Uses:
+
++ =GFP_KERNEL= is the default flag. Sleeping is allowed.
++ =GFP_ATOMIC= is used in interrupt handlers. Never sleeps.
++ =GFP_USER= for user mode allocations. Low priority, and may sleep. (Today equal to GFP_KERNEL.)
++ =GFP_NOIO= must not call down to drivers (since it is used from drivers).
++ =GFP_NOFS= must not call down to filesystems (since it is used from
+  filesystems -- see, e.g., dcache.c: =shrink_dcache_memory= and
+  inode.c: =shrink_icache_memory=).
+*** vmalloc
+The routine vmalloc() has a similar purpose, but has a better chance
+of being able to return larger consecutive areas, and is more
+expensive. It uses page table manipulation to create an area of memory
+that is consecutive in virtual memory, but not necessarily in physical
+memory. Device I/O to such an area is a bad idea. It uses the above
+calls with =GFP_KERNEL= to get its memory, so cannot be used in
+interrupt context.
+** Turning off overcommit
+Since 2.5.30 the values are: 0 (default): as before: guess about how
+much overcommitment is reasonable, 1: never refuse any malloc(), 2: be
+precise about the overcommit - never commit a virtual address space
+larger than swap space plus a fraction overcommit_ratio of the
+physical memory. Here /proc/sys/vm/overcommit_ratio (by default 50) is
+another user-settable parameter. It is possible to set
+overcommit_ratio to values larger than 100. 
+** Stack overflow
+A simple demo that catches SIGSEGV:
+
+#+begin_src c
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+
+void segfault(int dummy) {
+        printf("Help!\n");
+        exit(1);
+}
+
+int main() {
+        int *p = 0;
+
+        signal(SIGSEGV, segfault);
+        *p = 17;
+        return 0;
+}
+#+end_src
+Without the exit() here, this demo will loop because the illegal assignment is restarted.
+This simple demo fails to catch stack overflow, because there is no stack space for a call frame for the segfault() interrupt handler. If it is desired to catch stack overflow one first must set up an alternative stack. As follows:
+
+#+begin_src c
+...
+int main() {
+        char myaltstack[SIGSTKSZ];
+        struct sigaction act;
+        stack_t ss;
+
+        ss.ss_sp = myaltstack;
+        ss.ss_size = sizeof(myaltstack);
+        ss.ss_flags = 0;
+        if (sigaltstack(&ss, NULL))
+                errexit("sigaltstack failed");
+
+        act.sa_handler = segfault;
+        act.sa_flags = SA_ONSTACK;
+        if (sigaction(SIGSEGV, &act, NULL))
+                errexit("sigaction failed");
+...
+#+end_src
+
+* The Linux Page Cache and pdflush:[fn:2]
+** writes data out
+Linux usually writes data out of the page cache using a process called
+pdflush. At any moment, between 2 and 8 pdflush threads are running on
+the system. You can monitor how many are active by looking at
+=/proc/sys/vm/nr_pdflush_threads=. Whenever all existing pdflush threads
+are busy for at least one second, an additional pdflush daemon is
+spawned. The new ones try to write back data to device queues that are
+not congested, aiming to have each device that's active get its own
+thread flushing data to that device. Each time a second has passed
+without any pdflush activity, one of the threads is removed. There are
+tunables for adjusting the minimum and maximum number of pdflush
+processes, but it's very rare they need to be adjusted.
+** pdflush tunables
+Exactly what each pdflush thread does is controlled by a series of
+parameters in /proc/sys/vm:
+
+*** =/proc/sys/vm/dirty_writeback_centisecs=
+(default 500): In hundredths of a second, this is how often pdflush
+wakes up to write data to disk. The default wakes up the two (or more)
+active threads every five seconds.
+
+Because of all this, it's unlikely you'll gain much benefit from
+lowering the writeback time; the thread spawning code assures that
+they will automatically run themselves as often as is practical to try
+and meet the other requirements.
+
+*** =/proc/sys/vm/dirty_expire_centiseconds=
+The first thing pdflush works on is writing pages that have been dirty
+for longer than it deems acceptable.
+
+(default 3000): In hundredths of a second, how long data can be in the
+page cache before it's considered expired and must be written at the
+next opportunity. Note that this default is very long: a full 30
+seconds. That means that under normal circumstances, unless you write
+enough to trigger the other pdflush method, Linux won't actually
+commit anything you write until 30 seconds later.
+*** =/proc/sys/vm/dirty_background_ratio=
+(default 10): Maximum percentage of active that can be filled with
+dirty pages before pdflush begins to write them
+
+Note that some kernel versions may internally put a lower bound on
+this value at 5%.
+
+Most of the documentation you'll find about this parameter suggests
+it's in terms of total memory, but a look at the source code shows
+this isn't true. In terms of the meminfo output, the code actually
+looks at =MemFree + Cached - Mapped=-
+*** Summary: when does pdflush write?
+
+
+
+
+
+
+* Reference 
++ Understanding the Linux Virtual Memory Manager By Mel Gorman
+
+* Footnotes
+
+[fn:1] http://www.win.tue.nl/~aeb/linux/lk/lk-9.html
+
+[fn:2] http://www.westnet.com/~gsmith/content/linux-pdflush.htm
+
