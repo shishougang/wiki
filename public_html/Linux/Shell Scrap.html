@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Shell Scrap"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-05-26T09:46+0800"/>
+<meta name="generated" content="2013-06-07T20:18+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -171,7 +171,18 @@ for the JavaScript code in this tag.
 <li><a href="#sec-7-1">Simple usage</a></li>
 <li><a href="#sec-7-2">Indirection</a></li>
 <li><a href="#sec-7-3">Case modification</a></li>
-<li><a href="#sec-7-4">expansion</a></li>
+<li><a href="#sec-7-4">Variable name expansion</a></li>
+<li><a href="#sec-7-5">Substring removal</a></li>
+<li><a href="#sec-7-6">Search and replace</a></li>
+<li><a href="#sec-7-7">String length</a></li>
+<li><a href="#sec-7-8">Substring expansion</a></li>
+<li><a href="#sec-7-9">Use a default value</a></li>
+<li><a href="#sec-7-10">Assign a default value</a></li>
+<li><a href="#sec-7-11">Use an alternate value</a></li>
+<li><a href="#sec-7-12">Display error if null or unset</a></li>
+<li><a href="#sec-7-13">Arithmetic and command expansion</a></li>
+<li><a href="#sec-7-14">Brace expansion</a></li>
+<li><a href="#sec-7-15">aa</a></li>
 </ul>
 </li>
 <li><a href="#sec-8">String Operators</a></li>
@@ -856,22 +867,222 @@ ${<span style="color: #eedd82;">PARAMETER</span>~~}
 </div>
 
 <div id="outline-container-7-4" class="outline-3">
-<h3 id="sec-7-4">expansion</h3>
+<h3 id="sec-7-4">Variable name expansion</h3>
 <div class="outline-text-3" id="text-7-4">
 
 
 
 
-<pre class="src src-sh">Arithmetic expansion
+<pre class="src src-sh">${<span style="color: #eedd82;">!</span>PREFIX*} <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">This expands to a list of all set variable names beginning with the string PREFIX. </span>
+${<span style="color: #eedd82;">!</span>PREFIX@}
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-5" class="outline-3">
+<h3 id="sec-7-5">Substring removal</h3>
+<div class="outline-text-3" id="text-7-5">
+
+
+
+
+<pre class="src src-sh">${<span style="color: #eedd82;">PARAMETER</span>#PATTERN}  <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">The operator "#" will try to remove the shortest text matching the pattern, while "##" tries to do it with the longest text matching. </span>
+${<span style="color: #eedd82;">PARAMETER</span>##PATTERN}
+${<span style="color: #eedd82;">PARAMETER</span>%PATTERN} <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">except that Bash now tries to match the pattern from the end of the string</span>
+${<span style="color: #eedd82;">PARAMETER</span>%%PATTERN}
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-6" class="outline-3">
+<h3 id="sec-7-6">Search and replace</h3>
+<div class="outline-text-3" id="text-7-6">
+
+
+
+
+<pre class="src src-sh">${<span style="color: #eedd82;">PARAMETER</span>/PATTERN/STRING}
+${<span style="color: #eedd82;">PARAMETER</span>//PATTERN/STRING}
+${<span style="color: #eedd82;">PARAMETER</span>/PATTERN} <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">removed</span>
+${<span style="color: #eedd82;">PARAMETER</span>//PATTERN}
+
+Anchoring Additionally you can <span style="color: #ffa07a;">"anchor"</span> an expression: A <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">(hashmark) will indicate that your expression is matched against the beginning portion of the string, a % (percent-sign) will do it for the end portion.</span>
+
+<span style="color: #eedd82;">MYSTRING</span>=xxxxxxxxxx
+<span style="color: #b0c4de;">echo</span> ${<span style="color: #eedd82;">MYSTRING</span>/#x/y}  <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">RESULT: yxxxxxxxxx</span>
+<span style="color: #b0c4de;">echo</span> ${<span style="color: #eedd82;">MYSTRING</span>/%x/y}  <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">RESULT: xxxxxxxxxy</span>
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-7" class="outline-3">
+<h3 id="sec-7-7">String length</h3>
+<div class="outline-text-3" id="text-7-7">
+
+
+
+
+<pre class="src src-sh">${#<span style="color: #eedd82;">PARAMETER</span>}
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-8" class="outline-3">
+<h3 id="sec-7-8">Substring expansion</h3>
+<div class="outline-text-3" id="text-7-8">
+
+
+
+
+<pre class="src src-sh">${<span style="color: #eedd82;">PARAMETER</span>:OFFSET}
+${<span style="color: #eedd82;">PARAMETER</span>:OFFSET:LENGTH}
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-9" class="outline-3">
+<h3 id="sec-7-9">Use a default value</h3>
+<div class="outline-text-3" id="text-7-9">
+
+<p>If the parameter PARAMETER is unset (never was defined) or null
+(empty), this one expands to WORD, otherwise it expands to the value
+of PARAMETER, as if it just was ${PARAMETER}. If you omit the :
+(colon), like shown in the second form, the default value is only used
+when the parameter was unset, not when it was empty.
+</p>
+
+
+
+<pre class="src src-sh">${<span style="color: #eedd82;">PARAMETER</span>:-WORD}
+
+${<span style="color: #eedd82;">PARAMETER</span>-WORD}
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-10" class="outline-3">
+<h3 id="sec-7-10">Assign a default value</h3>
+<div class="outline-text-3" id="text-7-10">
+
+<p>This one works like the using default values, but the default text you
+give is not only expanded, but also assigned to the parameter, if it
+was unset or null. Equivalent to using a default value, when you omit
+the : (colon), as shown in the second form, the default value will
+only be assigned when the parameter was unset.
+</p>
+
+
+
+<pre class="src src-sh">${<span style="color: #eedd82;">PARAMETER</span>:=WORD}
+
+${<span style="color: #eedd82;">PARAMETER</span>=WORD}
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-11" class="outline-3">
+<h3 id="sec-7-11">Use an alternate value</h3>
+<div class="outline-text-3" id="text-7-11">
+
+<p>This form expands to nothing if the parameter is unset or empty. If it
+is set, it does not expand to the parameter's value, but to some text
+you can specify:
+</p>
+
+
+
+<pre class="src src-sh">${<span style="color: #eedd82;">PARAMETER</span>:+WORD}
+
+${<span style="color: #eedd82;">PARAMETER</span>+WORD}
+<span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"The Java application was installed and can be started.${JAVAPATH:+ NOTE: JAVAPATH seems to be set}"</span>
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-12" class="outline-3">
+<h3 id="sec-7-12">Display error if null or unset</h3>
+<div class="outline-text-3" id="text-7-12">
+
+<p>If the parameter PARAMETER is set/non-null, this form will simply
+expand it. Otherwise, the expansion of WORD will be used as appendix
+for an error message:
+</p>
+<ul>
+<li>an interactive shell has $? to a non-zero value
+</li>
+<li>a non-interactive shell exits with a non-zero exit code
+</li>
+</ul>
+
+
+
+
+<pre class="src src-sh">${<span style="color: #eedd82;">PARAMETER</span>:?WORD}
+
+${<span style="color: #eedd82;">PARAMETER</span>?WORD}
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-13" class="outline-3">
+<h3 id="sec-7-13">Arithmetic and command expansion</h3>
+<div class="outline-text-3" id="text-7-13">
+
+
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Arithmetic expansion</span>
 $(( EXPRESSION ))
-$[ EXPRESSION ]
-Command substitution
+$[ EXPRESSION ]  <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Please do not use the second form $[ &#8230; ]! It's deprecated. </span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Command substitution</span>
 $( COMMAND )
 <span style="color: #fa8072;">` COMMAND `</span>
 </pre>
 
 
+</div>
 
+</div>
+
+<div id="outline-container-7-14" class="outline-3">
+<h3 id="sec-7-14">Brace expansion</h3>
+<div class="outline-text-3" id="text-7-14">
+
+
+
+
+<pre class="src src-sh"></pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-7-15" class="outline-3">
+<h3 id="sec-7-15">aa</h3>
+<div class="outline-text-3" id="text-7-15">
+
+
+
+
+<pre class="src src-sh"></pre>
 
 </div>
 </div>
@@ -1101,7 +1312,7 @@ ${<span style="color: #eedd82;">*</span>:START:COUNT}
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-05-26T09:46+0800</p>
+<p class="date">Date: 2013-06-07T20:18+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

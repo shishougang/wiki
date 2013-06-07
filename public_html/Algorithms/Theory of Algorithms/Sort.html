@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
 <meta name="title" content="Sort"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-05-26T09:46+0800"/>
+<meta name="generated" content="2013-06-07T20:18+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -285,7 +285,102 @@ sort can be reduced to  at the cost of speed
 
 
 
-<pre class="src src-python"></pre>
+<pre class="src src-python"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Possibly replace with a generator that produces Leonardo numbers?</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">That would be of limited utility since this is all of them up to 31 bits.</span>
+<span style="color: #ffebcd; background-color: #2f4f4f;">LP</span> = [ 1, 1, 3, 5, 9, 15, 25, 41, 67, 109, 177, 287, 465, 753, 1219, 1973,
+       3193, 5167, 8361, 13529, 21891, 35421, 57313, 92735, 150049, 242785,
+       392835, 635621, 1028457, 1664079, 2692537, 4356617, 7049155,
+       11405773, 18454929, 29860703, 48315633, 78176337, 126491971,
+       204668309, 331160281, 535828591, 866988873 ]
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Solution for determining number of trailing zeroes of a number's binary representation.</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Taken from http://www.0xe3.com/text/ntz/ComputingTrailingZerosHOWTO.html</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">don't much like the magic numbers, but they really are magic.</span>
+<span style="color: #ffebcd; background-color: #2f4f4f;">MultiplyDeBruijnBitPosition</span> = [ 0,  1, 28,  2, 29, 14, 24, 3,
+                                30, 22, 20, 15, 25, 17,  4, 8,
+                                31, 27, 13, 23, 21, 19, 16, 7,
+                                26, 12, 18,  6, 11,  5, 10, 9]
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">trailingzeroes</span>(v):
+    <span style="color: #00ffff;">return</span> MultiplyDeBruijnBitPosition[(((v &amp; -v) * 0x077CB531L) &gt;&gt; 27) &amp; 0b11111]
+
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">sift</span>(lst, pshift, head):
+    <span style="color: #00ffff;">while</span> pshift &gt; 1:
+        <span style="color: #ffebcd; background-color: #2f4f4f;">rc</span> = head - 1
+        <span style="color: #ffebcd; background-color: #2f4f4f;">lc</span> = head - 1 - LP[pshift - 2]
+        <span style="color: #00ffff;">if</span> lst[head] &gt;= lst[lc] <span style="color: #00ffff;">and</span> lst[head] &gt;= lst[rc]:
+            <span style="color: #00ffff;">break</span>
+        <span style="color: #00ffff;">elif</span> lst[rc] &gt; lst[lc]:
+            lst[head], lst[rc] = lst[rc], lst[head]
+            <span style="color: #ffebcd; background-color: #2f4f4f;">head</span> = rc
+            <span style="color: #ffebcd; background-color: #2f4f4f;">pshift</span> -= 2
+        <span style="color: #00ffff;">else:</span>
+            lst[head], lst[lc] = lst[lc], lst[head]
+            <span style="color: #ffebcd; background-color: #2f4f4f;">head</span> = lc
+            <span style="color: #ffebcd; background-color: #2f4f4f;">pshift</span> -= 1
+
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">trinkle</span>(lst, p, pshift, head):
+    <span style="color: #00ffff;">while</span> p != 1:
+        <span style="color: #ffebcd; background-color: #2f4f4f;">priorHeap</span> = head - LP[pshift]
+        <span style="color: #00ffff;">if</span> lst[head] &gt;= lst[priorHeap]:
+            <span style="color: #00ffff;">break</span>
+        lst[head], lst[priorHeap] = lst[priorHeap], lst[head]
+        <span style="color: #ffebcd; background-color: #2f4f4f;">head</span> = priorHeap
+        <span style="color: #ffebcd; background-color: #2f4f4f;">trail</span> = trailingzeroes(p &amp; ~1)
+        p &gt;&gt;= trail
+        <span style="color: #ffebcd; background-color: #2f4f4f;">pshift</span> += trail
+    sift(lst, pshift, head)
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">smoothsort</span>(lst):
+    <span style="color: #ffa07a;">"""</span>
+<span style="color: #ffa07a;">    case 0: If there are no elements in the heap, add a tree of order 1</span>
+<span style="color: #ffa07a;">    case 1: If the last two heaps have sizes that differ by one, merge them</span>
+<span style="color: #ffa07a;">    case 2: If the last heap has LP 1, add a singleton heap of LP 0</span>
+<span style="color: #ffa07a;">    case 3: add a singleton heap of LP 1</span>
+<span style="color: #ffa07a;">    """</span>
+    <span style="color: #ff7f24;">#case 0:</span>
+    p = 1
+    <span style="color: #ffebcd; background-color: #2f4f4f;">pshift</span> = 1
+    <span style="color: #ffebcd; background-color: #2f4f4f;">head</span> = 0
+
+    <span style="color: #00ffff;">while</span> head &lt; <span style="color: #b0c4de;">len</span>(lst) - 1:
+        <span style="color: #ff7f24;">#case 1:</span>
+        <span style="color: #00ffff;">if</span> (p &amp; 3) == 3:
+            sift(lst, pshift, head)
+            p &gt;&gt;= 2
+            <span style="color: #ffebcd; background-color: #2f4f4f;">pshift</span> += 2
+        <span style="color: #00ffff;">else:</span>
+            <span style="color: #00ffff;">if</span> LP[pshift - 1] &gt;= <span style="color: #b0c4de;">len</span>(lst) - 1 - head:
+                trinkle(lst, p, pshift, head)
+            <span style="color: #00ffff;">else:</span>
+                sift(lst, pshift, head)
+
+            <span style="color: #ff7f24;">#case 2</span>
+            <span style="color: #00ffff;">if</span> pshift == 1:
+                p &lt;&lt;= 1
+                <span style="color: #ffebcd; background-color: #2f4f4f;">pshift</span> = 0
+            <span style="color: #00ffff;">else:</span> <span style="color: #ff7f24;">#case 3</span>
+                p &lt;&lt;= pshift - 1
+                <span style="color: #ffebcd; background-color: #2f4f4f;">pshift</span> = 1
+        p |= 1
+        <span style="color: #ffebcd; background-color: #2f4f4f;">head</span> += 1
+    trinkle(lst, p, pshift, head)
+    <span style="color: #00ffff;">while</span> pshift != 1 <span style="color: #00ffff;">or</span> p != 1:
+        <span style="color: #00ffff;">if</span> pshift &lt;= 1:
+            <span style="color: #ffebcd; background-color: #2f4f4f;">trail</span> = trailingzeroes(p &amp; ~1)
+            p &gt;&gt;= trail
+            <span style="color: #ffebcd; background-color: #2f4f4f;">pshift</span> += trail
+        <span style="color: #00ffff;">else:</span>
+            p &lt;&lt;= 2
+            p ^= 7
+            <span style="color: #ffebcd; background-color: #2f4f4f;">pshift</span> -= 2
+            <span style="color: #ff7f24;">#left child</span>
+            trinkle(lst, p &gt;&gt; 1, pshift + 1, head - LP[pshift] - 1)
+            trinkle(lst, p, pshift, head - 1)
+        <span style="color: #ffebcd; background-color: #2f4f4f;">head</span> -= 1
+</pre>
 
 </div>
 
@@ -620,7 +715,7 @@ sort can be reduced to  at the cost of speed
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-05-26T09:46+0800</p>
+<p class="date">Date: 2013-06-07T20:18+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

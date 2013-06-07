@@ -1,13 +1,13 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
                "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Bloom filter</title>
-<meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Bloom filter"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-05-10T22:44+0800"/>
+<meta name="generated" content="2013-06-07T20:18+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -124,12 +124,13 @@ for the JavaScript code in this tag.
 <h1 class="title">Bloom filter</h1>
 
 
-
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">Algorithm description</a></li>
+<li><a href="#sec-3">Implementation in C</a></li>
 </ul>
 </div>
 </div>
@@ -140,17 +141,246 @@ for the JavaScript code in this tag.
 
 <p>A Bloom filter is a space-efficient probabilistic data structure that
 is used to test whether an element is a member of a set.<sup><a class="footref" name="fnr-.1" href="#fn-.1">1</a></sup>
+</p></div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2">Algorithm description</h2>
+<div class="outline-text-2" id="text-2">
+
+<ol>
+<li>An <b>empty Bloom filter</b> is a bit array of m bits, all set to 0. There
+   must also be k different hash functions defined, each of which maps
+   or hashes some set element to one of the m array positions with a
+   uniform random distribution.
+</li>
+<li>To <b>add</b> an element, feed it to each of the k hash functions to get k
+   array positions. Set the bits at all these positions to 1.
+</li>
+<li>To <b>query</b> for an element (test whether it is in the set), feed it to
+   each of the k hash functions to get k array positions. If any of
+   the bits at these positions are 0, the element is definitely not in
+   the set – if it were, then all the bits would have been set to 1
+   when it was inserted. If all are 1, then either the element is in
+   the set, or the bits have by chance been set to 1 during the
+   insertion of other elements, resulting in a <b>false positive</b>.
+</li>
+</ol>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">Implementation in C</h2>
+<div class="outline-text-2" id="text-3">
+
+<p><a href="./files/bloom_filter/c/bloom.h">bloom.h</a>
 </p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#if</span><span style="color: #b0c4de;">n</span><span style="color: #b0c4de;">def</span> __BLOOM_H__
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__BLOOM_H__</span>
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> (*<span style="color: #98fb98;">hashfunc_t</span>)(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *);
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span>{
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">a</span>;
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">nhashfuncs</span>;
+  <span style="color: #98fb98;">hashfunc_t</span> *<span style="color: #eedd82;">hashfuncs</span>;
+} <span style="color: #98fb98;">BLOOM</span>;
+
+<span style="color: #98fb98;">BLOOM</span> *<span style="color: #87cefa;">bloom_create</span>(<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">nhashfuncs</span>, ...);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">bloom_destroy</span>(<span style="color: #98fb98;">BLOOM</span> *<span style="color: #eedd82;">bloom</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">bloom_add</span>(<span style="color: #98fb98;">BLOOM</span> *<span style="color: #eedd82;">bloom</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">s</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">bloom_check</span>(<span style="color: #98fb98;">BLOOM</span> *<span style="color: #eedd82;">bloom</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">s</span>);
+
+<span style="color: #b0c4de;">#endif</span>
+</pre>
+
+<p>
+<a href="./files/bloom_filter/c/bloom.c">bloom.c</a>
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;limits.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdarg.h&gt;</span>
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">"bloom.h"</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">SETBIT</span>(<span style="color: #eedd82;">a</span>, <span style="color: #eedd82;">n</span>) (a[n/CHAR_BIT] |= (1&lt;&lt;(n%CHAR_BIT)))
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">GETBIT</span>(<span style="color: #eedd82;">a</span>, <span style="color: #eedd82;">n</span>) (a[n/CHAR_BIT] &amp; (1&lt;&lt;(n%CHAR_BIT)))
+
+<span style="color: #98fb98;">BLOOM</span> *<span style="color: #87cefa;">bloom_create</span>(<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">nhashfuncs</span>, ...)
+{
+  <span style="color: #98fb98;">BLOOM</span> *<span style="color: #eedd82;">bloom</span>;
+  <span style="color: #98fb98;">va_list</span> <span style="color: #eedd82;">l</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>;
+  <span style="color: #00ffff;">if</span>(!(bloom = malloc(<span style="color: #00ffff;">sizeof</span>(BLOOM)))) <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+  <span style="color: #00ffff;">if</span>(!(bloom-&gt;a = calloc((size + CHAR_BIT - 1) / CHAR_BIT, <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">char</span>)))){
+    free(bloom);
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+  }
+  <span style="color: #00ffff;">if</span>(!(bloom-&gt;hashfuncs = (<span style="color: #98fb98;">hashfunc_t</span> *) malloc(nhashfuncs * <span style="color: #00ffff;">sizeof</span>(hashfunc_t)))){
+    free(bloom-&gt;a);
+    free(bloom);
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+  }
+
+  va_start(l, nhashfuncs);
+  <span style="color: #00ffff;">for</span>(n = 0; n &lt; nhashfuncs; ++n){
+    bloom-&gt;hashfuncs[n] = va_arg(l, hashfunc_t);
+  }
+  va_end(l);
+
+  bloom-&gt;size = size;
+  bloom-&gt;nhashfuncs = nhashfuncs;
+
+  <span style="color: #00ffff;">return</span> bloom;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">bloom_destroy</span>(<span style="color: #98fb98;">BLOOM</span> *<span style="color: #eedd82;">bloom</span>)
+{
+  free(bloom-&gt;hashfuncs);
+  free(bloom-&gt;a);
+  free(bloom);
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">bloom_add</span>(<span style="color: #98fb98;">BLOOM</span> *<span style="color: #eedd82;">bloom</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">s</span>)
+{
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">n</span>;
+  <span style="color: #00ffff;">for</span>(n = 0; n &lt; bloom-&gt;nhashfuncs; ++n){
+    SETBIT(bloom-&gt;a, bloom-&gt;hashfuncs[n](s)%bloom-&gt;size);
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">bloom_check</span>(<span style="color: #98fb98;">BLOOM</span> *<span style="color: #eedd82;">bloom</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">s</span>)
+{
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">n</span>;
+  <span style="color: #00ffff;">for</span>(n = 0; n &lt; bloom-&gt;nhashfuncs; ++n)
+    <span style="color: #00ffff;">if</span>(!(GETBIT(bloom-&gt;a, bloom-&gt;hashfuncs[n](s)%bloom-&gt;size)))
+      <span style="color: #00ffff;">return</span> 0;
+  <span style="color: #00ffff;">return</span> 1;
+}
+
+
+
+</pre>
+
+<p>
+<a href="./files/bloom_filter/c/test.c">test.c</a>
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string.h&gt;</span>
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">"bloom.h"</span>
+
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">sax_hash</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">key</span>)
+{
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">h</span> = 0;
+  <span style="color: #00ffff;">while</span>(*key)
+    h ^= (h &lt;&lt; 5) + (h &gt;&gt; 2) + (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>)*key++;
+  <span style="color: #00ffff;">return</span> h;
+}
+
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">sdbm_hash</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">key</span>)
+{
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">h</span> = 0;
+  <span style="color: #00ffff;">while</span>(*key)
+    h = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>)*key++ + (h &lt;&lt; 6) + (h &lt;&lt; 16) - h;
+  <span style="color: #00ffff;">return</span> h;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[])
+{
+  <span style="color: #98fb98;">FILE</span> *<span style="color: #eedd82;">fp</span>;
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">line</span>[1024];
+  <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">p</span>;
+  <span style="color: #98fb98;">BLOOM</span> *<span style="color: #eedd82;">bloom</span>;
+
+  <span style="color: #00ffff;">if</span>(argc &lt; 2){
+    fprintf(stderr, <span style="color: #ffa07a;">"ERROR, No word file specified\n"</span>);
+    <span style="color: #00ffff;">return</span> EXIT_FAILURE;
+  }
+
+  <span style="color: #00ffff;">if</span>(!(bloom = bloom_create(250000, 2, sax_hash, sdbm_hash))){
+    fprintf(stderr, <span style="color: #ffa07a;">"ERROR: Could not create bloom filter\n"</span>);
+    <span style="color: #00ffff;">return</span> EXIT_FAILURE;
+  }
+
+  <span style="color: #00ffff;">if</span>(!(fp = fopen(argv[1], <span style="color: #ffa07a;">"r"</span>))){
+    fprintf(stderr, <span style="color: #ffa07a;">"ERROR: Could not open the file:%s\n"</span>, argv[1]);
+    <span style="color: #00ffff;">return</span> EXIT_FAILURE;
+  }
+
+  <span style="color: #00ffff;">while</span>(fgets(line, 1024, fp)){
+    <span style="color: #00ffff;">if</span>((p = strchr(line, <span style="color: #ffa07a;">'\r'</span>))) *p = <span style="color: #ffa07a;">'\0'</span>;
+    <span style="color: #00ffff;">if</span>((p = strchr(line, <span style="color: #ffa07a;">'\n'</span>))) *p = <span style="color: #ffa07a;">'\0'</span>;
+    bloom_add(bloom, line);
+  }
+
+  fclose(fp);
+
+  <span style="color: #00ffff;">while</span>(fgets(line, 1024, stdin)){
+    <span style="color: #00ffff;">if</span>((p = strchr(line, <span style="color: #ffa07a;">'\r'</span>))) *p = <span style="color: #ffa07a;">'\0'</span>;
+    <span style="color: #00ffff;">if</span>((p = strchr(line, <span style="color: #ffa07a;">'\n'</span>))) *p = <span style="color: #ffa07a;">'\0'</span>;
+
+    p=strtok(line, <span style="color: #ffa07a;">" \t,.;:\r\n?!-/()"</span>);
+    <span style="color: #00ffff;">while</span>(p){
+      <span style="color: #00ffff;">if</span>(!bloom_check(bloom, p))
+        printf(<span style="color: #ffa07a;">"No match for word: %s\n"</span>, p);
+      p = strtok(<span style="color: #7fffd4;">NULL</span>,<span style="color: #ffa07a;">" \t,.;:\r\n?!-/()"</span>);
+    }
+  }
+  bloom_destroy(bloom);
+
+  <span style="color: #00ffff;">return</span> EXIT_SUCCESS;
+}
+
+
+
+
+</pre>
+
+<p>
+<a href="./files/bloom_filter/c/Makefile">Makefile</a>
+</p>
+
+
+<pre class="src src-c"><span style="color: #7fffd4;">all</span>: <span style="color: #98fb98;">bloom</span>
+
+<span style="color: #eedd82;">bloom</span>: bloom.o test.o
+        gcc -o bloom -Wall -pedantic bloom.o test.o
+
+bloom.o: bloom.c bloom.h
+        gcc -o bloom.o -Wall -pedantic -ansi -c bloom.c
+test.o: test.c bloom.h
+        gcc -o test.o -Wall -pedantic -ansi -c test.c
+</pre>
+
+<p>
+Test files: <a href="./files/bloom_filter/c/wordlist">wordlist</a> and <a href="./files/bloom_filter/c/check">check</a>
+</p>
+
+
+<pre class="src src-sh">make
+./test wordlist &lt; check
+</pre>
+
+
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
 <p class="footnote"><sup><a class="footnum" name="fn-.1" href="#fnr-.1">1</a></sup> <a href="http://en.wikipedia.org/wiki/Bloom_filter">http://en.wikipedia.org/wiki/Bloom_filter</a>
-</p>
-
-
-
-
-</div>
+</p></div>
 </div>
 
 </div>
@@ -158,7 +388,7 @@ is used to test whether an element is a member of a set.<sup><a class="footref" 
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-05-10T22:44+0800</p>
+<p class="date">Date: 2013-06-07T20:18+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

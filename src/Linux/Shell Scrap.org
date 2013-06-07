@@ -343,18 +343,105 @@ ${PARAMETER~} #~ reverses the case of first letter of words in the variabl
 ${PARAMETER~~}
 #+end_src
 
-** expansion
+** Variable name expansion
 #+begin_src sh
-Arithmetic expansion
+${!PREFIX*} #This expands to a list of all set variable names beginning with the string PREFIX. 
+${!PREFIX@}
+#+end_src
+** Substring removal
+#+begin_src sh
+${PARAMETER#PATTERN}  #The operator "#" will try to remove the shortest text matching the pattern, while "##" tries to do it with the longest text matching. 
+${PARAMETER##PATTERN}
+${PARAMETER%PATTERN} #except that Bash now tries to match the pattern from the end of the string
+${PARAMETER%%PATTERN}
+#+end_src
+** Search and replace
+#+begin_src sh
+${PARAMETER/PATTERN/STRING}
+${PARAMETER//PATTERN/STRING}
+${PARAMETER/PATTERN} #removed
+${PARAMETER//PATTERN}
+
+Anchoring Additionally you can "anchor" an expression: A # (hashmark) will indicate that your expression is matched against the beginning portion of the string, a % (percent-sign) will do it for the end portion.
+
+MYSTRING=xxxxxxxxxx
+echo ${MYSTRING/#x/y}  # RESULT: yxxxxxxxxx
+echo ${MYSTRING/%x/y}  # RESULT: xxxxxxxxxy
+#+end_src
+** String length
+#+begin_src sh
+${#PARAMETER}
+#+end_src
+** Substring expansion
+#+begin_src sh
+${PARAMETER:OFFSET}
+${PARAMETER:OFFSET:LENGTH}
+#+end_src
+** Use a default value
+If the parameter PARAMETER is unset (never was defined) or null
+(empty), this one expands to WORD, otherwise it expands to the value
+of PARAMETER, as if it just was ${PARAMETER}. If you omit the :
+(colon), like shown in the second form, the default value is only used
+when the parameter was unset, not when it was empty.
+
+#+begin_src sh
+${PARAMETER:-WORD}
+
+${PARAMETER-WORD}
+#+end_src
+** Assign a default value
+This one works like the using default values, but the default text you
+give is not only expanded, but also assigned to the parameter, if it
+was unset or null. Equivalent to using a default value, when you omit
+the : (colon), as shown in the second form, the default value will
+only be assigned when the parameter was unset.
+
+#+begin_src sh
+${PARAMETER:=WORD}
+
+${PARAMETER=WORD}
+#+end_src
+** Use an alternate value
+This form expands to nothing if the parameter is unset or empty. If it
+is set, it does not expand to the parameter's value, but to some text
+you can specify:
+
+#+begin_src sh
+${PARAMETER:+WORD}
+
+${PARAMETER+WORD}
+echo "The Java application was installed and can be started.${JAVAPATH:+ NOTE: JAVAPATH seems to be set}"
+#+end_src
+** Display error if null or unset
+If the parameter PARAMETER is set/non-null, this form will simply
+expand it. Otherwise, the expansion of WORD will be used as appendix
+for an error message:
+
++ an interactive shell has $? to a non-zero value
++ a non-interactive shell exits with a non-zero exit code
+#+begin_src sh
+${PARAMETER:?WORD}
+
+${PARAMETER?WORD}
+#+end_src
+** Arithmetic and command expansion
+#+begin_src sh
+#Arithmetic expansion
 $(( EXPRESSION ))
-$[ EXPRESSION ]
-Command substitution
+$[ EXPRESSION ]  #Please do not use the second form $[ … ]! It's deprecated. 
+#Command substitution
 $( COMMAND )
 ` COMMAND `
 #+end_src
 
+** Brace expansion
+#+begin_src sh
 
+#+end_src
+** aa
+#+begin_src sh
 
+#+end_src
 * String Operators
 * Command
 !$
