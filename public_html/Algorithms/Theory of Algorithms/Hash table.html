@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Hash table"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-05-10T22:44+0800"/>
+<meta name="generated" content="2013-06-22T12:57+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -130,11 +130,12 @@ for the JavaScript code in this tag.
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">Hash table</a></li>
-<li><a href="#sec-2">Choosing a good hash function</a></li>
-<li><a href="#sec-3">Collision resolution</a></li>
-<li><a href="#sec-4">Features</a></li>
-<li><a href="#sec-5">Independent packages</a></li>
-<li><a href="#sec-6">General Purpose Hash Function Algorithms</a></li>
+<li><a href="#sec-2">Cuckoo hashing</a></li>
+<li><a href="#sec-3">Choosing a good hash function</a></li>
+<li><a href="#sec-4">Collision resolution</a></li>
+<li><a href="#sec-5">Features</a></li>
+<li><a href="#sec-6">Independent packages</a></li>
+<li><a href="#sec-7">General Purpose Hash Function Algorithms</a></li>
 </ul>
 </div>
 </div>
@@ -152,15 +153,135 @@ array of buckets, from which the correct value can be found.<sup><a class="footr
 </div>
 
 <div id="outline-container-2" class="outline-2">
-<h2 id="sec-2">Choosing a good hash function</h2>
+<h2 id="sec-2">Cuckoo hashing<sup><a class="footref" name="fnr-.2" href="#fn-.2">2</a></sup></h2>
 <div class="outline-text-2" id="text-2">
+
+<ul>
+<li id="sec-2-1">Theory<br/>
+The basic idea is to use two hash functions instead of only one. This
+provides two possible locations in the hash table for each key. In one
+of the commonly used variants of the algorithm, the hash table is
+split into two smaller tables of equal size, and each hash function
+provides an index into one of these two tables.
+
+<p>
+When a new key is inserted, a greedy algorithm is used: The new key is
+inserted in one of its two possible locations, "kicking out", that is,
+displacing, any key that might already reside in this location. This
+displaced key is then inserted in its alternative location, again
+kicking out any key that might reside there, until a vacant position
+is found, or the procedure enters an infinite loop. In the latter
+case, the hash table is rebuilt in-place using new hash functions
+</p></li>
+</ul>
+<ul>
+<li id="sec-2-2">Cuckoo hash map written in C++<br/>
+<a href="http://sourceforge.net/projects/cuckoo-cpp/">http://sourceforge.net/projects/cuckoo-cpp/</a>
+
+
+
+<pre class="src src-c">  template &lt;class Key, <span style="color: #98fb98;">class</span> <span style="color: #eedd82;">Value</span>, <span style="color: #98fb98;">class</span> <span style="color: #eedd82;">Hash</span>, <span style="color: #98fb98;">class</span> <span style="color: #eedd82;">Equal</span>&gt; 
+  class cuckoo {
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">pair</span>&lt;Key, Value&gt; Data;
+}
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-3">Static cuckoo hashtable generator for C/C++<br/>
+<a href="http://www.theiling.de/projects/lookuptable.html">http://www.theiling.de/projects/lookuptable.html</a>
+<ul>
+<li id="sec-2-3-1">Example<br/>
+
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">If the input file looks like this:</span>
+100
+300
+120
+100043
+2031
+102
+</pre>
+
+<p>
+The output file might look like this:
+</p>
+
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">map_t</span> <span style="color: #eedd82;">map_a</span>[3]= {
+  300,
+  100,
+  102,
+};
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">map_t</span> <span style="color: #eedd82;">map_b</span>[3]= {
+  2031,
+  120,
+  100043,
+};
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">hash_a</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>) {
+    <span style="color: #00ffff;">return</span> (((1544301215 * x) - (x ^ 616423921)) % 3);
+}
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">hash_b</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>) {
+    <span style="color: #00ffff;">return</span> (((1521445927 * x) - (x ^ 1711634687)) % 3);
+}
+<span style="color: #00ffff;">static</span> map_t <span style="color: #00ffff;">const</span> *<span style="color: #87cefa;">lookup</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>)
+{
+    map_t <span style="color: #00ffff;">const</span> *<span style="color: #eedd82;">result</span>;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">index</span>;
+    index= hash_a (x);
+    assert (index &gt;= 0 &amp;&amp; index &lt; 3);
+    result= &amp;map_a[index];
+    <span style="color: #00ffff;">if</span> (MAP_KEY_MATCH(result,x))
+        <span style="color: #00ffff;">return</span> result;
+    index= hash_b (x);
+    assert (index &gt;= 0 &amp;&amp; index &lt; 3);
+    result= &amp;map_b[index];
+    <span style="color: #00ffff;">if</span> (MAP_KEY_MATCH(result,x))
+        <span style="color: #00ffff;">return</span> result;
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+}
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;assert.h&gt;</span>
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">int</span> <span style="color: #98fb98;">map_t</span>;
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">MAP_KEY_MATCH</span>(<span style="color: #eedd82;">X</span>,<span style="color: #eedd82;">Y</span>) *(X) == (Y)
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">"inthash.inc"</span>
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-2-3-2">Debian/Ubuntu<br/>
+
+
+
+<pre class="src src-sh">deb     http://debian.theiling.de/  etch  contrib main non-free
+deb-src http://debian.theiling.de/  etch  contrib main non-free
+
+apt-get update
+apt-get install mkhashtable
+</pre>
+
+
+</li>
+</ul>
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">Choosing a good hash function</h2>
+<div class="outline-text-2" id="text-3">
 
 <p>Some authors claim that good hash functions should have the <a href="http://en.wikipedia.org/wiki/Avalanche_effect">avalanche effect</a>; that is, a single-bit change in the input key should affect,
 on average, half the bits in the output. Some popular hash functions
 do not have this property.
 </p>
 <ul>
-<li id="sec-2-1">avalanche affect<br/>
+<li id="sec-3-1">avalanche affect<br/>
 The avalanche effect is evident if, when an input is changed slightly
 (for example, flipping a single bit) the output changes significantly
 (e.g., half the output bits flip).
@@ -188,46 +309,46 @@ algorithm terminates
 
 </div>
 
-<div id="outline-container-3" class="outline-2">
-<h2 id="sec-3">Collision resolution</h2>
-<div class="outline-text-2" id="text-3">
-
-<ul>
-<li id="sec-3-1">Separate chaining<br/>
-</li>
-</ul>
-<ul>
-<li id="sec-3-2">Open addressing<br/>
-</li>
-</ul>
-<ul>
-<li id="sec-3-3">Coalesced hashing<br/>
-</li>
-</ul>
-<ul>
-<li id="sec-3-4">Robin Hood hashing<br/>
-</li>
-</ul>
-<ul>
-<li id="sec-3-5">Cuckoo hashing<br/>
-</li>
-</ul>
-<ul>
-<li id="sec-3-6">Hopscotch hashing<br/>
-
-</li>
-</ul>
-</div>
-
-</div>
-
 <div id="outline-container-4" class="outline-2">
-<h2 id="sec-4">Features</h2>
+<h2 id="sec-4">Collision resolution</h2>
 <div class="outline-text-2" id="text-4">
 
+<ul>
+<li id="sec-4-1">Separate chaining<br/>
+</li>
+</ul>
+<ul>
+<li id="sec-4-2">Open addressing<br/>
+</li>
+</ul>
+<ul>
+<li id="sec-4-3">Coalesced hashing<br/>
+</li>
+</ul>
+<ul>
+<li id="sec-4-4">Robin Hood hashing<br/>
+</li>
+</ul>
+<ul>
+<li id="sec-4-5">Cuckoo hashing<br/>
+</li>
+</ul>
+<ul>
+<li id="sec-4-6">Hopscotch hashing<br/>
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-5" class="outline-2">
+<h2 id="sec-5">Features</h2>
+<div class="outline-text-2" id="text-5">
+
 
 <ul>
-<li id="sec-4-1">Advantages<br/>
+<li id="sec-5-1">Advantages<br/>
 The main advantage of hash tables over other table data structures is
 speed. This advantage is more apparent when the number of entries is
 large. Hash tables are particularly efficient when the maximum number
@@ -245,7 +366,7 @@ below). In this case the keys need not be stored in the table.
 </li>
 </ul>
 <ul>
-<li id="sec-4-2">Drawbacks<br/>
+<li id="sec-5-2">Drawbacks<br/>
 Although operations on a hash table take constant time on average, the
 cost of a good hash function can be significantly higher than the
 inner loop of the lookup algorithm for a sequential list or search
@@ -312,12 +433,12 @@ better worst-case guarantees may be preferable.
 
 </div>
 
-<div id="outline-container-5" class="outline-2">
-<h2 id="sec-5">Independent packages</h2>
-<div class="outline-text-2" id="text-5">
+<div id="outline-container-6" class="outline-2">
+<h2 id="sec-6">Independent packages</h2>
+<div class="outline-text-2" id="text-6">
 
 <ul>
-<li id="sec-5-1">SparseHash<br/>
+<li id="sec-6-1">SparseHash<br/>
 <a href="http://code.google.com/p/sparsehash/">http://code.google.com/p/sparsehash/</a>
 
 <p>
@@ -326,10 +447,17 @@ hash<sub>map</sub> implementation, with only 2 bits/entry of overhead. The
 SparseHash library has several C++ hash map implementations with
 different performance characteristics, including one that optimizes
 for memory use and another that optimizes for speed.
-</p></li>
+</p><ul>
+<li>Modifying Google Sparsehash for the Intel Compiler
+  <a href="http://kyleteague.com/blog/modifying-google-sparsehash-intel-compiler.html">http://kyleteague.com/blog/modifying-google-sparsehash-intel-compiler.html</a>
+</li>
+</ul>
+
+
+</li>
 </ul>
 <ul>
-<li id="sec-5-2">SunriseDD<br/>
+<li id="sec-6-2">SunriseDD [complex]<br/>
 <a href="http://www.sunrisetel.net/software/devtools/sunrise-data-dictionary.shtml">http://www.sunrisetel.net/software/devtools/sunrise-data-dictionary.shtml</a>
 
 <p>
@@ -344,7 +472,7 @@ well documented.
 </li>
 </ul>
 <ul>
-<li id="sec-5-3">uthash<br/>
+<li id="sec-6-3">uthash<br/>
 <a href="http://uthash.sourceforge.net/">http://uthash.sourceforge.net/</a>
 
 <p>
@@ -352,16 +480,72 @@ uthash This is an easy-to-use hash table for C structures.
 </p>
 </li>
 </ul>
+<ul>
+<li id="sec-6-4">CMPH - C Minimal Perfect Hashing Library<br/>
+<a href="http://cmph.sourceforge.net/">http://cmph.sourceforge.net/</a>
+</li>
+</ul>
+<ul>
+<li id="sec-6-5">strmap<br/>
+<a href="http://pokristensson.com/strmap.html">http://pokristensson.com/strmap.html</a>
+</li>
+</ul>
+<ul>
+<li id="sec-6-6">Libcfu<br/>
+<a href="http://libcfu.sourceforge.net/libcfu.html">http://libcfu.sourceforge.net/libcfu.html</a>
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-7">hash table<br/>
+<a href="http://burtleburtle.net/bob/hash/index.html">http://burtleburtle.net/bob/hash/index.html</a>
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-8">hash<sub>map</sub>/set in SGI STL<br/>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;hash_map&gt;</span>
+<span style="color: #98fb98;">namespace</span> <span style="color: #eedd82;">std</span>
+{
+  using <span style="color: #98fb98;">namespace</span> <span style="color: #eedd82;">__gnu_cxx</span>;
+  }
+
+using <span style="color: #98fb98;">namespace</span> <span style="color: #eedd82;">std</span>;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">str_hash</span>
+{
+  <span style="color: #98fb98;">size_t</span> <span style="color: #87cefa;">operator</span> () (<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span> &amp;str) <span style="color: #00ffff;">const</span>
+  {
+    <span style="color: #00ffff;">return</span> __stl_hash_string(str.c_str());
+  }
+};
+
+  std::hash_map&lt;string, string, str_hash&gt; hash_str;
+  <span style="color: #98fb98;">string</span> <span style="color: #87cefa;">str1</span>(<span style="color: #ffa07a;">"str1"</span>);
+  <span style="color: #98fb98;">string</span> <span style="color: #87cefa;">str2</span>(<span style="color: #ffa07a;">"str2"</span>);
+
+  hash_str[str1] = <span style="color: #ffa07a;">"hash_str1"</span>;
+  hash_str[str2] = <span style="color: #ffa07a;">"hash_str2"</span>;
+
+  cout &lt;&lt; hash_str[str1] &lt;&lt;endl;
+  cout &lt;&lt; hash_str[str2] &lt;&lt;endl;
+</pre>
+
+
+</li>
+</ul>
 </div>
 
 </div>
 
-<div id="outline-container-6" class="outline-2">
-<h2 id="sec-6">General Purpose Hash Function Algorithms<sup><a class="footref" name="fnr-.2" href="#fn-.2">2</a></sup></h2>
-<div class="outline-text-2" id="text-6">
+<div id="outline-container-7" class="outline-2">
+<h2 id="sec-7">General Purpose Hash Function Algorithms<sup><a class="footref" name="fnr-.3" href="#fn-.3">3</a></sup></h2>
+<div class="outline-text-2" id="text-7">
 
 <ul>
-<li id="sec-6-1">choose the hash function<br/>
+<li id="sec-7-1">choose the hash function<br/>
 <ul>
 <li>Data Distribution
   This is the measure of how well the hash function distributes the
@@ -376,7 +560,7 @@ uthash This is an easy-to-use hash table for C structures.
 </li>
 </ul>
 <ul>
-<li id="sec-6-2">Hashing Methodologies<br/>
+<li id="sec-7-2">Hashing Methodologies<br/>
 Hash functions are typically defined by the way they create hash
 values from data. There are two main methodologies for a hash
 algorithm to implement, they are:
@@ -407,7 +591,7 @@ algorithm to implement, they are:
 </li>
 </ul>
 <ul>
-<li id="sec-6-3">Various Forms Of Hashing<br/>
+<li id="sec-7-3">Various Forms Of Hashing<br/>
 <ul>
 <li>String Hashing
   Used in the area of data storage access. Mainly within indexing of
@@ -436,9 +620,9 @@ algorithm to implement, they are:
 </li>
 </ul>
 <ul>
-<li id="sec-6-4">Available Hash Functions<br/>
+<li id="sec-7-4">Available Hash Functions<br/>
 <ul>
-<li id="sec-6-4-1">RS Hash Function<br/>
+<li id="sec-7-4-1">RS Hash Function<br/>
 A simple hash function from Robert Sedgwicks Algorithms in C book.
 I've added some simple optimizations to the algorithm in order to
 speed up its hashing process.
@@ -465,7 +649,7 @@ speed up its hashing process.
 </li>
 </ul>
 <ul>
-<li id="sec-6-4-2">JS Hash Function<br/>
+<li id="sec-7-4-2">JS Hash Function<br/>
 A bitwise hash function written by Justin Sobel
 
 
@@ -489,7 +673,7 @@ A bitwise hash function written by Justin Sobel
 </li>
 </ul>
 <ul>
-<li id="sec-6-4-3">PJW Hash Function<br/>
+<li id="sec-7-4-3">PJW Hash Function<br/>
 This hash algorithm is based on work by Peter J. Weinberger of AT&amp;T
 Bell Labs. The book Compilers (Principles, Techniques and Tools) by
 Aho, Sethi and Ulman, recommends the use of hash functions that employ
@@ -526,7 +710,7 @@ the hashing methodology found in this particular algorithm.
 </li>
 </ul>
 <ul>
-<li id="sec-6-4-4">ELF Hash Function<br/>
+<li id="sec-7-4-4">ELF Hash Function<br/>
 
 <p>
 Similar to the PJW Hash function, but tweaked for 32-bit processors.
@@ -557,7 +741,7 @@ Its the hash function widely used on most UNIX systems.
 </li>
 </ul>
 <ul>
-<li id="sec-6-4-5">BKDR Hash Function<br/>
+<li id="sec-7-4-5">BKDR Hash Function<br/>
 
 <p>
 This hash function comes from Brian Kernighan and Dennis Ritchie's
@@ -587,7 +771,7 @@ function.
 </li>
 </ul>
 <ul>
-<li id="sec-6-4-6">SDBM Hash Function<br/>
+<li id="sec-7-4-6">SDBM Hash Function<br/>
 
 <p>
 This is the algorithm of choice which is used in the open source SDBM
@@ -616,7 +800,7 @@ set.
 </li>
 </ul>
 <ul>
-<li id="sec-6-4-7">DJB Hash Function<br/>
+<li id="sec-7-4-7">DJB Hash Function<br/>
 
 <p>
 An algorithm produced by Professor Daniel J. Bernstein and shown first
@@ -643,7 +827,7 @@ most efficient hash functions ever published.
 </li>
 </ul>
 <ul>
-<li id="sec-6-4-8">DEK Hash Function<br/>
+<li id="sec-7-4-8">DEK Hash Function<br/>
 
 <p>
 An algorithm proposed by Donald E. Knuth in The Art Of Computer
@@ -670,7 +854,7 @@ Programming Volume 3, under the topic of sorting and search chapter
 </li>
 </ul>
 <ul>
-<li id="sec-6-4-9">other<br/>
+<li id="sec-7-4-9">other<br/>
 
 
 
@@ -729,7 +913,11 @@ Programming Volume 3, under the topic of sorting and search chapter
 </p>
 
 
-<p class="footnote"><sup><a class="footnum" name="fn-.2" href="#fnr-.2">2</a></sup> <a href="http://www.partow.net/programming/hashfunctions/index.html#DJBHashFunction">http://www.partow.net/programming/hashfunctions/index.html#DJBHashFunction</a>
+<p class="footnote"><sup><a class="footnum" name="fn-.2" href="#fnr-.2">2</a></sup> <a href="http://en.wikipedia.org/wiki/Cuckoo_hashing">http://en.wikipedia.org/wiki/Cuckoo_hashing</a>
+</p>
+
+
+<p class="footnote"><sup><a class="footnum" name="fn-.3" href="#fnr-.3">3</a></sup> <a href="http://www.partow.net/programming/hashfunctions/index.html#DJBHashFunction">http://www.partow.net/programming/hashfunctions/index.html#DJBHashFunction</a>
 </p>
 
 
@@ -745,7 +933,7 @@ Programming Volume 3, under the topic of sorting and search chapter
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-05-10T22:44+0800</p>
+<p class="date">Date: 2013-06-22T12:57+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

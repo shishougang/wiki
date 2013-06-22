@@ -8,6 +8,90 @@ In computing, a hash table (also hash map) is a data structure used to
 implement an associative array, a structure that can map keys to
 values. A hash table uses a hash function to compute an index into an
 array of buckets, from which the correct value can be found.[fn:1]
+* Cuckoo hashing[fn:3]
+** Theory 
+The basic idea is to use two hash functions instead of only one. This
+provides two possible locations in the hash table for each key. In one
+of the commonly used variants of the algorithm, the hash table is
+split into two smaller tables of equal size, and each hash function
+provides an index into one of these two tables.
+
+When a new key is inserted, a greedy algorithm is used: The new key is
+inserted in one of its two possible locations, "kicking out", that is,
+displacing, any key that might already reside in this location. This
+displaced key is then inserted in its alternative location, again
+kicking out any key that might reside there, until a vacant position
+is found, or the procedure enters an infinite loop. In the latter
+case, the hash table is rebuilt in-place using new hash functions
+** Cuckoo hash map written in C++
+http://sourceforge.net/projects/cuckoo-cpp/
+#+begin_src c
+  template <class Key, class Value, class Hash, class Equal> 
+  class cuckoo {
+    typedef pair<Key, Value> Data;
+}
+#+end_src
+** Static cuckoo hashtable generator for C/C++
+http://www.theiling.de/projects/lookuptable.html
+*** Example
+#+begin_src sh
+#If the input file looks like this:
+100
+300
+120
+100043
+2031
+102
+#+end_src
+The output file might look like this:
+#+begin_src c
+static map_t map_a[3]= {
+  300,
+  100,
+  102,
+};
+static map_t map_b[3]= {
+  2031,
+  120,
+  100043,
+};
+static int hash_a (int x) {
+    return (((1544301215 * x) - (x ^ 616423921)) % 3);
+}
+static int hash_b (int x) {
+    return (((1521445927 * x) - (x ^ 1711634687)) % 3);
+}
+static map_t const *lookup (int x)
+{
+    map_t const *result;
+    int index;
+    index= hash_a (x);
+    assert (index >= 0 && index < 3);
+    result= &map_a[index];
+    if (MAP_KEY_MATCH(result,x))
+        return result;
+    index= hash_b (x);
+    assert (index >= 0 && index < 3);
+    result= &map_b[index];
+    if (MAP_KEY_MATCH(result,x))
+        return result;
+    return NULL;
+}
+
+#include <assert.h>
+typedef int map_t;
+#define MAP_KEY_MATCH(X,Y) *(X) == (Y)
+#include "inthash.inc"
+#+end_src
+*** Debian/Ubuntu
+#+begin_src sh
+deb     http://debian.theiling.de/  etch  contrib main non-free
+deb-src http://debian.theiling.de/  etch  contrib main non-free
+
+apt-get update
+apt-get install mkhashtable
+#+end_src
+
 * Choosing a good hash function
 Some authors claim that good hash functions should have the [[http://en.wikipedia.org/wiki/Avalanche_effect][avalanche
 effect]]; that is, a single-bit change in the input key should affect,
@@ -123,7 +207,10 @@ hash_map implementation, with only 2 bits/entry of overhead. The
 SparseHash library has several C++ hash map implementations with
 different performance characteristics, including one that optimizes
 for memory use and another that optimizes for speed.
-** SunriseDD
++ Modifying Google Sparsehash for the Intel Compiler
+  http://kyleteague.com/blog/modifying-google-sparsehash-intel-compiler.html
+
+** SunriseDD [complex]
 http://www.sunrisetel.net/software/devtools/sunrise-data-dictionary.shtml
 
 SunriseDD An open source C library for hash table storage of arbitrary
@@ -138,6 +225,44 @@ well documented.
 http://uthash.sourceforge.net/
 
 uthash This is an easy-to-use hash table for C structures.
+
+** CMPH - C Minimal Perfect Hashing Library
+http://cmph.sourceforge.net/
+** strmap
+http://pokristensson.com/strmap.html
+** Libcfu
+http://libcfu.sourceforge.net/libcfu.html
+
+** hash table
+http://burtleburtle.net/bob/hash/index.html
+
+** hash_map/set in SGI STL
+#+begin_src c
+#include <hash_map>
+namespace std
+{
+  using namespace __gnu_cxx;
+  }
+
+using namespace std;
+struct str_hash
+{
+  size_t operator () (const string &str) const
+  {
+    return __stl_hash_string(str.c_str());
+  }
+};
+
+  std::hash_map<string, string, str_hash> hash_str;
+  string str1("str1");
+  string str2("str2");
+
+  hash_str[str1] = "hash_str1";
+  hash_str[str2] = "hash_str2";
+
+  cout << hash_str[str1] <<endl;
+  cout << hash_str[str2] <<endl;
+#+end_src
 
 * General Purpose Hash Function Algorithms[fn:2]
 ** choose the hash function
@@ -423,5 +548,7 @@ unsigned int APHash(char* str, unsigned int len)
 [fn:1] http://en.wikipedia.org/wiki/Hash_table
 
 [fn:2] http://www.partow.net/programming/hashfunctions/index.html#DJBHashFunction
+
+[fn:3] http://en.wikipedia.org/wiki/Cuckoo_hashing
 
 
