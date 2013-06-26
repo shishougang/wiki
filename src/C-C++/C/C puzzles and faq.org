@@ -179,11 +179,30 @@ http://topic.csdn.net/u/20080710/15/01ca0f15-4403-45c1-91a8-a0326ceed700.html
 http://blog.csdn.net/qq515383106/article/details/7370241
 http://blog.csdn.net/dtmine/article/details/7366750
 
-* Footnotes
-
-[fn:1] http://blog.csdn.net/carry1314lele/article/details/2191113
-
-
+* the sizes of the standard types aren't precisely defined
+Though C is considered relatively low-level as high-level languages
+go, it does take the position that the exact size of an object (i.e.
+in bits) is an implementation detail. Type int is supposed to
+represent a machine's natural word size. 
+* donot use gets()
+** Example 1
+#+begin_src c
+char buf[256];
+gets(buf);
+#+end_src
+One should never use gets, since there is no way to limit the amount of input it will
+read. This leads to security problems(get the root priviledge). 
+* strings are represented as null-terminated arrays[fn:2]
+It makes some confusing problems.
+** Example 1
+#+begin_src c
+char *p, buf[256];
+p = malloc(strlen(buf)+1);
+strcpy(p, buf);
+#+end_src
+=strlen= does not count the '\0' that terminates a string, while
+=strcpy= copies it. So not enough space is allocated, and =strcpy= writes
+past the end of the allocated space.
 * What is the significance of the keyword “volatile” in C?
 		
 SOLUTION
@@ -197,8 +216,8 @@ int volatile x;
 Declaring a pointer variable for a volatile memory (only the pointer
 address is volatile):
 #+begin_src c
-volatile int * x;
-int volatile * x;
+  volatile int * x;
+  int volatile * x;
 #+end_src
 Declaring a volatile pointer variable for a non-volatile memory (only
 memory contained is volatile):
@@ -243,4 +262,145 @@ write ‘0’ to the location of variable opt. Volatile variables are also
 useful when multi-threaded programs have global variables and any
 thread can modify these shared variables. Of course, we don’t want
 optimization on them.
+
+More:
++ Volatile: A programmer’s best friend:
+  http://www.drdobbs.com/cpp/volatile-the-multithreaded-programmers-b/184403766
+
++ Do not use volatile as a synchronization primitive:
+  https://www.securecoding.cert.org/confluence/display/cplusplus/CON01-CPP.+Do+not+use+volatile+as+a+synchronization+primitive
+
+* Scope rules in C
+Block Scope: A Block is a set of statements enclosed within left and
+right braces ({ and } respectively). Blocks may be nested in C (a
+block may contain other blocks inside it). A variable declared in a
+block is accessible in the block and all inner blocks of that block,
+but not accessible outside the block.
+
+Can variables of block be accessed in another subsequent block?
+
+No, a variabled declared in a block can only be accessed inside the
+block and all inner blocks of this block. For example, following
+program produces compiler error.
+
+#+begin_src c
+int main()
+{
+  {
+      int x = 10;
+  }
+  {
+      printf("%d", x);  // Error: x is not accessible here
+  }
+  return 0;
+}
+#+end_src
+Output:
+=error: 'x' undeclared (first use in this function)=
+
+* What are the default values of static variables in C?
+In C, if an object that has static storage duration is not initialized explicitly, then:
++ if it has pointer type, it is initialized to a NULL pointer;
++ if it has arithmetic type, it is initialized to (positive or unsigned) zero;
++ if it is an aggregate, every member is initialized (recursively) according to these rules;
++ if it is a union, the first named member is initialized (recursively) according to these rules.
+
+* Scansets in C
+scanf family functions support scanset specifiers which are
+represented by %[]. Inside scanset, we can specify single character or
+range of characters. While processing scanset, scanf will process only
+those characters which are part of scanset.
+
+** store only capital letters to character array ‘str’
+#+begin_src c
+#include <stdio.h>
+ 
+int main(void)
+{
+    char str[128];
+ 
+    printf("Enter a string: ");
+    scanf("%[A-Z]s", str);
+ 
+    printf("You entered: %s\n", str);
+ 
+    return 0;
+}
+#+end_src
+#+begin_src  sh
+  # ./scan-set 
+  Enter a string: WIKI_aa
+  You entered: WIKI
+#+end_src
+** stop reading
+If first character of scanset is ‘^’, then the specifier will stop
+reading after first occurence of that character.
+
+#+begin_src c
+#include <stdio.h>
+ 
+int main(void)
+{
+    char str[128];
+ 
+    printf("Enter a string: ");
+    scanf("%[^o]s", str);
+ 
+    printf("You entered: %s\n", str);
+ 
+    return 0;
+}
+#+end_src
+#+begin_src sh
+#./scan-set
+Enter a string: http://geeks for geeks
+You entered: http://geeks f
+#+end_src
+
+
+* What is use of %n in printf() ?
+In C printf(), %n is a special format specifier which instead of
+printing something causes printf() to load the variable pointed by the
+corresponding argument with a value equal to the number of characters
+that have been printed by printf() before the occurrence of %n.
+
+More printf:
+http://swoolley.org/man.cgi/3/printf
+
+#+begin_src c
+#include<stdio.h>
+ 
+int main()
+{
+  int c;
+  printf("geeks for %ngeeks ", &c);
+  printf("%d", c);
+  getchar();
+  return 0;
+}
+#+end_src
+
+* Precedence of postfix ++ and prefix ++ in C/C++
+In C/C++, precedence of Prefix ++ (or Prefix –) and dereference (*)
+operators is same, and precedence of Postfix ++ (or Postfix –) is
+higher than both Prefix ++ and *.
+
+If p is a pointer then *p++ is equivalent to *(p++) and ++*p is
+equivalent to ++(*p) (both Prefix ++ and * are right associative).
+* Modulus on Negative Numbers
+he emphasis is, sign of left operand is appended to result in case of
+modulus operator in C.
+
+* aa
+#+begin_src c
+
+#+end_src
+
+* Footnotes
+
+[fn:1] http://blog.csdn.net/carry1314lele/article/details/2191113
+
+[fn:2] The Practice of Programming page 14
+
+
 

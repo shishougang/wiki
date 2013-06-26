@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Hash table"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-06-22T12:57+0800"/>
+<meta name="generated" content="2013-06-26T23:03+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -124,7 +124,6 @@ for the JavaScript code in this tag.
 <h1 class="title">Hash table</h1>
 
 
-
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
@@ -135,7 +134,9 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4">Collision resolution</a></li>
 <li><a href="#sec-5">Features</a></li>
 <li><a href="#sec-6">Independent packages</a></li>
-<li><a href="#sec-7">General Purpose Hash Function Algorithms</a></li>
+<li><a href="#sec-7">comparison of Hash Table Libraries</a></li>
+<li><a href="#sec-8">comparison of Hash Function</a></li>
+<li><a href="#sec-9">General Purpose Hash Function Algorithms</a></li>
 </ul>
 </div>
 </div>
@@ -451,13 +452,34 @@ for memory use and another that optimizes for speed.
 <li>Modifying Google Sparsehash for the Intel Compiler
   <a href="http://kyleteague.com/blog/modifying-google-sparsehash-intel-compiler.html">http://kyleteague.com/blog/modifying-google-sparsehash-intel-compiler.html</a>
 </li>
+<li>The Google Dense Hashtable Library
+  <a href="http://attractivechaos.wordpress.com/2008/09/12/the-google-hash-table-library/">http://attractivechaos.wordpress.com/2008/09/12/the-google-hash-table-library/</a>
+<ul>
+<li>Google dense hash table (google-dense) implements an open
+    addressing hash table with quardric probing. It requires users to
+    set an empty element and a deleted element which are distinct from
+    all the other valid keys in the hash table. Google-dense tests
+    whether a bucket is empty or deleted by performing key
+    comparisons. It is fast for integer keys where comparisons are
+    cheap but will have overhead for string keys.
+</li>
+<li>google-map keeps key-value pair in one array. Keeping one array
+    helps cache efficiency because we will not incur a cache miss when
+    we have located the bucket via a key. However, putting a key and a
+    value in one struct/class will waste memory when the key type and
+    the value type are not aligned. For example, on 64-bit systems, if
+    the key type is “const char*” and the value type is “int”, 25%
+    of memory is wasted on memory alignment. 
+</li>
 </ul>
 
+</li>
+</ul>
 
 </li>
 </ul>
 <ul>
-<li id="sec-6-2">SunriseDD [complex]<br/>
+<li id="sec-6-2">SunriseDD [thread-safe,complex]<br/>
 <a href="http://www.sunrisetel.net/software/devtools/sunrise-data-dictionary.shtml">http://www.sunrisetel.net/software/devtools/sunrise-data-dictionary.shtml</a>
 
 <p>
@@ -536,16 +558,273 @@ using <span style="color: #98fb98;">namespace</span> <span style="color: #eedd82
 
 </li>
 </ul>
+<ul>
+<li id="sec-6-9">glibc hash table<br/>
+<a href="http://linux.die.net/man/3/hsearch">http://linux.die.net/man/3/hsearch</a>
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">entry</span> {
+    <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">key</span>;
+    <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>;
+} <span style="color: #98fb98;">ENTRY</span>;
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;search.h&gt;</span>
+
+<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">data</span>[] = { <span style="color: #ffa07a;">"alpha"</span>, <span style="color: #ffa07a;">"bravo"</span>, <span style="color: #ffa07a;">"charlie"</span>, <span style="color: #ffa07a;">"delta"</span>,
+     <span style="color: #ffa07a;">"echo"</span>, <span style="color: #ffa07a;">"foxtrot"</span>, <span style="color: #ffa07a;">"golf"</span>, <span style="color: #ffa07a;">"hotel"</span>, <span style="color: #ffa07a;">"india"</span>, <span style="color: #ffa07a;">"juliet"</span>,
+     <span style="color: #ffa07a;">"kilo"</span>, <span style="color: #ffa07a;">"lima"</span>, <span style="color: #ffa07a;">"mike"</span>, <span style="color: #ffa07a;">"november"</span>, <span style="color: #ffa07a;">"oscar"</span>, <span style="color: #ffa07a;">"papa"</span>,
+     <span style="color: #ffa07a;">"quebec"</span>, <span style="color: #ffa07a;">"romeo"</span>, <span style="color: #ffa07a;">"sierra"</span>, <span style="color: #ffa07a;">"tango"</span>, <span style="color: #ffa07a;">"uniform"</span>,
+     <span style="color: #ffa07a;">"victor"</span>, <span style="color: #ffa07a;">"whisky"</span>, <span style="color: #ffa07a;">"x-ray"</span>, <span style="color: #ffa07a;">"yankee"</span>, <span style="color: #ffa07a;">"zulu"</span>
+};
+
+<span style="color: #98fb98;">int</span>
+<span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">void</span>)
+{
+    <span style="color: #98fb98;">ENTRY</span> <span style="color: #eedd82;">e</span>, *<span style="color: #eedd82;">ep</span>;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+
+   hcreate(30);
+
+   <span style="color: #00ffff;">for</span> (i = 0; i &lt; 24; i++) {
+        e.key = data[i];
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">data is just an integer, instead of a</span>
+<span style="color: #ff7f24;">           pointer to something </span><span style="color: #ff7f24;">*/</span>
+        e.data = (<span style="color: #98fb98;">void</span> *) i;
+        ep = hsearch(e, ENTER);
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">there should be no failures </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (ep == <span style="color: #7fffd4;">NULL</span>) {
+            fprintf(stderr, <span style="color: #ffa07a;">"entry failed\n"</span>);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+   <span style="color: #00ffff;">for</span> (i = 22; i &lt; 26; i++) {
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">print two entries from the table, and</span>
+<span style="color: #ff7f24;">           show that two are not in the table </span><span style="color: #ff7f24;">*/</span>
+        e.key = data[i];
+        ep = hsearch(e, FIND);
+        printf(<span style="color: #ffa07a;">"%9.9s -&gt; %9.9s:%d\n"</span>, e.key,
+               ep ? ep-&gt;key : <span style="color: #ffa07a;">"NULL"</span>, ep ? (<span style="color: #98fb98;">int</span>)(ep-&gt;data) : 0);
+    }
+    hdestroy();
+    exit(EXIT_SUCCESS);
+}
+</pre>
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-10">hashit<br/>
+<a href="http://freecode.com/projects/hashit">http://freecode.com/projects/hashit</a>
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">shash_t</span>;
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">shash_t</span> *<span style="color: #98fb98;">hash_t</span>;
+
+<span style="color: #98fb98;">hash_t</span> <span style="color: #87cefa;">hashit_create</span>(<span style="color: #98fb98;">uint32_t</span>, <span style="color: #98fb98;">size_t</span>, <span style="color: #98fb98;">uint32_t</span>(*)(), <span style="color: #98fb98;">int</span>(*)(<span style="color: #98fb98;">void</span> *, <span style="color: #98fb98;">void</span> *), <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">hashit_insert</span>(<span style="color: #98fb98;">hash_t</span>, <span style="color: #98fb98;">void</span> *, <span style="color: #98fb98;">void</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">hashit_delete</span>(<span style="color: #98fb98;">hash_t</span>, <span style="color: #98fb98;">void</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">hashit_replace</span>(<span style="color: #98fb98;">hash_t</span>, <span style="color: #98fb98;">void</span> *, <span style="color: #98fb98;">void</span> *);
+<span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">hashit_lookup</span>(<span style="color: #98fb98;">hash_t</span>, <span style="color: #98fb98;">void</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">hashit_destroy</span>(<span style="color: #98fb98;">hash_t</span>);
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Accesors </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">void</span> **<span style="color: #87cefa;">hashit_getkeys</span>(<span style="color: #98fb98;">hash_t</span>);
+<span style="color: #98fb98;">void</span> **<span style="color: #87cefa;">hashit_getvalues</span>(<span style="color: #98fb98;">hash_t</span>);
+<span style="color: #98fb98;">size_t</span> <span style="color: #87cefa;">hashit_tablesize</span>(<span style="color: #98fb98;">hash_t</span>);
+<span style="color: #98fb98;">size_t</span> <span style="color: #87cefa;">hashit_size</span>(<span style="color: #98fb98;">hash_t</span>);
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-11">Christopher Clark's hashtable<br/>
+<a href="./files/hashfunction/c-hashtable.zip">hashtable.zip</a>
+
+<p>
+Defined functions
+</p>
+
+
+<pre class="src src-sh">create_hashtable
+hashtable_insert
+hashtable_search
+hashtable_remove
+hashtable_count
+hashtable_destroy
+</pre>
+
+<p>
+Example of use
+</p>
+
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hashtable</span>  *<span style="color: #eedd82;">h</span>;
+      <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">some_key</span>   *<span style="color: #eedd82;">k</span>;
+      <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">some_value</span> *<span style="color: #eedd82;">v</span>;
+
+      <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>         <span style="color: #87cefa;">hash_from_key_fn</span>( <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">k</span> );
+      <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span>                  <span style="color: #87cefa;">keys_equal_fn</span> ( <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">key1</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">key2</span> );
+
+      h = create_hashtable(16, hash_from_key_fn, keys_equal_fn);
+
+      insert_key   = (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">some_key</span> *) malloc(<span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">some_key</span>));
+      retrieve_key = (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">some_key</span> *) malloc(<span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">some_key</span>));
+
+      v = (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">some_value</span> *) malloc(<span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">some_value</span>));
+
+      (You should <span style="color: #98fb98;">initialise</span> <span style="color: #eedd82;">insert_key</span>, retrieve_key and <span style="color: #98fb98;">v</span> <span style="color: #eedd82;">here</span>)
+
+      <span style="color: #00ffff;">if</span> (! hashtable_insert(h,insert_key,v) )
+      {     exit(-1);               }
+
+      <span style="color: #00ffff;">if</span> (<span style="color: #7fffd4;">NULL</span> == (found = hashtable_search(h,retrieve_key) ))
+      {    printf(<span style="color: #ffa07a;">"not found!"</span>);                  }
+
+      <span style="color: #00ffff;">if</span> (<span style="color: #7fffd4;">NULL</span> == (found = hashtable_remove(h,retrieve_key) ))
+      {    printf(<span style="color: #ffa07a;">"Not found\n"</span>);                 }
+
+      hashtable_destroy(h,1); <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">second arg indicates "free(value)" </span><span style="color: #ff7f24;">*/</span>
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-12">glib hash table<br/>
+<a href="https://developer.gnome.org/glib/2.31/glib-Hash-Tables.html">https://developer.gnome.org/glib/2.31/glib-Hash-Tables.html</a>
+
+<p>
+Build with glib:
+</p><ul>
+<li><code>sudo apt-get install libglib2.0-dev</code>
+</li>
+<li><code>gcc test.c -Wall -o test `pkg-config --cflags --libs glib-2.0`</code>
+</li>
+</ul>
+
+
+<p>
+example:
+<a href="http://www.ibm.com/developerworks/linux/tutorials/l-glib/section5.html">http://www.ibm.com/developerworks/linux/tutorials/l-glib/section5.html</a>
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;glib.h&gt;</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">value_destroyed</span>(<span style="color: #98fb98;">gpointer</span> <span style="color: #eedd82;">data</span>) {
+ printf(<span style="color: #ffa07a;">"Got a value destroy call for %d\n"</span>, GPOINTER_TO_INT(data));
+}
+<span style="color: #98fb98;">gboolean</span> <span style="color: #87cefa;">finder</span>(<span style="color: #98fb98;">gpointer</span> <span style="color: #eedd82;">key</span>, <span style="color: #98fb98;">gpointer</span> <span style="color: #eedd82;">value</span>, <span style="color: #98fb98;">gpointer</span> <span style="color: #eedd82;">user_data</span>) {
+ <span style="color: #00ffff;">return</span> (GPOINTER_TO_INT(key) + GPOINTER_TO_INT(value)) == 42;
+}
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span>** <span style="color: #eedd82;">argv</span>) {
+ <span style="color: #98fb98;">GHashTable</span>* <span style="color: #eedd82;">hash</span> = g_hash_table_new_full(g_direct_hash, g_direct_equal,
+  <span style="color: #7fffd4;">NULL</span>,
+  (<span style="color: #98fb98;">GDestroyNotify</span>)value_destroyed);
+ g_hash_table_insert(hash, GINT_TO_POINTER(6), GINT_TO_POINTER(36));
+ g_hash_table_insert(hash, GINT_TO_POINTER(10), GINT_TO_POINTER(12));
+ g_hash_table_insert(hash, GINT_TO_POINTER(20), GINT_TO_POINTER(22));
+ <span style="color: #98fb98;">gpointer</span> <span style="color: #eedd82;">item_ptr</span> = g_hash_table_find(hash, (<span style="color: #98fb98;">GHRFunc</span>)finder, <span style="color: #7fffd4;">NULL</span>);
+ <span style="color: #98fb98;">gint</span> <span style="color: #eedd82;">item</span> = GPOINTER_TO_INT(item_ptr);
+ printf(<span style="color: #ffa07a;">"%d + %d == 42\n"</span>, item, 42-item);
+ g_hash_table_destroy(hash);
+ <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-13">ghthash<br/>
+<a href="http://www.bth.se/people/ska/sim_home/libghthash.html">http://www.bth.se/people/ska/sim_home/libghthash.html</a>
+</li>
+</ul>
+<ul>
+<li id="sec-6-14">khash<br/>
+<a href="http://attractivechaos.awardspace.com/khash.h.html">http://attractivechaos.awardspace.com/khash.h.html</a>
+
+</li>
+</ul>
+<ul>
+<li id="sec-6-15">hashlib library<br/>
+<a href="./files/hashfunction/hashlib.zip">hashlib.zip</a>
+</li>
+</ul>
+<ul>
+<li id="sec-6-16">rdestl::hash<sub>map</sub>: from RDESTL, another implementation of STL<br/>
+<a href="https://code.google.com/p/rdestl/">https://code.google.com/p/rdestl/</a>
+<code>svn checkout http://rdestl.googlecode.com/svn/ rdestl-read-only</code>
+</li>
+</ul>
+<ul>
+<li id="sec-6-17">JudyL hash table<br/>
+<a href="http://judy.sourceforge.net/doc/JudyL_3x.htm">http://judy.sourceforge.net/doc/JudyL_3x.htm</a>
+
+
+</li>
+</ul>
 </div>
 
 </div>
 
 <div id="outline-container-7" class="outline-2">
-<h2 id="sec-7">General Purpose Hash Function Algorithms<sup><a class="footref" name="fnr-.3" href="#fn-.3">3</a></sup></h2>
+<h2 id="sec-7">comparison of Hash Table Libraries</h2>
 <div class="outline-text-2" id="text-7">
 
 <ul>
-<li id="sec-7-1">choose the hash function<br/>
+<li><a href="http://attractivechaos.wordpress.com/2008/08/28/comparison-of-hash-table-libraries/">http://attractivechaos.wordpress.com/2008/08/28/comparison-of-hash-table-libraries/</a>
+</li>
+<li><a href="http://attractivechaos.wordpress.com/2008/10/07/another-look-at-my-old-benchmark/">http://attractivechaos.wordpress.com/2008/10/07/another-look-at-my-old-benchmark/</a>
+</li>
+<li>Benchmark of Dictionary Structures
+  <a href="http://lh3lh3.users.sourceforge.net/udb.shtml">http://lh3lh3.users.sourceforge.net/udb.shtml</a>
+</li>
+<li>Hash Table Performance Tests
+  <a href="http://preshing.com/20110603/hash-table-performance-tests">http://preshing.com/20110603/hash-table-performance-tests</a>
+</li>
+<li>Hash Collision Probabilities
+  <a href="http://preshing.com/page/5">http://preshing.com/page/5</a>
+</li>
+</ul>
+
+
+
+</div>
+
+</div>
+
+<div id="outline-container-8" class="outline-2">
+<h2 id="sec-8">comparison of Hash Function</h2>
+<div class="outline-text-2" id="text-8">
+
+<ul>
+<li id="sec-8-1">Useless hash test<br/>
+<a href="http://cbloomrants.blogspot.hk/2010/11/11-29-10-useless-hash-test.html">http://cbloomrants.blogspot.hk/2010/11/11-29-10-useless-hash-test.html</a>
+</li>
+</ul>
+<ul>
+<li id="sec-8-2">Hash functions: An empirical comparison<br/>
+<a href="http://www.strchr.com/hash_functions">http://www.strchr.com/hash_functions</a>
+
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-9" class="outline-2">
+<h2 id="sec-9">General Purpose Hash Function Algorithms<sup><a class="footref" name="fnr-.3" href="#fn-.3">3</a></sup></h2>
+<div class="outline-text-2" id="text-9">
+
+<ul>
+<li id="sec-9-1">choose the hash function<br/>
 <ul>
 <li>Data Distribution
   This is the measure of how well the hash function distributes the
@@ -560,7 +839,7 @@ using <span style="color: #98fb98;">namespace</span> <span style="color: #eedd82
 </li>
 </ul>
 <ul>
-<li id="sec-7-2">Hashing Methodologies<br/>
+<li id="sec-9-2">Hashing Methodologies<br/>
 Hash functions are typically defined by the way they create hash
 values from data. There are two main methodologies for a hash
 algorithm to implement, they are:
@@ -591,7 +870,7 @@ algorithm to implement, they are:
 </li>
 </ul>
 <ul>
-<li id="sec-7-3">Various Forms Of Hashing<br/>
+<li id="sec-9-3">Various Forms Of Hashing<br/>
 <ul>
 <li>String Hashing
   Used in the area of data storage access. Mainly within indexing of
@@ -620,9 +899,9 @@ algorithm to implement, they are:
 </li>
 </ul>
 <ul>
-<li id="sec-7-4">Available Hash Functions<br/>
+<li id="sec-9-4">Available Hash Functions<br/>
 <ul>
-<li id="sec-7-4-1">RS Hash Function<br/>
+<li id="sec-9-4-1">RS Hash Function<br/>
 A simple hash function from Robert Sedgwicks Algorithms in C book.
 I've added some simple optimizations to the algorithm in order to
 speed up its hashing process.
@@ -649,7 +928,7 @@ speed up its hashing process.
 </li>
 </ul>
 <ul>
-<li id="sec-7-4-2">JS Hash Function<br/>
+<li id="sec-9-4-2">JS Hash Function<br/>
 A bitwise hash function written by Justin Sobel
 
 
@@ -673,7 +952,7 @@ A bitwise hash function written by Justin Sobel
 </li>
 </ul>
 <ul>
-<li id="sec-7-4-3">PJW Hash Function<br/>
+<li id="sec-9-4-3">PJW Hash Function<br/>
 This hash algorithm is based on work by Peter J. Weinberger of AT&amp;T
 Bell Labs. The book Compilers (Principles, Techniques and Tools) by
 Aho, Sethi and Ulman, recommends the use of hash functions that employ
@@ -710,7 +989,7 @@ the hashing methodology found in this particular algorithm.
 </li>
 </ul>
 <ul>
-<li id="sec-7-4-4">ELF Hash Function<br/>
+<li id="sec-9-4-4">ELF Hash Function<br/>
 
 <p>
 Similar to the PJW Hash function, but tweaked for 32-bit processors.
@@ -741,7 +1020,7 @@ Its the hash function widely used on most UNIX systems.
 </li>
 </ul>
 <ul>
-<li id="sec-7-4-5">BKDR Hash Function<br/>
+<li id="sec-9-4-5">BKDR Hash Function<br/>
 
 <p>
 This hash function comes from Brian Kernighan and Dennis Ritchie's
@@ -771,7 +1050,7 @@ function.
 </li>
 </ul>
 <ul>
-<li id="sec-7-4-6">SDBM Hash Function<br/>
+<li id="sec-9-4-6">SDBM Hash Function<br/>
 
 <p>
 This is the algorithm of choice which is used in the open source SDBM
@@ -800,7 +1079,7 @@ set.
 </li>
 </ul>
 <ul>
-<li id="sec-7-4-7">DJB Hash Function<br/>
+<li id="sec-9-4-7">DJB Hash Function<br/>
 
 <p>
 An algorithm produced by Professor Daniel J. Bernstein and shown first
@@ -827,7 +1106,7 @@ most efficient hash functions ever published.
 </li>
 </ul>
 <ul>
-<li id="sec-7-4-8">DEK Hash Function<br/>
+<li id="sec-9-4-8">DEK Hash Function<br/>
 
 <p>
 An algorithm proposed by Donald E. Knuth in The Art Of Computer
@@ -854,7 +1133,7 @@ Programming Volume 3, under the topic of sorting and search chapter
 </li>
 </ul>
 <ul>
-<li id="sec-7-4-9">other<br/>
+<li id="sec-9-4-9">other<br/>
 
 
 
@@ -933,7 +1212,7 @@ Programming Volume 3, under the topic of sorting and search chapter
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-06-22T12:57+0800</p>
+<p class="date">Date: 2013-06-26T23:03+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

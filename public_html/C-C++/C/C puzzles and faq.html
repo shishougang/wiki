@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="C puzzles and FAQ"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-05-10T22:30+0800"/>
+<meta name="generated" content="2013-06-26T23:03+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -137,7 +137,30 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3">Swap</a></li>
 <li><a href="#sec-4">指针数组和数组指针</a></li>
 <li><a href="#sec-5">pointer</a></li>
-<li><a href="#sec-6">What is the significance of the keyword “volatile” in C?</a></li>
+<li><a href="#sec-6">the sizes of the standard types aren't precisely defined</a></li>
+<li><a href="#sec-7">donot use gets()</a>
+<ul>
+<li><a href="#sec-7-1">Example 1</a></li>
+</ul>
+</li>
+<li><a href="#sec-8">strings are represented as null-terminated arrays</a>
+<ul>
+<li><a href="#sec-8-1">Example 1</a></li>
+</ul>
+</li>
+<li><a href="#sec-9">What is the significance of the keyword “volatile” in C?</a></li>
+<li><a href="#sec-10">Scope rules in C</a></li>
+<li><a href="#sec-11">What are the default values of static variables in C?</a></li>
+<li><a href="#sec-12">Scansets in C</a>
+<ul>
+<li><a href="#sec-12-1">store only capital letters to character array ‘str’</a></li>
+<li><a href="#sec-12-2">stop reading</a></li>
+</ul>
+</li>
+<li><a href="#sec-13">What is use of %n in printf() ?</a></li>
+<li><a href="#sec-14">Precedence of postfix ++ and prefix ++ in C/C++</a></li>
+<li><a href="#sec-15">Modulus on Negative Numbers</a></li>
+<li><a href="#sec-16">aa</a></li>
 </ul>
 </div>
 </div>
@@ -395,8 +418,75 @@ p=m;    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">p&#
 </div>
 
 <div id="outline-container-6" class="outline-2">
-<h2 id="sec-6">What is the significance of the keyword “volatile” in C?</h2>
+<h2 id="sec-6">the sizes of the standard types aren't precisely defined</h2>
 <div class="outline-text-2" id="text-6">
+
+<p>Though C is considered relatively low-level as high-level languages
+go, it does take the position that the exact size of an object (i.e.
+in bits) is an implementation detail. Type int is supposed to
+represent a machine's natural word size. 
+</p></div>
+
+</div>
+
+<div id="outline-container-7" class="outline-2">
+<h2 id="sec-7">donot use gets()</h2>
+<div class="outline-text-2" id="text-7">
+
+
+</div>
+
+<div id="outline-container-7-1" class="outline-3">
+<h3 id="sec-7-1">Example 1</h3>
+<div class="outline-text-3" id="text-7-1">
+
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">char</span> <span style="color: #eedd82;">buf</span>[256];
+gets(buf);
+</pre>
+
+<p>
+One should never use gets, since there is no way to limit the amount of input it will
+read. This leads to security problems(get the root priviledge). 
+</p></div>
+</div>
+
+</div>
+
+<div id="outline-container-8" class="outline-2">
+<h2 id="sec-8">strings are represented as null-terminated arrays<sup><a class="footref" name="fnr-.2" href="#fn-.2">2</a></sup></h2>
+<div class="outline-text-2" id="text-8">
+
+<p>It makes some confusing problems.
+</p>
+</div>
+
+<div id="outline-container-8-1" class="outline-3">
+<h3 id="sec-8-1">Example 1</h3>
+<div class="outline-text-3" id="text-8-1">
+
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">p</span>, <span style="color: #eedd82;">buf</span>[256];
+p = malloc(strlen(buf)+1);
+strcpy(p, buf);
+</pre>
+
+<p>
+<code>strlen</code> does not count the '\0' that terminates a string, while
+<code>strcpy</code> copies it. So not enough space is allocated, and <code>strcpy</code> writes
+past the end of the allocated space.
+</p></div>
+</div>
+
+</div>
+
+<div id="outline-container-9" class="outline-2">
+<h2 id="sec-9">What is the significance of the keyword “volatile” in C?</h2>
+<div class="outline-text-2" id="text-9">
 
 
 <p>                
@@ -482,10 +572,244 @@ useful when multi-threaded programs have global variables and any
 thread can modify these shared variables. Of course, we don’t want
 optimization on them.
 </p>
+<p>
+More:
+</p><ul>
+<li>Volatile: A programmer’s best friend:
+  <a href="http://www.drdobbs.com/cpp/volatile-the-multithreaded-programmers-b/184403766">http://www.drdobbs.com/cpp/volatile-the-multithreaded-programmers-b/184403766</a>
+
+</li>
+<li>Do not use volatile as a synchronization primitive:
+  <a href="https://www.securecoding.cert.org/confluence/display/cplusplus/CON01-CPP.+Do+not+use+volatile+as+a+synchronization+primitive">https://www.securecoding.cert.org/confluence/display/cplusplus/CON01-CPP.+Do+not+use+volatile+as+a+synchronization+primitive</a>
+</li>
+</ul>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-10" class="outline-2">
+<h2 id="sec-10">Scope rules in C</h2>
+<div class="outline-text-2" id="text-10">
+
+<p>Block Scope: A Block is a set of statements enclosed within left and
+right braces ({ and } respectively). Blocks may be nested in C (a
+block may contain other blocks inside it). A variable declared in a
+block is accessible in the block and all inner blocks of that block,
+but not accessible outside the block.
+</p>
+<p>
+Can variables of block be accessed in another subsequent block?
+</p>
+<p>
+No, a variabled declared in a block can only be accessed inside the
+block and all inner blocks of this block. For example, following
+program produces compiler error.
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>()
+{
+  {
+      <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span> = 10;
+  }
+  {
+      printf(<span style="color: #ffa07a;">"%d"</span>, x);  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Error: x is not accessible here</span>
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+
+<p>
+Output:
+<code>error: 'x' undeclared (first use in this function)</code>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-11" class="outline-2">
+<h2 id="sec-11">What are the default values of static variables in C?</h2>
+<div class="outline-text-2" id="text-11">
+
+<p>In C, if an object that has static storage duration is not initialized explicitly, then:
+</p><ul>
+<li>if it has pointer type, it is initialized to a NULL pointer;
+</li>
+<li>if it has arithmetic type, it is initialized to (positive or unsigned) zero;
+</li>
+<li>if it is an aggregate, every member is initialized (recursively) according to these rules;
+</li>
+<li>if it is a union, the first named member is initialized (recursively) according to these rules.
+</li>
+</ul>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-12" class="outline-2">
+<h2 id="sec-12">Scansets in C</h2>
+<div class="outline-text-2" id="text-12">
+
+<p>scanf family functions support scanset specifiers which are
+represented by %[]. Inside scanset, we can specify single character or
+range of characters. While processing scanset, scanf will process only
+those characters which are part of scanset.
+</p>
+
+</div>
+
+<div id="outline-container-12-1" class="outline-3">
+<h3 id="sec-12-1">store only capital letters to character array ‘str’</h3>
+<div class="outline-text-3" id="text-12-1">
+
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">void</span>)
+{
+    <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">str</span>[128];
+
+    printf(<span style="color: #ffa07a;">"Enter a string: "</span>);
+    scanf(<span style="color: #ffa07a;">"%[A-Z]s"</span>, str);
+
+    printf(<span style="color: #ffa07a;">"You entered: %s\n"</span>, str);
+
+    <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">./scan-set </span>
+Enter a string: WIKI_aa
+You entered: WIKI
+</pre>
+
+</div>
+
+</div>
+
+<div id="outline-container-12-2" class="outline-3">
+<h3 id="sec-12-2">stop reading</h3>
+<div class="outline-text-3" id="text-12-2">
+
+<p>If first character of scanset is ‘<sup>’</sup>, then the specifier will stop
+reading after first occurence of that character.
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">void</span>)
+{
+    <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">str</span>[128];
+
+    printf(<span style="color: #ffa07a;">"Enter a string: "</span>);
+    scanf(<span style="color: #ffa07a;">"%[^o]s"</span>, str);
+
+    printf(<span style="color: #ffa07a;">"You entered: %s\n"</span>, str);
+
+    <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">./scan-set</span>
+Enter a string: http://geeks for geeks
+You entered: http://geeks f
+</pre>
+
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-13" class="outline-2">
+<h2 id="sec-13">What is use of %n in printf() ?</h2>
+<div class="outline-text-2" id="text-13">
+
+<p>In C printf(), %n is a special format specifier which instead of
+printing something causes printf() to load the variable pointed by the
+corresponding argument with a value equal to the number of characters
+that have been printed by printf() before the occurrence of %n.
+</p>
+<p>
+More printf:
+<a href="http://swoolley.org/man.cgi/3/printf">http://swoolley.org/man.cgi/3/printf</a>
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>()
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">c</span>;
+  printf(<span style="color: #ffa07a;">"geeks for %ngeeks "</span>, &amp;c);
+  printf(<span style="color: #ffa07a;">"%d"</span>, c);
+  getchar();
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-14" class="outline-2">
+<h2 id="sec-14">Precedence of postfix ++ and prefix ++ in C/C++</h2>
+<div class="outline-text-2" id="text-14">
+
+<p>In C/C++, precedence of Prefix ++ (or Prefix –) and dereference (*)
+operators is same, and precedence of Postfix ++ (or Postfix –) is
+higher than both Prefix ++ and *.
+</p>
+<p>
+If p is a pointer then *p++ is equivalent to *(p++) and ++*p is
+equivalent to ++(*p) (both Prefix ++ and * are right associative).
+</p></div>
+
+</div>
+
+<div id="outline-container-15" class="outline-2">
+<h2 id="sec-15">Modulus on Negative Numbers</h2>
+<div class="outline-text-2" id="text-15">
+
+<p>he emphasis is, sign of left operand is appended to result in case of
+modulus operator in C.
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-16" class="outline-2">
+<h2 id="sec-16">aa</h2>
+<div class="outline-text-2" id="text-16">
+
+
+
+
+<pre class="src src-c"></pre>
+
+
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
 <p class="footnote"><sup><a class="footnum" name="fn-.1" href="#fnr-.1">1</a></sup> <a href="http://blog.csdn.net/carry1314lele/article/details/2191113">http://blog.csdn.net/carry1314lele/article/details/2191113</a>
+</p>
+
+
+<p class="footnote"><sup><a class="footnum" name="fn-.2" href="#fnr-.2">2</a></sup> The Practice of Programming page 14
 </p>
 
 
@@ -497,7 +821,7 @@ optimization on them.
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-05-10T22:30+0800</p>
+<p class="date">Date: 2013-06-26T23:03+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

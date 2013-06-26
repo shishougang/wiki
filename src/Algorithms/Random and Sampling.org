@@ -1,0 +1,169 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Random and Sampling
+#+OPTIONS: num:nil H:2
+
+
+* 洗牌程序
+http://coolshell.cn/articles/8593.html
+** 递归二分随机抽牌
+#+begin_src c
+//递归二分方法
+const size_t MAXLEN = 10;
+const char TestArr[MAXLEN] = {'A','B','C','D','E','F','G','H','I','J'};
+ 
+static char RecurArr[MAXLEN]={0};
+static int cnt = 0;
+void ShuffleArray_Recursive_Tmp(char* arr, int len)
+{
+    if(cnt > MAXLEN || len <=0){
+        return;
+    }
+ 
+    int pos = rand() % len;
+    RecurArr[cnt++] = arr[pos];
+    if (len==1) return;
+    ShuffleArray_Recursive_Tmp(arr, pos);
+    ShuffleArray_Recursive_Tmp(arr+pos+1, len-pos-1);
+}
+ 
+void ShuffleArray_Recursive(char* arr, int len)
+{
+    memset(RecurArr, 0, sizeof(RecurArr));
+    cnt=0;
+    ShuffleArray_Recursive_Tmp(arr, len);
+    memcpy(arr, RecurArr, len);
+}
+ 
+void main()
+{
+    char temp[MAXLEN]={0};
+    for(int i=0; i<5; i++) {
+        strncpy(temp, TestArr, MAXLEN);
+        ShuffleArray_Recursive((char*)temp, MAXLEN);
+    }
+}
+#+end_src
+** 快排Hack法
+#+begin_src c
+int compare( const void *a, const void *b )
+{
+    return rand()%3-1;
+}
+ 
+void ShuffleArray_Sort(char* arr, int len)
+{
+    qsort( (void *)arr, (size_t)len, sizeof(char), compare );
+}
+#+end_src
+** 大多数人的实现
+#+begin_src c
+void ShuffleArray_General(char* arr, int len)
+{
+    const int suff_time = len;
+    for(int idx=0; idx<suff_time; idx++) {
+        int i = rand() % len;
+        int j = rand() % len;
+        char temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+    }
+}
+#+end_src
+
+** 正确的算法
+[[http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle][Fisher_Yates算法]]
+#+begin_src c
+void ShuffleArray_Fisher_Yates(char* arr, int len)
+{
+    int i = len, j;
+    char temp;
+ 
+    if ( i == 0 ) return;
+    while ( --i ) {
+        j = rand() % (i+1);
+        temp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = temp;
+    }
+}
+#+end_src
+
+** Fisher_Yates from begin
+#+begin_src c
+/* Arrange the N elements of ARRAY in random order.
+   Only effective if N is much smaller than RAND_MAX;
+   if this may not be the case, use a better random
+   number generator. */
+void shuffle(int *array, size_t n)
+{
+    if (n > 1) {
+        size_t i;
+	for (i = 0; i < n - 1; i++) {
+	  size_t j = i + rand() / (RAND_MAX / (n - i) + 1);
+	  int t = array[j];
+	  array[j] = array[i];
+	  array[i] = t;
+	}
+    }
+}
+#+end_src
+** 模拟我们玩牌洗牌的算法
+#+begin_src c
+void ShuffleArray_Manual(char* arr, int len)
+{
+    int mid = len / 2;
+ 
+    for (int n=0; n<5; n++){
+ 
+        //两手洗牌
+        for (int i=1; i<mid; i+=2){
+            char tmp = arr[i];
+            arr[i] = arr[mid+i];
+            arr[mid+i] = tmp;
+        }
+ 
+        //随机切牌
+        char *buf = (char*)malloc(sizeof(char)*len);
+ 
+        for(int j=0; j<5; j++) {
+            int start= rand() % (len-1) + 1;
+            int numCards= rand()% (len/2) + 1;
+ 
+            if (start + numCards > len ){
+                numCards = len - start;
+            }
+ 
+            memset(buf, 0, len);
+            strncpy(buf, arr, start);
+            strncpy(arr, arr+start, numCards);
+            strncpy(arr+numCards, buf, start);
+        }
+        free(buf);
+ 
+    }
+}
+#+end_src
+
+* 一个不知道长度的数组，让你随机取出1000个数字。只能走一边。只能常数空间
+resevior sampling
+
+假设当前考虑第n个数， n>1000，如果n<=1000，直接选上。
+从之前的1000个选出来的数里随机选一个出来，以 1000/n的概率和当前数交换。
+#+begin_src sh
+array R[k];    // result
+integer i, j;
+
+// fill the reservoir array
+for each i in 1 to k do
+    R[i] := S[i]
+done;
+
+// replace elements with gradually decreasing probability
+for each i in k+1 to length(S) do
+    j := random(1, i);   // important: inclusive range
+    if j <= k then
+        R[j] := S[i]
+    fi
+done
+#+end_src
+

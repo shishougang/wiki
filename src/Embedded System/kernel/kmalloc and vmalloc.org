@@ -1,0 +1,40 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: kmalloc and vmalloc
+#+OPTIONS: num:nil H:2
+
+
+* Function
+#+begin_src c
+#include<linux/slab.h>
+void *kmalloc(size_t size, int flags);
+#+end_src
+
+(1)第一个参数是要分配的块的大小
+(2)第二个参数是分配标志（flags），他提供了多种kmalloc的行为。
+(3)第三个最常用的GFP_KERNEL；
+最终是调用get_free_pages来实现实际的分配
+使用GFP_KERNEL容许kmalloc在分配空闲内存时候如果内存不足容许把当前进程睡眠以等待。
+
++ GFP_ATOMIC
+  用来从中断处理和进程上下文之外的其他代码中分配内存. 从不睡眠.
++ GFP_KERNEL
+  内核内存的正常分配. 可能睡眠.
++ GFP_USER
+  用来为用户空间页来分配内存; 它可能睡眠.
++ GFP_HIGHUSER
+  如同 GFP_USER, 但是从高端内存分配, 
+* size and misc
+malloc特殊之处在于它分配的内存是物理上连续的,这对于要进行DMA的设备十分
+重要. 而用vmalloc分配的内存只是线性地址连续,物理地址不一定连续,不能直
+接用于DMA.
+
+　　注意kmalloc最大只能开辟128k(32XPAGE_SIZE)-16，16个字节是被页描述符结构占用了。
+* kmalloc和vmalloc的区别
++ vmalloc()与 kmalloc()都可用于分配内存
++ kmalloc()分配的内存处于3GB~high_memory之 间,这段内核空间与物理内存的映射一一对应
++ vmalloc()分配的内存在 VMALLOC_START~4GB之间,这段非连续内 存区映射到物理内存也可能是非连续的
++ 在内核空间中调用kmalloc()分配连续物理空间,而调用vmalloc()分配非物理连续空间。
++ 把kmalloc()所分配内核空间中的地址称为内核逻辑地址
++ 把vmalloc()分配的内核空间中的地址称 为内核虚拟地址
++ vmalloc()在分配过程中须更新内核页表
++ kmalloc分配内存是基于slab

@@ -2,7 +2,6 @@
 #+TITLE: Hash table
 #+OPTIONS: num:nil H:1
 
-
 * Hash table
 In computing, a hash table (also hash map) is a data structure used to
 implement an associative array, a structure that can map keys to
@@ -209,8 +208,23 @@ different performance characteristics, including one that optimizes
 for memory use and another that optimizes for speed.
 + Modifying Google Sparsehash for the Intel Compiler
   http://kyleteague.com/blog/modifying-google-sparsehash-intel-compiler.html
-
-** SunriseDD [complex]
++ The Google Dense Hashtable Library
+  http://attractivechaos.wordpress.com/2008/09/12/the-google-hash-table-library/
+  + Google dense hash table (google-dense) implements an open
+    addressing hash table with quardric probing. It requires users to
+    set an empty element and a deleted element which are distinct from
+    all the other valid keys in the hash table. Google-dense tests
+    whether a bucket is empty or deleted by performing key
+    comparisons. It is fast for integer keys where comparisons are
+    cheap but will have overhead for string keys.
+  + google-map keeps key-value pair in one array. Keeping one array
+    helps cache efficiency because we will not incur a cache miss when
+    we have located the bucket via a key. However, putting a key and a
+    value in one struct/class will waste memory when the key type and
+    the value type are not aligned. For example, on 64-bit systems, if
+    the key type is “const char*” and the value type is “int”, 25%
+    of memory is wasted on memory alignment. 
+** SunriseDD [thread-safe,complex]
 http://www.sunrisetel.net/software/devtools/sunrise-data-dictionary.shtml
 
 SunriseDD An open source C library for hash table storage of arbitrary
@@ -263,6 +277,184 @@ struct str_hash
   cout << hash_str[str1] <<endl;
   cout << hash_str[str2] <<endl;
 #+end_src
+
+** glibc hash table
+http://linux.die.net/man/3/hsearch
+#+begin_src c
+typedef struct entry {
+    char *key;
+    void *data;
+} ENTRY;
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <search.h>
+
+char *data[] = { "alpha", "bravo", "charlie", "delta",
+     "echo", "foxtrot", "golf", "hotel", "india", "juliet",
+     "kilo", "lima", "mike", "november", "oscar", "papa",
+     "quebec", "romeo", "sierra", "tango", "uniform",
+     "victor", "whisky", "x-ray", "yankee", "zulu"
+};
+
+int
+main(void)
+{
+    ENTRY e, *ep;
+    int i;
+
+   hcreate(30);
+
+   for (i = 0; i < 24; i++) {
+        e.key = data[i];
+        /* data is just an integer, instead of a
+           pointer to something */
+        e.data = (void *) i;
+        ep = hsearch(e, ENTER);
+        /* there should be no failures */
+        if (ep == NULL) {
+            fprintf(stderr, "entry failed\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+   for (i = 22; i < 26; i++) {
+        /* print two entries from the table, and
+           show that two are not in the table */
+        e.key = data[i];
+        ep = hsearch(e, FIND);
+        printf("%9.9s -> %9.9s:%d\n", e.key,
+               ep ? ep->key : "NULL", ep ? (int)(ep->data) : 0);
+    }
+    hdestroy();
+    exit(EXIT_SUCCESS);
+}
+#+end_src
+** hashit
+http://freecode.com/projects/hashit
+#+begin_src c
+struct shash_t;
+typedef struct shash_t *hash_t;
+
+hash_t hashit_create(uint32_t, size_t, uint32_t(*)(), int(*)(void *, void *), unsigned int);
+int hashit_insert(hash_t, void *, void *);
+int hashit_delete(hash_t, void *);
+int hashit_replace(hash_t, void *, void *);
+void *hashit_lookup(hash_t, void *);
+int hashit_destroy(hash_t);
+/* Accesors */
+void **hashit_getkeys(hash_t);
+void **hashit_getvalues(hash_t);
+size_t hashit_tablesize(hash_t);
+size_t hashit_size(hash_t);
+#+end_src
+
+** Christopher Clark's hashtable
+[[./files/hashfunction/c-hashtable.zip][hashtable.zip]]
+
+Defined functions
+#+begin_src sh
+create_hashtable
+hashtable_insert
+hashtable_search
+hashtable_remove
+hashtable_count
+hashtable_destroy
+#+end_src
+Example of use
+#+begin_src c
+struct hashtable  *h;
+      struct some_key   *k;
+      struct some_value *v;
+
+      static unsigned int         hash_from_key_fn( void *k );
+      static int                  keys_equal_fn ( void *key1, void *key2 );
+
+      h = create_hashtable(16, hash_from_key_fn, keys_equal_fn);
+
+      insert_key   = (struct some_key *) malloc(sizeof(struct some_key));
+      retrieve_key = (struct some_key *) malloc(sizeof(struct some_key));
+
+      v = (struct some_value *) malloc(sizeof(struct some_value));
+
+      (You should initialise insert_key, retrieve_key and v here)
+
+      if (! hashtable_insert(h,insert_key,v) )
+      {     exit(-1);               }
+
+      if (NULL == (found = hashtable_search(h,retrieve_key) ))
+      {    printf("not found!");                  }
+
+      if (NULL == (found = hashtable_remove(h,retrieve_key) ))
+      {    printf("Not found\n");                 }
+
+      hashtable_destroy(h,1); /* second arg indicates "free(value)" */
+#+end_src
+
+** glib hash table
+https://developer.gnome.org/glib/2.31/glib-Hash-Tables.html
+
+Build with glib:
++ =sudo apt-get install libglib2.0-dev=
++ =gcc test.c -Wall -o test `pkg-config --cflags --libs glib-2.0`=
+
+example:
+http://www.ibm.com/developerworks/linux/tutorials/l-glib/section5.html
+
+#+begin_src c
+#include <stdio.h>
+#include <glib.h>
+void value_destroyed(gpointer data) {
+ printf("Got a value destroy call for %d\n", GPOINTER_TO_INT(data));
+}
+gboolean finder(gpointer key, gpointer value, gpointer user_data) {
+ return (GPOINTER_TO_INT(key) + GPOINTER_TO_INT(value)) == 42;
+}
+int main(int argc, char** argv) {
+ GHashTable* hash = g_hash_table_new_full(g_direct_hash, g_direct_equal,
+  NULL,
+  (GDestroyNotify)value_destroyed);
+ g_hash_table_insert(hash, GINT_TO_POINTER(6), GINT_TO_POINTER(36));
+ g_hash_table_insert(hash, GINT_TO_POINTER(10), GINT_TO_POINTER(12));
+ g_hash_table_insert(hash, GINT_TO_POINTER(20), GINT_TO_POINTER(22));
+ gpointer item_ptr = g_hash_table_find(hash, (GHRFunc)finder, NULL);
+ gint item = GPOINTER_TO_INT(item_ptr);
+ printf("%d + %d == 42\n", item, 42-item);
+ g_hash_table_destroy(hash);
+ return 0;
+}
+#+end_src
+
+** ghthash
+http://www.bth.se/people/ska/sim_home/libghthash.html
+** khash
+http://attractivechaos.awardspace.com/khash.h.html
+
+** hashlib library
+[[./files/hashfunction/hashlib.zip][hashlib.zip]]
+** rdestl::hash_map: from RDESTL, another implementation of STL
+https://code.google.com/p/rdestl/
+=svn checkout http://rdestl.googlecode.com/svn/ rdestl-read-only=
+** JudyL hash table
+http://judy.sourceforge.net/doc/JudyL_3x.htm
+
+
+* comparison of Hash Table Libraries
++ http://attractivechaos.wordpress.com/2008/08/28/comparison-of-hash-table-libraries/
++ http://attractivechaos.wordpress.com/2008/10/07/another-look-at-my-old-benchmark/
++ Benchmark of Dictionary Structures
+  http://lh3lh3.users.sourceforge.net/udb.shtml
++ Hash Table Performance Tests
+  http://preshing.com/20110603/hash-table-performance-tests
++ Hash Collision Probabilities
+  http://preshing.com/page/5
+
+
+* comparison of Hash Function
+** Useless hash test
+http://cbloomrants.blogspot.hk/2010/11/11-29-10-useless-hash-test.html
+** Hash functions: An empirical comparison
+http://www.strchr.com/hash_functions
 
 * General Purpose Hash Function Algorithms[fn:2]
 ** choose the hash function

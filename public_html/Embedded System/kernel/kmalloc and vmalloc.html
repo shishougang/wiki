@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+               "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>kmalloc and vmalloc</title>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+<meta name="title" content="kmalloc and vmalloc"/>
+<meta name="generator" content="Org-mode"/>
+<meta name="generated" content="2013-06-26T23:03+0800"/>
+<meta name="author" content="Shi Shougang"/>
+<meta name="description" content=""/>
+<meta name="keywords" content=""/>
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  html { font-family: Times, serif; font-size: 12pt; }
+  .title  { text-align: center; }
+  .todo   { color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #add8e6; font-weight:normal }
+  .target { }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  {margin-left:auto; margin-right:0px;  text-align:right;}
+  .left   {margin-left:0px;  margin-right:auto; text-align:left;}
+  .center {margin-left:auto; margin-right:auto; text-align:center;}
+  p.verse { margin-left: 3% }
+  pre {
+	border: 1pt solid #AEBDCC;
+	background-color: #F3F5F7;
+	padding: 5pt;
+	font-family: courier, monospace;
+        font-size: 90%;
+        overflow:auto;
+  }
+  table { border-collapse: collapse; }
+  td, th { vertical-align: top;  }
+  th.right  { text-align:center;  }
+  th.left   { text-align:center;   }
+  th.center { text-align:center; }
+  td.right  { text-align:right;  }
+  td.left   { text-align:left;   }
+  td.center { text-align:center; }
+  dt { font-weight: bold; }
+  div.figure { padding: 0.5em; }
+  div.figure p { text-align: center; }
+  div.inlinetask {
+    padding:10px;
+    border:2px solid gray;
+    margin:10px;
+    background: #ffffcc;
+  }
+  textarea { overflow-x: auto; }
+  .linenr { font-size:smaller }
+  .code-highlighted {background-color:#ffff00;}
+  .org-info-js_info-navigation { border-style:none; }
+  #org-info-js_console-label { font-size:10px; font-weight:bold;
+                               white-space:nowrap; }
+  .org-info-js_search-highlight {background-color:#ffff00; color:#000000;
+                                 font-weight:bold; }
+  /*]]>*/-->
+</style><link rel="stylesheet" href="./assets/stylesheet.css" type="text/css"/>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+
+</head>
+<body>
+<div id="org-div-home-and-up" style="text-align:right;font-size:70%;white-space:nowrap;">
+ <a accesskey="h" href="../../index.html"> UP </a>
+ |
+ <a accesskey="H" href="../../index.html"> HOME </a>
+</div>
+
+<div id="preamble">
+
+</div>
+
+<div id="content">
+<h1 class="title">kmalloc and vmalloc</h1>
+
+
+
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Function</a></li>
+<li><a href="#sec-2">size and misc</a></li>
+<li><a href="#sec-3">kmalloc和vmalloc的区别</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-1" class="outline-2">
+<h2 id="sec-1">Function</h2>
+<div class="outline-text-2" id="text-1">
+
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;linux/slab.h&gt;</span>
+<span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">kmalloc</span>(<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flags</span>);
+</pre>
+
+
+<p>
+(1)第一个参数是要分配的块的大小
+(2)第二个参数是分配标志（flags），他提供了多种kmalloc的行为。
+(3)第三个最常用的GFP<sub>KERNEL；</sub>
+最终是调用get<sub>free</sub><sub>pages来实现实际的分配</sub>
+使用GFP<sub>KERNEL容许kmalloc在分配空闲内存时候如果内存不足容许把当前进程睡眠以等待。</sub>
+</p>
+<ul>
+<li>GFP<sub>ATOMIC</sub>
+  用来从中断处理和进程上下文之外的其他代码中分配内存. 从不睡眠.
+</li>
+<li>GFP<sub>KERNEL</sub>
+  内核内存的正常分配. 可能睡眠.
+</li>
+<li>GFP<sub>USER</sub>
+  用来为用户空间页来分配内存; 它可能睡眠.
+</li>
+<li>GFP<sub>HIGHUSER</sub>
+  如同 GFP<sub>USER</sub>, 但是从高端内存分配, 
+</li>
+</ul>
+
+</div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2">size and misc</h2>
+<div class="outline-text-2" id="text-2">
+
+<p>malloc特殊之处在于它分配的内存是物理上连续的,这对于要进行DMA的设备十分
+重要. 而用vmalloc分配的内存只是线性地址连续,物理地址不一定连续,不能直
+接用于DMA.
+</p>
+<p>
+　　注意kmalloc最大只能开辟128k(32XPAGE<sub>SIZE</sub>)-16，16个字节是被页描述符结构占用了。
+</p></div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">kmalloc和vmalloc的区别</h2>
+<div class="outline-text-2" id="text-3">
+
+<ul>
+<li>vmalloc()与 kmalloc()都可用于分配内存
+</li>
+<li>kmalloc()分配的内存处于3GB~high<sub>memory之</sub> 间,这段内核空间与物理内存的映射一一对应
+</li>
+<li>vmalloc()分配的内存在 VMALLOC<sub>START</sub>~4GB之间,这段非连续内 存区映射到物理内存也可能是非连续的
+</li>
+<li>在内核空间中调用kmalloc()分配连续物理空间,而调用vmalloc()分配非物理连续空间。
+</li>
+<li>把kmalloc()所分配内核空间中的地址称为内核逻辑地址
+</li>
+<li>把vmalloc()分配的内核空间中的地址称 为内核虚拟地址
+</li>
+<li>vmalloc()在分配过程中须更新内核页表
+</li>
+<li>kmalloc分配内存是基于slab
+</li>
+</ul>
+
+</div>
+</div>
+</div>
+
+<div id="postamble">
+<p class="date">Date: 2013-06-26T23:03+0800</p>
+<p class="author">Author: Shi Shougang</p>
+<p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
+<a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
+
+</div>
+</body>
+</html>

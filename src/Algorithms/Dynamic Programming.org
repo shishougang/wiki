@@ -1,0 +1,89 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Dynamic Programming
+#+OPTIONS: num:nil H:2
+
+
+* Overview[fn:1]
+dynamic programming is a method for solving complex problems by
+breaking them down into simpler subproblems. It is applicable to
+problems exhibiting the properties of overlapping subproblems and
+optimal substructure
+
+* Egg Dropping Puzzle[fn:2]
+When we drop an egg from a floor x, there can be two cases (1) The egg
+breaks (2) The egg doesn’t break.
+
+1) If the egg breaks after dropping from xth floor, then we only need
+   to check for floors lower than x with remaining eggs; so the
+   problem reduces to x-1 floors and n-1 eggs
+
+2) If the egg doesn’t break after dropping from the xth floor, then
+   we only need to check for floors higher than x; so the problem
+   reduces to k-x floors and n eggs.
+
+Since we need to minimize the number of trials in worst case, we take
+the maximum of two cases. We consider the max of above two cases for
+every floor and choose the floor which yields minimum number of
+trials.
+
+#+begin_src sh
+ k ==> Number of floors
+  n ==> Number of Eggs
+  eggDrop(n, k) ==> Minimum number of trails needed to find the critical
+                    floor in worst case.
+  eggDrop(n, k) = 1 + min{max(eggDrop(n - 1, x - 1), eggDrop(n, k - x)): 
+                 x in {1, 2, ..., k}}
+#+end_src
+
+#+begin_src c
+#include <stdio.h>
+#include <limits.h>
+
+int max(int a, int b) {return (a > b)? a : b;}
+
+int eggDrop(int n, int k)
+{
+  /* store the minimum number of trials needed for i eggs and j floors */
+  int eggdrop[n+1][k+1];
+  int res;
+  int i, j, x;
+
+  /* need j trails for 1 egg and j floors */
+  for(j = 0; j <= k; ++j)
+    eggdrop[1][j] = j;
+  /* need 1 trails for i egg and 1 floor
+     need 0 trials for i egg and 0 floor*/
+  for(i = 0; i <= n; ++i){
+    eggdrop[i][1] = 1;
+    eggdrop[i][0] = 0;
+  }
+
+  for(i = 2; i <= n; ++i){
+    for(j = 2; j <= k; ++j){
+      eggdrop[i][j] = INT_MAX;
+      for(x = 1; x <= j; ++x){
+        int res = 1 + max(eggdrop[i][j - x], eggdrop[i - 1][x - 1]);
+        if(res < eggdrop[i][j])
+          eggdrop[i][j] = res;
+      }
+    }
+  }
+  return eggdrop[n][k];
+}
+
+int main(int argc, char *argv[])
+{
+  int n = 2, k = 36;
+   printf ("\nMinimum number of trials in worst case with %d eggs and "
+             "%d floors is %d \n", n, k, eggDrop(n, k));
+   return 0;
+}
+#+end_src
+
+* Footnotes
+
+[fn:1] http://en.wikipedia.org/wiki/Dynamic_programming#Egg_dropping_puzzle
+
+[fn:2] http://en.wikipedia.org/wiki/Dynamic_programming#Egg_dropping_puzzle
+
+
