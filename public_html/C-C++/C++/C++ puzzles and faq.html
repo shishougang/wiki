@@ -1,13 +1,13 @@
-<?xml version="1.0" encoding="iso-8859-1"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
                "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>C++ puzzles and FAQ</title>
-<meta http-equiv="Content-Type" content="text/html;charset=iso-8859-1"/>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="C++ puzzles and FAQ"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-06-26T23:03+0800"/>
+<meta name="generated" content="2013-06-30T22:32+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -137,6 +137,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2-3">Inheritance differences?</a></li>
 </ul>
 </li>
+<li><a href="#sec-3">return statement vs exit() in main()</a></li>
 </ul>
 </div>
 </div>
@@ -245,6 +246,111 @@ when an access specificer for the base class is absent.
 </ul>
 
 
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">return statement vs exit() in main()</h2>
+<div class="outline-text-2" id="text-3">
+
+<p>When exit(0) is used to exit from program, destructors for locally
+scoped non-static objects are not called. But destructors are called
+if return 0 is used. Note that static objects will be cleaned up even
+if we call exit().
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+
+using <span style="color: #98fb98;">namespace</span> <span style="color: #eedd82;">std</span>;
+
+<span style="color: #98fb98;">class</span> <span style="color: #eedd82;">Test</span> {
+<span style="color: #7fffd4;">public</span>:
+  <span style="color: #eedd82;">Test</span>() {
+    printf(<span style="color: #ffa07a;">"Inside Test's Constructor\n"</span>);
+  }
+
+  ~Test(){
+    printf(<span style="color: #ffa07a;">"Inside Test's Destructor"</span>);
+    getchar();
+  }
+};
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">Test</span> <span style="color: #eedd82;">t1</span>;
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">using exit(0) to exit from main</span>
+  exit(0);
+}
+Output:
+Inside Test&#8217;s Constructor
+</pre>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+
+using <span style="color: #98fb98;">namespace</span> <span style="color: #eedd82;">std</span>;
+
+<span style="color: #98fb98;">class</span> <span style="color: #eedd82;">Test</span> {
+<span style="color: #7fffd4;">public</span>:
+  <span style="color: #eedd82;">Test</span>() {
+    printf(<span style="color: #ffa07a;">"Inside Test's Constructor\n"</span>);
+  }
+
+  ~Test(){
+    printf(<span style="color: #ffa07a;">"Inside Test's Destructor"</span>);
+  }
+};
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">Test</span> <span style="color: #eedd82;">t1</span>;
+
+   <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">using return 0 to exit from main</span>
+  <span style="color: #00ffff;">return</span> 0;
+}
+Output:
+Inside Test&#8217;s Constructor
+Inside Test&#8217;s Destructor
+</pre>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+
+using <span style="color: #98fb98;">namespace</span> <span style="color: #eedd82;">std</span>;
+
+<span style="color: #98fb98;">class</span> <span style="color: #eedd82;">Test</span> {
+<span style="color: #7fffd4;">public</span>:
+  <span style="color: #eedd82;">Test</span>() {
+    printf(<span style="color: #ffa07a;">"Inside Test's Constructor\n"</span>);
+  }
+
+  ~Test(){
+    printf(<span style="color: #ffa07a;">"Inside Test's Destructor"</span>);
+    getchar();
+  }
+};
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">Test</span> <span style="color: #eedd82;">t1</span>;  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Note that t1 is static</span>
+
+  exit(0);
+}
+Output:
+Inside Test&#8217;s Constructor
+Inside Test&#8217;s Destructor
+</pre>
+
+
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
@@ -255,14 +361,13 @@ differences
 
 </div>
 </div>
-</div>
 
 </div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-06-26T23:03+0800</p>
+<p class="date">Date: 2013-06-30T22:32+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

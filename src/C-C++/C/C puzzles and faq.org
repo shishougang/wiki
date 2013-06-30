@@ -390,17 +390,530 @@ equivalent to ++(*p) (both Prefix ++ and * are right associative).
 * Modulus on Negative Numbers
 he emphasis is, sign of left operand is appended to result in case of
 modulus operator in C.
-
-* aa
+* Variable length arguments for Macros
+To support variable length arguments in macro, we must include
+ellipses (…) in macro definition. There is also “__VA_ARGS__”
+preprocessing identifier which takes care of variable length argument
+substitutions which are provided to macro. Concatenation operator ##
+(aka paste operator) is used to concatenate variable arguments.
 #+begin_src c
-
+#include <stdio.h>
+ 
+#define INFO    1
+#define ERR 2
+#define STD_OUT stdout
+#define STD_ERR stderr
+ 
+#define LOG_MESSAGE(prio, stream, msg, ...) do {\
+                        char *str;\
+                        if (prio == INFO)\
+                            str = "INFO";\
+                        else if (prio == ERR)\
+                            str = "ERR";\
+                        fprintf(stream, "[%s] : %s : %d : "msg" \n", \
+                                str, __FILE__, __LINE__, ##__VA_ARGS__);\
+                    } while (0)
+ 
+int main(void)
+{
+    char *s = "Hello";
+ 
+        /* display normal message */
+    LOG_MESSAGE(ERR, STD_ERR, "Failed to open file");
+ 
+    /* provide string as argument */
+    LOG_MESSAGE(INFO, STD_OUT, "%s Geeks for Geeks", s);
+ 
+    /* provide integer as arguments */
+    LOG_MESSAGE(INFO, STD_OUT, "%d + %d = %d", 10, 20, (10 + 20));
+ 
+    return 0;
+}
 #+end_src
+#+begin_src sh
+  [narendra@/media/partition/GFG]$ ./variable_length 
+   [ERR] : variable_length.c : 26 : Failed to open file 
+   [INFO] : variable_length.c : 27 : Hello Geeks for Geeks 
+   [INFO] : variable_length.c : 28 : 10 + 20 = 30 
+   [narendra@/media/partition/GFG]$
+#+end_src
+* CRASH() macro – interpretation
+#+begin_src c
+#ifndef __cplusplus
+ 
+typedef enum BoolenTag
+{
+   false,
+   true
+} bool;
+ 
+#endif
+ 
+#define CRASH() do { \
+      ((void(*)())0)(); \
+   } while(false)
+ 
+int main()
+{
+   CRASH();
+   return 0;
+}
+#+end_src
+
+The statement while(false) is meant only for testing purpose. Consider the following operation,
+
+((void(*)())0)();
+It can be achieved as follows,
+#+begin_src sh
+0;                      /* literal zero */
+(0); ( ()0 );                /* 0 being casted to some type */
+( (*) 0 );              /* 0 casted some pointer type */
+( (*)() 0 );            /* 0 casted as pointer to some function */
+( void (*)(void) 0 );   /* Interpret 0 as address of function 
+ taking nothing and returning nothing */
+( void (*)(void) 0 )(); /* Invoke the function */
+#+end_src
+* The OFFSETOF() macro
+=#define OFFSETOF(TYPE, ELEMENT) ((size_t)&(((TYPE *)0)->ELEMENT))=
+
+Zero is casted to type of structure and required element’s address is
+accessed, which is casted to size_t. As per standard size_t is of type
+unsigned int. The overall expression results in the number of bytes
+after which the ELEMENT being placed in the structure.
+
+For example, the following code returns 16 bytes (padding is
+considered on 32 bit machine) as displacement of the character
+variable c in the structure Pod.
+
+* Are array members deeply copied?
+struct variable st1 contains pointer to dynamically allocated memory.
+When we assign st1 to st2, str pointer of st2 also start pointing to
+same memory location. This kind of copying is called Shallow Copy.
+#+begin_src c
+# include <iostream>
+# include <string.h>
+ 
+using namespace std;
+ 
+struct test
+{
+  char *str;
+};
+ 
+int main()
+{
+  struct test st1, st2;
+ 
+  st1.str = new char[20];
+  strcpy(st1.str, "GeeksforGeeks");
+ 
+  st2 = st1;
+ 
+  st1.str[0] = 'X';
+  st1.str[1] = 'Y';
+ 
+  /* Since copy was shallow, both strings are same */
+  cout << "st1's str = " << st1.str << endl;
+  cout << "st2's str = " << st2.str << endl;
+ 
+  return 0;
+}
+Output:
+st1′s str = XYeksforGeeks
+st2′s str = XYeksforGeeks
+#+end_src
+
+what about arrays? The point to note is that the array members are not
+shallow copied, compiler automatically performs Deep Copy for array
+members.. In the following program, struct test contains array member
+str[]. When we assign st1 to st2, st2 has a new copy of the array. So
+st2 is not changed when we change str[] of st1.
+#+begin_src c
+# include <iostream>
+# include <string.h>
+ 
+using namespace std;
+ 
+struct test
+{
+  char str[20];
+};
+ 
+int main()
+{
+  struct test st1, st2;
+ 
+  strcpy(st1.str, "GeeksforGeeks");
+ 
+  st2 = st1;
+ 
+  st1.str[0] = 'X';
+  st1.str[1] = 'Y';
+ 
+  /* Since copy was Deep, both arrays are different */
+  cout << "st1's str = " << st1.str << endl;
+  cout << "st2's str = " << st2.str << endl;
+ 
+  return 0;
+}
+Output:
+st1′s str = XYeksforGeeks
+st2′s str = GeeksforGeeks
+#+end_src
+
+* Functions that are executed before and after main() in C
+With GCC family of C compilers, we can mark some functions to execute
+before and after main(). So some startup code can be executed before
+main() starts, and some cleanup code can be executed after main()
+ends. For example, in the following program, myStartupFun() is called
+before main() and myCleanupFun() is called after main().
+#+begin_src c
+#include<stdio.h>
+ 
+/* Apply the constructor attribute to myStartupFun() so that it
+    is executed before main() */
+void myStartupFun (void) __attribute__ ((constructor));
+ 
+ 
+/* Apply the destructor attribute to myCleanupFun() so that it
+   is executed after main() */
+void myCleanupFun (void) __attribute__ ((destructor));
+ 
+ 
+/* implementation of myStartupFun */
+void myStartupFun (void)
+{
+    printf ("startup code before main()\n");
+}
+ 
+/* implementation of myCleanupFun */
+void myCleanupFun (void)
+{
+    printf ("cleanup code after main()\n");
+}
+ 
+int main (void)
+{
+    printf ("hello\n");
+    return 0;
+}
+#+end_src
+Like the above feature, GCC has added many other interesting features
+to standard C language. See this for more details.
+http://www.drdobbs.com/gnus-c-language-extensions/184401956
+
+* How to Count Variable Numbers of Arguments in C?
+C supports variable numbers of arguments. But there is no language
+provided way for finding out total number of arguments passed. User
+has to handle this in one of the following ways:
+
+1) By passing first argument as count of arguments.
+2) By passing last argument as NULL (or 0).
+3) Using some printf (or scanf) like mechanism where first argument
+   has placeholders for rest of the arguments.
+
+Following is an example that uses first argument arg_count to hold
+count of other arguments.
+#+begin_src c
+#include <stdarg.h>
+#include <stdio.h>
+ 
+// this function returns minimum of integer numbers passed.  First 
+// argument is count of numbers.
+int min(int arg_count, ...)
+{
+  int i;
+  int min, a;
+   
+  // va_list is a type to hold information about variable arguments
+  va_list ap; 
+ 
+  // va_start must be called before accessing variable argument list
+  va_start(ap, arg_count); 
+    
+  // Now arguments can be accessed one by one using va_arg macro
+  // Initialize min as first argument in list   
+  min = va_arg(ap, int);
+    
+  // traverse rest of the arguments to find out minimum
+  for(i = 2; i <= arg_count; i++) {
+    if((a = va_arg(ap, int)) < min)
+      min = a;
+  }   
+ 
+  //va_end should be executed before the function returns whenever
+  // va_start has been previously used in that function 
+  va_end(ap);   
+ 
+  return min;
+}
+ 
+int main()
+{
+   int count = 5;
+    
+   // Find minimum of 5 numbers: (12, 67, 6, 7, 100)
+   printf("Minimum value is %d", min(count, 12, 67, 6, 7, 100));
+   getchar();
+   return 0;
+}
+#+end_src
+* exit(), abort()
+** exit()
+=void exit ( int status );=
+exit() terminates the process normally. 
+status: Status value returned to the parent process. Generally, a status value of 0 or EXIT_SUCCESS indicates success, and any other value or the constant EXIT_FAILURE is used to indicate an error. exit() performs following operations.
++ Flushes unwritten buffered data.
++ Closes all open files.
++ Removes temporary files.
++ Returns an integer exit status to the operating system.
+
+The C standard atexit()[fn:3] function can be used to customize exit() to
+perform additional actions at program termination.
+** abort()
+void abort ( void );
+Unlike exit() function, abort() may not close files that are open. It may also not delete temporary files and may not flush stream buffer. Also, it does not call functions registered with atexit().
+
+This function actually terminates the process by raising a SIGABRT
+signal, and your program can include a handler to intercept this
+signal[fn:4]
+
+If we want to make sure that data is written to files and/or buffers
+are flushed then we should either use exit() or include a signal
+handler for SIGABRT.
+
+* Struct Hack
+What will be the size of following structure?
+#+begin_src c
+struct employee
+{
+    int     emp_id;
+    int     name_len;
+    char    name[0];
+};
+#+end_src
+4 + 4 + 0 = 8 bytes.
+
+And what about size of “name[0 ]“. In gcc, when we create an array
+of zero length, it is considered as array of incomplete type that’s
+why gcc reports its size as “0″ bytes. This technique is known as
+“Stuct Hack”. When we create array of zero length inside structure,
+it must be (and only) last member of structure. Shortly we will see
+how to use it.
+
+“Struct Hack” technique is used to create variable length member in
+a structure. In the above structure, string length of “name” is not
+fixed, so we can use “name” as variable length array.
+
+Let us see below memory allocation.
+
+struct employee *e = malloc(sizeof(*e) + sizeof(char) * 128); 
+is equivalent to
+#+begin_src c
+struct employee
+{
+    int     emp_id;
+    int     name_len;
+    char    name[128]; /* character array of size 128 */
+};
+#+end_src
+
+Now we can use “name” same as pointer. e.g.
+#+begin_src c
+e->emp_id 	= 100;
+e->name_len	= strlen("Geeks For Geeks");
+strncpy(e->name, "Geeks For Geeks", e->name_len);
+#+end_src
+When we allocate memory as given above, compiler will allocate memory to store “emp_id” and “name_len” plus contiguous memory to store “name”. When we use this technique, gcc guaranties that, “name” will get contiguous memory.
+Obviously there are other ways to solve problem, one is we can use character pointer. But there is no guarantee that character pointer will get contiguous memory, and we can take advantage of this contiguous memory. For example, by using this technique, we can allocate and deallocate memory by using single malloc and free call (because memory is contagious). Other advantage of this is, suppose if we want to write data, we can write whole data by using single “write()” call. e.g.
+#+begin_src c
+write(fd, e, sizeof(*e) + name_len); /* write emp_id + name_len + name */ 
+#+end_src
+If we use character pointer, then we need 2 write calls to write data. e.g.
+#+begin_src c
+write(fd, e, sizeof(*e)); 		/* write emp_id + name_len */
+write(fd, e->name, e->name_len);	/* write name */
+#+end_src
+
+* fseek() vs rewind() in C[fn:5]
+In C, fseek() should be preferred over rewind().
+
+Note the following text C99 standard:
+The rewind function sets the file position indicator for the stream pointed to by stream to the beginning of the file. It is equivalent to
+
+=(void)fseek(stream, 0L, SEEK_SET)=
+except that the error indicator for the stream is also cleared. But
+there is no way to check whether the rewind() was successful.
+
+fseek() can be used instead of rewind() to see if the operation
+succeeded. Following lines of code can be used in place of rewind(fp);
+
+#+begin_src c
+if ( fseek(fp, 0L, SEEK_SET) != 0 ) {
+  /* Handle repositioning error */
+}
+#+end_src
+
+* EOF, getc() and feof() in C
+n C/C++, getc() returns EOF when end of file is reached. getc() also
+returns EOF when it fails. So, only comparing the value returned by
+getc() with EOF is not sufficient to check for actual end of file. To
+solve this problem, C provides feof() which returns non-zero value
+only if end of file has reached, otherwise it returns 0.
+
+In the program, returned value of getc() is compared with EOF first,
+then there is another check using feof(). By putting this check, we
+make sure that the program prints “End of file reached” only if end
+of file is reached. And if getc() returns EOF due to any other reason,
+then the program prints “Something went wrong”
+#+begin_src c
+#include <stdio.h>
+ 
+int main()
+{
+  FILE *fp = fopen("test.txt", "r");
+  int ch = getc(fp);
+  while (ch != EOF) 
+  {
+    /* display contents of file on screen */
+    putchar(ch); 
+ 
+    ch = getc(fp);
+  }
+   
+  if (feof(fp))
+     printf("\n End of file reached.");
+  else
+     printf("\n Something went wrong.");
+  fclose(fp);
+     
+  getchar();
+  return 0;
+}
+#+end_src
+* Implement Your Own sizeof
+=#define my_sizeof(type) (char *)(&type+1)-(char*)(&type)=
+* Complicated declarations in C
+Most of the times declarations are simple to read, but it is hard to read some declarations which involve pointer to functions. For example, consider the following declaration from “signal.h”.
+
+=void (*bsd_signal(int, void (*)(int)))(int);=
+Let us see the steps to read complicated declarations.
+
+1) Convert C declaration to postfix format and read from left to right.
+2) To convert experssion to postfix, start from innermost parenthesis, If innermost parenthesis is not present then start from declarations name and go right first. When first ending parenthesis encounters then go left. Once whole parenthesis is parsed then come out from parenthesis.
+3) Continue until complete declaration has been parsed.
+
+Let us start with simple example. Below examples are from “K & R” book.
+
+1)  int (*fp) ();
+Let us convert above expression to postfix format. For the above example, there is no innermost parenthesis, that’s why, we will print declaration name i.e. “fp”. Next step is, go to right side of expression, but there is nothing on right side of “fp” to parse, that’s why go to left side. On left side we found “*”, now print “*” and come out of parenthesis. We will get postfix expression as below.
+
+  fp  *  ()  int
+Now read postfix expression from left to right. e.g. fp is pointer to function returning int
+
+Let us see some more examples.
+
+2) =int (*daytab)[13]=
+Postfix : =daytab * [13] int=
+Meaning : daytab is pointer to array of 13 integers.
+
+3) =void (*f[10]) (int, int)=
+Postfix : =f[10] * (int, int) void=
+Meaning : f is an array of 10 of pointer to function(which takes 2 arguments of type int) returning void
+
+4) char (*(*x())[]) ()
+Postfix : x () * [] * () char
+Meaning : x is a function returning pointer to array of pointers to function returnging char
+
+5) =char (*(*x[3])())[5]=
+Postfix : =x[3] * () * [5] char=
+Meaning : x is an array of 3 pointers to function returning pointer to array of 5 char’s
+
+6) =int *(*(*arr[5])()) ()=
+Postfix : =arr[5] * () * () * int=
+Meaning : arr is an array of 5 pointers to functions returning pointer to function returning pointer to integer
+
+7) void (*bsd_signal(int sig, void (*func)(int)))(int);
+Postfix : bsd_signal(int sig, void(*func)(int)) * (int) void
+Meaning : bsd_signal is a function that takes integer & a pointer to a
+function(that takes integer as argument and returns void) and returns
+pointer to a function(that take integer as argument and returns void)
+
+* How Linkers Resolve Multiply Defined Global Symbols?[fn:6]
+Given this notion of strong and weak symbols, Unix linkers use the following rules for dealing with multiply defined symbols:
+
+Rule 1: Multiple strong symbols are not allowed.
+Rule 2: Given a strong symbol and multiple weak symbols, choose the strong symbol.
+Rule 3: Given multiple weak symbols, choose any of the weak symbols.
+* Use of bool in C
+#+begin_src c
+#include <stdbool.h>
+int main()
+{
+  bool arr[2] = {true, false};
+  return 0;
+}
+#+end_src
+* Little and Big Endian Mystery
+** Is there a quick way to determine endianness of your machine?
+There are n no. of ways for determining endianness of your machine.
+Here is one quick way of doing the same.
+#+begin_src c
+#include <stdio.h>
+int main() 
+{
+   unsigned int i = 1;
+   char *c = (char*)&i;
+   if (*c)    
+       printf("Little endian");
+   else
+       printf("Big endian");
+   getchar();
+   return 0;
+}
+#+end_src
+** Does endianness matter for programmers?
+Most of the times compiler takes care of endianness, however,
+endianness becomes an issue in following cases.
+
+It matters in network programming: Suppose you write integers to file
+on a little endian machine and you transfer this file to a big endian
+machine. Unless there is little andian to big endian transformation,
+big endian machine will read the file in reverse order. You can find
+such a practical example here.
+
+Standard byte order for networks is big endian, also known as network
+byte order. Before transferring data on network, data is first
+converted to network byte order (big endian).
+
+Sometimes it matters when you are using type casting, below program is
+an example.
+#+begin_src c
+#include <stdio.h>
+int main()
+{
+    unsigned char arr[2] = {0x01, 0x00};
+    unsigned short int x = *(unsigned short int *) arr;
+    printf("%d", x);
+    getchar();
+    return 0;
+}
+#+end_src
+
 
 * Footnotes
 
 [fn:1] http://blog.csdn.net/carry1314lele/article/details/2191113
 
 [fn:2] The Practice of Programming page 14
+
+[fn:3] http://www.cplusplus.com/reference/cstdlib/atexit/
+
+[fn:4] http://msdn.microsoft.com/en-us/library/xdkz3x12%28VS.80%29.aspx
+
+[fn:5] https://www.securecoding.cert.org/confluence/display/seccode/FIO07-C.+Prefer+fseek%28%29+to+rewind%28%29
+
+[fn:6] http://www.geeksforgeeks.org/how-linkers-resolve-multiply-defined-global-symbols/
 
 
 
