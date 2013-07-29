@@ -2,10 +2,18 @@
 #+TITLE: Appendix A: Architecture Specifics Notes
 #+OPTIONS: num:nil H:2
 
+* Overview
+kernel严格区分架构相关和架构无关代码。 ~include/asm-arch~ 目录包含头文
+件， ~arch/arc~ 包含源代码。
+
+架构相关基本分为两类：
++ 架构相关独有调用的部分
++ 架构无关调用的接口部分由各自架构定义。
+
 * Data types
 内核在如下3个基本数据类型重做一些基本区别：
 + 在C程序中标准的数据类型；如unsigned long，void *和char。
-+ 固定比特数的数据类型。定义在=<asm-generic/int-ll64.h>=
++ 固定比特数的数据类型。定义在 ~<asm-arch/types.h>~
 #+begin_src c
 typedef __signed__ char __s8; 
 typedef unsigned char __u8;
@@ -33,18 +41,26 @@ typedef unsigned long long u64;
 
 
 #+begin_html
-<p class="info">infoThe pre-processor constant =__KERNEL__=  must
+<p class="info"> The pre-processor constant __KERNEL__  must
 always be defined before the file is linked into the kernel source.</p>
 #+end_html
 
 * Alignment
 在内核的某些地方可能需要处理非对齐数据类型。为了这目的，不同的体系需要
-定义2个不同的宏（在=<asm-generic/unaligned.h>=）：
-+ get_unaligned(ptr)
+定义2个不同的宏（在 ~<asm-arch/unaligned.h>~ ）：
++ get_unaligned(ptr) 
 + put_unaligned(val, ptr)
 
 * Memory Pages
-=asm-generic/page.h= to indicate the page size used:
+=asm-arch/page.h= to indicate the page size used:
++ PAGE_SHIFT 页大小的指数
++ PAGE_SIZE  in bytes
++ PAGE_ALIGN(addr) 使地址对齐页面
+
++ clear_page(start) 填充null已删除以start开始的页
++ copy_page(to. from) 拷贝页数据从from到to
+
+example：
 #+begin_src c
 #define PAGE_SHIFT	12
 #ifdef __ASSEMBLY__
@@ -55,6 +71,206 @@ always be defined before the file is linked into the kernel source.</p>
 #define PAGE_MASK	(~(PAGE_SIZE-1))
 #+end_src
 
-+ PAGE_SHIFT specifies the binary logarithm of the page size.
-+ PAGE_SIZE specifies the size of a memory page in bytes.
-+ PAGE_ALIGN
+
+* System Calls
+促发一个system call从用户空间转化到内核空间机制有区别在支持的平台
+上。 ~<asm-arch/unistd.h>~ 
++ It defines pre-processor constants to link the descriptors of all
+  system calls with symbolic constants.
++ It defines functions to invoke system calls from within the kernel itself. 
+
+* String Processing
+~<asm-arch/string.h>~
+
+The __HAVE_ARCH_OPERATION macro must be set for each string operation that is defined as optimized
+by an architecture; for instance, __HAVE_ARCH_MEMCPY must be set for memcpy. All nonimplemented
+functions are replaced with architecture-independent standard operations that are implemented in
+lib/string.c.
+* Thread Representation
+The state of a running process is defined primarily by the contents of
+the processor registers. Processes that are not currently running must
+keep this data in corresponding data structures from which the data
+can be read and moved to the appropriate registers when the process is
+next activated by the scheduler.
+
++ ~<asm-arch/ptrace.h>~ provides the pt_regs structure to hold all
+  registers that are placed on the kernel stack when the process
+  switches from user mode to space mode as a result of a system call,
+  an interrupt, or any other mechanism.
++ ~<asm-arch/processor.h>~ accommodates the thread_struct structure used
+  to describe all other registers and all other task state information.
++ ~<asm-arch/thread.h>~ defines the thread_info structure (not to be
+  confused with thread_struct), which contains all task structure
+  elements that the assembler code must access to implement kernel
+  entry and exit.
+** ARM
+
+The following definition of the pt_regs structure consists simply of an array to hold the values of all
+registers manipulated in kernel mode:
+~include/asm-arm/ptrace.h~
+#+begin_src c
+/*
+ * This struct defines the way the registers are stored on the
+ * stack during a system call.  Note that sizeof(struct pt_regs)
+ * has to be a multiple of 8.
+ */
+struct pt_regs {
+	long uregs[18];
+};
+#+end_src
+
+The symbolic names of the registers and their positions within the array are defined by means of pre-
+processor constants:
+~include/asm-arm/ptrace.h~
+#+begin_src c
+#define ARM_cpsr	uregs[16]
+#define ARM_pc		uregs[15]
+#define ARM_lr		uregs[14]
+#define ARM_sp		uregs[13]
+#define ARM_ip		uregs[12]
+#define ARM_fp		uregs[11]
+#define ARM_r10		uregs[10]
+#define ARM_r9		uregs[9]
+#define ARM_r8		uregs[8]
+#define ARM_r7		uregs[7]
+#define ARM_r6		uregs[6]
+#define ARM_r5		uregs[5]
+#define ARM_r4		uregs[4]
+#define ARM_r3		uregs[3]
+#define ARM_r2		uregs[2]
+#define ARM_r1		uregs[1]
+#define ARM_r0		uregs[0]
+#define ARM_ORIG_r0	uregs[17]
+#+end_src
+
+~include/asm-arm/processor.h~
+#+begin_src c
+struct thread_struct {
+							/* fault info	  */
+	unsigned long		address;
+	unsigned long		trap_no;
+	unsigned long		error_code;
+							/* debugging	  */
+	struct debug_info	debug;
+};
+#+end_src
+
+However, machine instructions (in the form of their opcode) can be saved together with a memory
+address for debugging purposes, as shown here:
+~include/asm-arm/processor.h~
+
+#+begin_src c
+union debug_insn {
+	u32	arm;
+	u16	thumb;
+};
+
+struct debug_entry {
+	u32			address;
+	union debug_insn	insn;
+};
+
+struct debug_info {
+	int			nsaved;
+	struct debug_entry	bp[2];
+};
+#+end_src
+
+* Bit Operations and Endianness
+** Manipulation of Bit Chains
+内核中架构相关的比特处理在 ~<asmm-arch/bitops.h>~
+#+begin_src sh
+void set_bit(int nr, volatile unsigned long * addr) sets the bit at position nr; counting begins at addr.
+
+int test_bit(int nr, const volatile unsigned long * addr) checks whether the specified bit is set.
+
+void clear_bit(int nr, volatile unsigned long * addr) deletes the bit at position nr (count- ing begins at addr).
+....
+#+end_src
+
+所有这些是原子函数，锁的陈述在相关汇编代码内。这些函数的非原子版本，以
+双下划线前缀。（__set_bit).
+** Conversion between Byte Orders
+The kernel provides the ~<byteorder/little_endian.h>~ and ~<byteorder/big_endian.h>~ files. The version for the current
+processor is linked into ~<asm-arch/byteorder.h>~.
+
+C default functions are defined in ~<byteoorder/swab.h>~, but they can be overwritten by a processor-specific implementation.
+__arch__swab16, __arch__swab32, and __arch__swab64 swap the bytes between the representations,
+and therefore convert big endian to little endian and vice versa. __swab16p, __arch__swab32p, and
+__arch__swab64p do the same for pointer variables. swab stands for swap bytes.
+
+~<byteorder/little_endian.h>~
+#+begin_src c
+#define __constant_htonl(x) ((__force __be32)___constant_swab32((x)))
+#define __constant_ntohl(x) ___constant_swab32((__force __be32)(x))
+#define __constant_htons(x) ((__force __be16)___constant_swab16((x)))
+#define __constant_ntohs(x) ___constant_swab16((__force __be16)(x))
+#define __constant_cpu_to_le64(x) ((__force __le64)(__u64)(x))
+#define __constant_le64_to_cpu(x) ((__force __u64)(__le64)(x))
+#define __constant_cpu_to_le32(x) ((__force __le32)(__u32)(x))
+#define __constant_le32_to_cpu(x) ((__force __u32)(__le32)(x))
+#define __constant_cpu_to_le16(x) ((__force __le16)(__u16)(x))
+#define __constant_le16_to_cpu(x) ((__force __u16)(__le16)(x))
+#define __constant_cpu_to_be64(x) ((__force __be64)___constant_swab64((x)))
+#define __constant_be64_to_cpu(x) ___constant_swab64((__force __u64)(__be64)(x))
+#define __constant_cpu_to_be32(x) ((__force __be32)___constant_swab32((x)))
+#define __constant_be32_to_cpu(x) ___constant_swab32((__force __u32)(__be32)(x))
+#define __constant_cpu_to_be16(x) ((__force __be16)___constant_swab16((x)))
+#define __constant_be16_to_cpu(x) ___constant_swab16((__force __u16)(__be16)(x))
+#define __cpu_to_le64(x) ((__force __le64)(__u64)(x))
+#define __le64_to_cpu(x) ((__force __u64)(__le64)(x))
+#define __cpu_to_le32(x) ((__force __le32)(__u32)(x))
+#define __le32_to_cpu(x) ((__force __u32)(__le32)(x))
+#define __cpu_to_le16(x) ((__force __le16)(__u16)(x))
+#define __le16_to_cpu(x) ((__force __u16)(__le16)(x))
+#define __cpu_to_be64(x) ((__force __be64)__swab64((x)))
+#define __be64_to_cpu(x) __swab64((__force __u64)(__be64)(x))
+#define __cpu_to_be32(x) ((__force __be32)__swab32((x)))
+#define __be32_to_cpu(x) __swab32((__force __u32)(__be32)(x))
+#define __cpu_to_be16(x) ((__force __be16)__swab16((x)))
+#define __be16_to_cpu(x) __swab16((__force __u16)(__be16)(x))
+#+end_src
+* Page Tables
+To simplify memory management and to provide a memory model that
+abstracts the differences between the various architectures, the ports
+must offer functions to manipulate *page tables* and *their entries*. These
+are declared in ~<asm-arch/pgtable.h>~.
+* Miscellaneous
+** Checksum Calculation
+为包算checksums是IP网络中一个关键的算法时间。实现在
+~<asm-arch/checksum.h>~
+#+begin_src c
+unsigned short ip_fast_csum calculates the requisite checksum based on the IP header and the header length.
+
+csum_partial calculates the checksum for a packet from the fragments that are received one by one.
+#+end_src
+** Context Switch
+~<asm-arch/system.h>~
+
+~void switch_to(struct task_struct *prev, struct task_struct *next, struct task_struct *last)~
+** Finding the Current Process
+The purpose of the current macro is to find a pointer to the task
+structure of the currently running process. It must be declared by
+each architecture in <asm-arch/current.h>. 
+
+ Arm architecture:
+~include/asm-arm/current.h~
+#+begin_src c
+  static __always_inline struct task_struct * get_current(void)
+  {
+    return current_thread_info()->task;
+  }
+  #define current get_current()
+#+end_src
+The pointer to the current ~thread_info~ instance found using
+=current_thread_info= is stored in register sp, as shown here:
+
+~include/asm-arm/thread_info.h~
+#+begin_src c
+  static inline struct thread_info *current_thread_info(void)
+  {
+    register unsigned long sp asm ("sp");
+    return (struct thread_info *)(sp & ~(THREAD_SIZE - 1));
+  }
+#+end_src
+

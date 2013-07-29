@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Appendix A: Architecture Specifics Notes"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2012-08-13 22:10:00 HKT"/>
+<meta name="generated" content="2013-07-29T22:21+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -62,6 +62,30 @@
 </style>
 <link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
 <script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
 <!--/*--><![CDATA[/*><!--*/
  function CodeHighlightOn(elem, id)
  {
@@ -100,26 +124,63 @@
 <h1 class="title">Appendix A: Architecture Specifics Notes</h1>
 
 
+
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">Data types</a></li>
-<li><a href="#sec-2">Alignment</a></li>
-<li><a href="#sec-3">Memory Pages</a></li>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">Data types</a></li>
+<li><a href="#sec-3">Alignment</a></li>
+<li><a href="#sec-4">Memory Pages</a></li>
+<li><a href="#sec-5">System Calls</a></li>
+<li><a href="#sec-6">String Processing</a></li>
+<li><a href="#sec-7">Thread Representation</a>
+<ul>
+<li><a href="#sec-7-1">ARM</a></li>
+</ul>
+</li>
+<li><a href="#sec-8">Bit Operations and Endianness</a>
+<ul>
+<li><a href="#sec-8-1">Manipulation of Bit Chains</a></li>
+<li><a href="#sec-8-2">Conversion between Byte Orders</a></li>
+</ul>
+</li>
+<li><a href="#sec-9">aa</a></li>
 </ul>
 </div>
 </div>
 
 <div id="outline-container-1" class="outline-2">
-<h2 id="sec-1">Data types</h2>
+<h2 id="sec-1">Overview</h2>
 <div class="outline-text-2" id="text-1">
+
+<p>kernel严格区分架构相关和架构无关代码。 <code>include/asm-arch</code> 目录包含头文
+件， <code>arch/arc</code> 包含源代码。
+</p>
+<p>
+架构相关基本分为两类：
+</p><ul>
+<li>架构相关独有调用的部分
+</li>
+<li>架构无关调用的接口部分由各自架构定义。
+</li>
+</ul>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-2" class="outline-2">
+<h2 id="sec-2">Data types</h2>
+<div class="outline-text-2" id="text-2">
 
 <p>内核在如下3个基本数据类型重做一些基本区别：
 </p><ul>
 <li>在C程序中标准的数据类型；如unsigned long，void *和char。
 </li>
-<li>固定比特数的数据类型。定义在=&lt;asm-generic/int-ll64.h&gt;=
+<li>固定比特数的数据类型。定义在 <code>&lt;asm-arch/types.h&gt;</code>
 </li>
 </ul>
 
@@ -158,21 +219,21 @@
 
 
 
-<p class="info">infoThe pre-processor constant =__KERNEL__=  must
+<p class="info"> The pre-processor constant __KERNEL__  must
 always be defined before the file is linked into the kernel source.</p>
 
 </div>
 
 </div>
 
-<div id="outline-container-2" class="outline-2">
-<h2 id="sec-2">Alignment</h2>
-<div class="outline-text-2" id="text-2">
+<div id="outline-container-3" class="outline-2">
+<h2 id="sec-3">Alignment</h2>
+<div class="outline-text-2" id="text-3">
 
 <p>在内核的某些地方可能需要处理非对齐数据类型。为了这目的，不同的体系需要
-定义2个不同的宏（在=&lt;asm-generic/unaligned.h&gt;=）：
+定义2个不同的宏（在 <code>&lt;asm-arch/unaligned.h&gt;</code> ）：
 </p><ul>
-<li>get<sub>unaligned</sub>(ptr)
+<li>get<sub>unaligned</sub>(ptr) 
 </li>
 <li>put<sub>unaligned</sub>(val, ptr)
 </li>
@@ -183,11 +244,28 @@ always be defined before the file is linked into the kernel source.</p>
 
 </div>
 
-<div id="outline-container-3" class="outline-2">
-<h2 id="sec-3">Memory Pages</h2>
-<div class="outline-text-2" id="text-3">
+<div id="outline-container-4" class="outline-2">
+<h2 id="sec-4">Memory Pages</h2>
+<div class="outline-text-2" id="text-4">
 
-<p><code>asm-generic/page.h</code> to indicate the page size used:
+<p><code>asm-arch/page.h</code> to indicate the page size used:
+</p><ul>
+<li>PAGE<sub>SHIFT</sub> 页大小的指数
+</li>
+<li>PAGE<sub>SIZE</sub>  in bytes
+</li>
+<li>PAGE<sub>ALIGN</sub>(addr) 使地址对齐页面
+
+</li>
+<li>clear<sub>page</sub>(start) 填充null已删除以start开始的页
+</li>
+<li>copy<sub>page</sub>(to. from) 拷贝页数据从from到to
+</li>
+</ul>
+
+
+<p>
+example：
 </p>
 
 
@@ -201,23 +279,244 @@ always be defined before the file is linked into the kernel source.</p>
 </pre>
 
 
-<ul>
-<li>PAGE<sub>SHIFT</sub> specifies the binary logarithm of the page size.
+
+
+</div>
+
+</div>
+
+<div id="outline-container-5" class="outline-2">
+<h2 id="sec-5">System Calls</h2>
+<div class="outline-text-2" id="text-5">
+
+<p>促发一个system call从用户空间转化到内核空间机制有区别在支持的平台
+上。 <code>&lt;asm-arch/unistd.h&gt;</code> 
+</p><ul>
+<li>It defines pre-processor constants to link the descriptors of all
+  system calls with symbolic constants.
 </li>
-<li>PAGE<sub>SIZE</sub> specifies the size of a memory page in bytes.
-</li>
-<li>PAGE<sub>ALIGN</sub>
+<li>It defines functions to invoke system calls from within the kernel itself. 
 </li>
 </ul>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-6" class="outline-2">
+<h2 id="sec-6">String Processing</h2>
+<div class="outline-text-2" id="text-6">
+
+<p><code>&lt;asm-arch/string.h&gt;</code>
+</p>
+<p>
+The _<sub>HAVE</sub><sub>ARCH</sub><sub>OPERATION</sub> macro must be set for each string operation that is defined as optimized
+by an architecture; for instance, _<sub>HAVE</sub><sub>ARCH</sub><sub>MEMCPY</sub> must be set for memcpy. All nonimplemented
+functions are replaced with architecture-independent standard operations that are implemented in
+lib/string.c.
+</p></div>
+
+</div>
+
+<div id="outline-container-7" class="outline-2">
+<h2 id="sec-7">Thread Representation</h2>
+<div class="outline-text-2" id="text-7">
+
+<p>The state of a running process is defined primarily by the contents of
+the processor registers. Processes that are not currently running must
+keep this data in corresponding data structures from which the data
+can be read and moved to the appropriate registers when the process is
+next activated by the scheduler.
+</p>
+<ul>
+<li><code>&lt;asm-arch/ptrace.h&gt;</code> provides the pt<sub>regs</sub> structure to hold all
+  registers that are placed on the kernel stack when the process
+  switches from user mode to space mode as a result of a system call,
+  an interrupt, or any other mechanism.
+</li>
+<li><code>&lt;asm-arch/processor.h&gt;</code> accommodates the thread<sub>struct</sub> structure used
+  to describe all other registers and all other task state information.
+</li>
+<li><code>&lt;asm-arch/thread.h&gt;</code> defines the thread<sub>info</sub> structure (not to be
+  confused with thread<sub>struct</sub>), which contains all task structure
+  elements that the assembler code must access to implement kernel
+  entry and exit.
+</li>
+</ul>
+
+
+</div>
+
+<div id="outline-container-7-1" class="outline-3">
+<h3 id="sec-7-1">ARM</h3>
+<div class="outline-text-3" id="text-7-1">
+
+
+<p>
+The following definition of the pt<sub>regs</sub> structure consists simply of an array to hold the values of all
+registers manipulated in kernel mode:
+<code>include/asm-arm/ptrace.h</code>
+</p>
+
+
+<pre class="src src-c"><span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * This struct defines the way the registers are stored on the</span>
+<span style="color: #ff7f24;"> * stack during a system call.  Note that sizeof(struct pt_regs)</span>
+<span style="color: #ff7f24;"> * has to be a multiple of 8.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">pt_regs</span> {
+        <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">uregs</span>[18];
+};
+</pre>
+
+
+<p>
+The symbolic names of the registers and their positions within the array are defined by means of pre-
+processor constants:
+<code>include/asm-arm/ptrace.h</code>
+</p>
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_cpsr</span>        uregs[16]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_pc</span>          uregs[15]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_lr</span>          uregs[14]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_sp</span>          uregs[13]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_ip</span>          uregs[12]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_fp</span>          uregs[11]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r10</span>         uregs[10]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r9</span>          uregs[9]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r8</span>          uregs[8]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r7</span>          uregs[7]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r6</span>          uregs[6]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r5</span>          uregs[5]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r4</span>          uregs[4]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r3</span>          uregs[3]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r2</span>          uregs[2]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r1</span>          uregs[1]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_r0</span>          uregs[0]
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ARM_ORIG_r0</span>     uregs[17]
+</pre>
+
+
+<p>
+<code>include/asm-arm/processor.h</code>
+</p>
+
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">thread_struct</span> {
+                                                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">fault info     </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>           <span style="color: #eedd82;">address</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>           <span style="color: #eedd82;">trap_no</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>           <span style="color: #eedd82;">error_code</span>;
+                                                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">debugging      </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">debug_info</span>       <span style="color: #eedd82;">debug</span>;
+};
+</pre>
+
+
+<p>
+However, machine instructions (in the form of their opcode) can be saved together with a memory
+address for debugging purposes, as shown here:
+<code>include/asm-arm/processor.h</code>
+</p>
+
+
+
+<pre class="src src-c"><span style="color: #00ffff;">union</span> <span style="color: #98fb98;">debug_insn</span> {
+        <span style="color: #98fb98;">u32</span>     <span style="color: #eedd82;">arm</span>;
+        <span style="color: #98fb98;">u16</span>     <span style="color: #eedd82;">thumb</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">debug_entry</span> {
+        <span style="color: #98fb98;">u32</span>                     <span style="color: #eedd82;">address</span>;
+        <span style="color: #00ffff;">union</span> <span style="color: #98fb98;">debug_insn</span>        <span style="color: #eedd82;">insn</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">debug_info</span> {
+        <span style="color: #98fb98;">int</span>                     <span style="color: #eedd82;">nsaved</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">debug_entry</span>      <span style="color: #eedd82;">bp</span>[2];
+};
+</pre>
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-8" class="outline-2">
+<h2 id="sec-8">Bit Operations and Endianness</h2>
+<div class="outline-text-2" id="text-8">
+
+
+</div>
+
+<div id="outline-container-8-1" class="outline-3">
+<h3 id="sec-8-1">Manipulation of Bit Chains</h3>
+<div class="outline-text-3" id="text-8-1">
+
+<p>内核中架构相关的比特处理在 <code>&lt;asmm-arch/bitops.h&gt;</code>
+</p>
+
+
+<pre class="src src-sh">void set_bit(int nr, volatile unsigned long * addr) sets the bit at position nr; counting begins at addr.
+
+int test_bit(int nr, const volatile unsigned long * addr) checks whether the specified bit is set.
+
+void clear_bit(int nr, volatile unsigned long * addr) deletes the bit at position nr (count- ing begins at addr).
+....
+</pre>
+
+
+<p>
+所有这些是原子函数，锁的陈述在相关汇编代码内。这些函数的非原子版本，以
+双下划线前缀。（_<sub>set</sub><sub>bit</sub>).
+</p></div>
+
+</div>
+
+<div id="outline-container-8-2" class="outline-3">
+<h3 id="sec-8-2">Conversion between Byte Orders</h3>
+<div class="outline-text-3" id="text-8-2">
+
+<p>The kernel provides the &lt;byteorder/little<sub>endian</sub>.h&gt; and &lt;byteorder/big<sub>endian</sub>.h&gt; files. The version for the current
+processor is linked into &lt;asm-arch/byteorder.h&gt;.
+</p>
+<p>
+C default functions are defined in &lt;byteoorder/swab.h&gt;, but they can be overwritten by a processor-specific implementation.
+_<sub>arch</sub>_<sub>swab16</sub>, _<sub>arch</sub>_<sub>swab32</sub>, and _<sub>arch</sub>_<sub>swab64</sub> swap the bytes between the representations,
+and therefore convert big endian to little endian and vice versa. _<sub>swab16p</sub>, _<sub>arch</sub>_<sub>swab32p</sub>, and
+_<sub>arch</sub>_<sub>swab64p</sub> do the same for pointer variables. swab stands for swap bytes.
+</p>
+
+
+</div>
+</div>
+
+</div>
+
+<div id="outline-container-9" class="outline-2">
+<h2 id="sec-9">aa</h2>
+<div class="outline-text-2" id="text-9">
+
+
+
+
+
+
+
+
+
 
 </div>
 </div>
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2012-08-13 22:10:00 HKT</p>
+<p class="date">Date: 2013-07-29T22:21+0800</p>
 <p class="author">Author: Shi Shougang</p>
-<p class="creator">Org version 7.8.09 with Emacs version 24</p>
+<p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>
 
 </div>
