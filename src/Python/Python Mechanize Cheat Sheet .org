@@ -1,0 +1,181 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: Python Mechanize Cheat Sheet 
+#+OPTIONS: num:nil H:2
+
+
+* Python Mechanize Overview
++ Python mechanize site 
+  http://wwwsearch.sourceforge.net/mechanize/
++ mechanize docs
+  http://wwwsearch.sourceforge.net/mechanize/doc.html
++ ClientForm docs
+  http://wwwsearch.sourceforge.net/old/ClientForm/
++ BeautifulSoup
+  http://www.crummy.com/software/BeautifulSoup/
+
+* Mechanize cheat sheet[fn:1]
+** Create a browser object
+#+begin_src python
+import mechanize
+
+br = mechanize.Browser()
+br.set_all_readonly(False)    # allow everything to be written to
+br.set_handle_robots(False)   # no robots
+br.set_handle_refresh(False)  # can sometimes hang without this
+br.addheaders = [('User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1')]
+# [('User-agent', 'Firefox')]
+#+end_src
+** Open a webpage and inspect its contents
+#+begin_src python
+response = br.open(url)
+print response.read()      # the text of the page
+
+response1 = br.response()  # get the response again
+print response1.read()     # can apply lxml.html.fromstring()
+#+end_src
+** Using forms
+#+begin_src python
+#List the forms
+for form in br.forms():
+    print "Form name:", form.name
+    print form
+
+#select form
+br.select_form("form1")         # works when form has a name
+br.form = list(br.forms())[0]  # use when form is unnamed
+
+#login form example
+br.select_form("login")         
+br['login:loginUsernameField'] = user
+br['login:password'] = password
+br.method = "POST"
+response = br.submit()
+#+end_src
+** Using Controls
+#+begin_src python
+# Iterate through the controls in the form.
+ 
+for control in br.form.controls:
+    print control
+    print "type=%s, name=%s value=%s" % (control.type, control.name, br[control.name])
+ 
+# Controls can be found by name
+control = br.form.find_control("controlname")
+ 
+# Having a select control tells you what values can be selected
+if control.type == "select":  # means it's class ClientForm.SelectControl
+    for item in control.items:
+    print " name=%s values=%s" % (item.name, str([label.text  for label in item.get_labels()]))
+ 
+# Because Select type controls can have multiple selections, they must be set with a list, even if it is one element.
+print control.value
+print control  # selected value is starred
+control.value = ["ItemName"]
+print control
+br[control.name] = ["ItemName"]  # equivalent and more normal
+ 
+# Text controls can be set as a string
+if control.type == "text":  # means it's class ClientForm.TextControl
+    control.value = "stuff here"
+br["controlname"] = "stuff here"  # equivalent
+ 
+# Controls can be set to readonly and disabled (sometimes necessary for superfluous submit buttons).
+control.readonly = False
+control.disabled = True
+ 
+# OR disable all of them like so
+ 
+for control in br.form.controls:
+   if control.type == "submit":
+       control.disabled = True
+#+end_src
+** Using Links
+#+begin_src python
+  #Iterate the links
+  for link in br.links():
+      print link.text, link.url
+  # Follow link and click links is the same as submit and click
+  request = br.click_link(link)
+  response = br.follow_link(link)
+  print response.geturl()
+#+end_src
+
+** Using Cookie jars
+#+begin_src python
+request = br.click()  # creates the request object
+cj = mechanize.CookieJar()
+br2 = mechanize.Browser()
+br2.set_cookiejar(cj)
+br2.open(request)
+#+end_src
+
+* More example
+** emulate a browser
+#+begin_src python
+import mechanize
+import cookielib
+
+# Browser
+br = mechanize.Browser()
+
+# Cookie Jar
+cj = cookielib.LWPCookieJar()
+br.set_cookiejar(cj)
+
+# Browser options
+br.set_handle_equiv(True)
+br.set_handle_gzip(True)
+br.set_handle_redirect(True)
+br.set_handle_referer(True)
+br.set_handle_robots(False)
+
+# Follows refresh 0 but not hangs on refresh > 0
+br.set_handle_refresh(mechanize._http.HTTPRefreshProcessor(), max_time=1)
+
+# Want debugging messages?
+#br.set_debug_http(True)
+#br.set_debug_redirects(True)
+#br.set_debug_responses(True)
+
+# User-Agent (this is cheating, ok?)
+br.addheaders = [('User-agent', 'Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1')]
+#+end_src
+** access a password protected site
+#+begin_src python
+# If the protected site didn't receive the authentication data you would
+# end up with a 410 error in your face
+br.add_password('http://safe-site.domain', 'username', 'password')
+br.open('http://safe-site.domain')
+#+end_src
+** Downloading a file
+#+begin_src python
+# Download
+f = br.retrieve('http://www.google.com.br/intl/pt-BR_br/images/logo.gif')[0]
+print f
+fh = open(f)
+#+end_src
+** Setting a proxy
+#+begin_src python
+# Proxy and user/password
+br.set_proxies({"http": "joe:password@myproxy.example.com:3128"})
+
+# Proxy
+br.set_proxies({"http": "myproxy.example.com:3128"})
+# Proxy password
+br.add_proxy_password("joe", "password")
+#+end_src
+** quickly open an webpage
+#+begin_src python
+import urllib2
+print urllib2.urlopen('http://stockrt.github.com').read()
+
+# With password?
+import urllib
+opener = urllib.FancyURLopener()
+print opener.open('http://user:password@stockrt.github.com').read()
+#+end_src
+
+* Footnotes
+
+[fn:1] https://views.scraperwiki.com/run/python_mechanize_cheat_sheet/
+

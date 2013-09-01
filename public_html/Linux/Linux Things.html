@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="Linux Things"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-07-22T22:07+0800"/>
+<meta name="generated" content="2013-09-01T22:40+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -146,7 +146,17 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2-3">more soft configuration in /etc/sysctl.conf</a></li>
 </ul>
 </li>
-<li><a href="#sec-3">The Linux Page Cache and pdflush</a></li>
+<li><a href="#sec-3">The Linux Page Cache and pdflush</a>
+<ul>
+<li><a href="#sec-3-1">pdflush tunables</a></li>
+<li><a href="#sec-3-2">Summary: when does pdflush write?</a></li>
+<li><a href="#sec-3-3">Process page writes</a></li>
+<li><a href="#sec-3-4">Tuning Recommendations for write-heavy operations</a></li>
+<li><a href="#sec-3-5">Swapping</a></li>
+<li><a href="#sec-3-6">References: page cache</a></li>
+<li><a href="#sec-3-7">References: I/O scheduling</a></li>
+</ul>
+</li>
 <li><a href="#sec-4">Linux Kernel Route Cache</a></li>
 <li><a href="#sec-5">Linux CPU Load</a>
 <ul>
@@ -192,10 +202,26 @@ for the JavaScript code in this tag.
 <li><a href="#sec-14-2">cat /proc/sys/kernel/printk</a></li>
 </ul>
 </li>
-<li><a href="#sec-15">Virtual Box - Failed to access the USB subsystem</a></li>
+<li><a href="#sec-15">VirtualBox</a>
+<ul>
+<li><a href="#sec-15-1">Virtual Box - Failed to access the USB subsystem</a></li>
+<li><a href="#sec-15-2">Failed to access the USB subsystem.</a></li>
+</ul>
+</li>
 <li><a href="#sec-16">install Oracle VM VirtualBox Extension Pack</a></li>
 <li><a href="#sec-17">eclipse提示框黑色背景色的修改方法</a></li>
 <li><a href="#sec-18">swapper: page allocation failure</a></li>
+<li><a href="#sec-19">IptablesHowTo</a></li>
+<li><a href="#sec-20">Dos attack tools</a>
+<ul>
+<li><a href="#sec-20-1">Low Orbit Ion Cannon</a></li>
+<li><a href="#sec-20-2">THC-SSL-DOS</a></li>
+<li><a href="#sec-20-3">XOIC</a></li>
+<li><a href="#sec-20-4">Distributed Denial of Service (DDoS) Attacks/tools</a></li>
+<li><a href="#sec-20-5">Denial of Service Basics</a></li>
+<li><a href="#sec-20-6">advanced firewall and DDoS utilities</a></li>
+</ul>
+</li>
 </ul>
 </div>
 </div>
@@ -504,7 +530,210 @@ save simple sysctl -w net.ipv4.route.flush=1
 <h2 id="sec-3">The Linux Page Cache and pdflush<sup><a class="footref" name="fnr-.1" href="#fn-.1">1</a></sup></h2>
 <div class="outline-text-2" id="text-3">
 
+<p>Linux usually writes data out of the page cache using a process called
+pdflush. At any moment, between 2 and 8 pdflush threads are running on
+the system. You can monitor how many are active by looking at
+<code>/proc/sys/vm/nr_pdflush_threads</code>.
+</p>
+</div>
 
+<div id="outline-container-3-1" class="outline-3">
+<h3 id="sec-3-1">pdflush tunables</h3>
+<div class="outline-text-3" id="text-3-1">
+
+<ul>
+<li id="sec-3-1-1"><code>/proc/sys/vm/dirty_writeback_centisecs</code><br/>
+ (default 500): In hundredths of a second, this is how often pdflush
+ wakes up to write data to disk. The default wakes up the two (or
+ more) active threads every five seconds.
+
+</li>
+</ul>
+<ul>
+<li id="sec-3-1-2"><code>/proc/sys/vm/dirty_writeback_centisecs</code><br/>
+(default 3000): In hundredths of a second, how long data can be in the
+page cache before it's considered expired and must be written at the
+next opportunity. Note that this default is very long: a full 30
+seconds.
+</li>
+</ul>
+<ul>
+<li id="sec-3-1-3"><code>/proc/sys/vm/dirty_background_ratio</code><br/>
+(default 10): Maximum percentage of active that can be filled with
+dirty pages before pdflush begins to write them
+
+<p>
+Most of the documentation you'll find about this parameter suggests it's in terms of total memory, but a look at the source code shows this isn't true. In terms of the meminfo output, the code actually looks at
+</p>
+<p>
+<code>MemFree + Cached - Mapped</code>
+</p>
+
+
+<pre class="src src-sh">MemTotal:      3950112 kB
+MemFree:        622560 kB
+Cached:        2901484 kB
+Mapped:         999852 kB
+</pre>
+
+<p>
+So on the system above, where this figure gives 2.5GB, with the
+default of 10% the system actually begins writing when the total for
+Dirty pages is slightly less than 250MB&ndash;not the 400MB you'd expect
+based on the total memory figure.
+</p>
+</li>
+</ul>
+</div>
+
+</div>
+
+<div id="outline-container-3-2" class="outline-3">
+<h3 id="sec-3-2">Summary: when does pdflush write?</h3>
+<div class="outline-text-3" id="text-3-2">
+
+<p>In the default configuration, then, data written to disk will sit in
+memory until either 
+a) they're more than 30 seconds old, or 
+b) thedirty pages have consumed more than 10% of the active, working
+   memory. 
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-3-3" class="outline-3">
+<h3 id="sec-3-3">Process page writes</h3>
+<div class="outline-text-3" id="text-3-3">
+
+<p>/proc/sys/vm/dirty<sub>ratio</sub> (default 40): Maximum percentage of total
+memory that can be filled with dirty pages before processes are forced
+to write dirty buffers themselves during their time slice instead of
+being allowed to do more writes.
+</p>
+<p>
+ Kernel Korner: I/O Schedulers:
+ <a href="http://www.linuxjournal.com/article/6931">http://www.linuxjournal.com/article/6931</a>
+</p></div>
+
+</div>
+
+<div id="outline-container-3-4" class="outline-3">
+<h3 id="sec-3-4">Tuning Recommendations for write-heavy operations</h3>
+<div class="outline-text-3" id="text-3-4">
+
+<ul>
+<li>dirty<sub>background</sub><sub>ratio</sub>: Primary tunable to adjust, probably
+  downward. If your goal is to reduce the amount of data Linux keeps
+  cached in memory, so that it writes it more consistently to the disk
+  rather than in a batch, lowering dirty<sub>background</sub><sub>ratio</sub> is the most
+  effective way to do that. 
+</li>
+<li>dirty<sub>ratio</sub>: Secondary tunable to adjust only for some workloads.
+  Applications that can cope with their writes being blocked
+  altogether might benefit from substantially lowering this value.
+</li>
+<li>dirty<sub>expire</sub><sub>centisecs</sub>: Test lowering, but not to extremely low
+  levels. Attempting to speed how long pages sit dirty in memory can
+  be accomplished here, but this will considerably slow average I/O
+  speed because of how much less efficient this is. This is
+  particularly true on systems with slow physical I/O to disk.
+</li>
+<li>dirty<sub>writeback</sub><sub>centisecs</sub>: Leave alone. The timing of pdflush
+  threads set by this parameter is so complicated by rules in the
+  kernel code for things like write congestion that adjusting this
+  tunable is unlikely to cause any real effect.
+</li>
+</ul>
+
+
+</div>
+
+</div>
+
+<div id="outline-container-3-5" class="outline-3">
+<h3 id="sec-3-5">Swapping</h3>
+<div class="outline-text-3" id="text-3-5">
+
+<p>By default, Linux will aggressively swap processes out of physical
+memory onto disk in order to keep the disk cache as large as possible.
+This means that pages that haven't been used recently will be pushed
+into swap long before the system even comes close to running out of
+memory, which is an unexpected behavior compared to some operating
+systems. The <code>/proc/sys/vm/swappiness</code> parameter controls how
+aggressive Linux is in this area.
+</p></div>
+
+</div>
+
+<div id="outline-container-3-6" class="outline-3">
+<h3 id="sec-3-6">References: page cache</h3>
+<div class="outline-text-3" id="text-3-6">
+
+<ul>
+<li>Neil Horman, "Understanding Virtual Memory in Red Hat Enterprise Linux 4" <a href="http://people.redhat.com/nhorman/papers/rhel4_vm.pdf">http://people.redhat.com/nhorman/papers/rhel4_vm.pdf</a>
+</li>
+<li>Daniel P. Bovet and Marco Cesati, "Understanding the Linux Kernel, 3rd edition", chapter 15 "The Page Cache". Available on the web at <a href="http://www.linux-security.cn/ebooks/ulk3-html/">http://www.linux-security.cn/ebooks/ulk3-html/</a>
+
+</li>
+<li>Robert Love, "Linux Kernel Development, 2nd edition", chapter 15 "The Page Cache and Page Writeback"
+
+</li>
+<li>"Runtime Memory Management", <a href="http://tree.celinuxforum.org/CelfPubWiki/RuntimeMemoryMeasurement">http://tree.celinuxforum.org/CelfPubWiki/RuntimeMemoryMeasurement</a>
+
+</li>
+<li>"Red Hat Enterprise Linux-Specific [Memory] Information", <a href="http://www.redhat.com/docs/manuals/enterprise/RHEL-4-Manual/admin-guide/s1-memory-rhlspec.html">http://www.redhat.com/docs/manuals/enterprise/RHEL-4-Manual/admin-guide/s1-memory-rhlspec.html</a>
+
+</li>
+<li>"Tuning Swapiness", <a href="http://kerneltrap.org/node/3000">http://kerneltrap.org/node/3000</a>
+
+</li>
+<li>"FAQ Linux Memory Management", <a href="http://gentoo-wiki.com/FAQ_Linux_Memory_Management">http://gentoo-wiki.com/FAQ_Linux_Memory_Management</a>
+
+</li>
+<li>From the Linux kernel tree:
+<ul>
+<li>Documentation/filesystems/proc.txt (the meminfo documentation there originally from <a href="http://lwn.net/Articles/28345/">http://lwn.net/Articles/28345/</a>)
+</li>
+<li>Documentation/sysctl/vm.txt
+</li>
+<li>Mm/page-writeback.c
+</li>
+</ul>
+
+</li>
+</ul>
+
+</div>
+
+</div>
+
+<div id="outline-container-3-7" class="outline-3">
+<h3 id="sec-3-7">References: I/O scheduling</h3>
+<div class="outline-text-3" id="text-3-7">
+
+
+<ul>
+<li>While not directly addressed here, the I/O scheduling algorithms in Linux actually handle the writes themselves, and some knowledge or tuning of them may be synergistic with adjusting the parameters here. Adjusting the scheduler only makes sense in the context where you've already configured the page cache flushing correctly for your workload.
+</li>
+<li>D. John Shakshober, "Choosing an I/O Scheduler for Red Hat Enterprise Linux 4 and the 2.6 Kernel" <a href="http://www.redhat.com/magazine/008jun05/features/schedulers/">http://www.redhat.com/magazine/008jun05/features/schedulers/</a>
+
+</li>
+<li>Robert Love, "Kernel Korner: I/O Schedulers", <a href="http://www.linuxjournal.com/article/6931">http://www.linuxjournal.com/article/6931</a>
+
+</li>
+<li>Seelam, Romero, and Teller, "Enhancements to Linux I/O Scheduling", <a href="http://linux.inet.hr/files/ols2005/seelam-reprint.pdf">http://linux.inet.hr/files/ols2005/seelam-reprint.pdf</a>
+
+</li>
+<li>Heger, D., Pratt, S., "Workload Dependent Performance Evaluation of the Linux 2.6 I/O Schedulers", <a href="http://linux.inet.hr/files/ols2004/pratt-reprint.pdf">http://linux.inet.hr/files/ols2004/pratt-reprint.pdf</a>
+</li>
+</ul>
+
+
+
+
+
+</div>
 </div>
 
 </div>
@@ -1308,8 +1537,15 @@ Kernel debugging messages, output by the kernel if the developer enabled debuggi
 </div>
 
 <div id="outline-container-15" class="outline-2">
-<h2 id="sec-15">Virtual Box - Failed to access the USB subsystem</h2>
+<h2 id="sec-15">VirtualBox</h2>
 <div class="outline-text-2" id="text-15">
+
+
+</div>
+
+<div id="outline-container-15-1" class="outline-3">
+<h3 id="sec-15-1">Virtual Box - Failed to access the USB subsystem</h3>
+<div class="outline-text-3" id="text-15-1">
 
 
 
@@ -1317,6 +1553,30 @@ Kernel debugging messages, output by the kernel if the developer enabled debuggi
 <pre class="src src-sh">sudo usermod -a -G vboxusers username
 </pre>
 
+</div>
+
+</div>
+
+<div id="outline-container-15-2" class="outline-3">
+<h3 id="sec-15-2">Failed to access the USB subsystem.</h3>
+<div class="outline-text-3" id="text-15-2">
+
+<p>Failed to access the USB subsystem.
+Could not load the Host USB Proxy service: VERR<sub>DISK</sub><sub>FULL</sub>.
+</p>
+
+
+<pre class="src src-sh">sudo VBoxManage extpack uninstall <span style="color: #ffa07a;">"Oracle VM VirtualBox Extension Pack"</span>
+sudo VBoxManage extpack install Oracle_VM_VirtualBox_Extension_Pack-xxxxvbox-extpack
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">download from oracle</span>
+</pre>
+
+
+<p>
+If do not resolve this issue,
+more:<a href="http://phobosk.wordpress.com/2012/11/11/howto-fix-a-virtualbox-failed-to-access-the-usb-subsystem-error/">http://phobosk.wordpress.com/2012/11/11/howto-fix-a-virtualbox-failed-to-access-the-usb-subsystem-error/</a>
+</p>
+</div>
 </div>
 
 </div>
@@ -1385,6 +1645,91 @@ This tells the kernel to try and keep 64MB of RAM free at all times. It’s usef
 </ul>
 
 
+</div>
+
+</div>
+
+<div id="outline-container-19" class="outline-2">
+<h2 id="sec-19">IptablesHowTo</h2>
+<div class="outline-text-2" id="text-19">
+
+<p><a href="https://help.ubuntu.com/community/IptablesHowTo">https://help.ubuntu.com/community/IptablesHowTo</a>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-20" class="outline-2">
+<h2 id="sec-20">Dos attack tools<sup><a class="footref" name="fnr-.5" href="#fn-.5">5</a></sup></h2>
+<div class="outline-text-2" id="text-20">
+
+
+</div>
+
+<div id="outline-container-20-1" class="outline-3">
+<h3 id="sec-20-1">Low Orbit Ion Cannon</h3>
+<div class="outline-text-3" id="text-20-1">
+
+<p><a href="http://sourceforge.net/projects/loic/">http://sourceforge.net/projects/loic/</a>
+</p></div>
+
+</div>
+
+<div id="outline-container-20-2" class="outline-3">
+<h3 id="sec-20-2">THC-SSL-DOS</h3>
+<div class="outline-text-3" id="text-20-2">
+
+<p><a href="http://www.thc.org/thc-ssl-dos/">http://www.thc.org/thc-ssl-dos/</a>
+</p></div>
+
+</div>
+
+<div id="outline-container-20-3" class="outline-3">
+<h3 id="sec-20-3">XOIC</h3>
+<div class="outline-text-3" id="text-20-3">
+
+<p><a href="http://sourceforge.net/projects/xoic/">http://sourceforge.net/projects/xoic/</a>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-20-4" class="outline-3">
+<h3 id="sec-20-4">Distributed Denial of Service (DDoS) Attacks/tools</h3>
+<div class="outline-text-3" id="text-20-4">
+
+<p><a href="http://staff.washington.edu/dittrich/misc/ddos/">http://staff.washington.edu/dittrich/misc/ddos/</a>
+</p></div>
+
+</div>
+
+<div id="outline-container-20-5" class="outline-3">
+<h3 id="sec-20-5">Denial of Service Basics</h3>
+<div class="outline-text-3" id="text-20-5">
+
+<p><a href="http://www.nmrc.org/pub/faq/hackfaq/hackfaq-05.html">http://www.nmrc.org/pub/faq/hackfaq/hackfaq-05.html</a>
+</p>
+</div>
+
+</div>
+
+<div id="outline-container-20-6" class="outline-3">
+<h3 id="sec-20-6">advanced firewall and DDoS utilities</h3>
+<div class="outline-text-3" id="text-20-6">
+
+<ul>
+<li>APF: Advanced Policy Firewall: <a href="http://www.rfxn.com/">http://www.rfxn.com/</a>
+</li>
+<li>BFD: Brute Force Detection: <a href="http://www.rfxn.com/">http://www.rfxn.com/</a>
+</li>
+<li>DDoS: DDoS Deflate: <a href="http://deflate.medialayer.com/">http://deflate.medialayer.com/</a>
+</li>
+<li>Rootkit: Spy and Junkware detection and removal tool:
+  <a href="http://www.rootkit.nl/projects/rootkit_hunter.html">http://www.rootkit.nl/projects/rootkit_hunter.html</a>
+</li>
+</ul>
+
+
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
@@ -1404,6 +1749,12 @@ This tells the kernel to try and keep 64MB of RAM free at all times. It’s usef
 </p>
 
 
+<p class="footnote"><sup><a class="footnum" name="fn-.5" href="#fnr-.5">5</a></sup> <a href="http://en.wikipedia.org/wiki/Denial-of-service_attack">http://en.wikipedia.org/wiki/Denial-of-service_attack</a>
+</p>
+
+
+
+</div>
 </div>
 </div>
 
@@ -1412,7 +1763,7 @@ This tells the kernel to try and keep 64MB of RAM free at all times. It’s usef
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-07-22T22:07+0800</p>
+<p class="date">Date: 2013-09-01T22:40+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

@@ -171,6 +171,112 @@ vm.min_free_kbytes=204800
 save simple sysctl -w net.ipv4.route.flush=1
 #+end_src
 * The Linux Page Cache and pdflush[fn:4]
+Linux usually writes data out of the page cache using a process called
+pdflush. At any moment, between 2 and 8 pdflush threads are running on
+the system. You can monitor how many are active by looking at
+=/proc/sys/vm/nr_pdflush_threads=.
+** pdflush tunables
+*** =/proc/sys/vm/dirty_writeback_centisecs=
+ (default 500): In hundredths of a second, this is how often pdflush
+ wakes up to write data to disk. The default wakes up the two (or
+ more) active threads every five seconds.
+
+*** =/proc/sys/vm/dirty_writeback_centisecs=
+(default 3000): In hundredths of a second, how long data can be in the
+page cache before it's considered expired and must be written at the
+next opportunity. Note that this default is very long: a full 30
+seconds.
+*** =/proc/sys/vm/dirty_background_ratio=
+(default 10): Maximum percentage of active that can be filled with
+dirty pages before pdflush begins to write them
+
+Most of the documentation you'll find about this parameter suggests it's in terms of total memory, but a look at the source code shows this isn't true. In terms of the meminfo output, the code actually looks at
+
+=MemFree + Cached - Mapped=
+#+begin_src sh
+MemTotal:      3950112 kB
+MemFree:        622560 kB
+Cached:        2901484 kB
+Mapped:         999852 kB
+#+end_src
+So on the system above, where this figure gives 2.5GB, with the
+default of 10% the system actually begins writing when the total for
+Dirty pages is slightly less than 250MB--not the 400MB you'd expect
+based on the total memory figure.
+
+** Summary: when does pdflush write?
+In the default configuration, then, data written to disk will sit in
+memory until either 
+a) they're more than 30 seconds old, or 
+b) thedirty pages have consumed more than 10% of the active, working
+   memory. 
+
+** Process page writes
+/proc/sys/vm/dirty_ratio (default 40): Maximum percentage of total
+memory that can be filled with dirty pages before processes are forced
+to write dirty buffers themselves during their time slice instead of
+being allowed to do more writes.
+
+ Kernel Korner: I/O Schedulers:
+ http://www.linuxjournal.com/article/6931
+** Tuning Recommendations for write-heavy operations
++ dirty_background_ratio: Primary tunable to adjust, probably
+  downward. If your goal is to reduce the amount of data Linux keeps
+  cached in memory, so that it writes it more consistently to the disk
+  rather than in a batch, lowering dirty_background_ratio is the most
+  effective way to do that. 
++ dirty_ratio: Secondary tunable to adjust only for some workloads.
+  Applications that can cope with their writes being blocked
+  altogether might benefit from substantially lowering this value.
++ dirty_expire_centisecs: Test lowering, but not to extremely low
+  levels. Attempting to speed how long pages sit dirty in memory can
+  be accomplished here, but this will considerably slow average I/O
+  speed because of how much less efficient this is. This is
+  particularly true on systems with slow physical I/O to disk.
++ dirty_writeback_centisecs: Leave alone. The timing of pdflush
+  threads set by this parameter is so complicated by rules in the
+  kernel code for things like write congestion that adjusting this
+  tunable is unlikely to cause any real effect.
+
+** Swapping
+By default, Linux will aggressively swap processes out of physical
+memory onto disk in order to keep the disk cache as large as possible.
+This means that pages that haven't been used recently will be pushed
+into swap long before the system even comes close to running out of
+memory, which is an unexpected behavior compared to some operating
+systems. The =/proc/sys/vm/swappiness= parameter controls how
+aggressive Linux is in this area.
+** References: page cache
++ Neil Horman, "Understanding Virtual Memory in Red Hat Enterprise Linux 4" http://people.redhat.com/nhorman/papers/rhel4_vm.pdf
++ Daniel P. Bovet and Marco Cesati, "Understanding the Linux Kernel, 3rd edition", chapter 15 "The Page Cache". Available on the web at http://www.linux-security.cn/ebooks/ulk3-html/
+
++ Robert Love, "Linux Kernel Development, 2nd edition", chapter 15 "The Page Cache and Page Writeback"
+
++ "Runtime Memory Management", http://tree.celinuxforum.org/CelfPubWiki/RuntimeMemoryMeasurement
+
++ "Red Hat Enterprise Linux-Specific [Memory] Information", http://www.redhat.com/docs/manuals/enterprise/RHEL-4-Manual/admin-guide/s1-memory-rhlspec.html
+
++ "Tuning Swapiness", http://kerneltrap.org/node/3000
+
++ "FAQ Linux Memory Management", http://gentoo-wiki.com/FAQ_Linux_Memory_Management
+
++ From the Linux kernel tree:
+    + Documentation/filesystems/proc.txt (the meminfo documentation there originally from http://lwn.net/Articles/28345/)
+    + Documentation/sysctl/vm.txt
+    + Mm/page-writeback.c
+** References: I/O scheduling
+
++ While not directly addressed here, the I/O scheduling algorithms in Linux actually handle the writes themselves, and some knowledge or tuning of them may be synergistic with adjusting the parameters here. Adjusting the scheduler only makes sense in the context where you've already configured the page cache flushing correctly for your workload.
++ D. John Shakshober, "Choosing an I/O Scheduler for Red Hat Enterprise Linux 4 and the 2.6 Kernel" http://www.redhat.com/magazine/008jun05/features/schedulers/
+
++ Robert Love, "Kernel Korner: I/O Schedulers", http://www.linuxjournal.com/article/6931
+
++ Seelam, Romero, and Teller, "Enhancements to Linux I/O Scheduling", http://linux.inet.hr/files/ols2005/seelam-reprint.pdf
+
++ Heger, D., Pratt, S., "Workload Dependent Performance Evaluation of the Linux 2.6 I/O Schedulers", http://linux.inet.hr/files/ols2004/pratt-reprint.pdf
+
+
+
 
 * Linux Kernel Route Cache
 To display the “Route Cache”, one could simply issue the =“ip route
@@ -636,10 +742,23 @@ cat /proc/sys/kernel/printk
 缺省的控制台日志级别：控制台日志级别的缺省值
 #+end_src
 
-* Virtual Box - Failed to access the USB subsystem
+* VirtualBox
+** Virtual Box - Failed to access the USB subsystem
 #+begin_src sh
 sudo usermod -a -G vboxusers username
 #+end_src
+** Failed to access the USB subsystem.
+Failed to access the USB subsystem.
+Could not load the Host USB Proxy service: VERR_DISK_FULL.
+#+begin_src sh
+sudo VBoxManage extpack uninstall "Oracle VM VirtualBox Extension Pack"
+sudo VBoxManage extpack install Oracle_VM_VirtualBox_Extension_Pack-xxxxvbox-extpack
+#download from oracle
+#+end_src
+
+If do not resolve this issue,
+more:http://phobosk.wordpress.com/2012/11/11/howto-fix-a-virtualbox-failed-to-access-the-usb-subsystem-error/
+
 * install Oracle VM VirtualBox Extension Pack
 http://www.oracle.com/technetwork/server-storage/virtualbox/downloads/index.html#extpack
 
@@ -675,6 +794,30 @@ This tells the kernel to try and keep 64MB of RAM free at all times. It’s usef
   DMA transfers below approximately 900MB of RAM. So you can end up
   with the bizarre situation of an OOM error with tons of RAM free.
 
+* IptablesHowTo
+https://help.ubuntu.com/community/IptablesHowTo
+
+* Dos attack tools[fn:5]
+** Low Orbit Ion Cannon
+http://sourceforge.net/projects/loic/
+** THC-SSL-DOS
+http://www.thc.org/thc-ssl-dos/
+** XOIC
+http://sourceforge.net/projects/xoic/
+
+** Distributed Denial of Service (DDoS) Attacks/tools
+http://staff.washington.edu/dittrich/misc/ddos/
+** Denial of Service Basics
+http://www.nmrc.org/pub/faq/hackfaq/hackfaq-05.html
+
+** advanced firewall and DDoS utilities
++ APF: Advanced Policy Firewall: http://www.rfxn.com/
++ BFD: Brute Force Detection: http://www.rfxn.com/
++ DDoS: DDoS Deflate: http://deflate.medialayer.com/
++ Rootkit: Spy and Junkware detection and removal tool:
+  http://www.rootkit.nl/projects/rootkit_hunter.html
+
+
 * Footnotes
 
 [fn:1] https://help.ubuntu.com/community/NvidiaMultiMonitors
@@ -684,5 +827,7 @@ This tells the kernel to try and keep 64MB of RAM free at all times. It’s usef
 [fn:3] http://www.linuxjournal.com/article/9001
 
 [fn:4] http://www.westnet.com/~gsmith/content/linux-pdflush.htm
+
+[fn:5] http://en.wikipedia.org/wiki/Denial-of-service_attack
 
 
