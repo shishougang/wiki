@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
 <meta name="title" content="C FAQ Notes"/>
 <meta name="generator" content="Org-mode"/>
-<meta name="generated" content="2013-05-10T22:35+0800"/>
+<meta name="generated" content="2013-11-13T22:02+0800"/>
 <meta name="author" content="Shi Shougang"/>
 <meta name="description" content=""/>
 <meta name="keywords" content=""/>
@@ -236,7 +236,9 @@ for the JavaScript code in this tag.
 </li>
 <li><a href="#sec-11">12. Stdio</a>
 <ul>
-<li><a href="#sec-11-1">Q</a></li>
+<li><a href="#sec-11-1">Q12.2</a></li>
+<li><a href="#sec-11-2">Q12.5 How can I read one character at a time, without waiting for the RETURN key?</a></li>
+<li><a href="#sec-11-3">12.9b What printf format should I use for a typedef like size<sub>t</sub> when I don't know whether it's long or some other type?</a></li>
 </ul>
 </li>
 <li><a href="#sec-12">18. Tools and Resources</a>
@@ -253,8 +255,7 @@ for the JavaScript code in this tag.
 </ul>
 </li>
 <li><a href="#sec-13">strok</a></li>
-<li><a href="#sec-14">strchr</a></li>
-<li><a href="#sec-15">qsort</a></li>
+<li><a href="#sec-14">qsort</a></li>
 </ul>
 </div>
 </div>
@@ -1831,9 +1832,9 @@ dynamically-allocated ``row.'' Here is a two-dimensional example:
 
 <pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
 
-<span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">array1</span> = malloc(nrows * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span> *));
+<span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">array1</span> = malloc(<span style="color: #98fb98;">nrows</span> * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span> *));
 <span style="color: #00ffff;">for</span>(i = 0; i &lt; nrows; i++)
-        array1[i] = malloc(ncolumns * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>));
+        array1[i] = malloc(<span style="color: #98fb98;">ncolumns</span> * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>));
 </pre>
 
 <p>
@@ -1849,7 +1850,7 @@ explicit pointer arithmetic:
 
 
 
-<pre class="src src-c"><span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">array2</span> = malloc(nrows * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span> *));
+<pre class="src src-c"><span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">array2</span> = malloc(<span style="color: #98fb98;">nrows</span> * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span> *));
 array2[0] = malloc(nrows * ncolumns * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>));
 <span style="color: #00ffff;">for</span>(i = 1; i &lt; nrows; i++)
         array2[i] = array2[0] + i * ncolumns;
@@ -2293,7 +2294,6 @@ modify; ``const'' really means ``readonly''.
 makes a header file ``idempotent'' so that it can safely be #included
 multiple times; 
 </p>
-
 
 
 
@@ -2963,8 +2963,50 @@ are basically just synonyms for ``conforming''.
 </div>
 
 <div id="outline-container-11-1" class="outline-3">
-<h3 id="sec-11-1">Q</h3>
+<h3 id="sec-11-1">Q12.2</h3>
 <div class="outline-text-3" id="text-11-1">
+
+<p>Why does the simple line-copying loop <code>while(!feof(infp)) { fgets(buf, MAXLINE, infp); fputs(buf, outfp); }</code> copy the last line twice?
+</p>
+<p>
+In C, end-of-file is only indicated after an input routine has tried to read, and failed. (In other words, C's I/O is not like Pascal's.) Usually, you should just check the return value of the input routine:
+</p>
+
+
+<pre class="src src-c"><span style="color: #00ffff;">while</span>(fgets(buf, MAXLINE, infp) != <span style="color: #7fffd4;">NULL</span>)
+        fputs(buf, outfp);
+</pre>
+
+<p>
+In virtually all cases, there's no need to use <code>feof</code> at all. (feof, or
+more likely ferror, may be useful after a stdio call has returned EOF
+or NULL, to distinguish between an end-of-file condition and a read
+error.)
+</p></div>
+
+</div>
+
+<div id="outline-container-11-2" class="outline-3">
+<h3 id="sec-11-2">Q12.5 How can I read one character at a time, without waiting for the RETURN key?</h3>
+<div class="outline-text-3" id="text-11-2">
+
+<p>See question 19.1.
+</p></div>
+
+</div>
+
+<div id="outline-container-11-3" class="outline-3">
+<h3 id="sec-11-3">12.9b What printf format should I use for a typedef like size<sub>t</sub> when I don't know whether it's long or some other type?</h3>
+<div class="outline-text-3" id="text-11-3">
+
+<p> Use a cast to convert the value to a known, conservatively-sized type, then use the printf format matching that type. For example, to print the size of a type, you might use
+</p>
+
+
+
+<pre class="src src-c">printf(<span style="color: #ffa07a;">"%lu"</span>, (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>)<span style="color: #00ffff;">sizeof</span>(thetype));
+</pre>
+
 
 </div>
 </div>
@@ -3266,29 +3308,72 @@ directory pub/languages/C/Publib/.
 <h2 id="sec-13">strok</h2>
 <div class="outline-text-2" id="text-13">
 
-<p><a href="http://www.cplusplus.com/reference/clibrary/cstring/strtok/">http://www.cplusplus.com/reference/clibrary/cstring/strtok/</a>
-<a href="http://www.cnblogs.com/oomusou/archive/2009/05/10/c_strtok.html">http://www.cnblogs.com/oomusou/archive/2009/05/10/c_strtok.html</a>
-</p>
+
+
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string.h&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span> ()
+{
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">str</span>[] =<span style="color: #ffa07a;">"- This, a sample string."</span>;
+  <span style="color: #98fb98;">char</span> * <span style="color: #eedd82;">pch</span>;
+  printf (<span style="color: #ffa07a;">"Splitting string \"%s\" into tokens:\n"</span>,str);
+  pch = strtok (str,<span style="color: #ffa07a;">" ,.-"</span>);
+  <span style="color: #00ffff;">while</span> (pch != <span style="color: #7fffd4;">NULL</span>)
+  {
+    printf (<span style="color: #ffa07a;">"%s\n"</span>,pch);
+    pch = strtok (<span style="color: #7fffd4;">NULL</span>, <span style="color: #ffa07a;">" ,.-"</span>);
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+
+
 </div>
 
 </div>
 
 <div id="outline-container-14" class="outline-2">
-<h2 id="sec-14">strchr</h2>
+<h2 id="sec-14">qsort</h2>
 <div class="outline-text-2" id="text-14">
 
-<p><a href="http://www.cplusplus.com/reference/clibrary/cstring/strchr/">http://www.cplusplus.com/reference/clibrary/cstring/strchr/</a>
-</p>
-</div>
 
-</div>
 
-<div id="outline-container-15" class="outline-2">
-<h2 id="sec-15">qsort</h2>
-<div class="outline-text-2" id="text-15">
 
-<p><a href="http://www.cplusplus.com/reference/clibrary/cstdlib/qsort/">http://www.cplusplus.com/reference/clibrary/cstdlib/qsort/</a>
-<a href="http://pubs.opengroup.org/onlinepubs/009695399/functions/qsort.html">http://pubs.opengroup.org/onlinepubs/009695399/functions/qsort.html</a>
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">qsort</span> (<span style="color: #98fb98;">void</span>* <span style="color: #eedd82;">base</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">num</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>,
+            <span style="color: #98fb98;">int</span> (*<span style="color: #eedd82;">compar</span>)(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span>*,<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span>*));
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">compar</span> (<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span>* <span style="color: #eedd82;">p1</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span>* <span style="color: #eedd82;">p2</span>);
+
+<span style="color: #00ffff;">return</span> value    meaning
+&lt;0      The element pointed by p1 goes before the element pointed by p2
+0       The element pointed by p1 is equivalent to the element pointed by p2
+&gt;0      The element pointed by p1 goes after the element pointed by p2
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">printf </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>     <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">qsort </span><span style="color: #ff7f24;">*/</span>
+
+<span style="color: #98fb98;">int</span> values[] = { 40, 10, 100, 90, 20, 25 };
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">compare</span> (<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> * <span style="color: #eedd82;">a</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> * <span style="color: #eedd82;">b</span>)
+{
+  <span style="color: #00ffff;">return</span> ( *(<span style="color: #98fb98;">int</span>*)a - *(<span style="color: #98fb98;">int</span>*)b );
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span> ()
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>;
+  qsort (values, 6, <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>), compare);
+  <span style="color: #00ffff;">for</span> (n=0; n&lt;6; n++)
+     printf (<span style="color: #ffa07a;">"%d "</span>,values[n]);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+
+
+<p>
+<a href="http://www.cplusplus.com/reference/clibrary/cstdlib/qsort/">http://www.cplusplus.com/reference/clibrary/cstdlib/qsort/</a>
 </p>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
@@ -3318,7 +3403,7 @@ directory pub/languages/C/Publib/.
 </div>
 
 <div id="postamble">
-<p class="date">Date: 2013-05-10T22:35+0800</p>
+<p class="date">Date: 2013-11-13T22:02+0800</p>
 <p class="author">Author: Shi Shougang</p>
 <p class="creator"><a href="http://orgmode.org">Org</a> version 7.9.3f with <a href="http://www.gnu.org/software/emacs/">Emacs</a> version 24</p>
 <a href="http://validator.w3.org/check?uri=referer">Validate XHTML 1.0</a>

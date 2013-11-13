@@ -1244,7 +1244,6 @@ multiple times;
 
 
 
-
 ** Q10.12 How can I construct preprocessor #if expressions which compare strings?
  You can't do it directly; *preprocessor #if arithmetic uses only
  integers*. An alternative is to #define several macros with symbolic
@@ -1656,7 +1655,28 @@ Unfortunately, neither of the definitions relating to conforming programs are as
 Other words you may hear are ``compliant'' and ``conformant'' which
 are basically just synonyms for ``conforming''.
 * 12. Stdio
-** Q
+** Q12.2
+Why does the simple line-copying loop =while(!feof(infp)) { fgets(buf,
+MAXLINE, infp); fputs(buf, outfp); }= copy the last line twice?
+
+In C, end-of-file is only indicated after an input routine has tried to read, and failed. (In other words, C's I/O is not like Pascal's.) Usually, you should just check the return value of the input routine:
+#+begin_src c
+	while(fgets(buf, MAXLINE, infp) != NULL)
+		fputs(buf, outfp);
+#+end_src
+In virtually all cases, there's no need to use =feof= at all. (feof, or
+more likely ferror, may be useful after a stdio call has returned EOF
+or NULL, to distinguish between an end-of-file condition and a read
+error.)
+** Q12.5 How can I read one character at a time, without waiting for the RETURN key?
+See question 19.1.
+** 12.9b What printf format should I use for a typedef like size_t when I don't know whether it's long or some other type?
+ Use a cast to convert the value to a known, conservatively-sized type, then use the printf format matching that type. For example, to print the size of a type, you might use
+
+#+begin_src c
+	printf("%lu", (unsigned long)sizeof(thetype));
+#+end_src
+
 * 18. Tools and Resources
 ** C development tools
 + a C cross-reference generator
@@ -1817,15 +1837,58 @@ Lars Wirzenius's ``publib'' library is available from ftp.funet.fi in
 directory pub/languages/C/Publib/.
 
 * strok
-http://www.cplusplus.com/reference/clibrary/cstring/strtok/
-http://www.cnblogs.com/oomusou/archive/2009/05/10/c_strtok.html
+#+begin_src c
+#include <stdio.h>
+#include <string.h>
 
-* strchr
-http://www.cplusplus.com/reference/clibrary/cstring/strchr/
+int main ()
+{
+  char str[] ="- This, a sample string.";
+  char * pch;
+  printf ("Splitting string \"%s\" into tokens:\n",str);
+  pch = strtok (str," ,.-");
+  while (pch != NULL)
+  {
+    printf ("%s\n",pch);
+    pch = strtok (NULL, " ,.-");
+  }
+  return 0;
+}
+#+end_src
 
 * qsort
+#+begin_src c
+void qsort (void* base, size_t num, size_t size,
+            int (*compar)(const void*,const void*));
+
+int compar (const void* p1, const void* p2);
+
+return value	meaning
+<0	The element pointed by p1 goes before the element pointed by p2
+0	The element pointed by p1 is equivalent to the element pointed by p2
+>0	The element pointed by p1 goes after the element pointed by p2
+
+#include <stdio.h>      /* printf */
+#include <stdlib.h>     /* qsort */
+
+int values[] = { 40, 10, 100, 90, 20, 25 };
+
+int compare (const void * a, const void * b)
+{
+  return ( *(int*)a - *(int*)b );
+}
+
+int main ()
+{
+  int n;
+  qsort (values, 6, sizeof(int), compare);
+  for (n=0; n<6; n++)
+     printf ("%d ",values[n]);
+  return 0;
+}
+#+end_src
+
 http://www.cplusplus.com/reference/clibrary/cstdlib/qsort/
-http://pubs.opengroup.org/onlinepubs/009695399/functions/qsort.html
 
 * Footnotes
 
