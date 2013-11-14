@@ -1,0 +1,50 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Programming Techniques
+#+OPTIONS: num:nil
+
+* Compute Max and Min
+#+begin_src c
+  #define USHRT_MAX       ((u16)(~0U))
+  #define SHRT_MAX        ((s16)(USHRT_MAX>>1))
+  #define SHRT_MIN        ((s16)(-SHRT_MAX - 1))
+  #define INT_MAX         ((int)(~0U>>1))
+  #define INT_MIN         (-INT_MAX - 1)  
+#+end_src
+** Two Complement
+s16 i = -1;
+if(i & 1)
+   SHRT_MIN  = ((s16)(-SHRT_MAX - 1))
+
+** One Complement
+s16 i = -1;
+if(!(i & 1))
+   SHRT_MIN = ((s16)(-SHRT_MAX ))
+* Duff's device[fn:1]
+#+begin_src c
+do {                          /* count > 0 assumed */
+    *to = *from++;            /* Note that the 'to' pointer is NOT incremented */
+} while(--count > 0);
+
+send(to, from, count)
+register short *to, *from;
+register count;
+{
+        register n = (count + 7) / 8;
+        switch(count % 8) {
+        case 0: do {    *to = *from++;
+        case 7:         *to = *from++;
+        case 6:         *to = *from++;
+        case 5:         *to = *from++;
+        case 4:         *to = *from++;
+        case 3:         *to = *from++;
+        case 2:         *to = *from++;
+        case 1:         *to = *from++;
+                } while(--n > 0);
+        }
+}
+#+end_src
+More: http://www.drdobbs.com/a-reusable-duff-device/184406208
+* Footnotes
+
+[fn:1] http://en.wikipedia.org/wiki/Duff's_device
+
