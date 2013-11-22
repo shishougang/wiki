@@ -1,0 +1,263 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Lions' Commentary on UNIX 6th Edition
+#+OPTIONS: num:nil H:2
+
+
+* Overview
+The most famous suppressed book in computer history! Used as an
+Operating System textbook at MIT"After 20 years, this is still the
+best expostion of the workings of a 'real' operating system." --- Ken
+Thompson 
+
+Source code listing for the Lions' Commentary in PDF and PostScript
+
+http://v6.cuzuco.com/
+* Chapter 5 Two Files
+#+begin_src c
+/*
+ * Structure of the coremap and swapmap
+ * arrays. Consists of non-zero count
+ * and base address of that many
+ * contiguous units.
+ * (The coremap unit is 64 bytes,
+ * the swapmap unit is 512 bytes)
+ * The addresses are increasing and
+ * the list is terminated with the
+ * first zero count.
+ */
+struct map
+{
+	char *m_size;
+	char *m_addr;
+};
+#+end_src
+** 5.3 malloc
+Algorithm is first fit.
+#+begin_src c
+/*
+ * Allocate size units from the given
+ * map. Return the base of the allocated
+ * space.
+ * Algorithm is first fit.
+ */
+malloc(mp, size)
+struct map *mp;
+{
+	register int a;
+	register struct map *bp;
+
+	for (bp = mp; bp->m_size; bp++) {
+		if (bp->m_size >= size) {
+			a = bp->m_addr;
+			bp->m_addr =+ size;
+			if ((bp->m_size =- size) == 0)
+				do {
+					bp++;
+					(bp-1)->m_addr = bp->m_addr;
+				} while ((bp-1)->m_size = bp->m_size);
+			return(a);
+		}
+	}
+	return(0);
+}
+#+end_src
+
+** 5.4 mfree
+1. 根据地址搜索释放内存的所在位置
+2. 3 cases：
+   1. 与前面一段合并
+   2. 与后面一段合并
+   3. 插入空内存列表
+
+#+begin_src c
+/*
+ * Free the previously allocated space aa
+ * of size units into the specified map.
+ * Sort aa into map and combine on
+ * one or both ends if possible.
+ */
+mfree(mp, size, aa)
+struct map *mp;
+{
+	register struct map *bp;
+	register int t;
+	register int a;
+
+	a = aa;
+	for (bp = mp; bp->m_addr<=a && bp->m_size!=0; bp++);
+	if (bp>mp && (bp-1)->m_addr+(bp-1)->m_size == a) {
+		(bp-1)->m_size =+ size;
+		if (a+size == bp->m_addr) {
+			(bp-1)->m_size =+ bp->m_size;
+			while (bp->m_size) {
+				bp++;
+				(bp-1)->m_addr = bp->m_addr;
+				(bp-1)->m_size = bp->m_size;
+			}
+		}
+	} else {
+		if (a+size == bp->m_addr && bp->m_size) {
+			bp->m_addr =- size;
+			bp->m_size =+ size;
+		} else if (size) do {
+			t = bp->m_addr;
+			bp->m_addr = a;
+			a = t;
+			t = bp->m_size;
+			bp->m_size = size;
+			bp++;
+		} while (size = t);
+	}
+}
+#+end_src
+
+
+
+** 5.6 =prf.c=
+#+begin_src sh
+panic--printf--printn--putchar
+
+deverror--prdev--printf--printn--putchar
+#+end_src
+** 5.10 panic
+"update" causes all the large block buffers to be written out.
+一旦产生panic，就进入运行idle的死循环。
+* Chapter 6 Getting Started
+main函数
+1. 创建进程0
+2. 创建进程1(exec /etc/init)
+3. sched-->sleep-->switch从进程0调度到进程1
+* Chapter 7 Processes
+The definition for "process" given, "a program in execution".
+** 7.2 The pro Structure
+#+begin_src c
+struct	proc
+{
+	char	p_stat;
+	char	p_flag;
+	char	p_pri;		/* priority, negative is high */
+	char	p_sig;		/* signal number sent to this process */
+	char	p_uid;		/* user id, used to direct tty signals */
+	char	p_time;		/* resident time for scheduling */
+	char	p_cpu;		/* cpu usage for scheduling */
+	char	p_nice;		/* nice for scheduling */
+	int	p_ttyp;		/* controlling tty */
+	int	p_pid;		/* unique process id */
+	int	p_ppid;		/* process id of parent */
+	int	p_addr;		/* address of swappable image */
+	int	p_size;		/* size of swappable image (*64 bytes) */
+	int	p_wchan;	/* event process is awaiting */
+	int	*p_textp;	/* pointer to text structure */
+} proc[NPROC];
+#+end_src
+
+=p_textp= is either null or pointer to an entry in the "text" arary.
+#+begin_src c
+/*
+ * Text structure.
+ * One allocated per pure
+ * procedure on swap device.
+ * Manipulated by text.c
+ */
+struct text
+{
+	int	x_daddr;	/* disk address of segment */
+	int	x_caddr;	/* core address, if loaded */
+	int	x_size;		/* size (*64) */
+	int	*x_iptr;	/* inode of prototype */
+	char	x_count;	/* reference count */
+	char	x_ccount;	/* number of loaded references */
+} text[NTEXT];
+#+end_src
+
+
+
+
+
+
+** 7.3 The user Structure
+#+begin_src c
+/*
+ * The user structure.
+ * One allocated per process.
+ * Contains all per process data
+ * that doesn't need to be referenced
+ * while the process is swapped.
+ * The user block is USIZE*64 bytes
+ * long; resides at virtual kernel
+ * loc 140000; contains the system
+ * stack per user; is cross referenced
+ * with the proc structure for the
+ * same process.
+ */
+struct user
+{
+	int	u_rsav[2];		/* save r5,r6 when exchanging stacks */
+	int	u_fsav[25];		/* save fp registers */
+					/* rsav and fsav must be first in structure */
+	char	u_segflg;		/* flag for IO; user or kernel space */
+	char	u_error;		/* return error code */
+	char	u_uid;			/* effective user id */
+	char	u_gid;			/* effective group id */
+	char	u_ruid;			/* real user id */
+	char	u_rgid;			/* real group id */
+	int	u_procp;		/* pointer to proc structure */
+	char	*u_base;		/* base address for IO */
+	char	*u_count;		/* bytes remaining for IO */
+	char	*u_offset[2];		/* offset in file for IO */
+	int	*u_cdir;		/* pointer to inode of current directory */
+	char	u_dbuf[DIRSIZ];		/* current pathname component */
+	char	*u_dirp;		/* current pointer to inode */
+	struct	{			/* current directory entry */
+		int	u_ino;
+		char	u_name[DIRSIZ];
+	} u_dent;
+	int	*u_pdir;		/* inode of parent directory of dirp */
+	int	u_uisa[16];		/* prototype of segmentation addresses */
+	int	u_uisd[16];		/* prototype of segmentation descriptors */
+	int	u_ofile[NOFILE];	/* pointers to file structures of open files */
+	int	u_arg[5];		/* arguments to current system call */
+	int	u_tsize;		/* text size (*64) */
+	int	u_dsize;		/* data size (*64) */
+	int	u_ssize;		/* stack size (*64) */
+	int	u_sep;			/* flag for I and D separation */
+	int	u_qsav[2];		/* label variable for quits and interrupts */
+	int	u_ssav[2];		/* label variable for swapping */
+	int	u_signal[NSIG];		/* disposition of signals */
+	int	u_utime;		/* this process user time */
+	int	u_stime;		/* this process system time */
+	int	u_cutime[2];		/* sum of childs' utimes */
+	int	u_cstime[2];		/* sum of childs' stimes */
+	int	*u_ar0;			/* address of users saved R0 */
+	int	u_prof[4];		/* profile arguments */
+	char	u_intflg;		/* catch intr from sys */
+					/* kernel stack per user
+					 * extends from u + USIZE*64
+					 * backward not to reach here
+					 */
+} u;
+#+end_src
+
+
+
+
+
+* Chapter 8 Process Management
+** 8.9 swtch
+2247: If you check, you will find that none of the procedures which
+call "swtch" directly examines the value returned here.
+
+Only the procedures which call "newproc" which are interested in this
+value, because of the way the child process is first activated!
+* Chapter 9 
+** 9.3 Interrupt Handlers
+#+begin_src sh
+  clock   pcrint  
+  rkintr  pcpint
+  klxint  lpint
+  klrint
+#+end_src
+
+
+
+
