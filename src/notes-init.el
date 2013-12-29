@@ -1,4 +1,4 @@
-(require 'org-publish)
+;; (require 'org-publish)
 ;; Modified From meteor1113@newsmth
 ;; URL: http://blog.csdn.net/meteor1113/archive/2009/07/30/4395673.aspx
 ;; http://orgmode.org/worg/org-tutorials/org-publish-html-tutorial.html
