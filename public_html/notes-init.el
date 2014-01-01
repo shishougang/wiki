@@ -1,4 +1,4 @@
-(require 'org-publish)
+;; (require 'org-publish)
 ;; Modified From meteor1113@newsmth
 ;; URL: http://blog.csdn.net/meteor1113/archive/2009/07/30/4395673.aspx
 ;; http://orgmode.org/worg/org-tutorials/org-publish-html-tutorial.html
@@ -16,9 +16,9 @@
          :base-directory ,note-root-dir
          :publishing-directory ,note-publish-dir
          :base-extension "org"
-         :style "<link rel=\"stylesheet\" href=\"./assets/stylesheet.css\" type=\"text/css\"/>"
+         :html-head  "<link rel=\"stylesheet\" href=\"./assets/stylesheet.css\" type=\"text/css\"/>"
          :recursive t
-         :publishing-function org-publish-org-to-html
+         :publishing-function org-html-publish-to-html 
          :auto-index t
 ;         :index-filename "index.org"
 ;         :index-title "index"
@@ -30,7 +30,7 @@
          :base-directory ,note-root-dir
          :publishing-directory ,note-publish-dir
          :recursive t
-         :base-extension "css\\|js\\|png\\|jpg\\|gif\\|pdf\\|mp3\\|swf\\|zip\\|gz\\|txt\\|el\\|tar.gz"
+         :base-extension "css\\|js\\|png\\|jpg\\|gif\\|pdf\\|mp3\\|swf\\|zip\\|gz\\|txt\\|el\\|tar.gz\\|c\\|cpp\\|sh"
          :publishing-function org-publish-attachment)
 
 
