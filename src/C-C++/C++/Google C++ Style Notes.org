@@ -1,0 +1,110 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Google C++ Style Guide Notes (Revision 3.274)
+#+OPTIONS: num:nil H:2
+
+* Homepage
++ en:http://google-styleguide.googlecode.com/svn/trunk/cppguide.xml
++ zh:http://zh-google-styleguide.readthedocs.org/en/latest/ 
+
+* Header Files
+** The #define Guard
+#+begin_html
+<p class="info">
+所有头文件都应该使用 #define 防止头文件被多重包含, 
+命名格式当是: &ltPROJECT&gt_&ltPATH&gt_&ltFILE&gt_H_
+</p>
+#+end_html
+
+For example, the file =foo/src/bar/baz.h= in project =foo= should have the
+following guard:
+
+#+begin_src c
+#ifndef FOO_BAR_BAZ_H_
+#define FOO_BAR_BAZ_H_
+
+...
+
+#endif  // FOO_BAR_BAZ_H_
+#+end_src
+
+** Forward Declarations
+#+begin_html
+<p class="info">
+能用前置声明来避免不必要的#include.
+</p>
+#+end_html
+
+A "forward declaration" is a declaration of a class, function, or
+template without an associated definition.
+
+用前置声明可以显著减少需要包含的头文件数量. 举例说明: 如果头文件中用到类 File, 但不需要访问 File 类的声明, 头文件中只需前置声明 class File; 而无须 #include "file/base/file.h".
+
+不允许访问类的定义的前提下, 我们在一个头文件中能对类 Foo 做哪些操作?
+
++ 我们可以将数据成员类型声明为 Foo * 或 Foo &.
++ 我们可以将函数参数 / 返回值的类型声明为 Foo (但不能定义实现).
++ 我们可以将静态数据成员的类型声明为 Foo, 因为静态数据成员的定义在类定义之外.
+反之, 如果你的类是 Foo 的子类, 或者含有类型为 Foo 的非静态数据成员, 则
+必须包含 Foo 所在的头文件.
+
+ *Decision:*
+   + When using a *function* declared in a header file, always #include
+     that header.
+   + When using a class template, prefer to #include its header file.
+   + When using an ordinary class, relying on a forward declaration is
+     OK, but be wary of situations where a forward declaration may be
+     insufficient or incorrect; when in doubt, just #include the
+     appropriate header.
+   + Do not replace data members with pointers just to avoid
+     an #include.
+
+当然 .cc 文件无论如何都需要所使用类的定义部分, 自然也就会包含若干头文件.
+
+** Inline Functions
+#+begin_html
+<p class="info">
+只有当函数只有 10 行甚至更少时才将其定义为内联函数.
+</p>
+#+end_html
+ *Decision:*
+一个较为合理的经验准则是, 不要内联超过 10 行的函数. 谨慎对待析构函数,
+析构函数往往比其表面看起来要更长, 因为有隐含的成员和基类析构函数被调用!
+
+另一个实用的经验准则: 内联那些包含循环或 switch 语句的函数常常是得不偿
+失 (除非在大多数情况下, 这些循环或 switch 语句从不被执行).
+
+有些函数即使声明为内联的也不一定会被编译器内联, 这点很重要; 比如虚函数
+和递归函数就不会被正常内联. 通常, 递归函数不应该声明成内联函
+数.（递归调用堆栈的展开并不像循环那么简单, 比如递归层数在
+编译时可能是未知的, 大多数编译器都不支持内联递归函数). 虚函数内联的主
+要原因则是想把它的函数体放在类定义内, 为了图个方便, 抑或是当作文档描述
+其行为, 比如精短的存取函数.
+
+** The -inl.h Files
+#+begin_html
+<p class="info">
+复杂的内联函数的定义, 可放在后缀名为 -inl.h 的头文件中.
+</p>
+#+end_html
+
+Another use of -inl.h files is for definitions of function templates.
+This can be used to keep your template definitions easy to read.
+
+Do not forget that a -inl.h file requires a #define guard just like
+any other header file.
+
+** Function Parameter Ordering
+#+begin_html
+<p class="info">
+When defining a function, parameter order is: inputs, then outputs.
+</p>
+#+end_html
+
+
+* cc
+
+#+begin_html
+<p class="info">
+
+</p>
+#+end_html
