@@ -100,6 +100,326 @@ When defining a function, parameter order is: inputs, then outputs.
 </p>
 #+end_html
 
+** Names and Order of Includes
+#+begin_html
+<p class="info">
+使用标准的头文件包含顺序可增强可读性, 避免隐藏依赖: C 库, C++ 库, 其他库的 .h, 本项目内的 .h.
+</p>
+#+end_html
+
+For example, =google-awesome-project/src/base/logging.h= should be
+included as
+#+begin_src c
+#include "base/logging.h"
+#+end_src
+
+In =dir/foo.cc= or =dir/foo_test.cc=, whose main purpose is to implement
+or test the stuff in dir2/foo2.h, order your includes as follows:
+#+begin_src sh
+dir2/foo2.h (preferred location — see details below).
+C system files.
+C++ system files.
+Other libraries' .h files.
+Your project's .h files.
+#+end_src
+
+With the preferred ordering, if dir2/foo2.h omits any necessary
+includes, the build of dir/foo.cc or =dir/foo_test.cc= will break. Thus,
+this rule ensures that build breaks show up first for the people
+working on these files, not for innocent people in other packages.
+
+Within each section the includes should be ordered alphabetically.
+Note that older code might not conform to this rule and should be
+fixed when convenient.
+
+Exception: sometimes, system-specific code needs conditional includes.
+Such code can put conditional includes after other includes. Example:
+#+begin_src c
+#include "foo/public/fooserver.h"
+
+#include "base/port.h"  // For LANG_CXX11.
+
+#ifdef LANG_CXX11
+#include <initializer_list>
+#endif  // LANG_CXX11
+#+end_src
+
+* Scoping
+** Namespaces
+#+begin_html
+<p class="info">
+鼓励在 .cc 文件内使用匿名名字空间. 使用具名的名字空间时, 
+其名称可基于项目名或相对路径. 不要使用 using 关键字.
+不要使用内嵌名字空间
+</p>
+#+end_html
+
+ *Decision:*
+Use namespaces according to the policy described below. Terminate
+namespaces with comments as shown in the given examples.
+*** Unnamed Namespaces
++ Unnamed namespaces are allowed and even encouraged in .cc files, to
+  avoid runtime naming conflicts:
+  
+  #+begin_src c
+    namespace {                           // This is in a .cc file.
+    
+    // The content of a namespace is not indented
+    enum { kUnused, kEOF, kError };       // Commonly used tokens.
+    bool AtEof() { return pos_ == kEOF; }  // Uses our namespace's EOF.
+    
+    }  // namespace
+  #+end_src
+  However, file-scope declarations that are associated with a
+  particular class may be declared in that class as types, static data
+  members or static member functions rather than as members of an
+  unnamed namespace.
+
++ Do not use unnamed namespaces in .h files.
+*** Named Namespaces
+Named namespaces should be used as follows:
++ Namespaces wrap the entire source file after includes, gflags
+  definitions/declarations, and forward declarations of classes from
+  other namespaces:
+  #+begin_src c
+    // In the .h file
+    namespace mynamespace {
+    
+    // All declarations are within the namespace scope.
+    // Notice the lack of indentation.
+    class MyClass {
+     public:
+      ...
+      void Foo();
+    };
+    
+    }  // namespace mynamespace
+    // In the .cc file
+    namespace mynamespace {
+    
+    // Definition of functions is within scope of the namespace.
+    void MyClass::Foo() {
+      ...
+    }
+    
+    }  // namespace mynamespace
+  #+end_src
+  The typical .cc file might have more complex detail, including the
+  need to reference classes in other namespaces.
+  #+begin_src c
+    #include "a.h"
+    
+    DEFINE_bool(someflag, false, "dummy flag");
+    
+    class C;  // Forward declaration of class C in the global namespace.
+    namespace a { class A; }  // Forward declaration of a::A.
+    
+    namespace b {
+    
+    ...code for b...         // Code goes against the left margin.
+    
+    }  // namespace b
+  #+end_src
++ Do not declare anything in namespace std, not even forward
+  declarations of standard library classes.
++ You may not use a using-directive to make all names from a namespace
+  available.
+  #+begin_src c
+    // Forbidden -- This pollutes the namespace.
+    using namespace foo;
+  #+end_src
++ You may use a using-declaration anywhere in a .cc file, and in
+  functions, methods or classes in .h files.
+  #+begin_src c
+    // OK in .cc files.
+    // Must be in a function, method or class in .h files.
+    using ::foo::bar;
+  #+end_src
++ Namespace aliases are allowed anywhere in a .cc file, anywhere
+  inside the named namespace that wraps an entire .h file, and in
+  functions and methods.
+  #+begin_src c
+    // Shorten access to some commonly used names in .cc files.
+    namespace fbz = ::foo::bar::baz;
+    
+    // Shorten access to some commonly used names (in a .h file).
+    namespace librarian {
+    // The following alias is available to all files including
+    // this header (in namespace librarian):
+    // alias names should therefore be chosen consistently
+    // within a project.
+    namespace pd_s = ::pipeline_diagnostics::sidetable;
+    
+    inline void my_inline_function() {
+      // namespace alias local to a function (or method).
+      namespace fbz = ::foo::bar::baz;
+      ...
+    }
+    }  // namespace librarian
+  #+end_src
++ Do not use inline namespaces.
+** Nested Classes
+#+begin_html
+<p class="info">
+当公有嵌套类作为接口的一部分时, 
+虽然可以直接将他们保持在全局作用域中, 但将嵌套类的声明置于名字空间内是更好的选择.
+</p>
+#+end_html
+Do not make nested classes public unless they are actually part of the
+interface, e.g., a class that holds a set of options for some method.
+** Nonmember, Static Member, and Global Functions
+#+begin_html
+<p class="info">
+使用静态成员函数或名字空间内的非成员函数, 尽量不要用裸的全局函数.
+</p>
+#+end_html
+
+Sometimes it is useful, or even necessary, to define a function not
+bound to a class instance. Such a function can be either a static
+member or a nonmember function. Nonmember functions should not depend
+on external variables, and should nearly always exist in a namespace.
+Rather than creating classes only to group static member functions
+which do not share static data, use namespaces instead.
+
+Functions defined in the same compilation unit as production classes
+may introduce unnecessary coupling and link-time dependencies when
+directly called from other compilation units; static member functions
+are particularly susceptible to this. Consider extracting a new class,
+or placing the functions in a namespace possibly in a separate
+library.
+
+If you must define a nonmember function and it is only needed in its
+.cc file, use an unnamed namespace or static linkage (eg static int
+Foo() {...}) to limit its scope.
+** Local Variables
+#+begin_html
+<p class="info">
+将函数变量尽可能置于最小作用域内, 并在变量声明时进行初始化.
+</p>
+#+end_html
+
+There is one caveat: if the variable is an object, its constructor is
+invoked every time it enters scope and is created, and its destructor
+is invoked every time it goes out of scope.
+
+#+begin_src c
+// Inefficient implementation:
+for (int i = 0; i < 1000000; ++i) {
+  Foo f;  // My ctor and dtor get called 1000000 times each.
+  f.DoSomething(i);
+}
+#+end_src
+It may be more efficient to declare such a variable used in a loop
+outside that loop:
+
+#+begin_src c
+Foo f;  // My ctor and dtor get called once each.
+for (int i = 0; i < 1000000; ++i) {
+  f.DoSomething(i);
+}
+#+end_src
+** Static and Global Variables
+#+begin_html
+<p class="info">
+禁止使用 class 类型的静态或全局变量: 它们会导致很难发现的 
+bug 和不确定的构造和析构函数调用顺序.但是，允许这些变量，
+当他们是没有动态初始和析构的constexpr:时。
+</p>
+#+end_html
+
+Objects with static storage duration, including global variables,
+static variables, static class member variables, and function static
+variables, must be Plain Old Data (POD): only ints, chars, floats, or
+pointers, or arrays/structs of POD.
+
+The order in which class constructors and initializers for static
+variables are called is only partially specified in C++ and can even
+change from build to build, which can cause bugs that are difficult to
+find. Therefore in addition to banning globals of class type, we do
+not allow static POD variables to be initialized with the result of a
+function, unless that function (such as getenv(), or getpid()) does
+not itself depend on any other globals.
+
+One way to alleviate the destructor problem is to terminate the
+program by calling =quick_exit()= instead of =exit()=. The difference is
+that =quick_exit()= does not invoke destructors and does not invoke any
+handlers that were registered by calling =atexit()=. If you have a
+handler that needs to run when a program terminates via =quick_exit()=
+(flushing logs, for example), you can register it using
+=at_quick_exit()=. (If you have a handler that needs to run at both
+=exit()= and =quick_exit()=, you need to register it in both places.)、
+
+If you need a static or global variable of a class type, consider
+initializing a pointer (which will never be freed), from either your
+main() function or from pthread_once(). Note that this must be a raw
+pointer, not a "smart" pointer, since the smart pointer's destructor
+will have the order-of-destructor issue that we are trying to avoid.
+
+* Classes
+
+** Doing Work in Constructors
+#+begin_html
+<p class="info">
+在构造函数中避免做复杂的初始化（特别，能失败或需要调用虚函数）
+</p>
+#+end_html
+
+ *Decision:*
+Constructors should never call virtual functions or attempt to raise
+non-fatal failures. If your object requires non-trivial
+initialization, consider using a factory function or Init() method.
+
+** Initialization
+#+begin_html
+<p class="info">
+如果类定义了成员变量，必须在类中定义一个初始化所有成员变量的初始化函数
+或构造函数（可以是默认构造函数）。如果没有定义任何默认构造函数. 编译器
+将自动生产一个默认的构造函数，使得一些没被初始化或初始化位不合理的值。
+</p>
+#+end_html
+ *Decision:*
+Use in-class member initialization for simple initializations,
+especially when a member variable must be initialized the same way in
+more than one constructor.
+
+If your class defines member variables that aren't initialized
+in-class, and if it has no other constructors, you must define a
+default constructor (one that takes no arguments).
+
+If your class inherits from an existing class but you add no new
+member variables, you are not required to have a default constructor.
+
+** Explicit Constructors
+#+begin_html
+<p class="info">
+对单个参数的构造函数使用 C++ 关键字 explicit.
+</p>
+#+end_html
+ *Decision:*
+We require all single argument constructors to be explicit. Always put
+explicit in front of one-argument constructors in the class
+definition: explicit Foo(string name); 
+
+The exception is copy constructors, which, in the rare cases when we
+allow them, should probably not be explicit. Classes that are intended
+to be transparent wrappers around other classes are also exceptions.
+Such exceptions should be clearly marked with comments. 
+
+Finally, constructors that take only an initializer_list may be
+non-explicit. This is to permit construction of your type using the
+assigment form for brace init lists (i.e. MyType m = {1, 2} ).
+
+** Copy Constructors
+#+begin_html
+<p class="info">
+
+</p>
+#+end_html
+
+
+
+
+
 
 * cc
 
@@ -108,3 +428,8 @@ When defining a function, parameter order is: inputs, then outputs.
 
 </p>
 #+end_html
+
+
+#+begin_src c
+
+#+end_src
