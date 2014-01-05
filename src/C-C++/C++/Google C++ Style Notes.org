@@ -356,7 +356,6 @@ pointer, not a "smart" pointer, since the smart pointer's destructor
 will have the order-of-destructor issue that we are trying to avoid.
 
 * Classes
-
 ** Doing Work in Constructors
 #+begin_html
 <p class="info">
@@ -412,14 +411,812 @@ assigment form for brace init lists (i.e. MyType m = {1, 2} ).
 ** Copy Constructors
 #+begin_html
 <p class="info">
+仅在代码中需要拷贝一个类对象的时候使用拷贝构造函数; 
+大部分情况下都不需要, 此时应使用 DISALLOW_COPY_AND_ASSIGN.
+</p>
+#+end_html
 
+ *Decision:*
+Few classes need to be copyable. Most should have neither a copy
+constructor nor an assignment operator. In many situations, a pointer
+or reference will work just as well as a copied value, with better
+performance. For example, you can pass function parameters by
+reference or pointer instead of by value, and you can store pointers
+rather than objects in an STL container. 
+
+If your class needs to be copyable, prefer providing a copy method,
+such as CopyFrom() or Clone(), rather than a copy constructor, because
+such methods cannot be invoked implicitly. If a copy method is
+insufficient in your situation (e.g. for performance reasons, or
+because your class needs to be stored by value in an STL container),
+provide both a copy constructor and assignment operator. 
+
+If your class does not need a copy constructor or assignment operator,
+you must explicitly disable them. To do so, add dummy declarations for
+the copy constructor and assignment operator in the private: section
+of your class, but do not provide any corresponding definition (so
+that any attempt to use them results in a link error). 
+
+For convenience, a =DISALLOW_COPY_AND_ASSIGN= macro can be used:
+#+begin_src c
+// A macro to disallow the copy constructor and operator= functions
+// This should be used in the private: declarations for a class
+#define DISALLOW_COPY_AND_ASSIGN(TypeName) \
+  TypeName(const TypeName&);               \
+  void operator=(const TypeName&)
+#+end_src
+Then, in =class Foo=:
+#+begin_src c
+class Foo {
+ public:
+  Foo(int f);
+  ~Foo();
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(Foo);
+};
+#+end_src
+
+** Delegating and inheriting constructors
+#+begin_html
+<p class="info">
+使用委托和继承构造函数，当他们减少重复代码。
+</p>
+#+end_html
+
+*Decision:*
+Use delegating and inheriting constructors when they reduce
+boilerplate and improve readability. Be cautious about inheriting
+constructors when your derived class has new member variables.
+Inheriting constructors may still be appropriate in that case if you
+can use in-class member initialization for the derived class's member
+variables. 
+
+** Structs vs. Classes
+#+begin_html
+<p class="info">
+仅当只有数据时使用 struct, 其它一概使用 class.
+</p>
+#+end_html
+structs should be used for passive objects that carry data, and may
+have associated constants, but lack any functionality other than
+access/setting the data members. The accessing/setting of fields is
+done by directly accessing the fields rather than through method
+invocations. Methods should not provide behavior but should only be
+used to set up the data members, e.g., constructor, destructor,
+Initialize(), Reset(), Validate(). 
+
+If more functionality is required, a class is more appropriate. If in
+doubt, make it a class.
+
+For consistency with STL, you can use struct instead of class for
+functors(仿函数) and traits(特性). 
+
+Note that member variables in structs and classes have *different
+naming rules*.
+
+** Inheritance
+#+begin_html
+<p class="info">
+使用组合常常比使用继承更合理. 如果使用继承的话, 定义为 public 继承.
+</p>
+#+end_html
+ *定义:*
+当子类继承基类时, 子类包含了父基类所有数据及操作的定义. C++ 实践中, 继
+承主要用于两种场合: 实现继承 (implementation inheritance), 子类继承父
+类的实现代码; 接口继承 (interface inheritance), 子类仅继承父类的方法名
+称. 
+
+ *Decision:*
+All inheritance should be public. If you want to do private
+inheritance, you should be including an instance of the base class as
+a member instead. 
+
+Do not overuse implementation inheritance. Composition is often more
+appropriate. Try to restrict use of inheritance to the "is-a" case:
+Bar subclasses Foo if it can reasonably be said that Bar "is a kind
+of" Foo. 
+
+Make your destructor virtual if necessary. If your class has virtual
+methods, its destructor should be virtual. 
+
+Limit the use of protected to those member functions that might need
+to be accessed from subclasses. Note that *data members should be
+private*. 
+
+When redefining an inherited virtual function, explicitly declare it
+virtual in the declaration of the derived class. Rationale: If virtual
+is omitted, the reader has to check all ancestors of the class in
+question to determine if the function is virtual or not.
+
+** Multiple Inheritance
+#+begin_html
+<p class="info">
+真正需要用到多重实现继承的情况少之又少. 只在以下情况我们才允许多重继承: 
+最多只有一个基类是非抽象类; 其它基类都是以 Interface 为后缀的 纯接口类.
+</p>
+#+end_html
+ *Decision:*
+Multiple inheritance is allowed only when all superclasses, with the
+possible exception of the first one, are pure interfaces. In order to
+ensure that they remain pure interfaces, they must end with the
+Interface suffix. 
+
+Note: There is an exception to this rule on Windows.
+
+** Interfaces
+#+begin_html
+<p class="info">
+接口是指满足特定条件的类, 这些类以 Interface 为后缀,不强制.
+</p>
+#+end_html
+
+ *定义:*
+当一个类满足以下要求时, 称之为纯接口:
+
++ 只有纯虚函数 (“=0”) 和静态函数 (除了下文提到的析构函数).
++ 没有非静态数据成员.
++ 没有定义任何构造函数. 如果有, 也不能带有参数, 并且必须为 protected.
++ 如果它是一个子类, 也只能从满足上述条件并以 Interface 为后缀的类继承.
+
+ *Decision:*
+A class may end with Interface only if it meets the above
+requirements. however: classes that meet the above requirements are
+not required to end with Interface.  
+
+** Operator Overloading
+#+begin_html
+<p class="info">
+除少数特定环境外，不要重载运算符. 不要自己定义字义。
+</p>
+#+end_html
+
+ *Decision:*
+In general, do not overload operators. The assignment operator
+(operator=), in particular, is insidious and should be avoided. You
+can define functions like Equals() and CopyFrom() if you need them.
+Likewise, avoid the dangerous unary operator& at all costs, if there's
+any possibility the class might be forward-declared. 
+
+Do not overload operator"", i.e. do not introduce user-defined
+literals. 
+
+However, there may be rare cases where you need to overload an
+operator to interoperate with templates or "standard" C++ classes
+(such as operator<<(ostream&, const T&) for logging). These are
+acceptable if fully justified, but you should try to avoid these
+whenever possible. In particular, do not overload operator== or
+operator< just so that your class can be used as a key in an STL
+container; instead, you should create equality and comparison functor
+types when declaring the container. 
+
+Some of the STL algorithms do require you to overload operator==, and
+you may do so in these cases, provided you document why.
+
+** Access Control
+#+begin_html
+<p class="info">
+将所有数据成员声明为 private, 并根据需要提供相应的存取函数(一些技术原
+因，允许测试类的数据成员位protected，当使用Google Test). 例如, 某个名
+为 foo_ 的变量, 其取值函数是 foo(). 还可能需要一个赋值函数set_foo().
+例外：static const的数据成员（通常称为kFoo)不需要private.
+</p>
+#+end_html
+
+The definitions of accessors are usually inlined in the header file.
+
+** Declaration Order
+#+begin_html
+<p class="info">
+在类中使用特定的声明顺序: public: 在 private: 之前, 成员函数在数据成员 (变量) 前;
+</p>
+#+end_html
+Your class definition should start with its public: section, followed
+by its protected: section and then its private: section. If any of
+these sections are empty, omit them. 
+
+Within each section, the declarations generally should be in the
+following order: 
+
++ Typedefs and Enums
++ Constants (static const data members)
++ Constructors
++ Destructor
++ Methods, including static methods
++ Data Members (except static const data members)
+
+Friend declarations should always be in the private section, and the
+=DISALLOW_COPY_AND_ASSIGN= macro invocation should be at the end of the
+private: section. It should be the last thing in the class.
+
+Method definitions in the corresponding .cc file should be the same as
+the declaration order, as much as possible. 
+
+Do not put large method definitions inline in the class definition.
+Usually, only trivial or performance-critical, and very short, methods
+may be defined inline. 
+
+** Write Short Functions
+#+begin_html
+<p class="info">
+倾向编写简短, 凝练的函数.
+</p>
+#+end_html
+ 如果函数超过 40 行, 可以思索一下能不能在不影响程序结构的前提下对其进行分割.
+
+* Google-Specific Magic
+** Ownership and Smart Pointers
+#+begin_html
+<p class="info">
+对动态分配的对象只有一个固定的隶属折。传递隶属使用智能指针。
+</p>
+#+end_html
+
+*** Definition:
+"Ownership" is a bookkeeping technique for managing dynamically
+allocated memory (and other resources). The owner of a dynamically
+allocated object is an object or function that is responsible for
+ensuring that it is deleted when no longer needed. Ownership can
+sometimes be shared, in which case the last owner is typically
+responsible for deleting it. Even when ownership is not shared, it can
+be transferred from one piece of code to another. 
+
+"Smart" pointers are classes that act like pointers, e.g. by
+overloading the * and -> operators. Some smart pointer types can be
+used to automate ownership bookkeeping, to ensure these
+responsibilities are met. =std::unique_ptr= is a smart pointer type
+introduced in C++11, which expresses exclusive ownership of a
+dynamically allocated object; the object is deleted when the
+=std::unique_ptr= goes out of scope. It cannot be copied, but can be
+moved to represent ownership transfer. =shared_ptr= is a smart pointer
+type which expresses shared ownership of a dynamically allocated
+object. =shared_ptrs= can be copied; ownership of the object is shared
+among all copies, and the object is deleted when the last =shared_ptr=
+is destroyed.
+
+*** Cons:
++ Ownership must be represented and transferred via pointers (whether
+  smart or plain). Pointer semantics are more complicated than value
+  semantics, especially in APIs: you have to worry not just about
+  ownership, but also aliasing, lifetime, and mutability, among other
+  issues. 
++ The performance costs of value semantics are often overestimated, so
+  the performance benefits of ownership transfer might not justify the
+  readability and complexity costs. 
++ APIs that transfer ownership force their clients into a single
+  memory management model.
++ Code using smart pointers is less explicit about where the resource
+  releases take place. 
++ std::unique_ptr expresses ownership transfer using C++11's move
+  semantics, which are generally forbidden in Google code, and may
+  confuse some programmers. 
++ Shared ownership can be a tempting alternative to careful ownership
+  design, obfuscating the design of a system. 
++ Shared ownership requires explicit bookkeeping at run-time, which
+  can be costly. 
++ In some cases (e.g. cyclic references), objects with shared
+  ownership may never be deleted. 
++ Smart pointers are not perfect substitutes for plain pointers.
+*** Decision:
+If dynamic allocation is necessary, prefer to keep ownership with the
+code that allocated it. If other code needs access to the object,
+consider passing it a copy, or passing a pointer or reference without
+transferring ownership. Prefer to use =std::unique_ptr= to make
+ownership transfer explicit. For example: 
+#+begin_src c
+std::unique_ptr<Foo> FooFactory();
+void FooConsumer(std::unique_ptr<Foo> ptr);
+#+end_src
+Do not design your code to use shared ownership without a very good
+reason. One such reason is to avoid expensive copy operations, but you
+should only do this if the performance benefits are significant, and
+the underlying object is immutable (i.e. =shared_ptr<const Foo>=). If
+you do use shared ownership, prefer to use =shared_ptr=. 
+
+Do not use =scoped_ptr= in new code unless you need to be compatible
+with older versions of C++. Never use =linked_ptr= or =std::auto_ptr=. In
+all three cases, use =std::unique_ptr= instead.
+
+** cpplint
+#+begin_html
+<p class="info">
+使用 cpplint.py 检查风格错误.
+</p>
+#+end_html
+
+False positives can be ignored by putting // NOLINT at the end of the line.
+
+download [[http://google-styleguide.googlecode.com/svn/trunk/cpplint/cpplint.py][cpplint.py]] separately.
+
+* Other C++ Features
+** Reference Arguments
+#+begin_html
+<p class="info">
+所有按引用传递的参数必须加上 const.
+</p>
+#+end_html
+
+ *Decision:*
+Within function parameter lists all references must be const:
+#+begin_src c
+void Foo(const string &in, string *out);
+#+end_src
+In fact it is a very strong convention in Google code that input
+arguments are values or const references while output arguments are
+pointers. Input parameters may be const pointers, but we never allow
+non-const reference parameters except when required by convention,
+e.g., =swap()=. 
+
+However, there are some instances where using =const T*= is preferable
+to =const T&= for input parameters. For example: 
+
++ You want to pass in a null pointer.
++ The function saves a pointer or reference to the input. 
+
+So if you choose =const T*= rather than =const T&=, do so for a concrete
+reason; otherwise it will likely confuse readers by making them look
+for an explanation that doesn't exist.
+** Rvalue references
+#+begin_html
+<p class="info">
+Do not use rvalue references, std::forward, std::move_iterator, or
+std::move_if_noexcept. Use the single-argument form of std::move only
+with non-copyable arguments. 
+</p>
+#+end_html
+*Decision:*
+Do not use rvalue references, and do not use the =std::forward= or
+=std::move_if_noexcept= utility functions (which are essentially just
+casts to rvalue reference types), or =std::move_iterator=. Use
+single-argument =std::move= only with objects that are not copyable
+(e.g. =std::unique_ptr=), or in templated code with objects that might
+not be copyable.
+** Function Overloading
+#+begin_html
+<p class="info">
+仅在读者看到调用能很好的知道发生了啥而不是首先去搞清楚哪个重载被调用时
+使用重载函数 (含构造函数). 
+</p>
+#+end_html
+
+*Decision:*
+If you want to overload a function, consider qualifying the name with
+some information about the arguments, e.g., AppendString(),
+AppendInt() rather than just Append().
+** Default Arguments
+#+begin_html
+<p class="info">
+我们不允许使用缺省函数参数，除了以下说明的有限场合。如果合适，用函数重
+载来模仿它们。
+</p>
+#+end_html
+
+*Decision:*
+So except as described below, we require all arguments to be
+explicitly specified. 
+
+One specific exception is when the function is a static function (or
+in an unnamed namespace) in a .cc file. In this case, the cons don't
+apply since the function's use is so localized. 
+
+Another specific exception is when default arguments are used to
+simulate variable-length argument lists. 
+#+begin_src c
+// Support up to 4 params by using a default empty AlphaNum.
+string StrCat(const AlphaNum &a,
+              const AlphaNum &b = gEmptyAlphaNum,
+              const AlphaNum &c = gEmptyAlphaNum,
+              const AlphaNum &d = gEmptyAlphaNum);
+#+end_src
+** Variable-Length Arrays and alloca()
+#+begin_html
+<p class="info">
+我们不允许使用变长数组和 alloca().
+</p>
+#+end_html
+
+*Decision:*
+Use a safe allocator instead, such as =scoped_ptr/scoped_array=.
+** Friends
+#+begin_html
+<p class="info">
+我们允许合理的使用友元类及友元函数.
+</p>
+#+end_html
+
+Friends should usually be defined in the same file so that the reader
+does not have to look in another file to find uses of the private
+members of a class. A common use of friend is to have a FooBuilder
+class be a friend of Foo so that it can construct the inner state of
+Foo correctly, without exposing this state to the world. In some cases
+it may be useful to make a unittest class a friend of the class it
+tests.
+** Exceptions
+#+begin_html
+<p class="info">
+我们不使用 C++ 异常.
+</p>
+#+end_html
+
+On their face, the benefits of using exceptions outweigh the costs,
+especially in new projects. However, for existing code, the
+introduction of exceptions has implications on all dependent code. If
+exceptions can be propagated beyond a new project, it also becomes
+problematic to integrate the new project into existing exception-free
+code. Because most existing C++ code at Google is not prepared to deal
+with exceptions, it is comparatively difficult to adopt new code that
+generates exceptions.
+
+Given that Google's existing code is not exception-tolerant, the costs
+of using exceptions are somewhat greater than the costs in a new
+project. 
+
+This prohibition also applies to the exception-related features added
+in C++11, such as =noexcept=, =std::exception_ptr=, and
+=std::nested_exception=. 
+
+There is an exception to this rule (no pun intended) for Windows code.
+** Run-Time Type Information (RTTI)
+#+begin_html
+<p class="info">
+禁止使用 RTTI.
+</p>
+#+end_html
+RTTI allows a programmer to query the C++ class of an object at run
+time. This is done by use of =typeid= or =dynamic_cast=. 
+
+*Decision:*
+RTTI has legitimate uses but is prone to abuse, so you must be careful
+when using it. You may use it freely in unittests, but avoid it when
+possible in other code. In particular, think twice before using RTTI
+in new code. If you find yourself needing to write code that behaves
+differently based on the class of an object, consider one of the
+following alternatives to querying the type: 
+
++ Virtual methods are the preferred way of executing different code
+  paths depending on a specific subclass type. This puts the work
+  within the object itself. 
++ If the work belongs outside the object and instead in some
+  processing code, consider a double-dispatch solution, such as the
+  Visitor design pattern. This allows a facility outside the object
+  itself to determine the type of class using the built-in type
+  system.
+
+When the logic of a program guarantees that a given instance of a base
+class is in fact an instance of a particular derived class, then a
+=dynamic_cast= may be used freely on the object. Usually one can use a
+=static_cast= as an alternative in such situations. 
+
+Do not hand-implement an RTTI-like workaround. The arguments against
+RTTI apply just as much to workarounds like class hierarchies with
+type tags. Moreover, workarounds disguise your true intent.
+** Casting
+#+begin_html
+<p class="info">
+使用 C++ 的类型转换, 如 static_cast<>(). 不要使用 int y = (int)x 或
+int y = int(x) 等转换方式; 
+</p>
+#+end_html
+
+*Decision:*
+Do not use C-style casts. Instead, use these C++-style casts.
+
++ Use =static_cast= as the equivalent of a C-style cast that does value
+  conversion, or when you need to explicitly up-cast a pointer from a
+  class to its superclass. 
++ Use =const_cast= to remove the const qualifier (see const).
++ Use =reinterpret_cast= to do unsafe conversions of pointer types to
+  and from integer and other pointer types. Use this only if you know
+  what you are doing and you understand the aliasing issues. 
++ You may use =dynamic_cast= freely in unittests, but avoid it when
+  possible in other code.
+** Streams
+#+begin_html
+<p class="info">
+只在记录日志时使用流
+</p>
+#+end_html
+
+*Decision:*
+Do not use streams, except where required by a logging interface. Use
+printf-like routines instead. 
+
+Either path would yield different advantages and disadvantages, and
+there is not a clearly superior solution. The simplicity doctrine
+mandates we settle on one of them though, and the majority decision
+was on =printf + read/write=.
+** Preincrement and Predecrement
+#+begin_html
+<p class="info">
+对于迭代器和其他模板对象使用前缀形式 (++i) 的自增, 自减运算符.
+</p>
+#+end_html
+
+*Decision:*
+For simple scalar (non-object) values there is no reason to prefer one
+form and we allow either. For iterators and other template types, use
+pre-increment.
+** Use of const
+#+begin_html
+<p class="info">
+我们强烈建议你在任何可能的情况下都要使用 const. 对于C++11中一些const，
+constexpr 是更好的选择。
+</p>
+#+end_html
+
+=const= variables, data members, methods and arguments add a level of
+compile-time type checking; it is better to detect errors as soon as
+possible. Therefore we strongly recommend that you use const whenever
+it makes sense to do so: 
+
++ If a function does not modify an argument passed by reference or by
+  pointer, that argument should be const. 
++ Declare methods to be const whenever possible. Accessors should
+  almost always be const. Other methods should be const if they do not
+  modify any data members, do not call any non-const methods, and do
+  not return a non-const pointer or non-const reference to a data
+  member. 
++ Consider making data members const whenever they do not need to be
+  modified after construction. 
+
+The =mutable= keyword is allowed but is unsafe when used with threads,
+so thread safety should be carefully considered first. 
+
+That said, while we encourage putting =const= first, we do not require
+it. But be consistent with the code around you!
+** Use of constexpr
+#+begin_html
+<p class="info">
+In C++11, use constexpr to define true constants or to ensure constant
+initialization. 
+</p>
+#+end_html
+
+*Decision:*
+=constexpr= definitions enable a more robust specification of the
+constant parts of an interface. Use =constexpr= to specify true
+constants and the functions that support their definitions. Avoid
+complexifying function definitions to enable their use with =constexpr=.
+Do not use constexpr to force inlining.
+** Integer Types
+Of the built-in C++ integer types, the only one used is int. If a
+program needs a variable of a different size, use a precise-width
+integer type from =<stdint.h>=, such as =int16_t=. If your variable
+represents a value that could ever be greater than or equal to 2^31
+(2GiB), use a 64-bit type such as =int64_t=. Keep in mind that even if
+your value won't ever be too large for an int, it may be used in
+intermediate calculations which may require a larger type. When in
+doubt, choose a larger type.
+
+*Decision:*
+=<stdint.h>= defines types like =int16_t=, =uint32_t=, =int64_t=, etc. You
+should always use those in preference to short, unsigned long long and
+the like, when you need a guarantee on the size of an integer. Of the
+C integer types, only int should be used. When appropriate, you are
+welcome to use standard types like =size_t= and =ptrdiff_t=. 
+
+For integers we know can be "big", use =int64_t=.
+
+You should not use the unsigned integer types such as uint32_t, unless
+there is a valid reason such as representing a bit pattern rather than
+a number, or you need defined overflow modulo 2^N. In particular, do
+not use unsigned types to say a number will never be negative.
+Instead, use *assertions* for this. 
+
+Use care when converting integer types. Integer conversions and
+promotions can cause non-intuitive behavior.
+
+So, document that a variable is non-negative using assertions. Don't
+use an unsigned type. 
+
+** 64-bit Portability
+#+begin_html
+<p class="info">
+代码应该对 64 位和 32 位系统友好. 处理打印, 比较, 结构体对齐时应切记:
+</p>
+#+end_html
+
++ printf() specifiers for some types are not cleanly portable between
+  32-bit and 64-bit systems. C99 defines some portable format
+  specifiers. Unfortunately, MSVC 7.1 does not understand some of
+  these specifiers and the standard is missing a few, so we have to
+  define our own ugly versions in some cases (in the style of the
+  standard include file inttypes.h): 
+  #+begin_src c
+    // printf macros for size_t, in the style of inttypes.h
+    #ifdef _LP64
+    #define __PRIS_PREFIX "z"
+    #else
+    #define __PRIS_PREFIX
+    #endif
+    
+    // Use these macros after a % in a printf format string
+    // to get correct 32/64 bit behavior, like this:
+    // size_t size = records.size();
+    // printf("%"PRIuS"\n", size);
+    
+    #define PRIdS __PRIS_PREFIX "d"
+    #define PRIxS __PRIS_PREFIX "x"
+    #define PRIuS __PRIS_PREFIX "u"
+    #define PRIXS __PRIS_PREFIX "X"
+    #define PRIoS __PRIS_PREFIX "o"
+  #+end_src
+| Type                     | DO NOT use    | DO use              | Notes              |
+|--------------------------+---------------+---------------------+--------------------|
+| =void *=(or any pointer) | %lx           | %p                  |                    |
+| =int64_t=                | %qd,%lld      | %"PRId64"           |                    |
+| =uint64_t=               | %qu,%llu,%llx | %"PRIu64",%"PRIx64" |                    |
+| =size_t=                 | %u            | %"PRIuS",%"PRIxS"   | C99 sepecifies %zu |
+| =ptrdiff_t=              | %d            | %"PRIdS"            | C99 sepecifies %td |
+Note that the PRI* macros expand to independent strings which are
+concatenated by the compiler. Hence if you are using a non-constant
+format string, you need to insert the value of the macro into the
+format, rather than the name. It is still possible, as usual, to
+include length specifiers, etc., after the % when using the PRI*
+macros. So, e.g. =printf("x = %30"PRIuS"\n", x)= would expand on 32-bit
+Linux to =printf("x = %30" "u" "\n", x)=, which the compiler will treat
+as =printf("x = %30u\n", x)=. 
+
++ Remember that ~sizeof(void *) != sizeof(int)~. Use =intptr_t= if you
+  want a pointer-sized integer. 
++ You may need to be careful with structure alignments, particularly
+  for structures being stored on disk. Any class/structure with a
+  int64_t/uint64_t member will by default end up being 8-byte aligned
+  on a 64-bit system. If you have such structures being shared on disk
+  between 32-bit and 64-bit code, you will need to ensure that they
+  are packed the same on both architectures. Most compilers offer a
+  way to alter structure alignment. For gcc, you can use
+  =__attribute__((packed))=. MSVC offers =#pragma pack()= and
+  =__declspec(align())=. 
++ Use the LL or ULL suffixes as needed to create 64-bit constants. For
+  example:
+  #+begin_src c
+    int64_t my_value = 0x123456789LL;
+    uint64_t my_mask = 3ULL << 48;
+  #+end_src
++ If you really need different code on 32-bit and 64-bit systems,
+  use #ifdef _LP64 to choose between the code variants. (But please
+  avoid this if possible, and keep any such changes localized.)
+** Preprocessor Macros
+#+begin_html
+<p class="info">
+使用宏时要非常谨慎, 尽量以内联函数, 枚举和常量代替之. 
+</p>
+#+end_html
+
+Instead of using a macro to inline performance-critical code, use an
+inline function. Instead of using a macro to store a constant, use a
+const variable. Instead of using a macro to "abbreviate" a long
+variable name, use a reference. Instead of using a macro to
+conditionally compile code ... well, don't do that at all (except, of
+course, for the #define guards to prevent double inclusion of header
+files). It makes testing much more difficult.
+
+Macros can do things these other techniques cannot, and you do see
+them in the codebase, especially in the lower-level libraries. And
+some of their special features (like stringifying(#), concatenation(##), and
+so forth) are not available through the language proper. But before
+using a macro, consider carefully whether there's a non-macro way to
+achieve the same result. 
+
+The following usage pattern will avoid many problems with macros; if
+you use macros, follow it whenever possible: 
+
++ Don't define macros in a .h file.
++ #define macros right before you use them, and #undef them right after.
++ Do not just #undef an existing macro before replacing it with your
+  own; instead, pick a name that's likely to be unique. 
++ Try not to use macros that expand to unbalanced C++ constructs, or
+  at least document that behavior well. 
++ Prefer not using ## to generate function/class/variable names.
+** 0 and nullptr/NULL
+#+begin_html
+<p class="info">
+整数用 0, 实数用 0.0, 指针用 nullptr(或NULL), 字符 (串) 用 '\0'.
+</p>
+#+end_html
+For pointers (address values), there is a choice between 0, NULL, and
+nullptr. For projects that allow C++11 features, use nullptr.  
+
+In fact, some C++ compilers provide special definitions of NULL which
+enable them to give useful warnings, particularly in situations where
+sizeof(NULL) is not equal to sizeof(0).
+** sizeof
+#+begin_html
+<p class="info">
+尽可能用 sizeof(varname) 代替 sizeof(type).
+</p>
+#+end_html
+Use sizeof(varname) when you take the size of a particular variable.
+sizeof(varname) will update appropriately if someone changes the
+variable type either now or later. You may use sizeof(type) for code
+unrelated to any particular variable, such as code that manages an
+external or internal data format where a variable of an appropriate
+C++ type is not convenient. 
+#+begin_src c
+Struct data;
+memset(&data, 0, sizeof(data));
+
+memset(&data, 0, sizeof(Struct));
+
+if (raw_size < sizeof(int)) {
+  LOG(ERROR) << "compressed record not big enough for count: " << raw_size;
+  return false;
+}
+</p>
+#+end_src
+** auto
+#+begin_html
+<p class="info">
+仅使用auto来避免杂乱的类型名。继续使用明示的类型声明当有助于读取，仅对本地变量使用auto。
+</p>
+#+end_html
+
+*Decision:*
+auto is permitted, for local variables only. . Never assign a braced
+initializer list to an auto-typed variable.
+
+The auto keyword is also used in an unrelated C++11 feature: it's part
+of the syntax for a new kind of function declaration with a trailing
+return type. Function declarations with trailing return types are not
+permitted.
+** Brace Initialization
+#+begin_html
+<p class="info">
+可用 brace initialization.
+</p>
+#+end_html
+
+Never assign a braced-init-list to an auto local variable. In the
+single element case, what this means can be confusing. 
+#+begin_src c
+auto d = {1.23};        // d is an initializer_list<double>
+auto d = double{1.23};  // Good -- d is a double, not an initializer_list.
+#+end_src
+** Lambda expressions
+#+begin_html
+<p class="info">
+不要使用lamba表达式，或相关的 std::function和std::bind程序。
 </p>
 #+end_html
 
 
 
+** Boost
+#+begin_html
+<p class="info">
+只使用 Boost 中被认可的库.
+</p>
+#+end_html
 
+*Decision:*
++ =Call Traits= from =boost/call_traits.hpp=
++ =Compressed Pair= from =boost/compressed_pair.hpp=
++ =The Boost Graph Library (BGL)= from boost/graph, except serialization
+  (=adj_list_serialize.hpp=) and parallel/distributed algorithms and
+  data structures (=boost/graph/parallel/*= and
+  =boost/graph/distributed/*=). 
++ =Property Map= from =boost/property_map=, except
+  parallel/distributed property maps (=boost/property_map/parallel/*=). 
++ The part of =Iterator= that deals with defining iterators:
+  =boost/iterator/iterator_adaptor.hpp=,
+  =boost/iterator/iterator_facade.hpp=, and
+  =boost/function_output_iterator.hpp=
++ The part of =Polygon= that deals with Voronoi diagram construction and
+  doesn't depend on the rest of Polygon:
+  =boost/polygon/voronoi_builder.hpp=,
+  =boost/polygon/voronoi_diagram.hpp=, and
+  =boost/polygon/voronoi_geometry_type.hpp=
++ =Bimap= from =boost/bimap=
++ =Statistical Distributions and Functions= from
+  =boost/math/distributions=
 
+The following libraries are permitted, but their use is discouraged
+because they've been superseded by standard libraries in C++11: 
+
++ =Array= from =boost/array.hpp=: use =std::array instead=.
++ =Pointer Container= from =boost/ptr_container=: use containers of
+  =std::unique_ptr= instead. 
 
 * cc
 

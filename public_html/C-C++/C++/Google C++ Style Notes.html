@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Google C++ Style Guide Notes (Revision 3.274)</title>
-<!-- 2014-01-03 Fri 21:50 -->
+<!-- 2014-01-05 Sun 09:47 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -167,9 +167,50 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4-2">Initialization</a></li>
 <li><a href="#sec-4-3">Explicit Constructors</a></li>
 <li><a href="#sec-4-4">Copy Constructors</a></li>
+<li><a href="#sec-4-5">Delegating and inheriting constructors</a></li>
+<li><a href="#sec-4-6">Structs vs. Classes</a></li>
+<li><a href="#sec-4-7">Inheritance</a></li>
+<li><a href="#sec-4-8">Multiple Inheritance</a></li>
+<li><a href="#sec-4-9">Interfaces</a></li>
+<li><a href="#sec-4-10">Operator Overloading</a></li>
+<li><a href="#sec-4-11">Access Control</a></li>
+<li><a href="#sec-4-12">Declaration Order</a></li>
+<li><a href="#sec-4-13">Write Short Functions</a></li>
 </ul>
 </li>
-<li><a href="#sec-5">cc</a></li>
+<li><a href="#sec-5">Google-Specific Magic</a>
+<ul>
+<li><a href="#sec-5-1">Ownership and Smart Pointers</a></li>
+<li><a href="#sec-5-2">cpplint</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">Other C++ Features</a>
+<ul>
+<li><a href="#sec-6-1">Reference Arguments</a></li>
+<li><a href="#sec-6-2">Rvalue references</a></li>
+<li><a href="#sec-6-3">Function Overloading</a></li>
+<li><a href="#sec-6-4">Default Arguments</a></li>
+<li><a href="#sec-6-5">Variable-Length Arrays and alloca()</a></li>
+<li><a href="#sec-6-6">Friends</a></li>
+<li><a href="#sec-6-7">Exceptions</a></li>
+<li><a href="#sec-6-8">Run-Time Type Information (RTTI)</a></li>
+<li><a href="#sec-6-9">Casting</a></li>
+<li><a href="#sec-6-10">Streams</a></li>
+<li><a href="#sec-6-11">Preincrement and Predecrement</a></li>
+<li><a href="#sec-6-12">Use of const</a></li>
+<li><a href="#sec-6-13">Use of constexpr</a></li>
+<li><a href="#sec-6-14">Integer Types</a></li>
+<li><a href="#sec-6-15">64-bit Portability</a></li>
+<li><a href="#sec-6-16">Preprocessor Macros</a></li>
+<li><a href="#sec-6-17">0 and nullptr/NULL</a></li>
+<li><a href="#sec-6-18">sizeof</a></li>
+<li><a href="#sec-6-19">auto</a></li>
+<li><a href="#sec-6-20">Brace Initialization</a></li>
+<li><a href="#sec-6-21">Lambda expressions</a></li>
+<li><a href="#sec-6-22">Boost</a></li>
+</ul>
+</li>
+<li><a href="#sec-7">cc</a></li>
 </ul>
 </div>
 </div>
@@ -749,19 +790,1212 @@ assigment form for brace init lists (i.e. MyType m = {1, 2} ).
 <h3 id="sec-4-4">Copy Constructors</h3>
 <div class="outline-text-3" id="text-4-4">
 <p class="info">
+仅在代码中需要拷贝一个类对象的时候使用拷贝构造函数; 
+大部分情况下都不需要, 此时应使用 DISALLOW_COPY_AND_ASSIGN.
+</p>
 
+<p>
+ <b>Decision:</b>
+Few classes need to be copyable. Most should have neither a copy
+constructor nor an assignment operator. In many situations, a pointer
+or reference will work just as well as a copied value, with better
+performance. For example, you can pass function parameters by
+reference or pointer instead of by value, and you can store pointers
+rather than objects in an STL container. 
+</p>
+
+<p>
+If your class needs to be copyable, prefer providing a copy method,
+such as CopyFrom() or Clone(), rather than a copy constructor, because
+such methods cannot be invoked implicitly. If a copy method is
+insufficient in your situation (e.g. for performance reasons, or
+because your class needs to be stored by value in an STL container),
+provide both a copy constructor and assignment operator. 
+</p>
+
+<p>
+If your class does not need a copy constructor or assignment operator,
+you must explicitly disable them. To do so, add dummy declarations for
+the copy constructor and assignment operator in the private: section
+of your class, but do not provide any corresponding definition (so
+that any attempt to use them results in a link error). 
+</p>
+
+<p>
+For convenience, a <code>DISALLOW_COPY_AND_ASSIGN</code> macro can be used:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A macro to disallow the copy constructor and operator= functions</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">This should be used in the private: declarations for a class</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">DISALLOW_COPY_AND_ASSIGN</span>(<span style="color: #eedd82;">TypeName</span>) \
+  TypeName(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">TypeName</span>&amp;);               \
+  <span style="color: #98fb98;">void</span> <span style="color: #eedd82;">operator</span>=(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">TypeName</span>&amp;)
+</pre>
+</div>
+<p>
+Then, in <code>class Foo</code>:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">class</span> <span style="color: #eedd82;">Foo</span> {
+ <span style="color: #7fffd4;">public</span>:
+  Foo(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">f</span>);
+  ~Foo();
+
+ <span style="color: #7fffd4;">private</span>:
+  DISALLOW_COPY_AND_ASSIGN(Foo);
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-5" class="outline-3">
+<h3 id="sec-4-5">Delegating and inheriting constructors</h3>
+<div class="outline-text-3" id="text-4-5">
+<p class="info">
+使用委托和继承构造函数，当他们减少重复代码。
+</p>
+
+<p>
+<b>Decision:</b>
+Use delegating and inheriting constructors when they reduce
+boilerplate and improve readability. Be cautious about inheriting
+constructors when your derived class has new member variables.
+Inheriting constructors may still be appropriate in that case if you
+can use in-class member initialization for the derived class's member
+variables. 
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-6" class="outline-3">
+<h3 id="sec-4-6">Structs vs. Classes</h3>
+<div class="outline-text-3" id="text-4-6">
+<p class="info">
+仅当只有数据时使用 struct, 其它一概使用 class.
+</p>
+<p>
+structs should be used for passive objects that carry data, and may
+have associated constants, but lack any functionality other than
+access/setting the data members. The accessing/setting of fields is
+done by directly accessing the fields rather than through method
+invocations. Methods should not provide behavior but should only be
+used to set up the data members, e.g., constructor, destructor,
+Initialize(), Reset(), Validate(). 
+</p>
+
+<p>
+If more functionality is required, a class is more appropriate. If in
+doubt, make it a class.
+</p>
+
+<p>
+For consistency with STL, you can use struct instead of class for
+functors(仿函数) and traits(特性). 
+</p>
+
+<p>
+Note that member variables in structs and classes have <b>different
+naming rules</b>.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-7" class="outline-3">
+<h3 id="sec-4-7">Inheritance</h3>
+<div class="outline-text-3" id="text-4-7">
+<p class="info">
+使用组合常常比使用继承更合理. 如果使用继承的话, 定义为 public 继承.
+</p>
+<p>
+ <b>定义:</b>
+当子类继承基类时, 子类包含了父基类所有数据及操作的定义. C++ 实践中, 继
+承主要用于两种场合: 实现继承 (implementation inheritance), 子类继承父
+类的实现代码; 接口继承 (interface inheritance), 子类仅继承父类的方法名
+称. 
+</p>
+
+<p>
+ <b>Decision:</b>
+All inheritance should be public. If you want to do private
+inheritance, you should be including an instance of the base class as
+a member instead. 
+</p>
+
+<p>
+Do not overuse implementation inheritance. Composition is often more
+appropriate. Try to restrict use of inheritance to the "is-a" case:
+Bar subclasses Foo if it can reasonably be said that Bar "is a kind
+of" Foo. 
+</p>
+
+<p>
+Make your destructor virtual if necessary. If your class has virtual
+methods, its destructor should be virtual. 
+</p>
+
+<p>
+Limit the use of protected to those member functions that might need
+to be accessed from subclasses. Note that <b>data members should be
+private</b>. 
+</p>
+
+<p>
+When redefining an inherited virtual function, explicitly declare it
+virtual in the declaration of the derived class. Rationale: If virtual
+is omitted, the reader has to check all ancestors of the class in
+question to determine if the function is virtual or not.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-8" class="outline-3">
+<h3 id="sec-4-8">Multiple Inheritance</h3>
+<div class="outline-text-3" id="text-4-8">
+<p class="info">
+真正需要用到多重实现继承的情况少之又少. 只在以下情况我们才允许多重继承: 
+最多只有一个基类是非抽象类; 其它基类都是以 Interface 为后缀的 纯接口类.
+</p>
+<p>
+ <b>Decision:</b>
+Multiple inheritance is allowed only when all superclasses, with the
+possible exception of the first one, are pure interfaces. In order to
+ensure that they remain pure interfaces, they must end with the
+Interface suffix. 
+</p>
+
+<p>
+Note: There is an exception to this rule on Windows.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-9" class="outline-3">
+<h3 id="sec-4-9">Interfaces</h3>
+<div class="outline-text-3" id="text-4-9">
+<p class="info">
+接口是指满足特定条件的类, 这些类以 Interface 为后缀,不强制.
+</p>
+
+<p>
+ <b>定义:</b>
+当一个类满足以下要求时, 称之为纯接口:
+</p>
+
+<ul class="org-ul">
+<li>只有纯虚函数 (“=0”) 和静态函数 (除了下文提到的析构函数).
+</li>
+<li>没有非静态数据成员.
+</li>
+<li>没有定义任何构造函数. 如果有, 也不能带有参数, 并且必须为 protected.
+</li>
+<li>如果它是一个子类, 也只能从满足上述条件并以 Interface 为后缀的类继承.
+
+<p>
+<b>Decision:</b>
+</p>
+</li>
+</ul>
+<p>
+A class may end with Interface only if it meets the above
+requirements. however: classes that meet the above requirements are
+not required to end with Interface.  
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-10" class="outline-3">
+<h3 id="sec-4-10">Operator Overloading</h3>
+<div class="outline-text-3" id="text-4-10">
+<p class="info">
+除少数特定环境外，不要重载运算符. 不要自己定义字义。
+</p>
+
+<p>
+ <b>Decision:</b>
+In general, do not overload operators. The assignment operator
+(operator=), in particular, is insidious and should be avoided. You
+can define functions like Equals() and CopyFrom() if you need them.
+Likewise, avoid the dangerous unary operator&amp; at all costs, if there's
+any possibility the class might be forward-declared. 
+</p>
+
+<p>
+Do not overload operator"", i.e. do not introduce user-defined
+literals. 
+</p>
+
+<p>
+However, there may be rare cases where you need to overload an
+operator to interoperate with templates or "standard" C++ classes
+(such as operator&lt;&lt;(ostream&amp;, const T&amp;) for logging). These are
+acceptable if fully justified, but you should try to avoid these
+whenever possible. In particular, do not overload operator== or
+operator&lt; just so that your class can be used as a key in an STL
+container; instead, you should create equality and comparison functor
+types when declaring the container. 
+</p>
+
+<p>
+Some of the STL algorithms do require you to overload operator==, and
+you may do so in these cases, provided you document why.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-11" class="outline-3">
+<h3 id="sec-4-11">Access Control</h3>
+<div class="outline-text-3" id="text-4-11">
+<p class="info">
+将所有数据成员声明为 private, 并根据需要提供相应的存取函数(一些技术原
+因，允许测试类的数据成员位protected，当使用Google Test). 例如, 某个名
+为 foo_ 的变量, 其取值函数是 foo(). 还可能需要一个赋值函数set_foo().
+例外：static const的数据成员（通常称为kFoo)不需要private.
+</p>
+
+<p>
+The definitions of accessors are usually inlined in the header file.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-12" class="outline-3">
+<h3 id="sec-4-12">Declaration Order</h3>
+<div class="outline-text-3" id="text-4-12">
+<p class="info">
+在类中使用特定的声明顺序: public: 在 private: 之前, 成员函数在数据成员 (变量) 前;
+</p>
+<p>
+Your class definition should start with its public: section, followed
+by its protected: section and then its private: section. If any of
+these sections are empty, omit them. 
+</p>
+
+<p>
+Within each section, the declarations generally should be in the
+following order: 
+</p>
+
+<ul class="org-ul">
+<li>Typedefs and Enums
+</li>
+<li>Constants (static const data members)
+</li>
+<li>Constructors
+</li>
+<li>Destructor
+</li>
+<li>Methods, including static methods
+</li>
+<li>Data Members (except static const data members)
+</li>
+</ul>
+
+<p>
+Friend declarations should always be in the private section, and the
+<code>DISALLOW_COPY_AND_ASSIGN</code> macro invocation should be at the end of the
+private: section. It should be the last thing in the class.
+</p>
+
+<p>
+Method definitions in the corresponding .cc file should be the same as
+the declaration order, as much as possible. 
+</p>
+
+<p>
+Do not put large method definitions inline in the class definition.
+Usually, only trivial or performance-critical, and very short, methods
+may be defined inline. 
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-13" class="outline-3">
+<h3 id="sec-4-13">Write Short Functions</h3>
+<div class="outline-text-3" id="text-4-13">
+<p class="info">
+倾向编写简短, 凝练的函数.
+</p>
+<p>
+如果函数超过 40 行, 可以思索一下能不能在不影响程序结构的前提下对其进行分割.
 </p>
 </div>
 </div>
 </div>
-
-
-
-
-
 <div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">cc</h2>
+<h2 id="sec-5">Google-Specific Magic</h2>
 <div class="outline-text-2" id="text-5">
+</div><div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Ownership and Smart Pointers</h3>
+<div class="outline-text-3" id="text-5-1">
+<p class="info">
+对动态分配的对象只有一个固定的隶属折。传递隶属使用智能指针。
+</p>
+</div>
+
+<ul class="org-ul"><li>Definition:<br  /><div class="outline-text-4" id="text-5-1-1">
+<p>
+"Ownership" is a bookkeeping technique for managing dynamically
+allocated memory (and other resources). The owner of a dynamically
+allocated object is an object or function that is responsible for
+ensuring that it is deleted when no longer needed. Ownership can
+sometimes be shared, in which case the last owner is typically
+responsible for deleting it. Even when ownership is not shared, it can
+be transferred from one piece of code to another. 
+</p>
+
+<p>
+"Smart" pointers are classes that act like pointers, e.g. by
+overloading the * and -&gt; operators. Some smart pointer types can be
+used to automate ownership bookkeeping, to ensure these
+responsibilities are met. <code>std::unique_ptr</code> is a smart pointer type
+introduced in C++11, which expresses exclusive ownership of a
+dynamically allocated object; the object is deleted when the
+<code>std::unique_ptr</code> goes out of scope. It cannot be copied, but can be
+moved to represent ownership transfer. <code>shared_ptr</code> is a smart pointer
+type which expresses shared ownership of a dynamically allocated
+object. <code>shared_ptrs</code> can be copied; ownership of the object is shared
+among all copies, and the object is deleted when the last <code>shared_ptr</code>
+is destroyed.
+</p>
+</div>
+</li>
+<li>Cons:<br  /><div class="outline-text-4" id="text-5-1-2">
+<ul class="org-ul">
+<li>Ownership must be represented and transferred via pointers (whether
+smart or plain). Pointer semantics are more complicated than value
+semantics, especially in APIs: you have to worry not just about
+ownership, but also aliasing, lifetime, and mutability, among other
+issues. 
+</li>
+<li>The performance costs of value semantics are often overestimated, so
+the performance benefits of ownership transfer might not justify the
+readability and complexity costs. 
+</li>
+<li>APIs that transfer ownership force their clients into a single
+memory management model.
+</li>
+<li>Code using smart pointers is less explicit about where the resource
+releases take place. 
+</li>
+<li>std::unique<sub>ptr</sub> expresses ownership transfer using C++11's move
+semantics, which are generally forbidden in Google code, and may
+confuse some programmers. 
+</li>
+<li>Shared ownership can be a tempting alternative to careful ownership
+design, obfuscating the design of a system. 
+</li>
+<li>Shared ownership requires explicit bookkeeping at run-time, which
+can be costly. 
+</li>
+<li>In some cases (e.g. cyclic references), objects with shared
+ownership may never be deleted. 
+</li>
+<li>Smart pointers are not perfect substitutes for plain pointers.
+</li>
+</ul>
+</div>
+</li>
+
+<li>Decision:<br  /><div class="outline-text-4" id="text-5-1-3">
+<p>
+If dynamic allocation is necessary, prefer to keep ownership with the
+code that allocated it. If other code needs access to the object,
+consider passing it a copy, or passing a pointer or reference without
+transferring ownership. Prefer to use <code>std::unique_ptr</code> to make
+ownership transfer explicit. For example: 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">std::unique_ptr&lt;Foo&gt; FooFactory();
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">FooConsumer</span>(std::unique_ptr&lt;Foo&gt; ptr);
+</pre>
+</div>
+<p>
+Do not design your code to use shared ownership without a very good
+reason. One such reason is to avoid expensive copy operations, but you
+should only do this if the performance benefits are significant, and
+the underlying object is immutable (i.e. <code>shared_ptr&lt;const Foo&gt;</code>). If
+you do use shared ownership, prefer to use <code>shared_ptr</code>. 
+</p>
+
+<p>
+Do not use <code>scoped_ptr</code> in new code unless you need to be compatible
+with older versions of C++. Never use <code>linked_ptr</code> or <code>std::auto_ptr</code>. In
+all three cases, use <code>std::unique_ptr</code> instead.
+</p>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">cpplint</h3>
+<div class="outline-text-3" id="text-5-2">
+<p class="info">
+使用 cpplint.py 检查风格错误.
+</p>
+
+<p>
+False positives can be ignored by putting // NOLINT at the end of the line.
+</p>
+
+<p>
+download <a href="http://google-styleguide.googlecode.com/svn/trunk/cpplint/cpplint.py">cpplint.py</a> separately.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Other C++ Features</h2>
+<div class="outline-text-2" id="text-6">
+</div><div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1">Reference Arguments</h3>
+<div class="outline-text-3" id="text-6-1">
+<p class="info">
+所有按引用传递的参数必须加上 const.
+</p>
+
+<p>
+ <b>Decision:</b>
+Within function parameter lists all references must be const:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Foo</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span> &amp;in, <span style="color: #98fb98;">string</span> *<span style="color: #eedd82;">out</span>);
+</pre>
+</div>
+<p>
+In fact it is a very strong convention in Google code that input
+arguments are values or const references while output arguments are
+pointers. Input parameters may be const pointers, but we never allow
+non-const reference parameters except when required by convention,
+e.g., <code>swap()</code>. 
+</p>
+
+<p>
+However, there are some instances where using <code>const T*</code> is preferable
+to <code>const T&amp;</code> for input parameters. For example: 
+</p>
+
+<ul class="org-ul">
+<li>You want to pass in a null pointer.
+</li>
+<li>The function saves a pointer or reference to the input. 
+</li>
+</ul>
+
+<p>
+So if you choose <code>const T*</code> rather than <code>const T&amp;</code>, do so for a concrete
+reason; otherwise it will likely confuse readers by making them look
+for an explanation that doesn't exist.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2">Rvalue references</h3>
+<div class="outline-text-3" id="text-6-2">
+<p class="info">
+Do not use rvalue references, std::forward, std::move_iterator, or
+std::move_if_noexcept. Use the single-argument form of std::move only
+with non-copyable arguments. 
+</p>
+<p>
+<b>Decision:</b>
+Do not use rvalue references, and do not use the <code>std::forward</code> or
+<code>std::move_if_noexcept</code> utility functions (which are essentially just
+casts to rvalue reference types), or <code>std::move_iterator</code>. Use
+single-argument <code>std::move</code> only with objects that are not copyable
+(e.g. <code>std::unique_ptr</code>), or in templated code with objects that might
+not be copyable.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-3" class="outline-3">
+<h3 id="sec-6-3">Function Overloading</h3>
+<div class="outline-text-3" id="text-6-3">
+<p class="info">
+仅在读者看到调用能很好的知道发生了啥而不是首先去搞清楚哪个重载被调用时
+使用重载函数 (含构造函数). 
+</p>
+
+<p>
+<b>Decision:</b>
+If you want to overload a function, consider qualifying the name with
+some information about the arguments, e.g., AppendString(),
+AppendInt() rather than just Append().
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-4" class="outline-3">
+<h3 id="sec-6-4">Default Arguments</h3>
+<div class="outline-text-3" id="text-6-4">
+<p class="info">
+我们不允许使用缺省函数参数，除了以下说明的有限场合。如果合适，用函数重
+载来模仿它们。
+</p>
+
+<p>
+<b>Decision:</b>
+So except as described below, we require all arguments to be
+explicitly specified. 
+</p>
+
+<p>
+One specific exception is when the function is a static function (or
+in an unnamed namespace) in a .cc file. In this case, the cons don't
+apply since the function's use is so localized. 
+</p>
+
+<p>
+Another specific exception is when default arguments are used to
+simulate variable-length argument lists. 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Support up to 4 params by using a default empty AlphaNum.</span>
+<span style="color: #98fb98;">string</span> <span style="color: #87cefa;">StrCat</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">AlphaNum</span> &amp;a,
+              <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">AlphaNum</span> &amp;b = gEmptyAlphaNum,
+              <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">AlphaNum</span> &amp;c = gEmptyAlphaNum,
+              <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">AlphaNum</span> &amp;d = gEmptyAlphaNum);
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-5" class="outline-3">
+<h3 id="sec-6-5">Variable-Length Arrays and alloca()</h3>
+<div class="outline-text-3" id="text-6-5">
+<p class="info">
+我们不允许使用变长数组和 alloca().
+</p>
+
+<p>
+<b>Decision:</b>
+Use a safe allocator instead, such as <code>scoped_ptr/scoped_array</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-6" class="outline-3">
+<h3 id="sec-6-6">Friends</h3>
+<div class="outline-text-3" id="text-6-6">
+<p class="info">
+我们允许合理的使用友元类及友元函数.
+</p>
+
+<p>
+Friends should usually be defined in the same file so that the reader
+does not have to look in another file to find uses of the private
+members of a class. A common use of friend is to have a FooBuilder
+class be a friend of Foo so that it can construct the inner state of
+Foo correctly, without exposing this state to the world. In some cases
+it may be useful to make a unittest class a friend of the class it
+tests.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-7" class="outline-3">
+<h3 id="sec-6-7">Exceptions</h3>
+<div class="outline-text-3" id="text-6-7">
+<p class="info">
+我们不使用 C++ 异常.
+</p>
+
+<p>
+On their face, the benefits of using exceptions outweigh the costs,
+especially in new projects. However, for existing code, the
+introduction of exceptions has implications on all dependent code. If
+exceptions can be propagated beyond a new project, it also becomes
+problematic to integrate the new project into existing exception-free
+code. Because most existing C++ code at Google is not prepared to deal
+with exceptions, it is comparatively difficult to adopt new code that
+generates exceptions.
+</p>
+
+<p>
+Given that Google's existing code is not exception-tolerant, the costs
+of using exceptions are somewhat greater than the costs in a new
+project. 
+</p>
+
+<p>
+This prohibition also applies to the exception-related features added
+in C++11, such as <code>noexcept</code>, <code>std::exception_ptr</code>, and
+<code>std::nested_exception</code>. 
+</p>
+
+<p>
+There is an exception to this rule (no pun intended) for Windows code.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-8" class="outline-3">
+<h3 id="sec-6-8">Run-Time Type Information (RTTI)</h3>
+<div class="outline-text-3" id="text-6-8">
+<p class="info">
+禁止使用 RTTI.
+</p>
+<p>
+RTTI allows a programmer to query the C++ class of an object at run
+time. This is done by use of <code>typeid</code> or <code>dynamic_cast</code>. 
+</p>
+
+<p>
+<b>Decision:</b>
+RTTI has legitimate uses but is prone to abuse, so you must be careful
+when using it. You may use it freely in unittests, but avoid it when
+possible in other code. In particular, think twice before using RTTI
+in new code. If you find yourself needing to write code that behaves
+differently based on the class of an object, consider one of the
+following alternatives to querying the type: 
+</p>
+
+<ul class="org-ul">
+<li>Virtual methods are the preferred way of executing different code
+paths depending on a specific subclass type. This puts the work
+within the object itself. 
+</li>
+<li>If the work belongs outside the object and instead in some
+processing code, consider a double-dispatch solution, such as the
+Visitor design pattern. This allows a facility outside the object
+itself to determine the type of class using the built-in type
+system.
+</li>
+</ul>
+
+<p>
+When the logic of a program guarantees that a given instance of a base
+class is in fact an instance of a particular derived class, then a
+<code>dynamic_cast</code> may be used freely on the object. Usually one can use a
+<code>static_cast</code> as an alternative in such situations. 
+</p>
+
+<p>
+Do not hand-implement an RTTI-like workaround. The arguments against
+RTTI apply just as much to workarounds like class hierarchies with
+type tags. Moreover, workarounds disguise your true intent.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-9" class="outline-3">
+<h3 id="sec-6-9">Casting</h3>
+<div class="outline-text-3" id="text-6-9">
+<p class="info">
+使用 C++ 的类型转换, 如 static_cast<>(). 不要使用 int y = (int)x 或
+int y = int(x) 等转换方式; 
+</p>
+
+<p>
+<b>Decision:</b>
+Do not use C-style casts. Instead, use these C++-style casts.
+</p>
+
+<ul class="org-ul">
+<li>Use <code>static_cast</code> as the equivalent of a C-style cast that does value
+conversion, or when you need to explicitly up-cast a pointer from a
+class to its superclass. 
+</li>
+<li>Use <code>const_cast</code> to remove the const qualifier (see const).
+</li>
+<li>Use <code>reinterpret_cast</code> to do unsafe conversions of pointer types to
+and from integer and other pointer types. Use this only if you know
+what you are doing and you understand the aliasing issues. 
+</li>
+<li>You may use <code>dynamic_cast</code> freely in unittests, but avoid it when
+possible in other code.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-6-10" class="outline-3">
+<h3 id="sec-6-10">Streams</h3>
+<div class="outline-text-3" id="text-6-10">
+<p class="info">
+只在记录日志时使用流
+</p>
+
+<p>
+<b>Decision:</b>
+Do not use streams, except where required by a logging interface. Use
+printf-like routines instead. 
+</p>
+
+<p>
+Either path would yield different advantages and disadvantages, and
+there is not a clearly superior solution. The simplicity doctrine
+mandates we settle on one of them though, and the majority decision
+was on <code>printf + read/write</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-11" class="outline-3">
+<h3 id="sec-6-11">Preincrement and Predecrement</h3>
+<div class="outline-text-3" id="text-6-11">
+<p class="info">
+对于迭代器和其他模板对象使用前缀形式 (++i) 的自增, 自减运算符.
+</p>
+
+<p>
+<b>Decision:</b>
+For simple scalar (non-object) values there is no reason to prefer one
+form and we allow either. For iterators and other template types, use
+pre-increment.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-12" class="outline-3">
+<h3 id="sec-6-12">Use of const</h3>
+<div class="outline-text-3" id="text-6-12">
+<p class="info">
+我们强烈建议你在任何可能的情况下都要使用 const. 对于C++11中一些const，
+constexpr 是更好的选择。
+</p>
+
+<p>
+<code>const</code> variables, data members, methods and arguments add a level of
+compile-time type checking; it is better to detect errors as soon as
+possible. Therefore we strongly recommend that you use const whenever
+it makes sense to do so: 
+</p>
+
+<ul class="org-ul">
+<li>If a function does not modify an argument passed by reference or by
+pointer, that argument should be const. 
+</li>
+<li>Declare methods to be const whenever possible. Accessors should
+almost always be const. Other methods should be const if they do not
+modify any data members, do not call any non-const methods, and do
+not return a non-const pointer or non-const reference to a data
+member. 
+</li>
+<li>Consider making data members const whenever they do not need to be
+modified after construction. 
+</li>
+</ul>
+
+<p>
+The <code>mutable</code> keyword is allowed but is unsafe when used with threads,
+so thread safety should be carefully considered first. 
+</p>
+
+<p>
+That said, while we encourage putting <code>const</code> first, we do not require
+it. But be consistent with the code around you!
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-13" class="outline-3">
+<h3 id="sec-6-13">Use of constexpr</h3>
+<div class="outline-text-3" id="text-6-13">
+<p class="info">
+In C++11, use constexpr to define true constants or to ensure constant
+initialization. 
+</p>
+
+<p>
+<b>Decision:</b>
+<code>constexpr</code> definitions enable a more robust specification of the
+constant parts of an interface. Use <code>constexpr</code> to specify true
+constants and the functions that support their definitions. Avoid
+complexifying function definitions to enable their use with <code>constexpr</code>.
+Do not use constexpr to force inlining.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-14" class="outline-3">
+<h3 id="sec-6-14">Integer Types</h3>
+<div class="outline-text-3" id="text-6-14">
+<p>
+Of the built-in C++ integer types, the only one used is int. If a
+program needs a variable of a different size, use a precise-width
+integer type from <code>&lt;stdint.h&gt;</code>, such as <code>int16_t</code>. If your variable
+represents a value that could ever be greater than or equal to 2<sup>31</sup>
+(2GiB), use a 64-bit type such as <code>int64_t</code>. Keep in mind that even if
+your value won't ever be too large for an int, it may be used in
+intermediate calculations which may require a larger type. When in
+doubt, choose a larger type.
+</p>
+
+<p>
+<b>Decision:</b>
+<code>&lt;stdint.h&gt;</code> defines types like <code>int16_t</code>, <code>uint32_t</code>, <code>int64_t</code>, etc. You
+should always use those in preference to short, unsigned long long and
+the like, when you need a guarantee on the size of an integer. Of the
+C integer types, only int should be used. When appropriate, you are
+welcome to use standard types like <code>size_t</code> and <code>ptrdiff_t</code>. 
+</p>
+
+<p>
+For integers we know can be "big", use <code>int64_t</code>.
+</p>
+
+<p>
+You should not use the unsigned integer types such as uint32<sub>t</sub>, unless
+there is a valid reason such as representing a bit pattern rather than
+a number, or you need defined overflow modulo 2<sup>N</sup>. In particular, do
+not use unsigned types to say a number will never be negative.
+Instead, use <b>assertions</b> for this. 
+</p>
+
+<p>
+Use care when converting integer types. Integer conversions and
+promotions can cause non-intuitive behavior.
+</p>
+
+<p>
+So, document that a variable is non-negative using assertions. Don't
+use an unsigned type. 
+</p>
+</div>
+</div>
+<div id="outline-container-sec-6-15" class="outline-3">
+<h3 id="sec-6-15">64-bit Portability</h3>
+<div class="outline-text-3" id="text-6-15">
+<p class="info">
+代码应该对 64 位和 32 位系统友好. 处理打印, 比较, 结构体对齐时应切记:
+</p>
+
+<ul class="org-ul">
+<li>printf() specifiers for some types are not cleanly portable between
+32-bit and 64-bit systems. C99 defines some portable format
+specifiers. Unfortunately, MSVC 7.1 does not understand some of
+these specifiers and the standard is missing a few, so we have to
+define our own ugly versions in some cases (in the style of the
+standard include file inttypes.h): 
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">printf macros for size_t, in the style of inttypes.h</span>
+<span style="color: #b0c4de;">#ifdef</span> _LP64
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__PRIS_PREFIX</span> <span style="color: #ffa07a;">"z"</span>
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__PRIS_PREFIX</span>
+<span style="color: #b0c4de;">#endif</span>
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Use these macros after a % in a printf format string</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">to get correct 32/64 bit behavior, like this:</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">size_t size = records.size();</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">printf("%"PRIuS"\n", size);</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PRIdS</span> __PRIS_PREFIX <span style="color: #ffa07a;">"d"</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PRIxS</span> __PRIS_PREFIX <span style="color: #ffa07a;">"x"</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PRIuS</span> __PRIS_PREFIX <span style="color: #ffa07a;">"u"</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PRIXS</span> __PRIS_PREFIX <span style="color: #ffa07a;">"X"</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PRIoS</span> __PRIS_PREFIX <span style="color: #ffa07a;">"o"</span>
+</pre>
+</div>
+</li>
+</ul>
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="left" />
+
+<col  class="left" />
+
+<col  class="left" />
+
+<col  class="left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="left">Type</th>
+<th scope="col" class="left">DO NOT use</th>
+<th scope="col" class="left">DO use</th>
+<th scope="col" class="left">Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="left">=void *=(or any pointer)</td>
+<td class="left">%lx</td>
+<td class="left">%p</td>
+<td class="left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="left"><code>int64_t</code></td>
+<td class="left">%qd,%lld</td>
+<td class="left">%"PRId64"</td>
+<td class="left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="left"><code>uint64_t</code></td>
+<td class="left">%qu,%llu,%llx</td>
+<td class="left">%"PRIu64",%"PRIx64"</td>
+<td class="left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="left"><code>size_t</code></td>
+<td class="left">%u</td>
+<td class="left">%"PRIuS",%"PRIxS"</td>
+<td class="left">C99 sepecifies %zu</td>
+</tr>
+
+<tr>
+<td class="left"><code>ptrdiff_t</code></td>
+<td class="left">%d</td>
+<td class="left">%"PRIdS"</td>
+<td class="left">C99 sepecifies %td</td>
+</tr>
+</tbody>
+</table>
+<p>
+Note that the PRI* macros expand to independent strings which are
+concatenated by the compiler. Hence if you are using a non-constant
+format string, you need to insert the value of the macro into the
+format, rather than the name. It is still possible, as usual, to
+include length specifiers, etc., after the % when using the PRI*
+macros. So, e.g. <code>printf("x = %30"PRIuS"\n", x)</code> would expand on 32-bit
+Linux to <code>printf("x = %30" "u" "\n", x)</code>, which the compiler will treat
+as <code>printf("x = %30u\n", x)</code>. 
+</p>
+
+<ul class="org-ul">
+<li>Remember that <code>sizeof(void *) != sizeof(int)</code>. Use <code>intptr_t</code> if you
+want a pointer-sized integer. 
+</li>
+<li>You may need to be careful with structure alignments, particularly
+for structures being stored on disk. Any class/structure with a
+int64<sub>t</sub>/uint64<sub>t</sub> member will by default end up being 8-byte aligned
+on a 64-bit system. If you have such structures being shared on disk
+between 32-bit and 64-bit code, you will need to ensure that they
+are packed the same on both architectures. Most compilers offer a
+way to alter structure alignment. For gcc, you can use
+<code>__attribute__((packed))</code>. MSVC offers <code>#pragma pack()</code> and
+<code>__declspec(align())</code>. 
+</li>
+<li>Use the LL or ULL suffixes as needed to create 64-bit constants. For
+example:
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int64_t</span> <span style="color: #eedd82;">my_value</span> = 0x123456789LL;
+<span style="color: #98fb98;">uint64_t</span> <span style="color: #eedd82;">my_mask</span> = 3ULL &lt;&lt; 48;
+</pre>
+</div>
+</li>
+<li>If you really need different code on 32-bit and 64-bit systems,
+use #ifdef _LP64 to choose between the code variants. (But please
+avoid this if possible, and keep any such changes localized.)
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-6-16" class="outline-3">
+<h3 id="sec-6-16">Preprocessor Macros</h3>
+<div class="outline-text-3" id="text-6-16">
+<p class="info">
+使用宏时要非常谨慎, 尽量以内联函数, 枚举和常量代替之. 
+</p>
+
+<p>
+Instead of using a macro to inline performance-critical code, use an
+inline function. Instead of using a macro to store a constant, use a
+const variable. Instead of using a macro to "abbreviate" a long
+variable name, use a reference. Instead of using a macro to
+conditionally compile code &#x2026; well, don't do that at all (except, of
+course, for the #define guards to prevent double inclusion of header
+files). It makes testing much more difficult.
+</p>
+
+<p>
+Macros can do things these other techniques cannot, and you do see
+them in the codebase, especially in the lower-level libraries. And
+some of their special features (like stringifying(#), concatenation(##), and
+so forth) are not available through the language proper. But before
+using a macro, consider carefully whether there's a non-macro way to
+achieve the same result. 
+</p>
+
+<p>
+The following usage pattern will avoid many problems with macros; if
+you use macros, follow it whenever possible: 
+</p>
+
+<ul class="org-ul">
+<li>Don't define macros in a .h file.
+</li>
+<li>#define macros right before you use them, and #undef them right after.
+</li>
+<li>Do not just #undef an existing macro before replacing it with your
+own; instead, pick a name that's likely to be unique. 
+</li>
+<li>Try not to use macros that expand to unbalanced C++ constructs, or
+at least document that behavior well. 
+</li>
+<li>Prefer not using ## to generate function/class/variable names.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-6-17" class="outline-3">
+<h3 id="sec-6-17">0 and nullptr/NULL</h3>
+<div class="outline-text-3" id="text-6-17">
+<p class="info">
+整数用 0, 实数用 0.0, 指针用 nullptr(或NULL), 字符 (串) 用 '\0'.
+</p>
+<p>
+For pointers (address values), there is a choice between 0, NULL, and
+nullptr. For projects that allow C++11 features, use nullptr.  
+</p>
+
+<p>
+In fact, some C++ compilers provide special definitions of NULL which
+enable them to give useful warnings, particularly in situations where
+sizeof(NULL) is not equal to sizeof(0).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-18" class="outline-3">
+<h3 id="sec-6-18">sizeof</h3>
+<div class="outline-text-3" id="text-6-18">
+<p class="info">
+尽可能用 sizeof(varname) 代替 sizeof(type).
+</p>
+<p>
+Use sizeof(varname) when you take the size of a particular variable.
+sizeof(varname) will update appropriately if someone changes the
+variable type either now or later. You may use sizeof(type) for code
+unrelated to any particular variable, such as code that manages an
+external or internal data format where a variable of an appropriate
+C++ type is not convenient. 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">Struct</span> <span style="color: #eedd82;">data</span>;
+memset(&amp;data, 0, <span style="color: #00ffff;">sizeof</span>(data));
+
+memset(&amp;data, 0, <span style="color: #00ffff;">sizeof</span>(Struct));
+
+<span style="color: #00ffff;">if</span> (raw_size &lt; <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>)) {
+  LOG(ERROR) &lt;&lt; <span style="color: #ffa07a;">"compressed record not big enough for count: "</span> &lt;&lt; raw_size;
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+}
+&lt;/p&gt;
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-19" class="outline-3">
+<h3 id="sec-6-19">auto</h3>
+<div class="outline-text-3" id="text-6-19">
+<p class="info">
+仅使用auto来避免杂乱的类型名。继续使用明示的类型声明当有助于读取，仅对本地变量使用auto。
+</p>
+
+<p>
+<b>Decision:</b>
+auto is permitted, for local variables only. . Never assign a braced
+initializer list to an auto-typed variable.
+</p>
+
+<p>
+The auto keyword is also used in an unrelated C++11 feature: it's part
+of the syntax for a new kind of function declaration with a trailing
+return type. Function declarations with trailing return types are not
+permitted.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-20" class="outline-3">
+<h3 id="sec-6-20">Brace Initialization</h3>
+<div class="outline-text-3" id="text-6-20">
+<p class="info">
+可用 brace initialization.
+</p>
+
+<p>
+Never assign a braced-init-list to an auto local variable. In the
+single element case, what this means can be confusing. 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">auto</span> <span style="color: #98fb98;">d</span> = {1.23};        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">d is an initializer_list&lt;double&gt;</span>
+<span style="color: #00ffff;">auto</span> <span style="color: #98fb98;">d</span> = <span style="color: #98fb98;">double</span>{1.23};  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Good -- d is a double, not an initializer_list.</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-21" class="outline-3">
+<h3 id="sec-6-21">Lambda expressions</h3>
+<div class="outline-text-3" id="text-6-21">
+<p class="info">
+不要使用lamba表达式，或相关的 std::function和std::bind程序。
+</p>
+</div>
+</div>
+
+
+<div id="outline-container-sec-6-22" class="outline-3">
+<h3 id="sec-6-22">Boost</h3>
+<div class="outline-text-3" id="text-6-22">
+<p class="info">
+只使用 Boost 中被认可的库.
+</p>
+
+<p>
+<b>Decision:</b>
+</p>
+<ul class="org-ul">
+<li><code>Call Traits</code> from <code>boost/call_traits.hpp</code>
+</li>
+<li><code>Compressed Pair</code> from <code>boost/compressed_pair.hpp</code>
+</li>
+<li><code>The Boost Graph Library (BGL)</code> from boost/graph, except serialization
+(<code>adj_list_serialize.hpp</code>) and parallel/distributed algorithms and
+data structures (<code>boost/graph/parallel/*</code> and
+<code>boost/graph/distributed/*</code>). 
+</li>
+<li><code>Property Map</code> from <code>boost/property_map</code>, except
+parallel/distributed property maps (<code>boost/property_map/parallel/*</code>). 
+</li>
+<li>The part of <code>Iterator</code> that deals with defining iterators:
+  <code>boost/iterator/iterator_adaptor.hpp</code>,
+  <code>boost/iterator/iterator_facade.hpp</code>, and
+  <code>boost/function_output_iterator.hpp</code>
+</li>
+<li>The part of <code>Polygon</code> that deals with Voronoi diagram construction and
+doesn't depend on the rest of Polygon:
+<code>boost/polygon/voronoi_builder.hpp</code>,
+<code>boost/polygon/voronoi_diagram.hpp</code>, and
+<code>boost/polygon/voronoi_geometry_type.hpp</code>
+</li>
+<li><code>Bimap</code> from <code>boost/bimap</code>
+</li>
+<li><code>Statistical Distributions and Functions</code> from
+  <code>boost/math/distributions</code>
+</li>
+</ul>
+
+<p>
+The following libraries are permitted, but their use is discouraged
+because they've been superseded by standard libraries in C++11: 
+</p>
+
+<ul class="org-ul">
+<li><code>Array</code> from <code>boost/array.hpp</code>: use <code>std::array instead</code>.
+</li>
+<li><code>Pointer Container</code> from <code>boost/ptr_container</code>: use containers of
+  <code>std::unique_ptr</code> instead. 
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">cc</h2>
+<div class="outline-text-2" id="text-7">
 <p class="info">
 
 </p>
@@ -776,7 +2010,7 @@ assigment form for brace init lists (i.e. MyType m = {1, 2} ).
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-01-03 Fri 21:50</p>
+<p class="date">Created: 2014-01-05 Sun 09:47</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
