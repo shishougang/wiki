@@ -1179,9 +1179,6 @@ auto d = double{1.23};  // Good -- d is a double, not an initializer_list.
 不要使用lamba表达式，或相关的 std::function和std::bind程序。
 </p>
 #+end_html
-
-
-
 ** Boost
 #+begin_html
 <p class="info">
@@ -1216,17 +1213,1107 @@ because they've been superseded by standard libraries in C++11:
 
 + =Array= from =boost/array.hpp=: use =std::array instead=.
 + =Pointer Container= from =boost/ptr_container=: use containers of
-  =std::unique_ptr= instead. 
-
-* cc
-
+  =std::unique_ptr= instead.
+** C++11
 #+begin_html
 <p class="info">
-
+适宜的使用C++11的库和语言扩展。再工程中使用c++11的特性前，考虑移植不同的环境。
 </p>
 #+end_html
 
+*Decision:*
+C++11 features may be used unless specified otherwise. In addition to what's described in the rest of the style guide, the following C++11 features may not be used:
+
++ Functions with trailing return types, e.g. writing =auto foo()
+  ->int=; instead of =int foo()=;, because of a desire to preserve 
+  stylistic consistency with the many existing function declarations. 
++ Compile-time rational numbers (=<ratio>=), because of concerns that
+  it's tied to a more template-heavy interface style. 
++ The =<cfenv>= and =<fenv.h>= headers, because many compilers do not
+  support those features reliably. 
++ Lambda expressions, or the related =std::function= or =std::bind
+  utilities=. 
+* Naming
+** General Naming Rules
+#+begin_html
+<p class="info">
+函数命名, 变量命名, 文件命名应具备描述性; 不要过度缩写.
+</p>
+#+end_html
 
 #+begin_src c
+int price_count_reader;    // No abbreviation.
+int num_errors;            // "num" is a widespread convention.
+int num_dns_connections;   // Most people know what "DNS" stands for.
 
+int n;                     // Meaningless.
+int nerr;                  // Ambiguous abbreviation.
+int n_comp_conns;          // Ambiguous abbreviation.
+int wgc_connections;       // Only your group knows what this stands for.
+int pc_reader;             // Lots of things can be abbreviated "pc".
+int cstmr_id;              // Deletes internal letters.
 #+end_src
+** File Names
+#+begin_html
+<p class="info">
+文件名要全部小写, 可以包含下划线 (_) 或连字符 (-). 按项目约定来.如果没有本地模式遵循，用"_".
+</p>
+#+end_html
+
+Examples of acceptable file names:
+#+begin_src c
+my_useful_class.cc
+my-useful-class.cc
+myusefulclass.cc
+myusefulclass_test.cc // _unittest and _regtest are deprecated.
+#+end_src
+C++ files should end in .cc and header files should end in .h.
+
+Inline functions must be in a .h file. If your inline functions are
+very short, they should go directly into your .h file. However, if
+your inline functions include a lot of code, they may go into a third
+file that ends in -inl.h. In a class with a lot of inline code, your
+class could have three files: 
+#+begin_src c
+url_table.h      // The class declaration.
+url_table.cc     // The class definition.
+url_table-inl.h  // Inline functions that include lots of code.
+#+end_src
+** Type Names
+#+begin_html
+<p class="info">
+类型名称的每个单词首字母均大写, 不包含下划线: MyExcitingClass, MyExcitingEnum.
+</p>
+#+end_html
+
+The names of all types — *classes, structs, typedefs, and enums* — have
+the same naming convention. Type names should start with a capital
+letter and have a capital letter for each new word. No underscores.
+For example: 
+#+begin_src c
+// classes and structs
+class UrlTable { ...
+class UrlTableTester { ...
+struct UrlTableProperties { ...
+
+// typedefs
+typedef hash_map<UrlTableProperties *, string> PropertiesMap;
+
+// enums
+enum UrlTableErrors { ...
+#+end_src
+** Variable Names
+#+begin_html
+<p class="info">
+变量名一律小写, 单词之间用下划线连接. 类的成员变量以下划线结尾, 
+如:<code>my_exciting_local_variable</code>,
+<code>my_exciting_member_variable_</code>.
+</p>
+#+end_html
+
++ Common Variable names
+  For example:
+  #+begin_src c
+    string table_name;  // OK - uses underscore.
+    string tablename;   // OK - all lowercase.
+    string tableName;   // Bad - mixed case.
+  #+end_src
++ Class Data Members
+  Data members (also called instance variables or member variables)
+  are lowercase with optional underscores like regular variable names,
+  but always end with a trailing underscore. 
+  #+begin_src c
+    string table_name_;  // OK - underscore at end.
+    string tablename_;   // OK.
+  #+end_src
++ Struct Variables
+  Data members in structs should be named like regular variables
+  without the trailing underscores that data members in classes have. 
+  #+begin_src c
+    struct UrlTableProperties {
+      string name;
+      int num_entries;
+    }
+  #+end_src
++ Global Variables
+  There are no special requirements for global variables, which should
+  be rare in any case, but if you use one, consider prefixing it with
+  =g_= or some other marker to easily distinguish it from local
+  variables.
+** Constant Names
+#+begin_html
+<p class="info">
+在名称前加 k: kDaysInAWeek.
+</p>
+#+end_html
+
+All compile-time constants, whether they are declared locally, globally, or as part of a class, follow a slightly different naming convention from other variables. Use a k followed by words with uppercase first letters:
+
+=const int kDaysInAWeek = 7;=
+** Function Names
+#+begin_html
+<p class="info">
+常规函数使用大小写混合, 取值和设值函数则要求与变量名匹配: <code>MyExcitingFunction(), 
+MyExcitingMethod(), my_exciting_member_variable(), 
+set_my_exciting_member_variable()</code>
+</p>
+#+end_html
+
++ Regular Functions
+  Functions should start with a capital letter and have a capital
+  letter for each new word. No underscores. 
+  
+  If your function crashes upon an error, you should append OrDie to
+  the function name. This only applies to functions which could be
+  used by production code and to errors that are reasonably likely to
+  occur during normal operation. 
+  #+begin_src c
+    AddTableEntry()
+    DeleteUrl()
+    OpenFileOrDie()
+  #+end_src
+
++ Accessors and Mutators
+  Accessors and mutators (get and set functions) should match the name
+  of the variable they are getting and setting. This shows an excerpt
+  of a class whose instance variable is =num_entries_=. 
+  #+begin_src c
+    class MyClass {
+     public:
+      ...
+      int num_entries() const { return num_entries_; }
+      void set_num_entries(int num_entries) { num_entries_ = num_entries; }
+    
+     private:
+      int num_entries_;
+    };
+  #+end_src
+  You may also use lowercase letters for other very short inlined functions.
+** Namespace Names
+#+begin_html
+<p class="info">
+名字空间用小写字母命名, 并基于项目名称和目录结构: <code>google_awesome_project</code>.
+</p>
+#+end_html
+** Enumerator Names
+#+begin_html
+<p class="info">
+枚举的命名应当和 常量 或 宏 一致: kEnumName 或是 <code>ENUM_NAME</code>.
+</p>
+#+end_html
+
+Preferably, the individual enumerators should be named like *constants*.
+However, it is also acceptable to name them like macros. The
+enumeration name, UrlTableErrors (and AlternateUrlTableErrors), is a
+type, and therefore mixed case. 
+#+begin_src c
+enum UrlTableErrors {
+  kOK = 0,
+  kErrorOutOfMemory,
+  kErrorMalformedInput,
+};
+enum AlternateUrlTableErrors {
+  OK = 0,
+  OUT_OF_MEMORY = 1,
+  MALFORMED_INPUT = 2,
+};
+#+end_src
+Until January 2009, the style was to name enum values like macros.
+This caused problems with name collisions between enum values and
+macros. Hence, the change to prefer constant-style naming was put in
+place. New code should prefer constant-style naming if possible.
+** Macro Names
+#+begin_html
+<p class="info">
+你并不打算 使用宏, 对吧? 如果你一定要用, 像这样命名: 
+<code>MY_MACRO_THAT_SCARES_SMALL_CHILDREN</code>.
+</p>
+#+end_html
+
+Please see the description of macros; in general macros should not be
+used. However, if they are absolutely needed, then they should be
+named with all capitals and underscores. 
+#+begin_src c
+#define ROUND(x) ...
+#define PI_ROUNDED 3.0 
+#+end_src
+** Exceptions to Naming Rules
+#+begin_html
+<p class="info">
+如果你命名的实体与已有 C/C++ 实体相似, 可参考现有命名策略.
+</p>
+#+end_html
+
++ bigopen()
+  function name, follows form of open()
++ uint
+  typedef
++ bigpos
+  struct or class, follows form of pos
++ =sparse_hash_map=
+  STL-like entity; follows STL naming conventions
++ =LONGLONG_MAX=
+  a constant, as in =INT_MAX=
+* Comments
+** Comment Style
+#+begin_html
+<p class="info">
+使用 // 或 /* */, 统一就好.
+</p>
+#+end_html
+You can use either the // or the /* */ syntax; however, // is much
+more common.
+** File Comments
+#+begin_html
+<p class="info">
+在每一个文件开头加入版权公告, 然后是文件内容描述.
+</p>
+#+end_html
++ Legal Notice and Author Line
+  Every file should contain license boilerplate. Choose the appropriate boilerplate for the license used by the project (for example, Apache 2.0, BSD, LGPL, GPL).
+
+  If you make significant changes to a file with an author line,
+  consider deleting the author line. 
++ File Contents
+  Every file should have a comment at the top describing its contents.
+
+  Generally a .h file will describe the classes that are declared in the file with an overview of what they are for and how they are used. A .cc file should contain more information about implementation details or discussions of tricky algorithms. If you feel the implementation details or a discussion of the algorithms would be useful for someone reading the .h, feel free to put it there instead, but mention in the .cc that the documentation is in the .h file.
+
+  Do not duplicate comments in both the .h and the .cc.
+** Class Comments
+#+begin_html
+<p class="info">
+每个类的定义都要附带一份注释, 描述类的功能和用法.
+</p>
+#+end_html
+#+begin_src c
+// Iterates over the contents of a GargantuanTable.  Sample usage:
+//    GargantuanTableIterator* iter = table->NewIterator();
+//    for (iter->Seek("foo"); !iter->done(); iter->Next()) {
+//      process(iter->key(), iter->value());
+//    }
+//    delete iter;
+class GargantuanTableIterator {
+  ...
+};
+#+end_src
+
+If you have already described a class in detail in the comments at the top of your file feel free to simply state "See comment at top of file for a complete description", but be sure to have some sort of comment.
+
+Document the synchronization assumptions the class makes, if any. If
+an instance of the class can be accessed by multiple threads, take
+extra care to document the rules and invariants surrounding
+multithreaded use.
+** Function Comments
+#+begin_html
+<p class="info">
+函数声明处注释描述函数功能; 定义处描述函数实现.
+</p>
+#+end_html
+
++ 函数声明:
+  注释位于声明之前, 对函数功能及用法进行描述. 注释使用叙述式 (“Opens the file”) 而非指令式 (“Open the file”); 注释只是为了描述函数, 而不是命令函数做什么. 通常, 注释不会描述函数如何工作. 那是函数定义部分的事情.
+
+  函数声明处注释的内容:
+  + 函数的输入输出.
+  + 对类成员函数而言: 函数调用期间对象是否需要保持引用参数, 是否会释放这些参数.
+  + 如果函数分配了空间, 需要由调用者释放.
+  + 参数是否可以为 NULL.
+  + 是否存在函数使用上的性能隐患.
+  + 如果函数是可重入的, 其同步前提是什么?
+  举例如下:
+  #+begin_src c
+  // Returns an iterator for this table.  It is the client's
+  // responsibility to delete the iterator when it is done with it,
+  // and it must not use the iterator once the GargantuanTable object
+  // on which the iterator was created has been deleted.
+  //
+  // The iterator is initially positioned at the beginning of the table.
+  //
+  // This method is equivalent to:
+  //    Iterator* iter = table->NewIterator();
+  //    iter->Seek("");
+  //    return iter;
+  // If you are going to immediately seek to another place in the
+  // returned iterator, it will be faster to use NewIterator()
+  // and avoid the extra seek.
+  Iterator* GetIterator() const;
+  #+end_src
+  但也要避免罗罗嗦嗦, 或做些显而易见的说明. 下面的注释就没有必要加上 “returns false otherwise”, 因为已经暗含其中了:
+  #+begin_src c
+  // Returns true if the table cannot hold any more entries.
+  bool IsTableFull();
+  #+end_src
+  注释构造/析构函数时, 切记读代码的人知道构造/析构函数是干啥的, 所以
+  “destroys this object” 这样的注释是没有意义的. 注明构造函数对参数
+  做了什么 (例如, 是否取得指针所有权) 以及析构函数清理了什么. 如果都是
+  些无关紧要的内容, 直接省掉注释. 析构函数前没有注释是很正常的. 
++ 函数定义:
+  每个函数定义时要用注释说明函数功能和实现要点. 比如说说你用的编程技巧,
+  实现的大致步骤, 或解释如此实现的理由, 为什么前半部分要加锁而后半部分
+  不需要. 
+
+  不要 从 .h 文件或其他地方的函数声明处直接复制注释. 简要重述函数功能
+  是可以的, 但注释重点要放在如何实现上.
+** Variable Comments
+#+begin_html
+<p class="info">
+通常变量名本身足以很好说明变量用途. 某些情况下, 也需要额外的注释说明.
+</p>
+#+end_html
+
++ Class Data Members
+  Each class data member (also called an instance variable or member
+  variable) should have a comment describing what it is used for. If
+  the variable can take sentinel values with special meanings, such as
+  a null pointer or -1, document this. For example: 
+  #+begin_src c
+    private:
+     // Keeps track of the total number of entries in the table.
+     // Used to ensure we do not go over the limit. -1 means
+     // that we don't yet know how many entries the table has.
+     int num_total_entries_;
+  #+end_src
++ Global Variables
+  As with data members, all global variables should have a comment describing what they are and what they are used for. For example:
+  #+begin_src c
+    // The total number of tests cases that we run through in this regression test.
+    const int kNumTestCases = 6;
+  #+end_src
+** Implementation Comments
+#+begin_html
+<p class="info">
+对于代码中巧妙的, 晦涩的, 有趣的, 重要的地方加以注释.
+</p>
+#+end_html
+
++ Class Data Members
+  Tricky or complicated code blocks should have comments before them. Example:
+  #+begin_src c
+    // Divide result by two, taking into account that x
+    // contains the carry from the add.
+    for (int i = 0; i < result->size(); i++) {
+      x = (x << 8) + (*result)[i];
+      (*result)[i] = x >> 1;
+      x &= 1;
+    }
+  #+end_src
++ Line Comments
+  Also, lines that are non-obvious should get a comment at the end of the line. These end-of-line comments should be separated from the code by 2 spaces. Example:
+  #+begin_src c
+    // If we have enough memory, mmap the data portion too.
+    mmap_budget = max<int64>(0, mmap_budget - index_->length());
+    if (mmap_budget >= data_size_ && !MmapData(mmap_chunk_bytes, mlock))
+      return;  // Error already logged.
+  #+end_src
+
+  Note that there are both comments that describe what the code is doing, and comments that mention that an error has already been logged when the function returns.
+
+  If you have several comments on subsequent lines, it can often be more readable to line them up:
+  #+begin_src c
+    DoSomething();                  // Comment here so the comments line up.
+    DoSomethingElseThatIsLonger();  // Comment here so there are two spaces between
+                                    // the code and the comment.
+    { // One space before comment when opening a new scope is allowed,
+      // thus the comment lines up with the following comments and code.
+      DoSomethingElse();  // Two spaces before line comments normally.
+    }
+    DoSomething(); /* For trailing block comments, one space is fine. */
+  #+end_src
++ nullptr/NULL, true/false, 1, 2, 3...
+  When you pass in a null pointer, boolean, or literal integer values to functions, you should consider adding a comment about what they are, or make your code self-documenting by using constants. For example, compare:
+  #+begin_src c
+    bool success = CalculateSomething(interesting_value,
+                                      10,
+                                      false,
+                                      NULL);  // What are these arguments??
+  #+end_src
+  versus:
+  #+begin_src c
+    bool success = CalculateSomething(interesting_value,
+                                      10,     // Default base value.
+                                      false,  // Not the first time we're calling this.
+                                      NULL);  // No callback.
+  #+end_src
+  Or alternatively, constants or self-describing variables:
+  #+begin_src c
+    const int kDefaultBaseValue = 10;
+    const bool kFirstTimeCalling = false;
+    Callback *null_callback = NULL;
+    bool success = CalculateSomething(interesting_value,
+                                      kDefaultBaseValue,
+                                      kFirstTimeCalling,
+                                      null_callback);
+  #+end_src
++ Don'ts
+  Note that you should never describe the code itself. Assume that the person reading the code knows C++ better than you do, even though he or she does not know what you are trying to do:
+  #+begin_src c
+    // Now go through the b array and make sure that if i occurs,
+    // the next element is i+1.
+    ...        // Geez.  What a useless comment.
+  #+end_src
+
+** Punctuation, Spelling and Grammar
+#+begin_html
+<p class="info">
+注意标点, 拼写和语法; 写的好的注释比差的要易读的多.
+</p>
+#+end_html
+Comments should be as readable as narrative text, with proper
+capitalization and punctuation. In many cases, complete sentences are
+more readable than sentence fragments. Shorter comments, such as
+comments at the end of a line of code, can sometimes be less formal,
+but you should be consistent with your style.
+
+** TODO Comments
+#+begin_html
+<p class="info">
+对那些临时的, 短期的解决方案, 或已经够好但仍不完美的代码使用 TODO 注释.
+</p>
+#+end_html
+
+TODOs should include the string TODO in all caps, followed by the
+name, e-mail address, or other identifier of the person who can best
+provide context about the problem referenced by the TODO. A colon is
+optional. The main purpose is to have a consistent TODO format that
+can be searched to find the person who can provide more details upon
+request. A TODO is not a commitment that the person referenced will
+fix the problem. Thus when you create a TODO, it is almost always your
+name that is given. 
+#+begin_src c
+// TODO(kl@gmail.com): Use a "*" here for concatenation operator.
+// TODO(Zeke) change this to use relations.
+#+end_src
+If your TODO is of the form "At a future date do something" make sure
+that you either include a very specific date ("Fix by November 2005")
+or a very specific event ("Remove this code when all clients can
+handle XML responses."). 
+
+** Deprecation Comments
+#+begin_html
+<p class="info">
+用DEPRECATED注释来标识废弃的接口。
+</p>
+#+end_html
+You can mark an interface as deprecated by writing a comment containing the word DEPRECATED in all caps. The comment goes either before the declaration of the interface or on the same line as the declaration.
+
+After the word DEPRECATED, write your name, e-mail address, or other identifier in parentheses.
+
+A deprecation comment must include simple, clear directions for people
+to fix their callsites. In C++, you can implement a deprecated
+function as an inline function that calls the new interface point.
+
+* Formatting
+** Line Length
+#+begin_html
+<p class="info">
+每一行代码字符数不超过 80.
+</p>
+#+end_html
+
+80 characters is the maximum.
+
++ Exception: if a comment line contains an example command or a literal URL longer than 80 characters, that line may be longer than 80 characters for ease of cut and paste.
++ Exception: an #include statement with a long path may exceed 80 columns. Try to avoid situations where this becomes necessary.
++ Exception: you needn't be concerned about header guards that exceed the maximum length.
+** Non-ASCII Characters
+#+begin_html
+<p class="info">
+量不使用非 ASCII 字符, 使用时必须使用 UTF-8 编码.
+</p>
+#+end_html
+
+Hex encoding is also OK, and encouraged where it enhances readability — for example, "\xEF\xBB\xBF", or, even more simply, u8"\uFEFF", is the Unicode zero-width no-break space character, which would be invisible if included in the source as straight UTF-8.
+
+Use the u8 prefix to guarantee that a string literal containing \uXXXX escape sequences is encoded as UTF-8. Do not use it for strings containing non-ASCII characters encoded as UTF-8, because that will produce incorrect output if the compiler does not interpret the source file as UTF-8.
+
+You shouldn't use the C++11 char16_t and char32_t character types,
+since they're for non-UTF-8 text. For similar reasons you also
+shouldn't use wchar_t (unless you're writing code that interacts with
+the Windows API, which uses wchar_t extensively).
+** Spaces vs. Tabs
+#+begin_html
+<p class="info">
+只使用空格, 每次缩进 2 个空格.
+</p>
+#+end_html
+We use spaces for indentation. Do not use tabs in your code. You
+should set your editor to emit spaces when you hit the tab key.
+** Function Declarations and Definitions
+#+begin_html
+<p class="info">
+返回类型和函数名在同一行, 参数也尽量放在同一行.
+</p>
+#+end_html
+
+Functions look like this:
+#+begin_src c
+ReturnType ClassName::FunctionName(Type par_name1, Type par_name2) {
+  DoSomething();
+  ...
+}
+#+end_src
+If you have too much text to fit on one line:
+#+begin_src c
+ReturnType ClassName::ReallyLongFunctionName(Type par_name1, Type par_name2,
+                                             Type par_name3) {
+  DoSomething();
+  ...
+}
+#+end_src
+or if you cannot fit even the first parameter:
+#+begin_src c
+ReturnType LongClassName::ReallyReallyReallyLongFunctionName(
+    Type par_name1,  // 4 space indent
+    Type par_name2,
+    Type par_name3) {
+  DoSomething();  // 2 space indent
+  ...
+}
+#+end_src
+
+注意以下几点:
++ 如果不能使返回值和函数名在同一行，分开它们;
++ 如果返回值总是和函数名被分开，不要缩进;
++ 左圆括号总是和函数名在同一行;
++ 函数名和左圆括号间没有空格;
++ 圆括号与参数间没有空格;
++ 左大括号总在最后一个参数同一行的末尾处;
++ 右大括号总是单独位于函数最后一行;
++ 右圆括号和左大括号间总是有一个空格;
++ 函数声明和实现处的所有形参名称必须保持一致;
++ 所有形参应尽可能对齐;
++ 缺省缩进为 2 个空格;
++ 换行后的参数保持 4 个空格的缩进;
+
+If some parameters are unused, comment out the variable name in the function definition:
+#+begin_src c
+// Always have named parameters in interfaces.
+class Shape {
+ public:
+  virtual void Rotate(double radians) = 0;
+}
+
+// Always have named parameters in the declaration.
+class Circle : public Shape {
+ public:
+  virtual void Rotate(double radians);
+}
+
+// Comment out unused named parameters in definitions.
+void Circle::Rotate(double /*radians*/) {}
+// Bad - if someone wants to implement later, it's not clear what the
+// variable means.
+void Circle::Rotate(double) {}
+#+end_src
+** Function Calls
+#+begin_html
+<p class="info">
+尽量放在同一行, 否则, 将实参封装在圆括号中.
+</p>
+#+end_html
+
+Function calls have the following format:
+#+begin_src c
+bool retval = DoSomething(argument1, argument2, argument3);
+#+end_src
+
+If the arguments do not all fit on one line, they should be broken up onto multiple lines, with each subsequent line aligned with the first argument. Do not add spaces after the open paren or before the close paren:
+#+begin_src c
+bool retval = DoSomething(averyveryveryverylongargument1,
+                          argument2, argument3);
+#+end_src
+
+If the function has many arguments, consider having one per line if this makes the code more readable:
+#+begin_src c
+bool retval = DoSomething(argument1,
+                          argument2,
+                          argument3,
+                          argument4);
+#+end_src
+
+Arguments may optionally all be placed on subsequent lines, with one line per argument:
+#+begin_src c
+if (...) {
+  ...
+  ...
+  if (...) {
+    DoSomething(
+        argument1,  // 4 space indent
+        argument2,
+        argument3,
+        argument4);
+  }
+#+end_src
+** Braced Initializer Lists
+#+begin_html
+<p class="info">
+如格式化函数调用一样格式化括号列单。
+</p>
+#+end_html
+
+If the braced list follows a name (e.g. a type or variable name), format as if the {} were the parentheses of a function call with that name. If there is no name, assume a zero-length name.
+#+begin_src c
+// Examples of braced init list on a single line.
+return {foo, bar};
+functioncall({foo, bar});
+pair<int, int> p{foo, bar};
+
+// When you have to wrap.
+SomeFunction(
+    {"assume a zero-length name before {"},
+    some_other_function_parameter);
+SomeType variable{
+    some, other, values,
+    {"assume a zero-length name before {"},
+    SomeOtherType{
+        "Very long string requiring the surrounding breaks.",
+        some, other values},
+    SomeOtherType{"Slightly shorter string",
+                  some, other, values}};
+SomeType variable{
+    "This is too long to fit all in one line"};
+MyType m = {  // Here, you could also break before {.
+    superlongvariablename1,
+    superlongvariablename2,
+    {short, interior, list},
+    {interiorwrappinglist,
+     interiorwrappinglist2}};
+#+end_src
+** Conditionals
+#+begin_html
+<p class="info">
+倾向于不在圆括号内使用空格. 关键字 else 另起一行.
+</p>
+#+end_html
+
+There are two acceptable formats for a basic conditional statement. One includes spaces between the parentheses and the condition, and one does not.
+
+The most common form is without spaces. Either is fine, but be consistent. If you are modifying a file, use the format that is already present. If you are writing new code, use the format that the other files in that directory or project use. If in doubt and you have no personal preference, do not add the spaces.
+#+begin_src c
+if (condition) {  // no spaces inside parentheses
+  ...  // 2 space indent.
+} else if (...) {  // The else goes on the same line as the closing brace.
+  ...
+} else {
+  ...
+}
+#+end_src
+
+If you prefer you may add spaces inside the parentheses:
+#+begin_src c
+if ( condition ) {  // spaces inside parentheses - rare
+  ...  // 2 space indent.
+} else {  // The else goes on the same line as the closing brace.
+  ...
+}
+#+end_src
+Note that in all cases you must have a space between the if and the open parenthesis. You must also have a space between the close parenthesis and the curly brace, if you're using one.
+#+begin_src c
+if(condition)     // Bad - space missing after IF.
+if (condition){   // Bad - space missing before {.
+if(condition){    // Doubly bad.
+if (condition) {  // Good - proper space after IF and before {.
+#+end_src
+Short conditional statements may be written on one line if this enhances readability. You may use this only when the line is brief and the statement does not use the else clause.
+#+begin_src c
+if (x == kFoo) return new Foo();
+if (x == kBar) return new Bar();
+#+end_src
+This is not allowed when the if statement has an else:
+#+begin_src c
+// Not allowed - IF statement on one line when there is an ELSE clause
+if (x) DoThis();
+else DoThat();
+#+end_src
+In general, curly braces are not required for single-line statements, but they are allowed if you like them; conditional or loop statements with complex conditions or statements may be more readable with curly braces. Some projects require that an if must always always have an accompanying brace.
+#+begin_src c
+if (condition)
+  DoSomething();  // 2 space indent.
+
+if (condition) {
+  DoSomething();  // 2 space indent.
+}
+#+end_src
+However, if one part of an if-else statement uses curly braces, the other part must too:
+#+begin_src c
+// Not allowed - curly on IF but not ELSE
+if (condition) {
+  foo;
+} else
+  bar;
+
+// Not allowed - curly on ELSE but not IF
+if (condition)
+  foo;
+else {
+  bar;
+}
+// Curly braces around both IF and ELSE required because
+// one of the clauses used braces.
+if (condition) {
+  foo;
+} else {
+  bar;
+}
+#+end_src
+** Loops and Switch Statements
+#+begin_html
+<p class="info">
+switch 语句可以使用大括号分段. 空循环体应使用 {} 或 continue.
+</p>
+#+end_html
+
+case blocks in switch statements can have curly braces or not, depending on your preference. If you do include curly braces they should be placed as shown below.
+
+If not conditional on an enumerated value, switch statements should always have a default case (in the case of an enumerated value, the compiler will warn you if any values are not handled). If the default case should never execute, simply assert:
+#+begin_src c
+switch (var) {
+  case 0: {  // 2 space indent
+    ...      // 4 space indent
+    break;
+  }
+  case 1: {
+    ...
+    break;
+  }
+  default: {
+    assert(false);
+  }
+}
+#+end_src
+Empty loop bodies should use {} or continue, but not a single semicolon.
+#+begin_src c
+while (condition) {
+  // Repeat test until it returns false.
+}
+for (int i = 0; i < kSomeNumber; ++i) {}  // Good - empty body.
+while (condition) continue;  // Good - continue indicates no logic.
+while (condition);  // Bad - looks like part of do/while loop.
+#+end_src
+** Pointer and Reference Expressions
+#+begin_html
+<p class="info">
+句点或箭头前后不要有空格. 指针/地址操作符 (*, &) 之后不能有空格.
+</p>
+#+end_html
+
+Note that:
++ There are no spaces around the period or arrow when accessing a member.
++ Pointer operators have no space after the * or &.
+When declaring a pointer variable or argument, you may place the
+asterisk adjacent to either the type or to the variable name 
+** Boolean Expressions
+#+begin_html
+<p class="info">
+如果一个布尔表达式超过 标准行宽, 断行方式要统一一下.
+</p>
+#+end_html
+In this example, the logical AND operator is always at the end of the lines:
+
+#+begin_src c
+if (this_one_thing > this_other_thing &&
+    a_third_thing == a_fourth_thing &&
+    yet_another && last_one) {
+  ...
+}
+#+end_src
+
+Note that when the code wraps in this example, both of the && logical
+AND operators are at the end of the line. This is more common in
+Google code, though wrapping all operators at the beginning of the
+line is also allowed. Feel free to insert extra parentheses
+judiciously because they can be very helpful in increasing readability
+when used appropriately.
+** Return Values
+#+begin_html
+<p class="info">
+return 表达式中不要用圆括号包围.
+</p>
+#+end_html
+
+Use parentheses in return expr; only where you would use them in x = expr;.
+#+begin_src c
+return result;                  // No parentheses in the simple case.
+return (some_long_condition &&  // Parentheses ok to make a complex
+        another_condition);     //     expression more readable.
+return (value);                // You wouldn't write var = (value);
+return(result);                // return is not a function!
+#+end_src
+** Variable and Array Initialization
+#+begin_html
+<p class="info">
+用 =, ()或{} 均可.
+</p>
+#+end_html
+
+You may choose between =, (), and {}; the following are all correct:
+#+begin_src c
+int x = 3;
+int x(3);
+int x{3};
+string name = "Some Name";
+string name("Some Name");
+string name{"Some Name"};
+#+end_src
+Be careful when using the {} on a type that takes an initializer_list
+in one of its constructors. The {} syntax prefers the initializer_list
+constructor whenever possible. To get the non- initializer_list
+constructor, use (). 
+#+begin_src c
+vector<int> v(100, 1);  // A vector of 100 1s.
+vector<int> v{100, 1};  // A vector of 100, 1.
+#+end_src
+Also, the brace form prevents narrowing of integral types. This can
+prevent some types of programming errors. 
+#+begin_src c
+int pi(3.14);  // OK -- pi == 3.
+int pi{3.14};  // Compile error: narrowing conversion.
+#+end_src
+** Preprocessor Directives
+#+begin_html
+<p class="info">
+预处理指令不要缩进, 从行首开始.
+</p>
+#+end_html
+   Even when preprocessor directives are within the body of indented code, the directives should start at the beginning of the line.
+#+begin_src c
+// Good - directives at beginning of line
+  if (lopsided_score) {
+#if DISASTER_PENDING      // Correct -- Starts at beginning of line
+    DropEverything();
+# if NOTIFY               // OK but not required -- Spaces after #
+    NotifyClient();
+# endif
+#endif
+    BackToNormal();
+  }
+#+end_src
+** Class Format
+#+begin_html
+<p class="info">
+访问控制块的声明依次序是 public:, protected:, private:, 每次缩进 1 个
+空格. 
+</p>
+#+end_html
+
+The basic format for a class declaration (lacking the comments, see
+Class Comments for a discussion of what comments are needed) is: 
+#+begin_src c
+class MyClass : public OtherClass {
+ public:      // Note the 1 space indent!
+  MyClass();  // Regular 2 space indent.
+  explicit MyClass(int var);
+  ~MyClass() {}
+
+  void SomeFunction();
+  void SomeFunctionThatDoesNothing() {
+  }
+
+  void set_some_var(int var) { some_var_ = var; }
+  int some_var() const { return some_var_; }
+
+ private:
+  bool SomeInternalFunction();
+
+  int some_var_;
+  int some_other_var_;
+  DISALLOW_COPY_AND_ASSIGN(MyClass);
+};
+#+end_src
+Things to note:
+
++ Any base class name should be on the same line as the subclass name, subject to the 80-column limit.
++ The public:, protected:, and private: keywords should be indented one space.
++ Except for the first instance, these keywords should be preceded by a blank line. This rule is optional in small classes.
++ Do not leave a blank line after these keywords.
++ The public section should be first, followed by the protected and finally the private section.
++ See Declaration Order for rules on ordering declarations within each of these sections.
+** Constructor Initializer Lists
+#+begin_html
+<p class="info">
+构造函数初始化列表放在同一行或按四格缩进并排几行.
+</p>
+#+end_html
+
+There are two acceptable formats for initializer lists:
+#+begin_src c
+// When it all fits on one line:
+MyClass::MyClass(int var) : some_var_(var), some_other_var_(var + 1) {}
+#+end_src
+
+or
+#+begin_src c
+// When it requires multiple lines, indent 4 spaces, putting the colon on
+// the first initializer line:
+MyClass::MyClass(int var)
+    : some_var_(var),             // 4 space indent
+      some_other_var_(var + 1) {  // lined up
+  ...
+  DoSomething();
+  ...
+}
+#+end_src
+** Namespace Formatting
+#+begin_html
+<p class="info">
+名字空间内容不缩进.
+</p>
+#+end_html
+
+Namespaces do not add an extra level of indentation. For example, use:
+#+begin_src c
+namespace {
+
+void foo() {  // Correct.  No extra indentation within namespace.
+  ...
+}
+
+}  // namespace
+#+end_src
+Do not indent within a namespace:
+#+begin_src c
+namespace {
+
+  // Wrong.  Indented when it should not be.
+  void foo() {
+    ...
+  }
+
+}  // namespace
+#+end_src
+When declaring nested namespaces, put each namespace on its own line.
+#+begin_src c
+namespace foo {
+namespace bar {
+#+end_src
+** Horizontal Whitespace
+#+begin_html
+<p class="info">
+水平留白的使用因地制宜. 永远不要在行尾添加没意义的留白
+</p>
+#+end_html
+
+*** General
+#+begin_src c
+void f(bool b) {  // Open braces should always have a space before them.
+  ...
+int i = 0;  // Semicolons usually have no space before them.
+int x[] = { 0 };  // Spaces inside braces for braced-init-list are
+int x[] = {0};    // optional.  If you use them, put them on both sides!
+// Spaces around the colon in inheritance and initializer lists.
+class Foo : public Bar {
+ public:
+  // For inline function implementations, put spaces between the braces
+  // and the implementation itself.
+  Foo(int b) : Bar(), baz_(b) {}  // No spaces inside empty braces.
+  void Reset() { baz_ = 0; }  // Spaces separating braces from implementation.
+  ...
+#+end_src
+
+Adding trailing whitespace can cause extra work for others editing the
+same file, when they merge, as can removing existing trailing
+whitespace. So: Don't introduce trailing whitespace. Remove it if
+you're already changing that line, or do it in a separate clean-up
+operation (preferably when no-one else is working on the file). 
+
+*** Loops and Conditionals
+#+begin_src c
+if (b) {          // Space after the keyword in conditions and loops.
+} else {          // Spaces around else.
+}
+while (test) {}   // There is usually no space inside parentheses.
+switch (i) {
+for (int i = 0; i < 5; ++i) {
+switch ( i ) {    // Loops and conditions may have spaces inside
+if ( test ) {     // parentheses, but this is rare.  Be consistent.
+for ( int i = 0; i < 5; ++i ) {
+for ( ; i < 5 ; ++i) {  // For loops always have a space after the
+  ...                   // semicolon, and may have a space before the
+                        // semicolon.
+for (auto x : counts) {  // Range-based for loops always have a
+  ...                    // space before and after the colon.
+}
+switch (i) {
+  case 1:         // No space before colon in a switch case.
+    ...
+  case 2: break;  // Use a space after a colon if there's code after it.
+#+end_src
+
+*** Operators
+#+begin_src c
+x = 0;              // Assignment operators always have spaces around
+                    // them.
+x = -5;             // No spaces separating unary operators and their
+++x;                // arguments.
+if (x && !y)
+  ...
+v = w * x + y / z;  // Binary operators usually have spaces around them,
+v = w*x + y/z;      // but it's okay to remove spaces around factors.
+v = w * (x + z);    // Parentheses should have no spaces inside them.
+#+end_src
+
+*** Templates and Casts
+#+begin_src c
+vector<string> x;           // No spaces inside the angle
+y = static_cast<char*>(x);  // brackets (< and >), before
+                            // <, or between >( in a cast.
+vector<char *> x;           // Spaces between type and pointer are
+                            // okay, but be consistent.
+set<list<string>> x;        // Permitted in C++11 code.
+set<list<string> > x;       // C++03 required a space in > >.
+set< list<string> > x;      // You may optionally use
+                            // symmetric spacing in < <.
+#+end_src
+** Vertical Whitespace
+#+begin_html
+<p class="info">
+垂直留白越少越好.
+</p>
+#+end_html
+
+This is more a principle than a rule: don't use blank lines when you
+don't have to. In particular, don't put more than one or two blank
+lines between functions, resist starting functions with a blank line,
+don't end functions with a blank line, and be discriminating with your
+use of blank lines inside functions.
+
+The basic principle is: The more code that fits on one screen, the easier it is to follow and understand the control flow of the program. Of course, readability can suffer from code being too dense as well as too spread out, so use your judgement. But in general, minimize use of vertical whitespace.
+
+Some rules of thumb to help when blank lines may be useful:
++ Blank lines at the beginning or end of a function very rarely help readability.
++ Blank lines inside a chain of if-else blocks may well help readability.
+
+* Exceptions to the Rules
+** Existing Non-conformant Code
+#+begin_html
+<p class="info">
+对于现有不符合既定编程风格的代码可以网开一面.
+</p>
+#+end_html.
+当你修改使用其他风格的代码时, 为了与代码原有风格保持一致可以不使用本指
+南约定. 如果不放心可以与代码原作者或现在的负责人员商讨, 记住, 一致性
+包括原有的一致性.
+
+** Windows Code
+#+begin_html
+<p class="info">
+Windows 程序员有自己的编程习惯, 主要源于 Windows 头文件和其它
+Microsoft 代码. 我们希望任何人都可以顺利读懂你的代码, 所以针对所有平台
+的 C++ 编程只给出一个单独的指南.
+</p>
+#+end_html
+
+如果你习惯使用 Windows 编码风格, 这儿有必要重申一下某些你可能会忘记的指南:
+
++ 不要使用匈牙利命名法 (比如把整型变量命名成 iNum). 使用 Google 命名约定, 包括对源文件使用 .cc 扩展名.
++ Windows 定义了很多原生类型的同义词 (YuleFox 注: 这一点, 我也很反感), 如 DWORD, HANDLE 等等. 在调用 Windows API 时这是完全可以接受甚至鼓励的. 但还是尽量使用原有的 C++ 类型, 例如, 使用 const TCHAR * 而不是 LPCTSTR.
++ 使用 Microsoft Visual C++ 进行编译时, 将警告级别设置为 3 或更高, 并将所有 warnings 当作 errors 处理.
++ 不要使用 #pragma once; 而应该使用 Google 的头文件保护规则. 头文件保护的路径应该相对于项目根目录 (yospaly 注: 如 #ifndef SRC_DIR_BAR_H_, 参考 #define 保护 一节).
++ 除非万不得已, 不要使用任何非标准的扩展, 如 #pragma 和 __declspec. 允许使用 __declspec(dllimport) 和 __declspec(dllexport); 但你必须通过宏来使用, 比如 DLLIMPORT 和 DLLEXPORT, 这样其他人在分享使用这些代码时很容易就去掉这些扩展.
+在 Windows 上, 只有很少的一些情况下, 我们可以偶尔违反规则:
+
++ 通常我们 禁止使用多重继承, 但在使用 COM 和 ATL/WTL 类时可以使用多重继承. 为了实现 COM 或 ATL/WTL 类/接口, 你可能不得不使用多重实现继承.
++ 虽然代码中不应该使用异常, 但是在 ATL 和部分 STL（包括 Visual C++ 的 STL) 中异常被广泛使用. 使用 ATL 时, 应定义 _ATL_NO_EXCEPTIONS 以禁用异常. 你要研究一下是否能够禁用 STL 的异常, 如果无法禁用, 启用编译器异常也可以. (注意这只是为了编译 STL, 自己代码里仍然不要含异常处理.)
++ 通常为了利用头文件预编译, 每个每个源文件的开头都会包含一个名为 StdAfx.h 或 precompile.h 的文件. 为了使代码方便与其他项目共享, 避免显式包含此文件 (precompile.cc), 使用 /FI 编译器选项以自动包含.
++ 资源头文件通常命名为 resource.h, 且只包含宏的, 不需要遵守本风格指南.

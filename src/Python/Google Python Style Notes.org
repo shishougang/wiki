@@ -1,30 +1,906 @@
 #+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
-#+TITLE: Google Python Style Notes
+#+TITLE: Google Python Style Notes (Revision 2.59)
 #+OPTIONS: num:nil H:2
 
 * Homepage
++ en: http://google-styleguide.googlecode.com/svn/trunk/pyguide.html
++ zh: http://zh-google-styleguide.readthedocs.org/en/latest/google-python-styleguide/python_language_rules/
+* Python Language Rules
+** Lint
+#+begin_html
+<p class="info">
+对你的代码运行pylint.
+</p>
+#+end_html
+
+Suppress warnings if they are inappropriate so that other issues are
+not hidden.
+
+To suppress warnings, you can set a line-level comment:
+#+begin_src python
+dict = 'something awful'  # Bad Idea... pylint: disable=redefined-builtin
+#+end_src
+pylint warnings are each identified by a alphanumeric code (C0112) and a symbolic name (empty-docstring). Prefer the symbolic names in new code or when updating existing code.
+
+If the reason for the suppression is not clear from the symbolic name, add an explanation.
+
+Suppressing in this way has the advantage that we can easily search
+for suppressions and revisit them.
+
+You can get a list of pylint warnings by doing =pylint --list-msgs=.
+To get more information on a particular message, use =pylint --help-msg=C6409=.
 
 
-* cc
+Prefer pylint: disable to the deprecated older form pylint: disable-msg.
+
+Unused argument warnings can be suppressed by using '=_=' as the
+identifier for the unused argument or prefixing the argument name with
+'=unused_='. In situations where changing the argument names is
+infeasible, you can mention them at the beginning of the function. For
+example:
+
+#+begin_src python
+def foo(a, unused_b, unused_c, d=None, e=None):
+    _ = d, e
+    return a
+#+end_src
+** Imports
+#+begin_html
+<p class="info">
+仅对包和模块使用导入
+</p>
+#+end_html
+
+*Decision:*
+Use import x for importing packages and modules. 
+
+Use from x import y where x is the package prefix and y is the module
+name with no prefix. 
+
+Use from x import y as z if two modules named y are to be imported or
+if y is an inconveniently long name.
+
+For example the module sound.effects.echo may be imported as follows:
+#+begin_src python
+from sound.effects import echo
+...
+echo.EchoFilter(input, output, delay=0.7, atten=4)
+#+end_src
+Do not use relative names in imports. Even if the module is in the
+same package, use the full package name. This helps prevent
+unintentionally importing a package twice.
+** Packages
+#+begin_html
+<p class="info">
+使用模块的全路径名来导入每个模块
+</p>
+#+end_html
+*Decision:*
+All new code should import each module by its full package name.
+
+Imports should be as follows:
+#+begin_src python
+# Reference in code with complete name.
+import sound.effects.echo
+
+# Reference in code with just module name (preferred).
+from sound.effects import echo
+#+end_src
+** Exceptions
+#+begin_html
+<p class="info">
+允许使用异常, 但必须小心
+</p>
+#+end_html
+
+*Decision:*
+Exceptions must follow certain conditions:
+
++ Raise exceptions like this: =raise MyException('Error message')= or
+  =raise MyException=. Do not use the two-argument form =(raise
+  MyException, 'Error message')= or deprecated string-based exceptions
+  =(raise 'Error message')=.
+
++ Modules or packages should define their own domain-specific base
+  exception class, which should inherit from the built-in Exception
+  class. The base exception for a module should be called Error.
+
+  #+begin_src python
+    class Error(Exception):
+        pass
+  #+end_src
++ Never use catch-all except: statements, or catch Exception or
+  StandardError, unless you are re-raising the exception or in the
+  outermost block in your thread (and printing an error message).
+  Python is very tolerant in this regard and except: will really catch
+  everything including misspelled names, sys.exit() calls, Ctrl+C
+  interrupts, unittest failures and all kinds of other exceptions that
+  you simply don't want to catch.
+
++ Minimize the amount of code in a try/except block. The larger the
+  body of the try, the more likely that an exception will be raised by
+  a line of code that you didn't expect to raise an exception. In
+  those cases, the try/except block hides a real error.
+
++ Use the finally clause to execute code whether or not an exception
+  is raised in the try block. This is often useful for cleanup, i.e.,
+  closing a file.
+
++ When capturing an exception, use as rather than a comma. For example:
+  #+begin_src python
+    try:
+        raise Error
+    except Error as error:
+        pass
+  #+end_src
+** Global variables
+#+begin_html
+<p class="info">
+避免全局变量
+</p>
+#+end_html
+
+Decision:
+
+Avoid global variables in favor of class variables. Some exceptions are:
+
++ Default options for scripts.
++ Module-level constants. For example: =PI = 3.14159=. Constants
+  should be named using all caps with underscores; see Naming below.
++ It is sometimes useful for globals to cache values needed or returned by functions.
++ If needed, globals should be made internal to the module and
+  accessed through public module level functions; see Naming below.
+** Nested/Local/Inner Classes and Functions
+#+begin_html
+<p class="info">
+鼓励使用嵌套/本地/内部类或函数
+</p>
+#+end_html
+** List Comprehensions
+#+begin_html
+<p class="info">
+可以在简单情况下使用
+</p>
+#+end_html
+*Decision:*
+Okay to use for simple cases. Each portion must fit on *one line*: mapping expression, for clause, filter expression. Multiple for clauses or filter expressions are not permitted. Use loops instead when things get more complicated.
+#+begin_src python
+Yes:
+  result = []
+  for x in range(10):
+      for y in range(5):
+          if x * y > 10:
+              result.append((x, y))
+
+  for x in xrange(5):
+      for y in xrange(5):
+          if x != y:
+              for z in xrange(5):
+                  if y != z:
+                      yield (x, y, z)
+
+  return ((x, complicated_transform(x))
+          for x in long_generator_function(parameter)
+          if x is not None)
+
+  squares = [x * x for x in range(10)]
+
+  eat(jelly_bean for jelly_bean in jelly_beans
+      if jelly_bean.color == 'black')
+No:
+  result = [(x, y) for x in range(10) for y in range(5) if x * y > 10]
+
+  return ((x, y, z)
+          for x in xrange(5)
+          for y in xrange(5)
+          if x != y
+          for z in xrange(5)
+          if y != z)
+#+end_src
+** Default Iterators and Operators
+#+begin_html
+<p class="info">
+如果类型支持, 就使用默认迭代器和操作符. 比如列表, 字典及文件等.
+</p>
+#+end_html
+Decision:
+Use default iterators and operators for types that support them, like
+lists, dictionaries, and files. The built-in types define iterator
+methods, too. Prefer these methods to methods that return lists,
+except that you should not mutate a container while iterating over it.
+
+#+begin_src python
+Yes:  for key in adict: ...
+      if key not in adict: ...
+      if obj in alist: ...
+      for line in afile: ...
+      for k, v in dict.iteritems(): ...
+No:   for key in adict.keys(): ...
+      if not adict.has_key(key): ...
+      for line in afile.readlines(): ...
+#+end_src
+** Generators
+#+begin_html
+<p class="info">
+按需使用生成器.
+</p>
+#+end_html
+Decision:
+
+Fine. Use "Yields:" rather than "Returns:" in the doc string for generator functions.
+** Lambda Functions
+#+begin_html
+<p class="info">
+适用于单行函数
+</p>
+#+end_html
+Decision:
+
+Okay to use them for one-liners. If the code inside the lambda function is any longer than 60–80 chars, it's probably better to define it as a regular (nested) function.
+
+For common operations like multiplication, use the functions from the
+operator module instead of lambda functions. For example, prefer
+=operator.mul= to =lambda x, y: x * y=.
+** Conditional Expressions
+#+begin_html
+<p class="info">
+适用于单行.
+</p>
+#+end_html
+Conditional expressions are mechanisms that provide a shorter syntax
+for if statements. For example: =x = 1 if cond else 2=
+** Default Argument Values
+#+begin_html
+<p class="info">
+适用于大部分情况.
+</p>
+#+end_html
+Decision:
+
+Okay to use with the following caveat:
+
+Do not use mutable objects as default values in the function or method definition.
+#+begin_src python
+Yes: def foo(a, b=None):
+         if b is None:
+             b = []
+No:  def foo(a, b=[]):
+         ...
+No:  def foo(a, b=time.time()):  # The time the module was loaded???
+         ...
+No:  def foo(a, b=FLAGS.my_thing):  # sys.argv has not yet been parsed...
+         ...
+#+end_src
+** Properties
+#+begin_html
+<p class="info">
+访问和设置数据成员时, 你通常会使用简单, 轻量级的访问和设置函数. 建议用属性（properties）来代替它们.
+</p>
+#+end_html
+Use properties in new code to access or set data where you would
+normally have used simple, lightweight accessor or setter methods.
+Read-only properties should be created with the =@property= decorator.
+
+Inheritance with properties can be non-obvious if the property itself
+is not overridden. Thus one must make sure that accessor methods are
+called indirectly to ensure methods overridden in subclasses are
+called by the property (using the Template Method DP).
+
+#+begin_src python
+Yes: import math
+
+     class Square(object):
+         """A square with two properties: a writable area and a read-only perimeter.
+
+         To use:
+         >>> sq = Square(3)
+         >>> sq.area
+         9
+         >>> sq.perimeter
+         12
+         >>> sq.area = 16
+         >>> sq.side
+         4
+         >>> sq.perimeter
+         16
+         """
+
+         def __init__(self, side):
+             self.side = side
+
+         def __get_area(self):
+             """Calculates the 'area' property."""
+             return self.side ** 2
+
+         def ___get_area(self):
+             """Indirect accessor for 'area' property."""
+             return self.__get_area()
+
+         def __set_area(self, area):
+             """Sets the 'area' property."""
+             self.side = math.sqrt(area)
+
+         def ___set_area(self, area):
+             """Indirect setter for 'area' property."""
+             self.__set_area(area)
+
+         area = property(___get_area, ___set_area,
+                         doc="""Gets or sets the area of the square.""")
+
+         @property
+         def perimeter(self):
+             return self.side * 4
+#+end_src
+** True/False evaluations
+#+begin_html
+<p class="info">
+尽可能使用隐式false
+</p>
+#+end_html
+Use the "implicit" false if at all possible, e.g., =if foo:= rather than
+~if foo != []:~. There are a few caveats that you should keep in mind
+though: 
+
++ Never use == or != to compare singletons like None. Use is or is not.
++ Beware of writing if x: when you really mean if x is not None:—e.g.,
+  when testing whether a variable or argument that defaults to None
+  was set to some other value. The other value might be a value that's
+  false in a boolean context!
++ Never compare a boolean variable to False using ==. Use if not x:
+  instead. If you need to distinguish False from None then chain the
+  expressions, such as if not x and x is not None:.
++ For sequences (strings, lists, tuples), use the fact that empty
+  sequences are false, so if not seq: or if seq: is preferable to if
+  len(seq): or if not len(seq):.
++ When handling integers, implicit false may involve more risk than
+  benefit (i.e., accidentally handling None as 0). You may compare a
+  value which is known to be an integer (and is not the result of
+  len()) against the integer 0.
+
+#+begin_src python
+Yes: if not users:
+         print 'no users'
+
+     if foo == 0:
+         self.handle_zero()
+
+     if i % 10 == 0:
+         self.handle_multiple_of_ten()
+No:  if len(users) == 0:
+         print 'no users'
+
+     if foo is not None and not foo:
+         self.handle_zero()
+
+     if not i % 10:
+         self.handle_multiple_of_ten()
+#+end_src
++ Note that '0' (i.e., 0 as string) evaluates to true.
+** Deprecated Language Features
+#+begin_html
+<p class="info">
+尽可能使用字符串方法取代字符串模块. 使用函数调用语法取代apply(). 
+使用列表推导, for循环取代filter()和map()当函数参数是个内联的lamdba.
+使用for取代reduce().
+</p>
+#+end_html
+We do not use any Python version which does not support these
+features, so there is no reason not to use the new styles.
+
+#+begin_src python
+Yes: words = foo.split(':')
+
+     [x[1] for x in my_list if x[2] == 5]
+
+     map(math.sqrt, data)    # Ok. No inlined lambda expression.
+
+     fn(*args, **kwargs)
+No:  words = string.split(foo, ':')
+
+     map(lambda x: x[1], filter(lambda x: x[2] == 5, my_list))
+
+     apply(fn, args, kwargs)
+#+end_src
+** Lexical Scoping
+#+begin_html
+<p class="info">
+可以使用
+</p>
+#+end_html
+** Function and Method Decorators
+#+begin_html
+<p class="info">
+如果好处很显然, 就明智的使用装饰器
+</p>
+#+end_html
+Use decorators judiciously when there is a clear advantage. Decorators
+should follow the same import and naming guidelines as functions.
+Decorator pydoc should clearly state that the function is a decorator.
+Write unit tests for decorators.
+
+Avoid external dependencies in the decorator itself (e.g. don't rely
+on files, sockets, database connections, etc.), since they might not
+be available when the decorator runs (at import time, perhaps from
+pydoc or other tools). A decorator that is called with valid
+parameters should (as much as possible) be guaranteed to succeed in
+all cases.
+
+Decorators are a special case of "top level code" - see main for more
+discussion.
+** Threading
+#+begin_html
+<p class="info">
+不要依赖内建类型的原子性.
+</p>
+#+end_html
+While Python's built-in data types such as dictionaries appear to have atomic operations, there are corner cases where they aren't atomic (e.g. if __hash__ or __eq__ are implemented as Python methods) and their atomicity should not be relied upon. Neither should you rely on atomic variable assignment (since this in turn depends on dictionaries).
+
+Use the Queue module's Queue data type as the preferred way to
+communicate data between threads. Otherwise, use the threading module
+and its locking primitives. Learn about the proper use of condition
+variables so you can use threading.Condition instead of using
+lower-level locks.
+** Power Features
+#+begin_html
+<p class="info">
+避免使用这些特性
+</p>
+#+end_html
+* Python Style Rules
+** Semicolons
+#+begin_html
+<p class="info">
+不要在行尾加分号, 也不要用分号将两条命令放在同一行.
+</p>
+#+end_html
+** Line length
+#+begin_html
+<p class="info">
+每行不超过80个字符
+</p>
+#+end_html
+Exceptions:
+
++ Long import statements.
++ URLs in comments.
+
+Do not use backslash line continuation.
+
+Make use of Python's [[http://docs.python.org/2/reference/lexical_analysis.html#implicit-line-joining][implicit line joining inside parentheses]],
+brackets and braces. If necessary, you can add an extra pair of
+parentheses around an expression.
+
+#+begin_src python
+Yes: foo_bar(self, width, height, color='black', design=None, x='foo',
+             emphasis=None, highlight=0)
+
+     if (width == 0 and height == 0 and
+         color == 'red' and emphasis == 'strong'):
+#+end_src
+When a literal string won't fit on a single line, use parentheses for implicit line joining.
+#+begin_src python
+x = ('This will build a very long long '
+     'long long long long long long string')
+#+end_src
+Within comments, put long URLs on their own line if necessary.
+#+begin_src python
+Yes:  # See details at
+      # http://www.example.com/us/developer/documentation/api/content/v2.0/csv_file_name_extension_full_specification.html
+No:  # See details at
+     # http://www.example.com/us/developer/documentation/api/content/\
+     # v2.0/csv_file_name_extension_full_specification.html
+#+end_src
+Make note of the *indentation* of the elements in the line continuation
+examples above; see the indentation section for explanation.
+** Parentheses
+#+begin_html
+<p class="info">
+保守的使用括号
+</p>
+#+end_html
+Do not use them in return statements or conditional statements unless
+using parentheses for implied line continuation. (See above.) It is
+however fine to use parentheses around tuples.
+
+#+begin_src python
+Yes: if foo:
+         bar()
+     while x:
+         x = bar()
+     if x and y:
+         bar()
+     if not x:
+         bar()
+     return foo
+     for (x, y) in dict.items(): ...
+No:  if (x):
+         bar()
+     if not(x):
+         bar()
+     return (foo)
+#+end_src
+** Indentation
+#+begin_html
+<p class="info">
+用4个空格来缩进代码
+</p>
+#+end_html
+
+Never use tabs or mix tabs and spaces. In cases of implied line
+continuation, you should align wrapped elements either vertically, as
+per the examples in the *line length* section; or using a hanging indent
+of 4 spaces, in which case there should be no argument on the first
+line.
+
+#+begin_src python
+Yes:   # Aligned with opening delimiter
+       foo = long_function_name(var_one, var_two,
+                                var_three, var_four)
+
+       # Aligned with opening delimiter in a dictionary
+       foo = {
+           long_dictionary_key: value1 +
+                                value2,
+           ...
+       }
+
+       # 4-space hanging indent; nothing on first line
+       foo = long_function_name(
+           var_one, var_two, var_three,
+           var_four)
+
+       # 4-space hanging indent in a dictionary
+       foo = {
+           long_dictionary_key:
+               long_dictionary_value,
+           ...
+       }
+No:    # Stuff on first line forbidden
+       foo = long_function_name(var_one, var_two,
+           var_three, var_four)
+
+       # 2-space hanging indent forbidden
+       foo = long_function_name(
+         var_one, var_two, var_three,
+         var_four)
+
+       # No hanging indent in a dictionary
+       foo = {
+       long_dictionary_key:
+       long_dictionary_value,
+               ...
+       }
+#+end_src
+** Blank Lines
+#+begin_html
+<p class="info">
+顶级定义之间空两行, 方法定义之间空一行
+</p>
+#+end_html
+One blank line between method definitions and between the class line
+and the first method. Use single blank lines as you judge appropriate
+within functions or methods.
+
+** Whitespace
+#+begin_html
+<p class="info">
+按照标准的排版规范来使用标点两边的空格
+</p>
+#+end_html
+
+No whitespace inside parentheses, brackets or braces.
+#+begin_src python
+Yes: spam(ham[1], {eggs: 2}, [])
+No:  spam( ham[ 1 ], { eggs: 2 }, [ ] )
+#+end_src
+No whitespace before a comma, semicolon, or colon. Do use whitespace
+after a comma, semicolon, or colon except at the end of the line.
+
+#+begin_src python
+Yes: if x == 4:
+         print x, y
+     x, y = y, x
+No:  if x == 4 :
+         print x , y
+     x , y = y , x
+#+end_src
+No whitespace before the open paren/bracket that starts an argument
+list, indexing or slicing.
+
+#+begin_src python
+Yes: spam(1)
+No:  spam (1)
+Yes: dict['key'] = list[index]
+No:  dict ['key'] = list [index]
+#+end_src
+Surround binary operators with a single space on either side for
+assignment ~(=)~, comparisons (~==, <, >, !=, <>, <=, >=~, in, not in, is,
+is not), and Booleans (and, or, not). Use your better judgment for the
+insertion of spaces around arithmetic operators but always be
+consistent about whitespace on either side of a binary operator.
+
+#+begin_src python
+Yes: x == 1
+No:  x<1
+#+end_src
+Don't use spaces around the '=' sign when used to indicate a keyword
+argument or a default parameter value.
+
+#+begin_src python
+Yes: def complex(real, imag=0.0): return magic(r=real, i=imag)
+No:  def complex(real, imag = 0.0): return magic(r = real, i = imag)
+#+end_src
+Don't use spaces to vertically align tokens on consecutive lines,
+since it becomes a maintenance burden (applies to :, #, =, etc.):
+
+#+begin_src python
+Yes:
+  foo = 1000  # comment
+  long_name = 2  # comment that should not be aligned
+
+  dictionary = {
+      'foo': 1,
+      'long_name': 2,
+  }
+No:
+  foo       = 1000  # comment
+  long_name = 2     # comment that should not be aligned
+
+  dictionary = {
+      'foo'      : 1,
+      'long_name': 2,
+  }
+#+end_src
+
+** Shebang Line
+#+begin_html
+<p class="info">
+大部分.py文件不要以#!行开头。以#!/usr/bin/env python<version>开头
+</p>
+#+end_html
+
+This line is used by the kernel to find the Python interpreter, but is
+ignored by Python when importing modules. It is only necessary on a
+file that will be executed directly.
+#+begin_src python
+#!/usr/bin/env python2.4
+#+end_src
+** Comments
+#+begin_html
+<p class="info">
+确保对模块, 函数, 方法和行内注释使用正确的风格
+</p>
+#+end_html
+*** Doc Strings
+Python has a unique commenting style using doc strings. A doc string
+is a string that is the first statement in a package, module, class or
+function. These strings can be extracted automatically through the
+=__doc__= member of the object and are used by pydoc. (Try running pydoc
+on your module to see how it looks.) We always use the three
+double-quote """ format for doc strings (per PEP 257). A doc string
+should be organized as a summary line (one physical line) terminated
+by a period, question mark, or exclamation point, followed by a blank
+line, followed by the rest of the doc string starting at the same
+cursor position as the first quote of the first line. There are more
+formatting guidelines for doc strings below.
+*** Modules
++ Every file should contain license boilerplate.(Copyright 2008 Google Inc)
++ Choose the appropriate boilerplate for the license used by the
+  project (for example, Apache 2.0, BSD, LGPL, GPL)
+*** Functions and Methods
+As used in this section "function" applies to methods, function, and
+generators.
+
+A function must have a docstring, unless it meets all of the following
+criteria:
++ not externally visible
++ very short
++ obvious
+
++ A docstring should give enough information to write a call to the
+  function without reading the function's code. 
++ A docstring should describe the function's calling syntax and its
+  semantics, not its implementation. 
++ For tricky code, comments alongside the code are more appropriate
+  than using docstrings.
+
+Certain aspects of a function should be documented in special
+sections, listed below. Each section begins with a heading line, which
+ends with a colon. Sections should be indented two spaces, except for
+the heading.
+
+Args:
+    List each parameter by name. A description should follow the name,
+    and be separated by a colon and a space. If the description is too
+    long to fit on a single 80-character line, use a hanging indent of
+    2 or 4 spaces (be consistent with the rest of the file).
+
+    The description should mention required type(s) and the meaning of
+    the argument.
+
+    If a function accepts *foo (variable length argument lists) and/or
+   **bar (arbitrary keyword arguments), they should be listed as *foo
+   and **bar.
+
+
+Returns: (or Yields: for generators)
+    Describe the type and semantics of the return value. If the
+    function only returns None, this section is not required.
+
+Raises:
+    List all exceptions that are relevant to the interface.
+
+#+begin_src python
+def fetch_bigtable_rows(big_table, keys, other_silly_variable=None):
+    """Fetches rows from a Bigtable.
+
+    Retrieves rows pertaining to the given keys from the Table instance
+    represented by big_table.  Silly things may happen if
+    other_silly_variable is not None.
+
+    Args:
+        big_table: An open Bigtable Table instance.
+        keys: A sequence of strings representing the key of each table row
+            to fetch.
+        other_silly_variable: Another optional variable, that has a much
+            longer name than the other args, and which does nothing.
+
+    Returns:
+        A dict mapping keys to the corresponding table row data
+        fetched. Each row is represented as a tuple of strings. For
+        example:
+
+        {'Serak': ('Rigel VII', 'Preparer'),
+         'Zim': ('Irk', 'Invader'),
+         'Lrrr': ('Omicron Persei 8', 'Emperor')}
+
+        If a key from the keys argument is missing from the dictionary,
+        then that row was not found in the table.
+
+    Raises:
+        IOError: An error occurred accessing the bigtable.Table object.
+    """
+    pass
+#+end_src
+*** Classes
+Classes should have a doc string below the class definition describing
+the class. If your class has public attributes, they should be
+documented here in an Attributes section and follow the same
+formatting as a function's Args section.
+
+#+begin_src python
+class SampleClass(object):
+    """Summary of class here.
+
+    Longer class information....
+    Longer class information....
+
+    Attributes:
+        likes_spam: A boolean indicating if we like SPAM or not.
+        eggs: An integer count of the eggs we have laid.
+    """
+
+    def __init__(self, likes_spam=False):
+        """Inits SampleClass with blah."""
+        self.likes_spam = likes_spam
+        self.eggs = 0
+
+    def public_method(self):
+        """Performs operation blah."""
+#+end_src
+*** Block and Inline Comments
+The final place to have comments is in tricky parts of the code. If
+you're going to have to explain it at the next code review, you should
+comment it now. Complicated operations get a few lines of comments
+before the operations commence. Non-obvious ones get comments at the
+end of the line.
+
+#+begin_src python
+# We use a weighted dictionary search to find out where i is in
+# the array.  We extrapolate position based on the largest num
+# in the array and the array size and then do binary search to
+# get the exact number.
+
+if i & (i-1) == 0:        # true iff i is a power of 2
+#+end_src
+
+To improve legibility, these comments should be at least 2 spaces away from the code.
+
+** Classes
+#+begin_html
+<p class="info">
+如果一个类不继承自其它类, 就显式的从object继承. 嵌套类也一样.
+</p>
+#+end_html
+#+begin_src python
+Yes: class SampleClass(object):
+         pass
+
+
+     class OuterClass(object):
+
+         class InnerClass(object):
+             pass
+
+
+     class ChildClass(ParentClass):
+         """Explicitly inherits from another class already."""
+
+No: class SampleClass:
+        pass
+
+
+    class OuterClass:
+
+        class InnerClass:
+            pass
+#+end_src
+Inheriting from =object= is needed to make properties work properly, and
+it will protect your code from one particular potential
+incompatibility with Python 3000. It also defines special methods that
+implement the default semantics of objects including
+=__new__,__init__, __delattr__, __getattribute__, __setattr__, __hash__,
+__repr__, and __str__=.
+** Strings
+#+begin_html
+<p class="info">
+用%操作符格式化字符串, 即使参数都是字符串. 不过也不能一概而论, 你需要在+和%之间好好判定.
+</p>
+#+end_html
+
+
+
+
+** Files and Sockets
 #+begin_html
 <p class="info">
 
 </p>
+#+end_html
 
-<p class="warning">
+** TODO Comments
+#+begin_html
+<p class="info">
 
 </p>
 #+end_html
 
+** Imports formatting
+#+begin_html
+<p class="info">
+
+</p>
+#+end_html
+** Statements
+#+begin_html
+<p class="info">
+
+</p>
+#+end_html
+** Access Control
+#+begin_html
+<p class="info">
+
+</p>
+#+end_html
+** Naming
+#+begin_html
+<p class="info">
+
+</p>
+#+end_html
+
+** Main
+#+begin_html
+<p class="info">
+
+</p>
+#+end_html
+
+* cc
 #+begin_src python
 
 #+end_src
 
-#+begin_src c
-
-#+end_src
 
 
-#+begin_src sh
-
-#+end_src
