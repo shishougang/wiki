@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Google Shell Style Notes</title>
-<!-- 2014-01-03 Fri 21:50 -->
+<!-- 2014-01-08 Wed 22:09 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -142,38 +142,398 @@ for the JavaScript code in this tag.
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">Homepage</a></li>
-<li><a href="#sec-2">cc</a></li>
+<li><a href="#sec-2">Shell Files and Interpreter Invocation</a>
+<ul>
+<li><a href="#sec-2-1">File Extensions</a></li>
+<li><a href="#sec-2-2">SUID/SGID</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">Environment</a>
+<ul>
+<li><a href="#sec-3-1">STDOUT vs STDERR</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">Comments</a>
+<ul>
+<li><a href="#sec-4-1">File Header</a></li>
+<li><a href="#sec-4-2">Function Comments</a></li>
+<li><a href="#sec-4-3">Implementation Comments</a></li>
+<li><a href="#sec-4-4"><span class="todo TODO">TODO</span> Comments</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">Formatting</a>
+<ul>
+<li><a href="#sec-5-1">Indentation</a></li>
+<li><a href="#sec-5-2">Line Length and Long Strings</a></li>
+<li><a href="#sec-5-3">Pipelines</a></li>
+<li><a href="#sec-5-4">Loops</a></li>
+<li><a href="#sec-5-5">Case statement</a></li>
+<li><a href="#sec-5-6">Variable expansion</a></li>
+<li><a href="#sec-5-7">Quoting</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">Features and Bugs</a>
+<ul>
+<li><a href="#sec-6-1">Command Substitution</a></li>
+<li><a href="#sec-6-2">Test, [ and [[</a></li>
+<li><a href="#sec-6-3">Testing Strings</a></li>
+<li><a href="#sec-6-4">Wildcard Expansion of Filenames</a></li>
+<li><a href="#sec-6-5">Eval</a></li>
+<li><a href="#sec-6-6">Pipes to While</a></li>
+</ul>
+</li>
+<li><a href="#sec-7">Naming Conventions</a>
+<ul>
+<li><a href="#sec-7-1">Function Names</a></li>
+<li><a href="#sec-7-2">Variable Names</a></li>
+<li><a href="#sec-7-3">Constants and Environment Variable Names</a></li>
+<li><a href="#sec-7-4">Source Filenames</a></li>
+<li><a href="#sec-7-5">Read-only Variables</a></li>
+<li><a href="#sec-7-6">Function Location</a></li>
+<li><a href="#sec-7-7">main</a></li>
+</ul>
+</li>
+<li><a href="#sec-8">Calling Commands</a>
+<ul>
+<li><a href="#sec-8-1">Checking Return Values</a></li>
+<li><a href="#sec-8-2">Builtin Commands vs. External Commands</a></li>
+</ul>
+</li>
+<li><a href="#sec-9">cc</a></li>
 </ul>
 </div>
 </div>
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">Homepage</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+<a href="http://google-styleguide.googlecode.com/svn/trunk/shell.xml">http://google-styleguide.googlecode.com/svn/trunk/shell.xml</a>
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Shell Files and Interpreter Invocation</h2>
+<div class="outline-text-2" id="text-2">
+</div><div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">File Extensions</h3>
+<div class="outline-text-3" id="text-2-1">
+<p class="info">
+可执行文件应该没有后缀（强烈推荐）或以.sh后缀。库必须有.sh后缀而且
+不能被执行。
+</p>
+<p>
+However, for libraries it's important to know what language it is and
+sometimes there's a need to have similar libraries in different
+languages. This allows library files with identical purposes but
+different languages to be identically named except for the
+language-specific suffix.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">SUID/SGID</h3>
+<div class="outline-text-3" id="text-2-2">
+<p class="info">
+SUID和SGID被禁止。
+</p>
+<p>
+Use sudo to provide elevated access if you need it.
+</p>
+</div>
+</div>
 </div>
 
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Environment</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">STDOUT vs STDERR</h3>
+<div class="outline-text-3" id="text-3-1">
+<p class="info">
+所有错误信息输出到STDERR
+</p>
+<p>
+This makes it easier to separate normal status from actual issues.
+</p>
 
-<div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">cc</h2>
-<div class="outline-text-2" id="text-2">
+<p>
+A function to print out error messages along with other status
+information is recommended.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #87cefa;">err</span>() {
+  <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $@"</span> &gt;&amp;2
+}
+
+<span style="color: #00ffff;">if</span> ! do_something; <span style="color: #00ffff;">then</span>
+  err <span style="color: #ffa07a;">"Unable to do_something"</span>
+  <span style="color: #00ffff;">exit</span> <span style="color: #ffa07a;">"${E_DID_NOTHING}"</span>
+<span style="color: #00ffff;">fi</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Comments</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">File Header</h3>
+<div class="outline-text-3" id="text-4-1">
+<p class="info">
+每个文件以一段它内容的描述开始。
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">Function Comments</h3>
+<div class="outline-text-3" id="text-4-2">
 <p class="info">
 
 </p>
+</div>
+</div>
 
-<p class="warning">
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3">Implementation Comments</h3>
+<div class="outline-text-3" id="text-4-3">
+<p class="info">
 
 </p>
-
-<div class="org-src-container">
-
-<pre class="src src-python"></pre>
+</div>
 </div>
 
-<div class="org-src-container">
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4"><span class="todo TODO">TODO</span> Comments</h3>
+<div class="outline-text-3" id="text-4-4">
+<p class="info">
 
-<pre class="src src-c"></pre>
+</p>
+</div>
+</div>
 </div>
 
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Formatting</h2>
+<div class="outline-text-2" id="text-5">
+</div><div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Indentation</h3>
+<div class="outline-text-3" id="text-5-1">
+<p class="info">
 
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">Line Length and Long Strings</h3>
+<div class="outline-text-3" id="text-5-2">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3">Pipelines</h3>
+<div class="outline-text-3" id="text-5-3">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-4" class="outline-3">
+<h3 id="sec-5-4">Loops</h3>
+<div class="outline-text-3" id="text-5-4">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-5" class="outline-3">
+<h3 id="sec-5-5">Case statement</h3>
+<div class="outline-text-3" id="text-5-5">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-6" class="outline-3">
+<h3 id="sec-5-6">Variable expansion</h3>
+<div class="outline-text-3" id="text-5-6">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-7" class="outline-3">
+<h3 id="sec-5-7">Quoting</h3>
+<div class="outline-text-3" id="text-5-7">
+<p class="info">
+
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Features and Bugs</h2>
+<div class="outline-text-2" id="text-6">
+</div><div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1">Command Substitution</h3>
+<div class="outline-text-3" id="text-6-1">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2">Test, [ and [[</h3>
+<div class="outline-text-3" id="text-6-2">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-3" class="outline-3">
+<h3 id="sec-6-3">Testing Strings</h3>
+<div class="outline-text-3" id="text-6-3">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-4" class="outline-3">
+<h3 id="sec-6-4">Wildcard Expansion of Filenames</h3>
+<div class="outline-text-3" id="text-6-4">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-5" class="outline-3">
+<h3 id="sec-6-5">Eval</h3>
+<div class="outline-text-3" id="text-6-5">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-6" class="outline-3">
+<h3 id="sec-6-6">Pipes to While</h3>
+<div class="outline-text-3" id="text-6-6">
+<p class="info">
+
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">Naming Conventions</h2>
+<div class="outline-text-2" id="text-7">
+</div><div id="outline-container-sec-7-1" class="outline-3">
+<h3 id="sec-7-1">Function Names</h3>
+<div class="outline-text-3" id="text-7-1">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-7-2" class="outline-3">
+<h3 id="sec-7-2">Variable Names</h3>
+<div class="outline-text-3" id="text-7-2">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-7-3" class="outline-3">
+<h3 id="sec-7-3">Constants and Environment Variable Names</h3>
+<div class="outline-text-3" id="text-7-3">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-7-4" class="outline-3">
+<h3 id="sec-7-4">Source Filenames</h3>
+<div class="outline-text-3" id="text-7-4">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-7-5" class="outline-3">
+<h3 id="sec-7-5">Read-only Variables</h3>
+<div class="outline-text-3" id="text-7-5">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-7-6" class="outline-3">
+<h3 id="sec-7-6">Function Location</h3>
+<div class="outline-text-3" id="text-7-6">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-7-7" class="outline-3">
+<h3 id="sec-7-7">main</h3>
+<div class="outline-text-3" id="text-7-7">
+<p class="info">
+
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">Calling Commands</h2>
+<div class="outline-text-2" id="text-8">
+</div><div id="outline-container-sec-8-1" class="outline-3">
+<h3 id="sec-8-1">Checking Return Values</h3>
+<div class="outline-text-3" id="text-8-1">
+<p class="info">
+
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-8-2" class="outline-3">
+<h3 id="sec-8-2">Builtin Commands vs. External Commands</h3>
+<div class="outline-text-3" id="text-8-2">
+<p class="info">
+
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">cc</h2>
+<div class="outline-text-2" id="text-9">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -183,7 +543,7 @@ for the JavaScript code in this tag.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-01-03 Fri 21:50</p>
+<p class="date">Created: 2014-01-08 Wed 22:09</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Google Python Style Notes (Revision 2.59)</title>
-<!-- 2014-01-06 Mon 20:03 -->
+<!-- 2014-01-07 Tue 22:18 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -186,7 +186,6 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3-17">Main</a></li>
 </ul>
 </li>
-<li><a href="#sec-4">cc</a></li>
 </ul>
 </div>
 </div>
@@ -1370,18 +1369,133 @@ __repr__, and __str__</code>.
 <h3 id="sec-3-10">Strings</h3>
 <div class="outline-text-3" id="text-3-10">
 <p class="info">
-用%操作符格式化字符串, 即使参数都是字符串. 不过也不能一概而论, 你需要在+和%之间好好判定.
+用format方法或%操作符格式化字符串, 即使参数都是字符串.
+然而你也需要在+和%(或%)之间好好判定.
 </p>
+<div class="org-src-container">
+
+<pre class="src src-python">Yes: x = a + b
+     x = <span style="color: #ffa07a;">'%s, %s!'</span> % (imperative, expletive)
+     x = <span style="color: #ffa07a;">'{}, {}!'</span>.format(imperative, expletive)
+     x = <span style="color: #ffa07a;">'name: %s; score: %d'</span> % (name, n)
+     x = <span style="color: #ffa07a;">'name: {}; score: {}'</span>.format(name, n)
+No: x = <span style="color: #ffa07a;">'%s%s'</span> % (a, b)  <span style="color: #ff7f24;"># use + in this case</span>
+    x = <span style="color: #ffa07a;">'{}{}'</span>.format(a, b)  <span style="color: #ff7f24;"># use + in this case</span>
+    x = imperative + <span style="color: #ffa07a;">', '</span> + expletive + <span style="color: #ffa07a;">'!'</span>
+    x = <span style="color: #ffa07a;">'name: '</span> + name + <span style="color: #ffa07a;">'; score: '</span> + <span style="color: #b0c4de;">str</span>(n)
+</pre>
+</div>
+
+<p>
+Avoid using the + and += operators to accumulate a string within a
+loop. Since strings are immutable, this creates unnecessary temporary
+objects and results in quadratic rather than linear running time.
+Instead, add each substring to a list and ''.join the list after the
+loop terminates (or, write each substring to a io.BytesIO buffer).
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-python">Yes: <span style="color: #ffebcd; background-color: #2f4f4f;">items</span> = [<span style="color: #ffa07a;">'&lt;table&gt;'</span>]
+     <span style="color: #00ffff;">for</span> last_name, first_name <span style="color: #00ffff;">in</span> employee_list:
+         items.append(<span style="color: #ffa07a;">'&lt;tr&gt;&lt;td&gt;%s, %s&lt;/td&gt;&lt;/tr&gt;'</span> % (last_name, first_name))
+     items.append(<span style="color: #ffa07a;">'&lt;/table&gt;'</span>)
+     <span style="color: #ffebcd; background-color: #2f4f4f;">employee_table</span> = <span style="color: #ffa07a;">''</span>.join(items)
+No: <span style="color: #ffebcd; background-color: #2f4f4f;">employee_table</span> = <span style="color: #ffa07a;">'&lt;table&gt;'</span>
+    <span style="color: #00ffff;">for</span> last_name, first_name <span style="color: #00ffff;">in</span> employee_list:
+        <span style="color: #ffebcd; background-color: #2f4f4f;">employee_table</span> += <span style="color: #ffa07a;">'&lt;tr&gt;&lt;td&gt;%s, %s&lt;/td&gt;&lt;/tr&gt;'</span> % (last_name, first_name)
+    <span style="color: #ffebcd; background-color: #2f4f4f;">employee_table</span> += <span style="color: #ffa07a;">'&lt;/table&gt;'</span>
+</pre>
+</div>
+
+<p>
+Be consistent with your choice of string quote character within a
+file. Pick ' or " and stick with it. It is okay to use the other quote
+character on a string to avoid the need to \ escape within the string.
+GPyLint enforces this.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-python">Yes:
+  Python(<span style="color: #ffa07a;">'Why are you hiding your eyes?'</span>)
+  Gollum(<span style="color: #ffa07a;">"I'm scared of lint errors."</span>)
+  Narrator(<span style="color: #ffa07a;">'"Good!" thought a happy Python reviewer.'</span>)
+No:
+  Python(<span style="color: #ffa07a;">"Why are you hiding your eyes?"</span>)
+  Gollum(<span style="color: #ffa07a;">'The lint. It burns. It burns us.'</span>)
+  Gollum(<span style="color: #ffa07a;">"Always the great lint. Watching. Watching."</span>)
+</pre>
+</div>
+
+<p>
+Prefer """ for multi-line strings rather than '''. Projects may choose
+to use ''' for all non-docstring multi-line strings if and only if
+they also use ' for regular strings. Doc strings must use """
+regardless. Note that it is often cleaner to use implicit line joining
+since multi-line strings do not flow with the indentation of the rest
+of the program:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-python">Yes:
+  <span style="color: #b0c4de;">print</span> (<span style="color: #ffa07a;">"This is much nicer.\n"</span>
+         <span style="color: #ffa07a;">"Do it this way.\n"</span>)
+  No:
+    <span style="color: #b0c4de;">print</span> <span style="color: #ffa07a;">"""This is pretty ugly.</span>
+<span style="color: #ffa07a;">Don't do this.</span>
+<span style="color: #ffa07a;">"""</span>
+</pre>
 </div>
 </div>
-
-
-
+</div>
 <div id="outline-container-sec-3-11" class="outline-3">
 <h3 id="sec-3-11">Files and Sockets</h3>
 <div class="outline-text-3" id="text-3-11">
 <p class="info">
+明确的关系文件和套接子当使用完。
+</p>
 
+<p>
+Furthermore, while files and sockets are automatically closed when the
+file object is destructed, tying the life-time of the file object to
+the state of the file is poor practice, for several reasons:
+</p>
+
+<ul class="org-ul">
+<li>There are no guarantees as to when the runtime will actually run the file's destructor. Different Python implementations use different memory management techniques, such as delayed Garbage Collection, which may increase the object's lifetime arbitrarily and indefinitely.
+</li>
+<li>Unexpected references to the file may keep it around longer than intended (e.g. in tracebacks of exceptions, inside globals, etc).
+</li>
+</ul>
+
+<p>
+The preferred way to manage files is using the "with" statement:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-python"><span style="color: #00ffff;">with</span> <span style="color: #b0c4de;">open</span>(<span style="color: #ffa07a;">"hello.txt"</span>) <span style="color: #00ffff;">as</span> hello_file:
+    <span style="color: #00ffff;">for</span> line <span style="color: #00ffff;">in</span> hello_file:
+        <span style="color: #b0c4de;">print</span> line
+</pre>
+</div>
+
+<p>
+For file-like objects that do not support the "with" statement, use
+<code>contextlib.closing()</code>:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-python"><span style="color: #00ffff;">import</span> contextlib
+
+<span style="color: #00ffff;">with</span> contextlib.closing(urllib.urlopen(<span style="color: #ffa07a;">"http://www.python.org/"</span>)) <span style="color: #00ffff;">as</span> front_page:
+    <span style="color: #00ffff;">for</span> line <span style="color: #00ffff;">in</span> front_page:
+        <span style="color: #b0c4de;">print</span> line
+</pre>
+</div>
+<p>
+Legacy AppEngine code using Python 2.5 may enable the "with" statement using "from <span class="underline"><span class="underline">future</span></span> import with<sub>statement</sub>".
 </p>
 </div>
 </div>
@@ -1389,7 +1503,33 @@ __repr__, and __str__</code>.
 <h3 id="sec-3-12"><span class="todo TODO">TODO</span> Comments</h3>
 <div class="outline-text-3" id="text-3-12">
 <p class="info">
+为临时代码使用TODO注释, 它是一种短期解决方案. 不算完美, 但够好了.
+</p>
+<p>
+TODOs should include the string TODO in all caps, followed by the
+name, e-mail address, or other identifier of the person who can best
+provide context about the problem referenced by the TODO, in
+parentheses. A colon is optional. A comment explaining what there is
+to do is required. The main purpose is to have a consistent TODO
+format that can be searched to find the person who can provide more
+details upon request. A TODO is not a commitment that the person
+referenced will fix the problem. Thus when you create a TODO, it is
+almost always your name that is given.
+</p>
 
+
+<div class="org-src-container">
+
+<pre class="src src-python"><span style="color: #ff7f24;"># </span><span style="color: #ffa07a;">TODO</span><span style="color: #ff7f24;">(kl@gmail.com): Use a "*" here for string repetition.</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ffa07a;">TODO</span><span style="color: #ff7f24;">(Zeke) Change this to use relations.</span>
+</pre>
+</div>
+
+<p>
+If your TODO is of the form "At a future date do something" make sure
+that you either include a very specific date ("Fix by November 2009")
+or a very specific event ("Remove this code when all clients can
+handle XML responses.").
 </p>
 </div>
 </div>
@@ -1397,59 +1537,276 @@ __repr__, and __str__</code>.
 <h3 id="sec-3-13">Imports formatting</h3>
 <div class="outline-text-3" id="text-3-13">
 <p class="info">
-
+每个导入应该独占一行
 </p>
-</div>
-</div>
+<p>
+E.g.:
+</p>
+<div class="org-src-container">
 
+<pre class="src src-python">Yes: <span style="color: #00ffff;">import</span> os
+     <span style="color: #00ffff;">import</span> sys
+No:  <span style="color: #00ffff;">import</span> os, sys
+</pre>
+</div>
+<p>
+Imports are always put at the top of the file, just after any module
+comments and doc strings and before module globals and constants.
+</p>
+
+<p>
+Imports should be grouped with the order being most generic to least
+generic:
+</p>
+
+<ul class="org-ul">
+<li>standard library imports
+</li>
+<li>third-party imports
+</li>
+<li>application-specific imports
+</li>
+</ul>
+
+<p>
+Within each grouping, imports should be sorted lexicographically,
+ignoring case, according to each module's full package path.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-python"><span style="color: #00ffff;">import</span> foo
+<span style="color: #00ffff;">from</span> foo <span style="color: #00ffff;">import</span> bar
+<span style="color: #00ffff;">from</span> foo.bar <span style="color: #00ffff;">import</span> baz
+<span style="color: #00ffff;">from</span> foo.bar <span style="color: #00ffff;">import</span> Quux
+<span style="color: #00ffff;">from</span> Foob <span style="color: #00ffff;">import</span> ar
+</pre>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-3-14" class="outline-3">
 <h3 id="sec-3-14">Statements</h3>
 <div class="outline-text-3" id="text-3-14">
 <p class="info">
-
+通常每个语句应该独占一行
 </p>
-</div>
-</div>
+<p>
+However, you may put the result of a test on the same line as the test
+only if the entire statement fits on one line. In particular, you can
+never do so with try/except since the try and except can't both fit on
+the same line, and you can only do so with an if if there is no else.
+</p>
 
+<div class="org-src-container">
+
+<pre class="src src-python">Yes:
+
+  <span style="color: #00ffff;">if</span> foo: bar(foo)
+No:
+
+  <span style="color: #00ffff;">if</span> foo: bar(foo)
+  <span style="color: #00ffff;">else:</span>   baz(foo)
+
+  <span style="color: #00ffff;">try:</span>               bar(foo)
+  <span style="color: #00ffff;">except</span> <span style="color: #b0c4de;">ValueError</span>: baz(foo)
+
+  <span style="color: #00ffff;">try:</span>
+      bar(foo)
+  <span style="color: #00ffff;">except</span> <span style="color: #b0c4de;">ValueError</span>: baz(foo)
+</pre>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-3-15" class="outline-3">
 <h3 id="sec-3-15">Access Control</h3>
 <div class="outline-text-3" id="text-3-15">
 <p class="info">
-
+在Python中, 对于琐碎又不太重要的访问函数, 你应该直接使用公有变量来取代它们, 
+这样可以避免额外的函数调用开销. 当添加更多功能时, 
+你可以用属性(property)来保持语法的一致性.
+</p>
+<p>
+On the other hand, if access is more complex, or the cost of accessing
+the variable is significant, you should use function calls (following
+the Naming guidelines) such as get<sub>foo</sub>() and set<sub>foo</sub>(). If the past
+behavior allowed access through a property, do not bind the new
+accessor functions to the property. Any code still attempting to
+access the variable by the old method should break visibly so they are
+made aware of the change in complexity.
 </p>
 </div>
 </div>
-
 <div id="outline-container-sec-3-16" class="outline-3">
 <h3 id="sec-3-16">Naming</h3>
 <div class="outline-text-3" id="text-3-16">
-<p class="info">
+<div class="org-src-container">
 
-</p>
+<pre class="src src-python">module_name, package_name, ClassName, method_name, ExceptionName, function_name,
+GLOBAL_CONSTANT_NAME, global_var_name, instance_var_name, function_parameter_name, 
+local_var_name.
+</pre>
 </div>
+</div>
+<ul class="org-ul"><li>Names to Avoid<br  /><div class="outline-text-4" id="text-3-16-1">
+<ul class="org-ul">
+<li>single character names except for counters or iterators
+</li>
+<li>dashes (-) in any package/module name
+</li>
+<li><code>__double_leading_and_trailing_underscore__</code> names (reserved by Python)
+</li>
+</ul>
+</div>
+</li>
+
+<li>Naming Convention<br  /><div class="outline-text-4" id="text-3-16-2">
+<ul class="org-ul">
+<li>"Internal" means internal to a module or protected or private within
+a class.
+</li>
+
+<li>Prepending a single underscore (<code>_</code>) has some support for protecting
+module variables and functions (not included with import * from).
+Prepending a double underscore (<code>__</code>) to an instance variable or
+method effectively serves to make the variable or method private to
+its class (using name mangling).
+</li>
+
+<li>Place related classes and top-level functions together in a module.
+Unlike Java, there is no need to limit yourself to one class per
+module.
+</li>
+
+<li>Use CapWords for class names, but <code>lower_with_under.py</code> for module
+names. Although there are many existing modules named CapWords.py,
+this is now discouraged because it's confusing when the module
+happens to be named after a class. ("wait &#x2013; did I write <code>import
+  StringIO</code> or from <code>StringIO import StringIO</code>?")
+</li>
+</ul>
+
+<p>
+Guidelines derived from Guido's Recommendations
+</p>
+
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="left" />
+
+<col  class="left" />
+
+<col  class="left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="left">Type</th>
+<th scope="col" class="left">Public</th>
+<th scope="col" class="left">internal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="left">Packages</td>
+<td class="left"><code>lower_with_under</code></td>
+<td class="left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="left">Modules</td>
+<td class="left"><code>lower_with_under</code></td>
+<td class="left"><code>_lower_with_under</code></td>
+</tr>
+
+<tr>
+<td class="left">Classes</td>
+<td class="left">CapWords</td>
+<td class="left"><code>_CapWords</code></td>
+</tr>
+
+<tr>
+<td class="left">Exceptions</td>
+<td class="left">CapWords</td>
+<td class="left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="left">Functions</td>
+<td class="left"><code>lower_with_under()</code></td>
+<td class="left"><code>_lower_with_under()</code></td>
+</tr>
+
+<tr>
+<td class="left">Global/Class Constants</td>
+<td class="left"><code>CAPS_WITH_UNDER</code></td>
+<td class="left"><code>_CAPS_WITH_UNDER</code></td>
+</tr>
+
+<tr>
+<td class="left">Global/Class Variable</td>
+<td class="left"><code>lower_with_under</code></td>
+<td class="left"><code>_lower_with_under</code></td>
+</tr>
+
+<tr>
+<td class="left">Instance Variable</td>
+<td class="left"><code>lower_with_under</code></td>
+<td class="left"><code>_lower_with_under(protected)</code> or <code>__lower_with_under(private)</code></td>
+</tr>
+
+<tr>
+<td class="left">Method Names</td>
+<td class="left"><code>lower_with_under()</code></td>
+<td class="left"><code>_lower_with_under()(protected)</code> or <code>__lower_with_under()(private)</code></td>
+</tr>
+
+<tr>
+<td class="left">Function/Method Parameters</td>
+<td class="left"><code>lower_with_under</code></td>
+<td class="left">&#xa0;</td>
+</tr>
+
+<tr>
+<td class="left">Local Variables</td>
+<td class="left"><code>lower_with_under</code></td>
+<td class="left">&#xa0;</td>
+</tr>
+</tbody>
+</table>
+</div>
+</li></ul>
 </div>
 <div id="outline-container-sec-3-17" class="outline-3">
 <h3 id="sec-3-17">Main</h3>
 <div class="outline-text-3" id="text-3-17">
 <p class="info">
-
+即使是一个打算被用作脚本的文件,仅仅的导入不应该对脚本的主功能造成副作用。
+主功能应该在一个main()函数中。
 </p>
-</div>
-</div>
-</div>
-<div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">cc</h2>
-<div class="outline-text-2" id="text-4">
+<p>
+In Python, pydoc as well as unit tests require modules to be
+importable. Your code should always check <code>if __name__ == '__main__':</code>
+before executing your main program so that the main program is not
+executed when the module is imported.
+</p>
+
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
+<pre class="src src-python"><span style="color: #00ffff;">def</span> <span style="color: #87cefa;">main</span>():
+      ...
+
+<span style="color: #00ffff;">if</span> <span style="color: #b0c4de;">__name__</span> == <span style="color: #ffa07a;">'__main__'</span>:
+    main()
+</pre>
+</div>
 </div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-01-06 Mon 20:03</p>
+<p class="date">Created: 2014-01-07 Tue 22:18</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

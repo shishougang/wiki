@@ -844,62 +844,273 @@ __repr__, and __str__=.
 ** Strings
 #+begin_html
 <p class="info">
-用%操作符格式化字符串, 即使参数都是字符串. 不过也不能一概而论, 你需要在+和%之间好好判定.
+用format方法或%操作符格式化字符串, 即使参数都是字符串.
+然而你也需要在+和%(或%)之间好好判定.
 </p>
 #+end_html
+#+begin_src python
+Yes: x = a + b
+     x = '%s, %s!' % (imperative, expletive)
+     x = '{}, {}!'.format(imperative, expletive)
+     x = 'name: %s; score: %d' % (name, n)
+     x = 'name: {}; score: {}'.format(name, n)
+No: x = '%s%s' % (a, b)  # use + in this case
+    x = '{}{}'.format(a, b)  # use + in this case
+    x = imperative + ', ' + expletive + '!'
+    x = 'name: ' + name + '; score: ' + str(n)
+#+end_src
 
+Avoid using the + and += operators to accumulate a string within a
+loop. Since strings are immutable, this creates unnecessary temporary
+objects and results in quadratic rather than linear running time.
+Instead, add each substring to a list and ''.join the list after the
+loop terminates (or, write each substring to a io.BytesIO buffer).
 
+#+begin_src python
+Yes: items = ['<table>']
+     for last_name, first_name in employee_list:
+         items.append('<tr><td>%s, %s</td></tr>' % (last_name, first_name))
+     items.append('</table>')
+     employee_table = ''.join(items)
+No: employee_table = '<table>'
+    for last_name, first_name in employee_list:
+        employee_table += '<tr><td>%s, %s</td></tr>' % (last_name, first_name)
+    employee_table += '</table>'
+#+end_src
 
+Be consistent with your choice of string quote character within a
+file. Pick ' or " and stick with it. It is okay to use the other quote
+character on a string to avoid the need to \ escape within the string.
+GPyLint enforces this.
+
+#+begin_src python
+Yes:
+  Python('Why are you hiding your eyes?')
+  Gollum("I'm scared of lint errors.")
+  Narrator('"Good!" thought a happy Python reviewer.')
+No:
+  Python("Why are you hiding your eyes?")
+  Gollum('The lint. It burns. It burns us.')
+  Gollum("Always the great lint. Watching. Watching.")
+#+end_src
+
+Prefer """ for multi-line strings rather than '''. Projects may choose
+to use ''' for all non-docstring multi-line strings if and only if
+they also use ' for regular strings. Doc strings must use """
+regardless. Note that it is often cleaner to use implicit line joining
+since multi-line strings do not flow with the indentation of the rest
+of the program:
+#+begin_src python
+Yes:
+  print ("This is much nicer.\n"
+         "Do it this way.\n")
+  No:
+    print """This is pretty ugly.
+Don't do this.
+"""
+#+end_src
 
 ** Files and Sockets
 #+begin_html
 <p class="info">
-
+明确的关系文件和套接子当使用完。
 </p>
 #+end_html
+
+Furthermore, while files and sockets are automatically closed when the
+file object is destructed, tying the life-time of the file object to
+the state of the file is poor practice, for several reasons:
+
++ There are no guarantees as to when the runtime will actually run the file's destructor. Different Python implementations use different memory management techniques, such as delayed Garbage Collection, which may increase the object's lifetime arbitrarily and indefinitely.
++ Unexpected references to the file may keep it around longer than intended (e.g. in tracebacks of exceptions, inside globals, etc).
+
+The preferred way to manage files is using the "with" statement:
+
+#+begin_src python
+with open("hello.txt") as hello_file:
+    for line in hello_file:
+        print line
+#+end_src
+
+For file-like objects that do not support the "with" statement, use
+=contextlib.closing()=:
+#+begin_src python
+import contextlib
+
+with contextlib.closing(urllib.urlopen("http://www.python.org/")) as front_page:
+    for line in front_page:
+        print line
+#+end_src
+Legacy AppEngine code using Python 2.5 may enable the "with" statement using "from __future__ import with_statement".
 
 ** TODO Comments
 #+begin_html
 <p class="info">
-
+为临时代码使用TODO注释, 它是一种短期解决方案. 不算完美, 但够好了.
 </p>
 #+end_html
+TODOs should include the string TODO in all caps, followed by the
+name, e-mail address, or other identifier of the person who can best
+provide context about the problem referenced by the TODO, in
+parentheses. A colon is optional. A comment explaining what there is
+to do is required. The main purpose is to have a consistent TODO
+format that can be searched to find the person who can provide more
+details upon request. A TODO is not a commitment that the person
+referenced will fix the problem. Thus when you create a TODO, it is
+almost always your name that is given.
+
+
+#+begin_src python
+# TODO(kl@gmail.com): Use a "*" here for string repetition.
+# TODO(Zeke) Change this to use relations.
+#+end_src
+
+If your TODO is of the form "At a future date do something" make sure
+that you either include a very specific date ("Fix by November 2009")
+or a very specific event ("Remove this code when all clients can
+handle XML responses.").
 
 ** Imports formatting
 #+begin_html
 <p class="info">
-
+每个导入应该独占一行
 </p>
 #+end_html
+E.g.:
+#+begin_src python
+Yes: import os
+     import sys
+No:  import os, sys
+#+end_src
+Imports are always put at the top of the file, just after any module
+comments and doc strings and before module globals and constants.
+
+Imports should be grouped with the order being most generic to least
+generic:
+
++ standard library imports
++ third-party imports
++ application-specific imports
+
+Within each grouping, imports should be sorted lexicographically,
+ignoring case, according to each module's full package path.
+
+#+begin_src python
+import foo
+from foo import bar
+from foo.bar import baz
+from foo.bar import Quux
+from Foob import ar
+#+end_src
+
 ** Statements
 #+begin_html
 <p class="info">
-
+通常每个语句应该独占一行
 </p>
 #+end_html
+However, you may put the result of a test on the same line as the test
+only if the entire statement fits on one line. In particular, you can
+never do so with try/except since the try and except can't both fit on
+the same line, and you can only do so with an if if there is no else.
+
+#+begin_src python
+Yes:
+
+  if foo: bar(foo)
+No:
+
+  if foo: bar(foo)
+  else:   baz(foo)
+
+  try:               bar(foo)
+  except ValueError: baz(foo)
+
+  try:
+      bar(foo)
+  except ValueError: baz(foo)
+#+end_src
+
 ** Access Control
 #+begin_html
 <p class="info">
-
+在Python中, 对于琐碎又不太重要的访问函数, 你应该直接使用公有变量来取代它们, 
+这样可以避免额外的函数调用开销. 当添加更多功能时, 
+你可以用属性(property)来保持语法的一致性.
 </p>
 #+end_html
+On the other hand, if access is more complex, or the cost of accessing
+the variable is significant, you should use function calls (following
+the Naming guidelines) such as get_foo() and set_foo(). If the past
+behavior allowed access through a property, do not bind the new
+accessor functions to the property. Any code still attempting to
+access the variable by the old method should break visibly so they are
+made aware of the change in complexity.
+
 ** Naming
-#+begin_html
-<p class="info">
+#+begin_src python
+module_name, package_name, ClassName, method_name, ExceptionName, function_name,
+GLOBAL_CONSTANT_NAME, global_var_name, instance_var_name, function_parameter_name, 
+local_var_name.
+#+end_src
+*** Names to Avoid
++ single character names except for counters or iterators
++ dashes (-) in any package/module name
++ =__double_leading_and_trailing_underscore__= names (reserved by Python)
+*** Naming Convention
++ "Internal" means internal to a module or protected or private within
+  a class.
 
-</p>
-#+end_html
++ Prepending a single underscore (=_=) has some support for protecting
+  module variables and functions (not included with import * from).
+  Prepending a double underscore (=__=) to an instance variable or
+  method effectively serves to make the variable or method private to
+  its class (using name mangling).
+
++ Place related classes and top-level functions together in a module.
+  Unlike Java, there is no need to limit yourself to one class per
+  module.
+
++ Use CapWords for class names, but =lower_with_under.py= for module
+  names. Although there are many existing modules named CapWords.py,
+  this is now discouraged because it's confusing when the module
+  happens to be named after a class. ("wait -- did I write =import
+  StringIO= or from =StringIO import StringIO=?")
+
+Guidelines derived from Guido's Recommendations
+
+| Type                       | Public               | internal                                                            |
+|----------------------------+----------------------+---------------------------------------------------------------------|
+| Packages                   | =lower_with_under=   |                                                                     |
+| Modules                    | =lower_with_under=   | =_lower_with_under=                                                 |
+| Classes                    | CapWords             | =_CapWords=                                                         |
+| Exceptions                 | CapWords             |                                                                     |
+| Functions                  | =lower_with_under()= | =_lower_with_under()=                                               |
+| Global/Class Constants     | =CAPS_WITH_UNDER=    | =_CAPS_WITH_UNDER=                                                  |
+| Global/Class Variable      | =lower_with_under=   | =_lower_with_under=                                                 |
+| Instance Variable          | =lower_with_under=   | =_lower_with_under(protected)= or =__lower_with_under(private)=     |
+| Method Names               | =lower_with_under()= | =_lower_with_under()(protected)= or =__lower_with_under()(private)= |
+| Function/Method Parameters | =lower_with_under=   |                                                                     |
+| Local Variables            | =lower_with_under=   |                                                                     |
 
 ** Main
 #+begin_html
 <p class="info">
-
+即使是一个打算被用作脚本的文件,仅仅的导入不应该对脚本的主功能造成副作用。
+主功能应该在一个main()函数中。
 </p>
 #+end_html
+In Python, pydoc as well as unit tests require modules to be
+importable. Your code should always check ~if __name__ == '__main__':~
+before executing your main program so that the main program is not
+executed when the module is imported.
 
-* cc
 #+begin_src python
+def main():
+      ...
 
+if __name__ == '__main__':
+    main()
 #+end_src
 
 
