@@ -1,5 +1,5 @@
-#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
-#+TITLE: Google Shell Style Notes
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: Google Shell Style Notes (Revision 1.26)
 #+OPTIONS: num:nil H:2
 
 * Homepage
@@ -55,165 +55,753 @@ fi
 每个文件以一段它内容的描述开始。
 </p>
 #+end_html
+Every file must have a top-level comment including a brief overview of its contents. A copyright notice and author information are optional.
 
+Example:
+#+begin_src sh
+#!/bin/bash
+#
+# Perform hot backups of Oracle databases.
+#+end_src
 
 ** Function Comments
 #+begin_html
 <p class="info">
-
+长而不清晰的函数都必须注释。库中的函数都要注释，
 </p>
 #+end_html
+All function comments should contain:
+
++ Description of the function
++ Global variables used and modified
++ Arguments taken
++ Returned values other than the default exit status of the last
+  command run
+
+Example:
+#+begin_src sh
+#!/bin/bash
+#
+# Perform hot backups of Oracle databases.
+
+export PATH='/usr/xpg4/bin:/usr/bin:/opt/csw/bin:/opt/goog/bin'
+
+#######################################
+# Cleanup files from the backup dir
+# Globals:
+#   BACKUP_DIR
+#   ORACLE_SID
+# Arguments:
+#   None
+# Returns:
+#   None
+#######################################
+cleanup() {
+  ...
+}
+#+end_src
+
 ** Implementation Comments
 #+begin_html
 <p class="info">
-
+在代码中，对巧妙的，不清晰的，有趣或重要的部分注释。
 </p>
 #+end_html
 ** TODO Comments
 #+begin_html
 <p class="info">
-
+对那些临时的, 短期的解决方案, 或已经够好但仍不完美的代码使用 TODO 注释.
 </p>
 #+end_html
+TODOs should include the string TODO in all caps, followed by your
+username in parentheses. A colon is optional. It's preferable to put a
+bug/ticket number next to the TODO item as well.
+
+Examples:
+#+begin_src sh
+# TODO(mrmonkey): Handle the unlikely edge cases (bug ####)
+#+end_src
 * Formatting
 ** Indentation
 #+begin_html
 <p class="info">
-
+缩进2个空格。不要用tab。
 </p>
 #+end_html
+Use blank lines between blocks to improve readability. Indentation is
+two spaces. Whatever you do, don't use tabs. For existing files, stay
+faithful to the existing indentation.
+
 ** Line Length and Long Strings
 #+begin_html
 <p class="info">
-
+最大行长度是80字符。
 </p>
 #+end_html
+If you have to write strings that are longer than 80 characters, this
+should be done with a here document or an embedded newline if
+possible. Literal strings that have to be longer than 80 chars and
+can't sensibly be split are ok, but it's strongly preferred to find a
+way to make it shorter.
+
+#+begin_src sh
+# DO use 'here document's
+cat <<END;
+I am an exceptionally long
+string.
+END
+
+# Embedded newlines are ok too
+long_string="I am an exceptionally
+  long string."
+#+end_src
 ** Pipelines
 #+begin_html
 <p class="info">
-
+多个管道如果不能在一行，那么就一行一个。
 </p>
 #+end_html
+If not, it should be split at one pipe segment per line with the pipe
+on the newline and a 2 space indent for the next section of the pipe.
+This applies to a chain of commands combined using '|' as well as to
+logical compounds using '||' and '&&'.
+#+begin_src sh
+# All fits on one line
+command1 | command2
+
+# Long commands
+command1 \
+  | command2 \
+  | command3 \
+  | command4
+#+end_src
+
 ** Loops
 #+begin_html
 <p class="info">
-
+使用<code>while</code>,<code>for</code>.或<code>if</code>时，把
+<code>;do</code>和<code>;then</code>放在一行。
 </p>
 #+end_html
+That is: ; then and ; do should be on the same line as the
+if/for/while. =else= should be on its own line and closing statements
+should be on their own line vertically aligned with the opening
+statement.
+
+Example:
+#+begin_src sh
+for dir in ${dirs_to_cleanup}; do
+  if [[ -d "${dir}/${ORACLE_SID}" ]]; then
+    log_date "Cleaning up old files in ${dir}/${ORACLE_SID}"
+    rm "${dir}/${ORACLE_SID}/"*
+    if [[ "$?" -ne 0 ]]; then
+      error_message
+    fi
+  else
+    mkdir -p "${dir}/${ORACLE_SID}"
+    if [[ "$?" -ne 0 ]]; then
+      error_message
+    fi
+  fi
+done
+#+end_src
+
 ** Case statement
 #+begin_html
 <p class="info">
-
+选项缩进2个空格
+<br>在一行的选项中，用空格分割分别在右括号后和;;之前</br>
+<br>长或多命令选项需要分成这样形式的多行:匹配项，操作，和;;</br>
 </p>
 #+end_html
+The matching expressions are indented one level from the 'case' and
+'esac'. Multiline actions are indented another level. In general,
+there is no need to quote match expressions. Pattern expressions
+should not be preceded by an open parenthesis. Avoid the ;& and ;;&
+notations.
+
+#+begin_src sh
+case "${expression}" in
+  a)
+    variable="..."
+    some_command "${variable}" "${other_expr}" ...
+    ;;
+  absolute)
+    actions="relative"
+    another_command "${actions}" "${other_expr}" ...
+    ;;
+  *)
+    error "Unexpected expression '${expression}'"
+    ;;
+esac
+#+end_src
+Simple commands may be put on the same line as the pattern and ;; as
+long as the expression remains readable. This is often appropriate for
+single-letter option processing. When on the same line as the actions,
+use a space after the close parenthesis of the pattern and another
+before the ;;.
+
+#+begin_src sh
+verbose='false'
+aflag=''
+bflag=''
+files=''
+while getopts 'abf:v' flag; do
+  case "${flag}" in
+    a) aflag='true' ;;
+    b) bflag='true' ;;
+    f) files="${OPTARG}" ;;
+    v) verbose='true' ;;
+    *) error "Unexpected option ${flag}" ;;
+  esac
+done
+#+end_src
+
 ** Variable expansion
 #+begin_html
 <p class="info">
-
+优先顺序：保持之前风格;把变量放引号里，用"${var}"代替"$var"，但看如下细节。
 </p>
 #+end_html
+
+They are listed in order of precedence.
+
+1. Stay consistent with what you find for existing code.
+2. Quote variables, see Quoting section below.
+3. Don't brace-quote single character shell specials / positional
+   parameters, unless strictly necessary or avoiding deep confusion. 
+   Prefer brace-quoting all other variables.
+
+#+begin_src sh
+# Section of recommended cases.
+
+# Preferred style for 'special' variables:
+echo "Positional: $1" "$5" "$3"
+echo "Specials: !=$!, -=$-, _=$_. ?=$?, #=$# *=$* @=$@ \$=$$ ..."
+
+# Braces necessary:
+echo "many parameters: ${10}"
+
+# Braces avoiding confusion:
+# Output is "a0b0c0"
+set -- a b c
+echo "${1}0${2}0${3}0"
+
+# Preferred style for other variables:
+echo "PATH=${PATH}, PWD=${PWD}, mine=${some_var}"
+while read f; do
+  echo "file=${f}"
+done < <(ls -l /tmp)
+
+# Section of discouraged cases
+
+# Unquoted vars, unbraced vars, brace-quoted single letter
+# shell specials.
+echo a=$avar "b=$bvar" "PID=${$}" "${1}"
+
+# Confusing use: this is expanded as "${1}0${2}0${3}0",
+# not "${10}${20}${30}
+set -- a b c
+echo "$10$20$30"
+#+end_src
+
 ** Quoting
-#+begin_html
-<p class="info">
++ Always quote strings containing variables, command substitutions,
+  spaces or shell meta characters, unless careful unquoted expansion
+  is required.
++ Prefer quoting strings that are "words" (as opposed to command
+  options or path names).
++ Never quote literal integers.
++ Be aware of the quoting rules for pattern matches in [[.
++ Use "$@" unless you have a specific reason to use $*.
 
-</p>
-#+end_html
+#+begin_src sh
+# 'Single' quotes indicate that no substitution is desired.
+# "Double" quotes indicate that substitution is required/tolerated.
+
+# Simple examples
+# "quote command substitutions"
+flag="$(some_command and its args "$@" 'quoted separately')"
+
+# "quote variables"
+echo "${flag}"
+
+# "never quote literal integers"
+value=32
+# "quote command substitutions", even when you expect integers
+number="$(generate_number)"
+
+# "prefer quoting words", not compulsory
+readonly USE_INTEGER='true'
+
+# "quote shell meta characters"
+echo 'Hello stranger, and well met. Earn lots of $$$'
+echo "Process $$: Done making \$\$\$."
+
+# "command options or path names"
+# ($1 is assumed to contain a value here)
+grep -li Hugo /dev/null "$1"
+
+# Less simple examples
+# "quote variables, unless proven false": ccs might be empty
+git send-email --to "${reviewers}" ${ccs:+"--cc" "${ccs}"}
+
+# Positional parameter precautions: $1 might be unset
+# Single quotes leave regex as-is.
+grep -cP '([Ss]pecial|\|?characters*)$' ${1:+"$1"}
+
+# For passing on arguments,
+# "$@" is right almost everytime, and
+# $* is wrong almost everytime:
+#
+# * $* and $@ will split on spaces, clobbering up arguments
+#   that contain spaces and dropping empty strings;
+# * "$@" will retain arguments as-is, so no args
+#   provided will result in no args being passed on;
+#   This is in most cases what you want to use for passing
+#   on arguments.
+# * "$*" expands to one argument, with all args joined
+#   by (usually) spaces,
+#   so no args provided will result in one empty string
+#   being passed on.
+# (Consult 'man bash' for the nit-grits ;-)
+
+set -- 1 "2 two" "3 three tres"; echo $# ; set -- "$*"; echo "$#, $@"
+set -- 1 "2 two" "3 three tres"; echo $# ; set -- "$@"; echo "$#, $@"
+#+end_src
+
 * Features and Bugs
 ** Command Substitution
 #+begin_html
 <p class="info">
-
+使用 $(command) 代替重音符(``)
 </p>
 #+end_html
+Nested backticks require escaping the inner ones with \. The
+=$(command)= format doesn't change when nested and is easier to read.
+
+Example:
+#+begin_src sh
+# This is preferred:
+var="$(command "$(command1)")"
+
+# This is not:
+var="`command \`command1\``"
+#+end_src
+
 ** Test, [ and [[
 #+begin_html
 <p class="info">
-
+用[[ ... ]], 不要用[, test和/usr/bin/[.
 </p>
 #+end_html
+=[[ ... ]]= reduces errors as no pathname expansion or word splitting takes
+place between ~[[~ and ~]]~ and ~[[~ ... ~]]~ allows for regular expression matching
+where [ ... ] does not.
+#+begin_src sh
+# This ensures the string on the left is made up of characters in the
+# alnum character class followed by the string name.
+# Note that the RHS should not be quoted here.
+# For the gory details, see
+# E14 at http://tiswww.case.edu/php/chet/bash/FAQ
+if [[ "filename" =~ ^[[:alnum:]]+name ]]; then
+  echo "Match"
+fi
+
+# This matches the exact pattern "f*" (Does not match in this case)
+if [[ "filename" == "f*" ]]; then
+  echo "Match"
+fi
+
+# This gives a "too many arguments" error as f* is expanded to the
+# contents of the current directory
+if [ "filename" == f* ]; then
+  echo "Match"
+fi
+#+end_src
+
 ** Testing Strings
 #+begin_html
 <p class="info">
-
+尽量使用引号，而不是填充字符。
 </p>
 #+end_html
+Bash is smart enough to deal with an empty string in a test. So, given
+that the code is much easier to read, use tests for empty/non-empty
+strings or empty strings rather than filler characters.
+#+begin_src sh
+# Do this:
+if [[ "${my_var}" = "some_string" ]]; then
+  do_something
+fi
+
+# -z (string length is zero) and -n (string length is not zero) are
+# preferred over testing for an empty string
+if [[ -z "${my_var}" ]]; then
+  do_something
+fi
+
+# This is OK (ensure quotes on the empty side), but not preferred:
+if [[ "${my_var}" = "" ]]; then
+  do_something
+fi
+
+# Not this:
+if [[ "${my_var}X" = "some_stringX" ]]; then
+  do_something
+fi
+To avoid confusion about what you're testing for, explicitly use -z or -n.
+
+# Use this
+if [[ -n "${my_var}" ]]; then
+  do_something
+fi
+
+# Instead of this as errors can occur if ${my_var} expands to a test
+# flag
+if [[ "${my_var}" ]]; then
+  do_something
+fi
+#+end_src
+
 ** Wildcard Expansion of Filenames
 #+begin_html
 <p class="info">
-
+当做文件名通配符扩展时，使用明确的路径。
 </p>
 #+end_html
+As filenames can begin with a -, it's a lot safer to expand wildcards
+with =./*= instead of =*=.
+#+begin_src sh
+# Here's the contents of the directory:
+# -f  -r  somedir  somefile
+
+# This deletes almost everything in the directory by force
+psa@bilby$ rm -v *
+removed directory: `somedir'
+removed `somefile'
+
+# As opposed to:
+psa@bilby$ rm -v ./*
+removed `./-f'
+removed `./-r'
+rm: cannot remove `./somedir': Is a directory
+removed `./somefile'
+#+end_src
+
 ** Eval
 #+begin_html
 <p class="info">
-
+eval应该被避免使用。
 </p>
 #+end_html
+Eval munges the input when used for assignment to variables and can
+set variables without making it possible to check what those variables
+were.
+
+#+begin_src sh
+# What does this set?
+# Did it succeed? In part or whole?
+eval $(set_my_variables)
+
+# What happens if one of the returned values has a space in it?
+variable="$(eval some_function)"
+#+end_src
+
 ** Pipes to While
 #+begin_html
 <p class="info">
-
+使用进程替换或for循环来替代管道到while的形式。在while循环中改变的变量不会传递到父进程，因为
+循环的命令运行在子shell。
 </p>
 #+end_html
+The implicit subshell in a pipe to while can make it difficult to
+track down bugs.
+
+#+begin_src sh
+last_line='NULL'
+your_command | while read line; do
+  last_line="${line}"
+done
+
+# This will output 'NULL'
+echo "${last_line}"
+#+end_src
+
+Use a for loop if you are confident that the input will not contain
+spaces or special characters (usually, this means not user input).
+
+#+begin_src sh
+total=0
+# Only do this if there are no spaces in return values.
+for value in $(command); do
+  total+="${value}"
+done
+#+end_src
+
+Using process substitution allows redirecting output but puts the
+commands in an explicit subshell rather than the implicit subshell
+that bash creates for the while loop.
+#+begin_src sh
+total=0
+last_file=
+while read count filename; do
+  total+="${count}"
+  last_file="${filename}"
+done < <(your_command | uniq -c)
+
+# This will output the second field of the last line of output from
+# the command.
+echo "Total = ${total}"
+echo "Last one = ${last_file}"
+#+end_src
+
+Use while loops where it is not necessary to pass complex results to
+the parent shell - this is typically where some more complex "parsing"
+is required. Beware that simple examples are probably more easily done
+with a tool such as awk. This may also be useful where you
+specifically don't want to change the parent scope variables.
+#+begin_src sh
+# Trivial implementation of awk expression:
+#   awk '$3 == "nfs" { print $2 " maps to " $1 }' /proc/mounts
+cat /proc/mounts | while read src dest type opts rest; do
+  if [[ ${type} == "nfs" ]]; then
+    echo "NFS ${dest} maps to ${src}"
+  fi
+done
+#+end_src
+
 * Naming Conventions
 ** Function Names
 #+begin_html
 <p class="info">
-
+小写，下划线分割词语。分离库用::. 需要括号在函数名后。关键字function是可选的，
+但是必须在一个工程内保持一致。
 </p>
 #+end_html
+If you're writing single functions, use lowercase and separate words
+with underscore. If you're writing a package, separate package names
+with ::. Braces must be on the same line as the function name and no
+space between the function name and the parenthesis.
+#+begin_src sh
+# Single function
+my_func() {
+  ...
+}
+
+# Part of a package
+mypackage::my_func() {
+  ...
+}
+#+end_src
+The function keyword is extraneous when "()" is present after the
+function name, but enhances quick identification of functions.
+
 ** Variable Names
 #+begin_html
 <p class="info">
-
+格式和函数名一样。
 </p>
 #+end_html
+Variables names for loops should be similarly named for any variable
+you're looping through.
+#+begin_src sh
+for zone in ${zones}; do
+  something_with "${zone}"
+done
+#+end_src
+
 ** Constants and Environment Variable Names
 #+begin_html
 <p class="info">
-
+所有大写，以下划线分格，在文件顶端定义。
 </p>
 #+end_html
+Constants and anything exported to the environment should be
+capitalized.
+#+begin_src sh
+# Constant
+readonly PATH_TO_FILES='/some/path'
+
+# Both constant and environment
+declare -xr ORACLE_SID='PROD'
+#+end_src
+Some things become constant at their first setting (for example, via
+getopts). Thus, it's OK to set a constant in getopts or based on a
+condition, but it should be made readonly immediately afterwards. Note
+that declare doesn't operate on global variables within functions, so
+readonly or export is recommended instead.
+#+begin_src sh
+VERBOSE='false'
+while getopts 'v' flag; do
+  case "${flag}" in
+    v) VERBOSE='true' ;;
+  esac
+done
+readonly VERBOSE
+#+end_src
+
 ** Source Filenames
 #+begin_html
 <p class="info">
-
+小写，如果需要，用下划线风格词语。
 </p>
 #+end_html
+This is for consistency with other code styles in Google: =maketemplate=
+or =make_template= but not =make-template=.
+
 ** Read-only Variables
 #+begin_html
 <p class="info">
-
+使用readonly和declare -r来确认它们是只读的。
 </p>
 #+end_html
+As globals are widely used in shell, it's important to catch errors
+when working with them. When you declare a variable that is meant to
+be read-only, make this explicit.
+
+#+begin_src sh
+zip_version="$(dpkg --status zip | grep Version: | cut -d ' ' -f 2)"
+if [[ -z "${zip_version}" ]]; then
+  error_message
+else
+  readonly zip_version
+fi
+#+end_src
+
+** Use Local Variables
+#+begin_html
+<p class="info">
+用local声明函数内的变量。声明和赋值应当在不同行。
+</p>
+#+end_html
+Ensure that local variables are only seen inside a function and its
+children by using local when declaring them. This avoids polluting the
+global name space and inadvertently setting variables that may have
+significance outside the function.
+
+Declaration and assignment must be separate statements when the
+assignment value is provided by a command substitution; as the 'local'
+builtin does not propagate the exit code from the command
+substitution.
+#+begin_src sh
+my_func2() {
+  local name="$1"
+
+  # Separate lines for declaration and assignment:
+  local my_var
+  my_var="$(my_func)" || return
+
+  # DO NOT do this: $? contains the exit code of 'local', not my_func
+  local my_var="$(my_func)"
+  [[ $? -eq 0 ]] || return
+
+  ...
+}
+#+end_src
+
 ** Function Location
 #+begin_html
 <p class="info">
-
+在文件里把所有函数一起放在定量下面。不要在函数间隐藏可执行代码。
 </p>
 #+end_html
+If you've got functions, put them all together near the top of the
+file. Only includes, set statements and setting constants may be done
+before declaring functions.
+
+Don't hide executable code between functions. Doing so makes the code
+difficult to follow and results in nasty surprises when debugging.
+
 ** main
 #+begin_html
 <p class="info">
-
+只要在脚本长到至少含有另外一个函数时，main函数才需要。
 </p>
 #+end_html
+In order to easily find the start of the program, put the main program
+in a function called main as the bottom most function. This provides
+consistency with the rest of the code base as well as allowing you to
+define more variables as local (which can't be done if the main code
+is not a function). The last non-comment line in the file should be a
+call to main:
+#+begin_src sh
+main "$@"
+#+end_src
+Obviously, for short scripts where it's just a linear flow, main is
+overkill and so is not required.
+
 * Calling Commands
 ** Checking Return Values
 #+begin_html
 <p class="info">
-
+一直检查返回值，返回有意义的值。
 </p>
 #+end_html
+For unpiped commands, use $? or check directly via an if statement to
+keep it simple.
+
+Example:
+#+begin_src sh
+if ! mv "${file_list}" "${dest_dir}/" ; then
+  echo "Unable to move ${file_list} to ${dest_dir}" >&2
+  exit "${E_BAD_MOVE}"
+fi
+
+# Or
+mv "${file_list}" "${dest_dir}/"
+if [[ "$?" -ne 0 ]]; then
+  echo "Unable to move ${file_list} to ${dest_dir}" >&2
+  exit "${E_BAD_MOVE}"
+fi
+#+end_src
+
+Bash also has the =PIPESTATUS= variable that allows checking of the
+return code from all parts of a pipe. If it's only necessary to check
+success or failure of the whole pipe, then the following is
+acceptable:
+
+#+begin_src sh
+tar -cf - ./* | ( cd "${dir}" && tar -xf - )
+if [[ "${PIPESTATUS[0]}" -ne 0 || "${PIPESTATUS[1]}" -ne 0 ]]; then
+  echo "Unable to tar files to ${dir}" >&2
+fi
+#+end_src
+However, as =PIPESTATUS= will be overwritten as soon as you do any
+other command, if you need to act differently on errors based on where
+it happened in the pipe, you'll need to assign PIPESTATUS to another
+variable immediately after running the command (don't forget that =[= is
+a command and will wipe out PIPESTATUS).
+
+#+begin_src sh
+tar -cf - ./* | ( cd "${DIR}" && tar -xf - )
+return_codes=(${PIPESTATUS[*]})
+if [[ "${return_codes[0]}" -ne 0 ]]; then
+  do_something
+fi
+if [[ "${return_codes[1]}" -ne 0 ]]; then
+  do_something_else
+fi
+#+end_src
+
 ** Builtin Commands vs. External Commands
 #+begin_html
 <p class="info">
-
+可以选用shell内嵌的功能或一个分开的处理，选择内嵌的功能。
 </p>
 #+end_html
+We prefer the use of builtins such as the Parameter Expansion
+functions in =bash(1)= as it's more robust and portable (especially when
+compared to things like sed).
 
-* cc
-
+Example:
 #+begin_src sh
+# Prefer this:
+addition=$((${X} + ${Y}))
+substitution="${string/#foo/bar}"
 
+# Instead of this:
+addition="$(expr ${X} + ${Y})"
+substitution="$(echo "${string}" | sed -e 's/^foo/bar/')"
 #+end_src
+

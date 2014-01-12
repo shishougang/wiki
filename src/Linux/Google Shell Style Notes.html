@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Google Shell Style Notes (Revision 1.26)</title>
-<!-- 2014-01-11 Sat 20:21 -->
+<!-- 2014-01-11 Sat 16:47 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -189,9 +189,8 @@ for the JavaScript code in this tag.
 <li><a href="#sec-7-3">Constants and Environment Variable Names</a></li>
 <li><a href="#sec-7-4">Source Filenames</a></li>
 <li><a href="#sec-7-5">Read-only Variables</a></li>
-<li><a href="#sec-7-6">Use Local Variables</a></li>
-<li><a href="#sec-7-7">Function Location</a></li>
-<li><a href="#sec-7-8">main</a></li>
+<li><a href="#sec-7-6">Function Location</a></li>
+<li><a href="#sec-7-7">main</a></li>
 </ul>
 </li>
 <li><a href="#sec-8">Calling Commands</a>
@@ -200,6 +199,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-8-2">Builtin Commands vs. External Commands</a></li>
 </ul>
 </li>
+<li><a href="#sec-9">cc</a></li>
 </ul>
 </div>
 </div>
@@ -730,215 +730,48 @@ Example:
 place between <code>[[</code> and <code>]]</code> and <code>[[</code> &#x2026; <code>]]</code> allows for regular expression matching
 where [ &#x2026; ] does not.
 </p>
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">This ensures the string on the left is made up of characters in the</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">alnum character class followed by the string name.</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Note that the RHS should not be quoted here.</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">For the gory details, see</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">E14 at http://tiswww.case.edu/php/chet/bash/FAQ</span>
-<span style="color: #00ffff;">if</span> [[ <span style="color: #ffa07a;">"filename"</span> =~ ^[[:alnum:]]+name ]]; <span style="color: #00ffff;">then</span>
-  <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"Match"</span>
-<span style="color: #00ffff;">fi</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">This matches the exact pattern "f*" (Does not match in this case)</span>
-<span style="color: #00ffff;">if</span> [[ <span style="color: #ffa07a;">"filename"</span> == <span style="color: #ffa07a;">"f*"</span> ]]; <span style="color: #00ffff;">then</span>
-  <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"Match"</span>
-<span style="color: #00ffff;">fi</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">This gives a "too many arguments" error as f* is expanded to the</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">contents of the current directory</span>
-<span style="color: #00ffff;">if</span> [ <span style="color: #ffa07a;">"filename"</span> == f* ]; <span style="color: #00ffff;">then</span>
-  <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"Match"</span>
-<span style="color: #00ffff;">fi</span>
-</pre>
 </div>
 </div>
-</div>
+
+
+
 <div id="outline-container-sec-6-3" class="outline-3">
 <h3 id="sec-6-3">Testing Strings</h3>
 <div class="outline-text-3" id="text-6-3">
 <p class="info">
-尽量使用引号，而不是填充字符。
+
 </p>
-<p>
-Bash is smart enough to deal with an empty string in a test. So, given
-that the code is much easier to read, use tests for empty/non-empty
-strings or empty strings rather than filler characters.
-</p>
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Do this:</span>
-<span style="color: #00ffff;">if</span> [[ <span style="color: #ffa07a;">"${my_var}"</span> = <span style="color: #ffa07a;">"some_string"</span> ]]; <span style="color: #00ffff;">then</span>
-  do_something
-<span style="color: #00ffff;">fi</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">-z (string length is zero) and -n (string length is not zero) are</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">preferred over testing for an empty string</span>
-<span style="color: #00ffff;">if</span> [[ -z <span style="color: #ffa07a;">"${my_var}"</span> ]]; <span style="color: #00ffff;">then</span>
-  do_something
-<span style="color: #00ffff;">fi</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">This is OK (ensure quotes on the empty side), but not preferred:</span>
-<span style="color: #00ffff;">if</span> [[ <span style="color: #ffa07a;">"${my_var}"</span> = <span style="color: #ffa07a;">""</span> ]]; <span style="color: #00ffff;">then</span>
-  do_something
-<span style="color: #00ffff;">fi</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Not this:</span>
-<span style="color: #00ffff;">if</span> [[ <span style="color: #ffa07a;">"${my_var}X"</span> = <span style="color: #ffa07a;">"some_stringX"</span> ]]; <span style="color: #00ffff;">then</span>
-  do_something
-<span style="color: #00ffff;">fi</span>
-To avoid confusion about what you<span style="color: #ffa07a;">'re testing for, explicitly use -z or -n.</span>
-
-<span style="color: #ffa07a;"># Use this</span>
-<span style="color: #ffa07a;">if [[ -n "${my_var}" ]]; then</span>
-<span style="color: #ffa07a;">  do_something</span>
-<span style="color: #ffa07a;">fi</span>
-
-<span style="color: #ffa07a;"># Instead of this as errors can occur if ${my_var} expands to a test</span>
-<span style="color: #ffa07a;"># flag</span>
-<span style="color: #ffa07a;">if [[ "${my_var}" ]]; then</span>
-<span style="color: #ffa07a;">  do_something</span>
-<span style="color: #ffa07a;">fi</span>
-</pre>
 </div>
 </div>
-</div>
+
 <div id="outline-container-sec-6-4" class="outline-3">
 <h3 id="sec-6-4">Wildcard Expansion of Filenames</h3>
 <div class="outline-text-3" id="text-6-4">
 <p class="info">
-当做文件名通配符扩展时，使用明确的路径。
+
 </p>
-<p>
-As filenames can begin with a -, it's a lot safer to expand wildcards
-with <code>./*</code> instead of <code>*</code>.
-</p>
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Here's the contents of the directory:</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">-f  -r  somedir  somefile</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">This deletes almost everything in the directory by force</span>
-psa@bilby$ rm -v *
-removed directory: <span style="color: #fa8072;">`somedir'</span>
-<span style="color: #fa8072;">removed `</span>somefile<span style="color: #ffa07a;">'</span>
-
-<span style="color: #ffa07a;"># As opposed to:</span>
-<span style="color: #ffa07a;">psa@bilby$ rm -v ./*</span>
-<span style="color: #ffa07a;">removed `./-f'</span>
-removed <span style="color: #fa8072;">`./-r'</span>
-<span style="color: #fa8072;">rm: cannot remove `</span>./somedir<span style="color: #ffa07a;">': Is a directory</span>
-<span style="color: #ffa07a;">removed `./somefile'</span>
-</pre>
 </div>
 </div>
-</div>
+
 <div id="outline-container-sec-6-5" class="outline-3">
 <h3 id="sec-6-5">Eval</h3>
 <div class="outline-text-3" id="text-6-5">
 <p class="info">
-eval应该被避免使用。
+
 </p>
-<p>
-Eval munges the input when used for assignment to variables and can
-set variables without making it possible to check what those variables
-were.
-</p>
-
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">What does this set?</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Did it succeed? In part or whole?</span>
-<span style="color: #b0c4de;">eval</span> $(set_my_variables)
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">What happens if one of the returned values has a space in it?</span>
-<span style="color: #eedd82;">variable</span>=<span style="color: #ffa07a;">"$(eval some_function)"</span>
-</pre>
 </div>
 </div>
-</div>
+
 <div id="outline-container-sec-6-6" class="outline-3">
 <h3 id="sec-6-6">Pipes to While</h3>
 <div class="outline-text-3" id="text-6-6">
 <p class="info">
-使用进程替换或for循环来替代管道到while的形式。在while循环中改变的变量不会传递到父进程，因为
-循环的命令运行在子shell。
+
 </p>
-<p>
-The implicit subshell in a pipe to while can make it difficult to
-track down bugs.
-</p>
-
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #eedd82;">last_line</span>=<span style="color: #ffa07a;">'NULL'</span>
-your_command | <span style="color: #00ffff;">while </span><span style="color: #b0c4de;">read</span> line; <span style="color: #00ffff;">do</span>
-  <span style="color: #eedd82;">last_line</span>=<span style="color: #ffa07a;">"${line}"</span>
-<span style="color: #00ffff;">done</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">This will output 'NULL'</span>
-<span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"${last_line}"</span>
-</pre>
-</div>
-
-<p>
-Use a for loop if you are confident that the input will not contain
-spaces or special characters (usually, this means not user input).
-</p>
-
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #eedd82;">total</span>=0
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Only do this if there are no spaces in return values.</span>
-<span style="color: #00ffff;">for</span> value<span style="color: #00ffff;"> in</span> $(command); <span style="color: #00ffff;">do</span>
-  <span style="color: #eedd82;">total</span>+=<span style="color: #ffa07a;">"${value}"</span>
-<span style="color: #00ffff;">done</span>
-</pre>
-</div>
-
-<p>
-Using process substitution allows redirecting output but puts the
-commands in an explicit subshell rather than the implicit subshell
-that bash creates for the while loop.
-</p>
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #eedd82;">total</span>=0
-<span style="color: #eedd82;">last_file</span>=
-<span style="color: #00ffff;">while </span><span style="color: #b0c4de;">read</span> count filename; <span style="color: #00ffff;">do</span>
-  <span style="color: #eedd82;">total</span>+=<span style="color: #ffa07a;">"${count}"</span>
-  <span style="color: #eedd82;">last_file</span>=<span style="color: #ffa07a;">"${filename}"</span>
-<span style="color: #00ffff;">done</span> &lt; &lt;(your_command | uniq -c)
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">This will output the second field of the last line of output from</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">the command.</span>
-<span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"Total = ${total}"</span>
-<span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"Last one = ${last_file}"</span>
-</pre>
-</div>
-
-<p>
-Use while loops where it is not necessary to pass complex results to
-the parent shell - this is typically where some more complex "parsing"
-is required. Beware that simple examples are probably more easily done
-with a tool such as awk. This may also be useful where you
-specifically don't want to change the parent scope variables.
-</p>
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Trivial implementation of awk expression:</span>
-<span style="color: #ff7f24;">#   </span><span style="color: #ff7f24;">awk '$3 == "nfs" { print $2 " maps to " $1 }' /proc/mounts</span>
-cat /proc/mounts | <span style="color: #00ffff;">while </span><span style="color: #b0c4de;">read</span> src dest type opts rest; <span style="color: #00ffff;">do</span>
-  <span style="color: #00ffff;">if</span> [[ ${<span style="color: #b0c4de;">type</span>} == <span style="color: #ffa07a;">"nfs"</span> ]]; <span style="color: #00ffff;">then</span>
-    <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"NFS ${dest} maps to ${src}"</span>
-  <span style="color: #00ffff;">fi</span>
-<span style="color: #00ffff;">done</span>
-</pre>
 </div>
 </div>
 </div>
-</div>
+
 <div id="outline-container-sec-7" class="outline-2">
 <h2 id="sec-7">Naming Conventions</h2>
 <div class="outline-text-2" id="text-7">
@@ -946,210 +779,66 @@ cat /proc/mounts | <span style="color: #00ffff;">while </span><span style="color
 <h3 id="sec-7-1">Function Names</h3>
 <div class="outline-text-3" id="text-7-1">
 <p class="info">
-小写，下划线分割词语。分离库用::. 需要括号在函数名后。关键字function是可选的，
-但是必须在一个工程内保持一致。
-</p>
-<p>
-If you're writing single functions, use lowercase and separate words
-with underscore. If you're writing a package, separate package names
-with ::. Braces must be on the same line as the function name and no
-space between the function name and the parenthesis.
-</p>
-<div class="org-src-container">
 
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Single function</span>
-<span style="color: #87cefa;">my_func</span>() {
-  ...
-}
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Part of a package</span>
-mypackage::my_func() {
-  ...
-}
-</pre>
-</div>
-<p>
-The function keyword is extraneous when "()" is present after the
-function name, but enhances quick identification of functions.
 </p>
 </div>
 </div>
+
 <div id="outline-container-sec-7-2" class="outline-3">
 <h3 id="sec-7-2">Variable Names</h3>
 <div class="outline-text-3" id="text-7-2">
 <p class="info">
-格式和函数名一样。
-</p>
-<p>
-Variables names for loops should be similarly named for any variable
-you're looping through.
-</p>
-<div class="org-src-container">
 
-<pre class="src src-sh"><span style="color: #00ffff;">for</span> zone<span style="color: #00ffff;"> in</span> ${<span style="color: #eedd82;">zones</span>}; <span style="color: #00ffff;">do</span>
-  something_with <span style="color: #ffa07a;">"${zone}"</span>
-<span style="color: #00ffff;">done</span>
-</pre>
+</p>
 </div>
 </div>
-</div>
+
 <div id="outline-container-sec-7-3" class="outline-3">
 <h3 id="sec-7-3">Constants and Environment Variable Names</h3>
 <div class="outline-text-3" id="text-7-3">
 <p class="info">
-所有大写，以下划线分格，在文件顶端定义。
-</p>
-<p>
-Constants and anything exported to the environment should be
-capitalized.
-</p>
-<div class="org-src-container">
 
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Constant</span>
-<span style="color: #b0c4de;">readonly</span> <span style="color: #eedd82;">PATH_TO_FILES</span>=<span style="color: #ffa07a;">'/some/path'</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Both constant and environment</span>
-<span style="color: #b0c4de;">declare</span> -xr <span style="color: #eedd82;">ORACLE_SID</span>=<span style="color: #ffa07a;">'PROD'</span>
-</pre>
-</div>
-<p>
-Some things become constant at their first setting (for example, via
-getopts). Thus, it's OK to set a constant in getopts or based on a
-condition, but it should be made readonly immediately afterwards. Note
-that declare doesn't operate on global variables within functions, so
-readonly or export is recommended instead.
 </p>
-<div class="org-src-container">
+</div>
+</div>
 
-<pre class="src src-sh"><span style="color: #eedd82;">VERBOSE</span>=<span style="color: #ffa07a;">'false'</span>
-<span style="color: #00ffff;">while </span><span style="color: #b0c4de;">getopts</span> <span style="color: #ffa07a;">'v'</span> flag; <span style="color: #00ffff;">do</span>
-  <span style="color: #00ffff;">case</span> <span style="color: #ffa07a;">"${flag}"</span><span style="color: #00ffff;"> in</span>
-    v) <span style="color: #eedd82;">VERBOSE</span>=<span style="color: #ffa07a;">'true'</span> ;;
-  <span style="color: #00ffff;">esac</span>
-<span style="color: #00ffff;">done</span>
-<span style="color: #b0c4de;">readonly</span> VERBOSE
-</pre>
-</div>
-</div>
-</div>
 <div id="outline-container-sec-7-4" class="outline-3">
 <h3 id="sec-7-4">Source Filenames</h3>
 <div class="outline-text-3" id="text-7-4">
 <p class="info">
-小写，如果需要，用下划线风格词语。
-</p>
-<p>
-This is for consistency with other code styles in Google: <code>maketemplate</code>
-or <code>make_template</code> but not <code>make-template</code>.
+
 </p>
 </div>
 </div>
+
 <div id="outline-container-sec-7-5" class="outline-3">
 <h3 id="sec-7-5">Read-only Variables</h3>
 <div class="outline-text-3" id="text-7-5">
 <p class="info">
-使用readonly和declare -r来确认它们是只读的。
-</p>
-<p>
-As globals are widely used in shell, it's important to catch errors
-when working with them. When you declare a variable that is meant to
-be read-only, make this explicit.
-</p>
 
-<div class="org-src-container">
+</p>
+</div>
+</div>
 
-<pre class="src src-sh"><span style="color: #eedd82;">zip_version</span>=<span style="color: #ffa07a;">"$(dpkg --status zip | grep Version: | cut -d ' ' -f 2)"</span>
-<span style="color: #00ffff;">if</span> [[ -z <span style="color: #ffa07a;">"${zip_version}"</span> ]]; <span style="color: #00ffff;">then</span>
-  error_message
-<span style="color: #00ffff;">else</span>
-  <span style="color: #b0c4de;">readonly</span> zip_version
-<span style="color: #00ffff;">fi</span>
-</pre>
-</div>
-</div>
-</div>
 <div id="outline-container-sec-7-6" class="outline-3">
-<h3 id="sec-7-6">Use Local Variables</h3>
+<h3 id="sec-7-6">Function Location</h3>
 <div class="outline-text-3" id="text-7-6">
 <p class="info">
-用local声明函数内的变量。声明和赋值应当在不同行。
+
 </p>
-<p>
-Ensure that local variables are only seen inside a function and its
-children by using local when declaring them. This avoids polluting the
-global name space and inadvertently setting variables that may have
-significance outside the function.
-</p>
-
-<p>
-Declaration and assignment must be separate statements when the
-assignment value is provided by a command substitution; as the 'local'
-builtin does not propagate the exit code from the command
-substitution.
-</p>
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #87cefa;">my_func2</span>() {
-  <span style="color: #b0c4de;">local</span> <span style="color: #eedd82;">name</span>=<span style="color: #ffa07a;">"$1"</span>
-
-  <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Separate lines for declaration and assignment:</span>
-  <span style="color: #b0c4de;">local</span> my_var
-  <span style="color: #eedd82;">my_var</span>=<span style="color: #ffa07a;">"$(my_func)"</span> || <span style="color: #00ffff;">return</span>
-
-  <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">DO NOT do this: $? contains the exit code of 'local', not my_func</span>
-  <span style="color: #b0c4de;">local</span> <span style="color: #eedd82;">my_var</span>=<span style="color: #ffa07a;">"$(my_func)"</span>
-  [[ $<span style="color: #eedd82;">?</span> -eq 0 ]] || <span style="color: #00ffff;">return</span>
-
-  ...
-}
-</pre>
 </div>
 </div>
-</div>
+
 <div id="outline-container-sec-7-7" class="outline-3">
-<h3 id="sec-7-7">Function Location</h3>
+<h3 id="sec-7-7">main</h3>
 <div class="outline-text-3" id="text-7-7">
 <p class="info">
-在文件里把所有函数一起放在定量下面。不要在函数间隐藏可执行代码。
-</p>
-<p>
-If you've got functions, put them all together near the top of the
-file. Only includes, set statements and setting constants may be done
-before declaring functions.
-</p>
 
-<p>
-Don't hide executable code between functions. Doing so makes the code
-difficult to follow and results in nasty surprises when debugging.
 </p>
 </div>
 </div>
-<div id="outline-container-sec-7-8" class="outline-3">
-<h3 id="sec-7-8">main</h3>
-<div class="outline-text-3" id="text-7-8">
-<p class="info">
-只要在脚本长到至少含有另外一个函数时，main函数才需要。
-</p>
-<p>
-In order to easily find the start of the program, put the main program
-in a function called main as the bottom most function. This provides
-consistency with the rest of the code base as well as allowing you to
-define more variables as local (which can't be done if the main code
-is not a function). The last non-comment line in the file should be a
-call to main:
-</p>
-<div class="org-src-container">
+</div>
 
-<pre class="src src-sh">main <span style="color: #ffa07a;">"$@"</span>
-</pre>
-</div>
-<p>
-Obviously, for short scripts where it's just a linear flow, main is
-overkill and so is not required.
-</p>
-</div>
-</div>
-</div>
 <div id="outline-container-sec-8" class="outline-2">
 <h2 id="sec-8">Calling Commands</h2>
 <div class="outline-text-2" id="text-8">
@@ -1157,102 +846,33 @@ overkill and so is not required.
 <h3 id="sec-8-1">Checking Return Values</h3>
 <div class="outline-text-3" id="text-8-1">
 <p class="info">
-一直检查返回值，返回有意义的值。
+
 </p>
-<p>
-For unpiped commands, use $? or check directly via an if statement to
-keep it simple.
-</p>
-
-<p>
-Example:
-</p>
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #00ffff;">if</span> ! mv <span style="color: #ffa07a;">"${file_list}"</span> <span style="color: #ffa07a;">"${dest_dir}/"</span> ; <span style="color: #00ffff;">then</span>
-  <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"Unable to move ${file_list} to ${dest_dir}"</span> &gt;&amp;2
-  <span style="color: #00ffff;">exit</span> <span style="color: #ffa07a;">"${E_BAD_MOVE}"</span>
-<span style="color: #00ffff;">fi</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Or</span>
-mv <span style="color: #ffa07a;">"${file_list}"</span> <span style="color: #ffa07a;">"${dest_dir}/"</span>
-<span style="color: #00ffff;">if</span> [[ <span style="color: #ffa07a;">"$?"</span> -ne 0 ]]; <span style="color: #00ffff;">then</span>
-  <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"Unable to move ${file_list} to ${dest_dir}"</span> &gt;&amp;2
-  <span style="color: #00ffff;">exit</span> <span style="color: #ffa07a;">"${E_BAD_MOVE}"</span>
-<span style="color: #00ffff;">fi</span>
-</pre>
-</div>
-
-<p>
-Bash also has the <code>PIPESTATUS</code> variable that allows checking of the
-return code from all parts of a pipe. If it's only necessary to check
-success or failure of the whole pipe, then the following is
-acceptable:
-</p>
-
-<div class="org-src-container">
-
-<pre class="src src-sh">tar -cf - ./* | ( <span style="color: #b0c4de;">cd</span> <span style="color: #ffa07a;">"${dir}"</span> &amp;&amp; tar -xf - )
-<span style="color: #00ffff;">if</span> [[ <span style="color: #ffa07a;">"${PIPESTATUS[0]}"</span> -ne 0 || <span style="color: #ffa07a;">"${PIPESTATUS[1]}"</span> -ne 0 ]]; <span style="color: #00ffff;">then</span>
-  <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"Unable to tar files to ${dir}"</span> &gt;&amp;2
-<span style="color: #00ffff;">fi</span>
-</pre>
-</div>
-<p>
-However, as <code>PIPESTATUS</code> will be overwritten as soon as you do any
-other command, if you need to act differently on errors based on where
-it happened in the pipe, you'll need to assign PIPESTATUS to another
-variable immediately after running the command (don't forget that <code>[</code> is
-a command and will wipe out PIPESTATUS).
-</p>
-
-<div class="org-src-container">
-
-<pre class="src src-sh">tar -cf - ./* | ( <span style="color: #b0c4de;">cd</span> <span style="color: #ffa07a;">"${DIR}"</span> &amp;&amp; tar -xf - )
-<span style="color: #eedd82;">return_codes</span>=(${<span style="color: #eedd82;">PIPESTATUS</span>[*]})
-<span style="color: #00ffff;">if</span> [[ <span style="color: #ffa07a;">"${return_codes[0]}"</span> -ne 0 ]]; <span style="color: #00ffff;">then</span>
-  do_something
-<span style="color: #00ffff;">fi</span>
-<span style="color: #00ffff;">if</span> [[ <span style="color: #ffa07a;">"${return_codes[1]}"</span> -ne 0 ]]; <span style="color: #00ffff;">then</span>
-  do_something_else
-<span style="color: #00ffff;">fi</span>
-</pre>
 </div>
 </div>
-</div>
+
 <div id="outline-container-sec-8-2" class="outline-3">
 <h3 id="sec-8-2">Builtin Commands vs. External Commands</h3>
 <div class="outline-text-3" id="text-8-2">
 <p class="info">
-可以选用shell内嵌的功能或一个分开的处理，选择内嵌的功能。
-</p>
-<p>
-We prefer the use of builtins such as the Parameter Expansion
-functions in <code>bash(1)</code> as it's more robust and portable (especially when
-compared to things like sed).
-</p>
 
-<p>
-Example:
 </p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">cc</h2>
+<div class="outline-text-2" id="text-9">
 <div class="org-src-container">
 
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Prefer this:</span>
-<span style="color: #eedd82;">addition</span>=$((${<span style="color: #eedd82;">X</span>} + ${<span style="color: #eedd82;">Y</span>}))
-<span style="color: #eedd82;">substitution</span>=<span style="color: #ffa07a;">"${string/#foo/bar}"</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Instead of this:</span>
-<span style="color: #eedd82;">addition</span>=<span style="color: #ffa07a;">"$(expr ${X} + ${Y})"</span>
-<span style="color: #eedd82;">substitution</span>=<span style="color: #ffa07a;">"$(echo "${string}" | sed -e 's/^foo/bar/')"</span>
-</pre>
-</div>
+<pre class="src src-sh"></pre>
 </div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-01-11 Sat 20:21</p>
+<p class="date">Created: 2014-01-11 Sat 16:47</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
