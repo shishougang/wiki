@@ -6,15 +6,195 @@
 + http://google-styleguide.googlecode.com/svn/trunk/javaguide.html
 
 * Source file basics
-
 ** File name 
 The source file name consists of the case-sensitive name of the
 top-level class it contains, plus the .java extension (aside from
 package-info.java files).
 
 ** File encoding: UTF-8
+** Special characters
+*** Whitespace characters 
+Aside from the line terminator sequence, the *ASCII horizontal space
+character (0x20)* is the only whitespace character that appears
+anywhere in a source file. This implies that:
 
-** 
+1. All other whitespace characters in string and character literals
+   are escaped.
+2. Tab characters are not used for indentation.
+*** Special escape sequences
+For any character that has a special escape sequence (\b, \t, \n, \f,
+\r, \", \' and \\), that sequence is used rather than the
+corresponding octal (e.g. \012) or Unicode (e.g. \u000a) escape.
+*** Non-ASCII characters 
+For the remaining non-ASCII characters, either the actual Unicode
+character (e.g. ∞) or the equivalent Unicode escape (e.g. \u221e) is
+used, depending only on which makes the code *easier to read and
+understand*.
+#+begin_html
+<p class="info">
+Tip: in the Unicode escape case, and occasionally even when actual
+Unicode characters are used, an explanatory comment can be very
+helpful.
+</p>
+#+end_html
+Examples:
+
+| Example                                                    | Discussion                                                                |
+|------------------------------------------------------------+---------------------------------------------------------------------------|
+| =String unitAbbrev = "μs";=                               | Best: perfectly clear even without a comment.                             |
+| ~[String unitAbbrev = "\u03bcs"; // "μs"]~                | Allowed, but there's no reason to do this.                                |
+| ~[String unitAbbrev = "\u03bcs"; // Greek letter mu, "s"]~ | Allowed, but awkward and prone to mistakes.                               |
+| =String unitAbbrev = "\u03bcs";=                           | Poor: the reader has no idea what this is.                                |
+| =return '\ufeff' + content; // byte order mark=            | Good: use escapes for non-printable characters, and comment if necessary. |
+
+#+begin_html
+<p class="info">
+Tip:  Never make your code less readable simply out of fear that some
+programs might not handle non-ASCII characters properly. If that
+should happen, those programs are broken and they must be fixed.
+</p>
+#+end_html
+* Source file structure
+A source file consists of, in order:
+
+1. License or copyright information, if present
+2. Package statement
+3. Import statements
+4. Exactly one top-level class
+
+*Exactly one blank line* separates each section that is present.
+** License or copyright information, if present
+** Package statement
+The package statement is not line-wrapped. The column limit (Section
+4.4, Column limit: 80 or 100) does not apply to package statements.
+** Import statements
+*** No wildcard imports
+Wildcard imports, static or otherwise, *are not used*.
+*** Ordering and spacing
+Import statements are divided into the following groups, in this
+order, with each group separated by a single blank line:
+
+1. All static imports in a single group
+2. =com.google= imports (only if this source file is in the com.google package space)
+3. Third-party imports, one group per top-level package, in ASCII sort order
+   for example: android, com, junit, org, sun
+4. java imports
+5. javax imports
+Within a group there are no blank lines, and the imported names appear
+in ASCII sort order.
+** Class declaration
+*** Exactly one top-level class declaration
+Each top-level class resides in a source file of its own.
+*** Class member ordering
+What is important is that each class order its members in some logical
+order, which its maintainer could explain if asked. For example, new
+methods are not just habitually added to the end of the class, as that
+would yield "chronological by date added" ordering, which is not a
+logical ordering.
+*** Overloads: never split
+When a class has multiple constructors, or multiple methods with the
+same name, these appear sequentially, with no intervening members
+* Formatting
+** Braces
+*** Braces are used where optional
+Braces are used with if, else, for, do and while statements, even when
+the body is empty or contains only a single statement.
+*** Nonempty blocks: K & R style
+Braces follow the Kernighan and Ritchie style for nonempty blocks and
+block-like constructs:
+
++ No line break before the opening brace.
++ Line break after the opening brace.
++ Line break before the closing brace.
++ Line break after the closing brace if that brace terminates a
+  statement or the body of a method, constructor or named class. For
+  example, there is no line break after the brace if it is followed by
+  else or a comma.
+
+Example:
+#+begin_src java
+return new MyClass() {
+  @Override public void method() {
+    if (condition()) {
+      try {
+        something();
+      } catch (ProblemException e) {
+        recover();
+      }
+    }
+  }
+};
+#+end_src
+*** Empty blocks: may be concise
+An empty block or block-like construct may be closed immediately after
+it is opened, with no characters or line break in between ({}), unless
+it is part of a multi-block statement
+
+Example:
+#+begin_src java
+  void doNothing() {}
+#+end_src
+** Block indentation: +2 spaces
+** One statement per line
+** Column limit: 80 or 100
+Projects are free to choose a column limit of either 80 or 100
+characters. Except as noted below, any line that would exceed this
+limit must be line-wrapped.
+
+Exceptions:
+
+1. Lines where obeying the column limit is not possible (for example, a long URL in Javadoc, or a long JSNI method reference).
+2. package and import statements.
+3. Command lines in a comment that may be cut-and-pasted into a shell.
+** Line-wrapping 
+There is no comprehensive, deterministic formula showing exactly how to line-wrap in every situation. Very often there are several valid ways to line-wrap the same piece of code.
+#+begin_html
+<p class="info">
+Tip: extracting a method or local variable may solve the problem
+without the need to line-wrap.
+</p>
+#+end_html
+*** Where to break
+The prime directive of line-wrapping is: prefer to break at a *higher
+syntactic level*. Also:
+
+
+1. When a line is broken at a non-assignment operator the break comes
+   before the symbol. (Note that this is not the same practice used in
+   Google style for other languages, such as C++ and JavaScript.)
+
+   + This also applies to the following "operator-like" symbols: the
+     dot separator (.), the ampersand in type bounds (=<T extends Foo
+     & Bar>=), and the pipe in catch blocks (=catch (FooException |
+     BarException e)=).
+
+2. When a line is broken at an assignment operator the break typically comes after the symbol, but either way is acceptable.
+   + This also applies to the "assignment-operator-like" colon in an enhanced for ("foreach") statement.
+3. A method or constructor name stays attached to the open parenthesis (() that follows it.
+4. A comma (,) stays attached to the token that precedes it.
+*** Indent continuation lines at least +4 spaces 
+When line-wrapping, each line after the first (each continuation line)
+is indented at least +4 from the original line.
+
+When there are multiple continuation lines, indentation may be varied
+beyond +4 as desired. In general, two continuation lines use the same
+indentation level if and only if they begin with syntactically
+parallel elements.
+** Whitespace
+*** Vertical Whitespace 
+A single blank line appears:
+
+1. Between consecutive members (or initializers) of a class: fields, constructors, methods, nested classes, static initializers, instance initializers.
+   Exception: a blank line between two consecutive fields (having no other code between them) is optional. Such blank lines are used as needed to create logical groupings of fields.
+2. Within method bodies, as needed to create logical groupings of statements.
+3. Optionally before the first member or after the last member of the class (neither encouraged nor discouraged).
+4. As required by other sections of this document (such as Section 3.3, Import statements).
+
+Multiple consecutive blank lines are permitted, but never required (or encouraged).
+*** Horizontal whitespace
+
+
+
 * cc
 #+begin_html
 <p class="info">

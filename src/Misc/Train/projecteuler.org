@@ -361,6 +361,72 @@ while num > 0:
     num /= 10
 print sum
 
+#18
+def strlist_to_intlist(strlist):
+    intlist = []
+    for c in strlist:
+        intlist.append(int(c))
+    return intlist
+
+
+pre_counts = [0]
+
+with open('problem18.txt', 'r') as ifile:
+    for line in ifile:
+        current_counts = line.strip('\n').split(' ')
+        current_counts = strlist_to_intlist(current_counts)
+
+        current_counts[0] += pre_counts[0]
+
+        length_path = len(current_counts)
+        for i in range(1, length_path-1):
+            current_counts[i] += max(pre_counts[i-1], pre_counts[i])
+        if length_path > 1:
+            current_counts[length_path-1] += pre_counts[length_path-2]
+        pre_counts = current_counts
+
+print max(current_counts)
+
+#19
+def is_leap_year(year):
+    if year % 400 == 0:
+        return True
+    elif year % 100 == 0:
+        return False
+    elif year % 4 == 0:
+        return True
+    else:
+        return False
+
+def days_of_month(isleap_year, month):
+
+    if month in [9, 4, 6, 11]:
+        return 30
+    if month == 2:
+        if isleap_year:
+            return 29
+        else:
+            return 28
+    else:
+        return 31
+
+num_sun_in_first_month = 0
+days = 1
+DAYS_ONE_WEEK = 7
+for year in [1900]:
+    isleap_year = is_leap_year(year)
+    for month in range(2,13):
+        days += days_of_month(isleap_year, month-1)
+
+for year in range(1901, 2001):
+    isleap_year = is_leap_year(year)
+    for month in range(1, 13):
+        days += days_of_month(isleap_year, month-1)
+        if days % DAYS_ONE_WEEK == 0:
+            num_sun_in_first_month += 1
+print num_sun_in_first_month
+
+
 
 #20
 number_product = 1
@@ -374,8 +440,91 @@ while number_product > 0:
     number_product /= 10
 print sum
 
+#21
+import math
+
+def sum_proper_divisors(num):
+    sum = 1
+    sqrt_num = int(math.sqrt(num))
+    for i in range(2, sqrt_num+1):
+        if num % i == 0:
+            sum += i
+            sum += num / i
+    if sqrt_num ** 2 == num:
+        sum -= sqrt_num
+    return sum
+
+sum_all_amicable_numbers = 0
+for i in range(4, 10000):
+    temp_sum = sum_proper_divisors(i)
+    if temp_sum != i and sum_proper_divisors(temp_sum) == i:
+        sum_all_amicable_numbers += i
+
+print sum_all_amicable_numbers
+
+#22
+def score_name(name):
+    name = name.strip('"')
+    score = 0
+    ord_A = ord('A')
+    for letter in name:
+        score += ord(letter) - ord_A + 1
+    return score
 
 
+with open('names.txt', 'r') as ifile:
+    line = ifile.readline()
+    line_list = line.split(',')
+    line_list.sort()
+
+n = 1
+total_name_scores = 0
+for name in line_list:
+    total_name_scores += n * score_name(name)
+    n += 1
+
+print total_name_scores
+
+#23
+import math
+import bisect
+
+def sum_proper_divisors(num):
+    sum = 1
+    sqrt_num = int(math.sqrt(num))
+    for i in range(2, sqrt_num + 1):
+        if num % i == 0:
+            sum += i
+            sum += num / i
+    if sqrt_num ** 2 == num:
+        sum -= sqrt_num
+    return sum
+
+def can_be_written(num, abundant_list):
+    index_high =  bisect.bisect(abundant_list, num)
+    i = 0
+    j = index_high - 1
+    while i <= j:
+        sum_num = abundant_list[i] + abundant_list[j]
+        if sum_num == num:
+            return True
+        elif sum_num < num:
+            i += 1
+        else:
+            j -= 1
+    return False
+
+abundant_numbers = []
+LIM = 28123
+for i in range(1, LIM + 1):
+    if sum_proper_divisors(i) > i:
+        abundant_numbers.append(i)
+
+sum_cannot_be_written = 0
+for i in range(1, LIM + 1):
+    if not can_be_written(i, abundant_numbers):
+        sum_cannot_be_written += i
+print sum_cannot_be_written
 
 #+end_src
 
