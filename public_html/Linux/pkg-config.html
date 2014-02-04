@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<title>Deep Learning</title>
+<title>pkg-config Notes</title>
 <!-- 2014-02-04 Tue 23:37 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
@@ -86,7 +86,7 @@
     { background-color: #ffff00; color: #000000; font-weight: bold; }
   /*]]>*/-->
 </style>
-<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<link rel="stylesheet" type="text/css" href="../assets/stylesheet.css" />
 <script type="text/javascript">
 /*
 @licstart  The following is the entire license notice for the
@@ -136,71 +136,140 @@ for the JavaScript code in this tag.
 </head>
 <body>
 <div id="content">
-<h1 class="title">Deep Learning</h1>
+<h1 class="title">pkg-config Notes</h1>
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">learn</a></li>
-<li><a href="#sec-2">Projects</a>
-<ul>
-<li><a href="#sec-2-1">java deep learnin</a></li>
-<li><a href="#sec-2-2">.NET</a></li>
-</ul>
-</li>
-<li><a href="#sec-3">How Google Cracked House Number Identification in Street View</a></li>
+<li><a href="#sec-1">Concepts</a></li>
+<li><a href="#sec-2">Using pkg-config files</a></li>
+<li><a href="#sec-3">use example</a></li>
 </ul>
 </div>
 </div>
-
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">learn</h2>
+<h2 id="sec-1">Concepts<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
 <div class="outline-text-2" id="text-1">
 <p>
-<a href="https://code.google.com/p/cuda-convnet/">https://code.google.com/p/cuda-convnet/</a>
+The file format contains predefined metadata keywords and freeform
+variables. An example may be illustrative:
 </p>
 
-<p>
-<a href="http://www.torch.ch/">http://www.torch.ch/</a>
-</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">prefix</span>=/usr/local
+<span style="color: #eedd82;">exec_prefix</span>=${<span style="color: #eedd82;">prefix</span>}
+<span style="color: #eedd82;">includedir</span>=${<span style="color: #eedd82;">prefix</span>}/include
+<span style="color: #eedd82;">libdir</span>=${<span style="color: #eedd82;">exec_prefix</span>}/lib
+
+Name: foo
+Description: The foo library
+Version: 1.0.0
+Cflags: -I${<span style="color: #eedd82;">includedir</span>}/foo
+Libs: -L${<span style="color: #eedd82;">libdir</span>} -lfoo
+</pre>
+</div>
 
 <p>
-<a href="http://deeplearning.net/software/theano/">http://deeplearning.net/software/theano/</a>
+Here is a short description of the keyword fields. A more in depth description of these fields and how to use them effectively will be given in the Writing pkg-config files section.
 </p>
+
+<ul class="org-ul">
+<li>Name: A human-readable name for the library or package. This does
+not affect usage of the pkg-config tool, which uses the name of the
+.pc file.
+</li>
+<li>Description: A brief description of the package.
+</li>
+<li>URL: An URL where people can get more information about and download the package.
+</li>
+<li>Version: A string specifically defining the version of the package.
+</li>
+<li>Requires: A list of packages required by this package. The versions of these packages may be specified using the comparison operators =, &lt;, &gt;, &lt;= or &gt;=.
+</li>
+<li>Requires.private: A list of private packages required by this package but not exposed to applications. The version specific rules from the Requires field also apply here.
+</li>
+<li>Conflicts: An optional field describing packages that this one conflicts with. The version specific rules from the Requires field also apply here. This field also takes multiple instances of the same package. E.g., Conflicts: bar &lt; 1.2.3, bar &gt;= 1.3.0.
+</li>
+<li>Cflags: The compiler flags specific to this package and any required libraries that don't support pkg-config. If the required libraries support pkg-config, they should be added to Requires or Requires.private.
+</li>
+<li>Libs: The link flags specific to this package and any required libraries that don't support pkg-config. The same rule as Cflags applies here.
+</li>
+<li>Libs.private: The link flags for private libraries required by this package but not exposed to applications. The same rule as Cflags applies here.
+</li>
+</ul>
 </div>
 </div>
+
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">Projects</h2>
+<h2 id="sec-2">Using pkg-config files</h2>
 <div class="outline-text-2" id="text-2">
-</div><div id="outline-container-sec-2-1" class="outline-3">
-<h3 id="sec-2-1">java deep learnin</h3>
-<div class="outline-text-3" id="text-2-1">
 <p>
-<a href="https://github.com/agibsonccc">https://github.com/agibsonccc</a>
+A few autoconf macros are also provided to ease integration of pkg-config modules into projects.
 </p>
-</div>
-</div>
 
-<div id="outline-container-sec-2-2" class="outline-3">
-<h3 id="sec-2-2">.NET</h3>
-<div class="outline-text-3" id="text-2-2">
-<p>
-<a href="https://github.com/primaryobjects?tab=repositories">https://github.com/primaryobjects?tab=repositories</a>
-</p>
-</div>
+<ul class="org-ul">
+<li><code>PKG_PROG_PKG_CONFIG([MIN-VERSION])</code> : Locates the pkg-config tool on the system and checks the version for compatibility.
+</li>
+<li><code>PKG_CHECK_EXISTS(MODULES, [ACTION-IF-FOUND],
+  [ACTION-IF-NOT-FOUND])</code> : Checks to see whether a particular set of
+modules exists.
+</li>
+<li><code>PKG_CHECK_MODULES(VARIABLE-PREFIX, MODULES, [ACTION-IF-FOUND],
+  [ACTION-IF-NOT-FOUND])</code> : Checks to see whether a particular set of
+modules exists. If so, it sets &lt;VARIABLE-PREFIX&gt;<sub>CFLAGS</sub> and
+&lt;VARIABLE-PREFIX&gt;<sub>LIBS</sub> according to the output from pkg-config
+&#x2013;cflags and pkg-config &#x2013;libs.
+</li>
+</ul>
 </div>
 </div>
 
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">How Google Cracked House Number Identification in Street View</h2>
+<h2 id="sec-3">use example</h2>
 <div class="outline-text-2" id="text-3">
 <p>
-<a href="http://www.technologyreview.com/view/523326/how-google-cracked-house-number-identification-in-street-view/">http://www.technologyreview.com/view/523326/how-google-cracked-house-number-identification-in-street-view/</a>
+My program uses library x. What do I do?
+The pkg-config output can easily be used on the compiler command line.
+Assuming the x library has a x.pc pkg-config file:
 </p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">cc <span style="color: #fa8072;">`pkg-config --cflags --libs x`</span> -o myapp myapp.c
+</pre>
+</div>
+
+<p>
+The integration can be more robust when used with autoconf and
+automake. By using the supplied <code>PKG_CHECK_MODULES</code> macro, the metadata
+is easily accessed in the build process.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">configure.ac:
+<span style="color: #87cefa;">PKG_CHECK_MODULES</span>([X], [x])
+
+Makefile.am:
+<span style="color: #eedd82;">myapp_CFLAGS</span> = $(X_CFLAGS)
+<span style="color: #eedd82;">myapp_LDADD</span> = $(X_LIBS)
+</pre>
 </div>
 </div>
 </div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://people.freedesktop.org/~dbn/pkg-config-guide.html">http://people.freedesktop.org/~dbn/pkg-config-guide.html</a>
+</p></div>
+
+
+</div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
 <p class="date">Created: 2014-02-04 Tue 23:37</p>

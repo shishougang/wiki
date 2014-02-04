@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Python Things</title>
-<!-- 2014-01-27 Mon 23:26 -->
+<!-- 2014-02-04 Tue 23:37 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -208,6 +208,9 @@ for the JavaScript code in this tag.
 <li><a href="#sec-10-1">Iterables</a></li>
 <li><a href="#sec-10-2">Generators</a></li>
 <li><a href="#sec-10-3">Yield</a></li>
+<li><a href="#sec-10-4">Controlling a generator exhaustion</a></li>
+<li><a href="#sec-10-5">Itertools</a></li>
+<li><a href="#sec-10-6">Understanding the inner mechanisms of iteration</a></li>
 </ul>
 </li>
 </ul>
@@ -1212,6 +1215,128 @@ generators can only be used once
 
 <div id="outline-container-sec-10-3" class="outline-3">
 <h3 id="sec-10-3">Yield</h3>
+<div class="outline-text-3" id="text-10-3">
+<p>
+<code>Yield</code> is a keyword that is used like <code>return</code>, except the function will
+return a generator.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-python">&gt;&gt;&gt; <span style="color: #00ffff;">def</span> <span style="color: #87cefa;">createGenerator</span>():
+...    <span style="color: #ffebcd; background-color: #2f4f4f;">mylist</span> = <span style="color: #b0c4de;">range</span>(3)
+...    <span style="color: #00ffff;">for</span> i <span style="color: #00ffff;">in</span> mylist:
+...        <span style="color: #00ffff;">yield</span> i*i
+...
+&gt;&gt;&gt; <span style="color: #ffebcd; background-color: #2f4f4f;">mygenerator</span> = createGenerator() <span style="color: #ff7f24;"># create a generator</span>
+&gt;&gt;&gt; <span style="color: #b0c4de;">print</span>(mygenerator) <span style="color: #ff7f24;"># mygenerator is an object!</span>
+&lt;generator <span style="color: #b0c4de;">object</span> createGenerator at 0xb7555c34&gt;
+&gt;&gt;&gt; <span style="color: #00ffff;">for</span> i <span style="color: #00ffff;">in</span> mygenerator:
+...     print(i)
+0
+1
+4
+</pre>
+</div>
+<p>
+To master yield, you must understand that when you call the function,
+the code you have written in the function body does not run. The
+function only returns the generator object
+</p>
+
+<p>
+Now the hard part:
+</p>
+
+<p>
+The first time the <code>for</code> calls the generator object created from your
+function, it will run the code in your function from the beginning
+until it hits <code>yield</code>, then it'll return the first value of the loop.
+Then, each other call will run the loop you have written in the
+function one more time, and return the next value, until there is no
+value to return.
+</p>
+
+<p>
+The generator is considered empty once the function runs but does not
+hit yield anymore. It can be because the loop had come to an end, or
+because you do not satisfy a "if/else" anymore.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-10-4" class="outline-3">
+<h3 id="sec-10-4">Controlling a generator exhaustion</h3>
+<div class="outline-text-3" id="text-10-4">
+<div class="org-src-container">
+
+<pre class="src src-python">&gt;&gt;&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Bank</span>(): <span style="color: #ff7f24;"># let's create a bank, building ATMs</span>
+...    <span style="color: #ffebcd; background-color: #2f4f4f;">crisis</span> = <span style="color: #00ffff;">False</span>
+...    <span style="color: #00ffff;">def</span> <span style="color: #87cefa;">create_atm</span>(<span style="color: #00ffff;">self</span>):
+...        <span style="color: #00ffff;">while</span> <span style="color: #00ffff;">not</span> <span style="color: #00ffff;">self</span>.crisis:
+...            <span style="color: #00ffff;">yield</span> <span style="color: #ffa07a;">"$100"</span>
+&gt;&gt;&gt; <span style="color: #ffebcd; background-color: #2f4f4f;">hsbc</span> = Bank() <span style="color: #ff7f24;"># when everything's ok the ATM gives you as much as you want</span>
+&gt;&gt;&gt; <span style="color: #ffebcd; background-color: #2f4f4f;">corner_street_atm</span> = hsbc.create_atm()
+&gt;&gt;&gt; <span style="color: #b0c4de;">print</span>(corner_street_atm.next())
+$100
+&gt;&gt;&gt; <span style="color: #b0c4de;">print</span>(corner_street_atm.next())
+$100
+&gt;&gt;&gt; <span style="color: #b0c4de;">print</span>([corner_street_atm.next() <span style="color: #00ffff;">for</span> cash <span style="color: #00ffff;">in</span> <span style="color: #b0c4de;">range</span>(5)])
+[<span style="color: #ffa07a;">'$100'</span>, <span style="color: #ffa07a;">'$100'</span>, <span style="color: #ffa07a;">'$100'</span>, <span style="color: #ffa07a;">'$100'</span>, <span style="color: #ffa07a;">'$100'</span>]
+&gt;&gt;&gt; <span style="color: #ffebcd; background-color: #2f4f4f;">hsbc.crisis</span> = <span style="color: #00ffff;">True</span> <span style="color: #ff7f24;"># crisis is coming, no more money!</span>
+&gt;&gt;&gt; <span style="color: #b0c4de;">print</span>(corner_street_atm.next())
+&lt;<span style="color: #b0c4de;">type</span> <span style="color: #ffa07a;">'exceptions.StopIteration'</span>&gt;
+&gt;&gt;&gt; <span style="color: #ffebcd; background-color: #2f4f4f;">wall_street_atm</span> = hsbc.create_atm() <span style="color: #ff7f24;"># it's even true for new ATMs</span>
+&gt;&gt;&gt; <span style="color: #b0c4de;">print</span>(wall_street_atm.next())
+&lt;<span style="color: #b0c4de;">type</span> <span style="color: #ffa07a;">'exceptions.StopIteration'</span>&gt;
+&gt;&gt;&gt; <span style="color: #ffebcd; background-color: #2f4f4f;">hsbc.crisis</span> = <span style="color: #00ffff;">False</span> <span style="color: #ff7f24;"># trouble is, even post-crisis the ATM remains empty</span>
+&gt;&gt;&gt; <span style="color: #b0c4de;">print</span>(corner_street_atm.next())
+&lt;<span style="color: #b0c4de;">type</span> <span style="color: #ffa07a;">'exceptions.StopIteration'</span>&gt;
+&gt;&gt;&gt; <span style="color: #ffebcd; background-color: #2f4f4f;">brand_new_atm</span> = hsbc.create_atm() <span style="color: #ff7f24;"># build a new one to get back in business</span>
+&gt;&gt;&gt; <span style="color: #00ffff;">for</span> cash <span style="color: #00ffff;">in</span> brand_new_atm:
+...    print cash
+$100
+$100
+$100
+$100
+$100
+$100
+$100
+...
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-10-5" class="outline-3">
+<h3 id="sec-10-5">Itertools</h3>
+<div class="outline-text-3" id="text-10-5">
+<div class="org-src-container">
+
+<pre class="src src-python">&gt;&gt;&gt; <span style="color: #00ffff;">import</span> itertools
+&gt;&gt;&gt; <span style="color: #ffebcd; background-color: #2f4f4f;">horses</span> = [1, 2, 3, 4]
+&gt;&gt;&gt; <span style="color: #ffebcd; background-color: #2f4f4f;">races</span> = itertools.permutations(horses)
+&gt;&gt;&gt; <span style="color: #b0c4de;">print</span>(races)
+&lt;itertools.permutations <span style="color: #b0c4de;">object</span> at 0xb754f1dc&gt;
+&gt;&gt;&gt; <span style="color: #b0c4de;">print</span>(list(itertools.permutations(horses)))
+[(1, 2, 3, 4),
+ (1, 2, 4, 3),
+...]
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-10-6" class="outline-3">
+<h3 id="sec-10-6">Understanding the inner mechanisms of iteration</h3>
+<div class="outline-text-3" id="text-10-6">
+<p>
+Iteration is a process implying iterables (implementing the <code>__iter__()</code>
+method) and iterators (implementing the <code>__next__()</code> method). Iterables
+are any objects you can get an iterator from. Iterators are objects
+that let you iterate on iterables.
+</p>
+</div>
 </div>
 </div>
 <div id="footnotes">
@@ -1227,7 +1352,7 @@ generators can only be used once
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-01-27 Mon 23:26</p>
+<p class="date">Created: 2014-02-04 Tue 23:37</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

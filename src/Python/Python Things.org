@@ -875,8 +875,93 @@ generate the values on the fly*:
 BUT, you can not perform for i in mygenerator a second time since
 generators can only be used once
 ** Yield
+=Yield= is a keyword that is used like =return=, except the function will
+return a generator.
 
+#+begin_src python
+>>> def createGenerator():
+...    mylist = range(3)
+...    for i in mylist:
+...        yield i*i
+...
+>>> mygenerator = createGenerator() # create a generator
+>>> print(mygenerator) # mygenerator is an object!
+<generator object createGenerator at 0xb7555c34>
+>>> for i in mygenerator:
+...     print(i)
+0
+1
+4
+#+end_src
+To master yield, you must understand that when you call the function,
+the code you have written in the function body does not run. The
+function only returns the generator object
 
+Now the hard part:
+
+The first time the =for= calls the generator object created from your
+function, it will run the code in your function from the beginning
+until it hits =yield=, then it'll return the first value of the loop.
+Then, each other call will run the loop you have written in the
+function one more time, and return the next value, until there is no
+value to return.
+
+The generator is considered empty once the function runs but does not
+hit yield anymore. It can be because the loop had come to an end, or
+because you do not satisfy a "if/else" anymore.
+** Controlling a generator exhaustion
+#+begin_src python
+>>> class Bank(): # let's create a bank, building ATMs
+...    crisis = False
+...    def create_atm(self):
+...        while not self.crisis:
+...            yield "$100"
+>>> hsbc = Bank() # when everything's ok the ATM gives you as much as you want
+>>> corner_street_atm = hsbc.create_atm()
+>>> print(corner_street_atm.next())
+$100
+>>> print(corner_street_atm.next())
+$100
+>>> print([corner_street_atm.next() for cash in range(5)])
+['$100', '$100', '$100', '$100', '$100']
+>>> hsbc.crisis = True # crisis is coming, no more money!
+>>> print(corner_street_atm.next())
+<type 'exceptions.StopIteration'>
+>>> wall_street_atm = hsbc.create_atm() # it's even true for new ATMs
+>>> print(wall_street_atm.next())
+<type 'exceptions.StopIteration'>
+>>> hsbc.crisis = False # trouble is, even post-crisis the ATM remains empty
+>>> print(corner_street_atm.next())
+<type 'exceptions.StopIteration'>
+>>> brand_new_atm = hsbc.create_atm() # build a new one to get back in business
+>>> for cash in brand_new_atm:
+...    print cash
+$100
+$100
+$100
+$100
+$100
+$100
+$100
+...
+#+end_src
+** Itertools
+#+begin_src python
+>>> import itertools
+>>> horses = [1, 2, 3, 4]
+>>> races = itertools.permutations(horses)
+>>> print(races)
+<itertools.permutations object at 0xb754f1dc>
+>>> print(list(itertools.permutations(horses)))
+[(1, 2, 3, 4),
+ (1, 2, 4, 3),
+...]
+#+end_src
+** Understanding the inner mechanisms of iteration
+Iteration is a process implying iterables (implementing the =__iter__()=
+method) and iterators (implementing the =__next__()= method). Iterables
+are any objects you can get an iterator from. Iterators are objects
+that let you iterate on iterables.
 
 * Footnotes
 

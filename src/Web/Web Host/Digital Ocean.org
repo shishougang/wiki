@@ -26,3 +26,572 @@ PermitRootLogin without-password
 reload ssh
 #+end_src
 
+* Setting up a new user[fn:1]
+** Create a New User
+#+begin_src sh
+adduser demo
+#+end_src
+** add Root Privileges to the New User
+#+begin_src sh
+visudo
+
+# User privilege specification
+root    ALL=(ALL:ALL) ALL
+#Under there, add the following line, granting all the permissions to your new user
+demo    ALL=(ALL:ALL) ALL
+#+end_src
+** Configure SSH (OPTIONAL)
+#+begin_src sh
+nano /etc/ssh/sshd_config
+Port 25000
+Protocol 2
+PermitRootLogin no
+#+end_src
+*PermitRootLogin*: change this from yes to no to stop future root login.
+You will now only be logging on as the new user.
+
+
+Add these lines to the bottom of the document, replacing *demo* in the
+AllowUsers line with your username. (AllowUsers will limit login to
+only the users on that line. To avoid this, skip this line):
+#+begin_src sh
+UseDNS no
+AllowUsers demo
+#+end_src
+** Reload and Done
+#+begin_src sh
+reload ssh
+ssh -p 25000 demo@123.45.67.890
+#+end_src
+
+* SFTP and SCP
+** SCP
+#+begin_src sh
+scp ~/Downloads/backup_db.sql.gz username@server_ip_address:
+#+end_src
+** SFTP
+#+begin_src sh
+sftp username@remote_hostname_or_IP
+#download files from our remote host
+get remoteFile
+#Transferring files to the remote system
+put localFile
+#+end_src
+
+* Security
+** How To Protect SSH with fail2ban on Ubuntu 12.04[fn:2]
+** How To Install DenyHosts on Ubuntu 12.04[fn:3]
+* How To Add Swap on Ubuntu 12.04[fn:4]
+** Check for Swap Space
+#+begin_src sh
+sudo swapon -s
+#An empty list will confirm that you have no swap files enabled:
+Filename				Type		Size	Used	Priority
+#+end_src
+** Create and Enable the Swap File
+1024*512k=512M swap space
+#+begin_src sh
+sudo dd if=/dev/zero of=/swapfile bs=1024 count=512k
+sudo mkswap /swapfile
+#The results display:
+Setting up swapspace version 1, size = 262140 KiB
+no label, UUID=103c4545-5fc5-47f3-a8b3-dfbdb64fd7eb
+#Finish up by activating the swap file:
+sudo swapon /swapfile
+#You will then be able to see the new swap file when you view the swap summary.
+swapon -s
+Filename				Type		Size	Used	Priority
+/swapfile                               file		262140	0	-1
+#the swap is permanent by adding it to the fstab file
+sudo nano /etc/fstab
+#Paste in the following line:
+ /swapfile       none    swap    sw      0       0 
+#+end_src
+
+** More Setting
+Swappiness in the file should be set to 0. Skipping this step may
+cause both poor performance, whereas setting it to 0 will cause swap
+to act as an emergency buffer, preventing out-of-memory crashes.
+
+You can do this with the following commands:
+#+begin_src sh
+echo 0 | sudo tee /proc/sys/vm/swappiness
+echo vm.swappiness = 0 | sudo tee -a /etc/sysctl.conf
+#+end_src
+
+To prevent the file from being world-readable, set up the correct
+permissions on the swap file:
+#+begin_src sh
+sudo chown root:root /swapfile 
+sudo chmod 0600 /swapfile
+#+end_src
+* How To Install Linux, nginx, MySQL, PHP (LEMP) stack on Ubuntu 12.04[fn:5]
+** Update Apt-Get
+#+begin_src sh
+sudo apt-get update
+#+end_src
+** Install MySQL
+#+begin_src sh
+sudo apt-get install mysql-server mysql-client
+sudo apt-get install php5-mysql php5-gd php5-xdebug php-apc
+#+end_src
+php5-gd: This package provides a module for handling graphics directly
+from PHP scripts. It supports the PNG, JPEG, XPM formats as well as
+Freetype/ttf fonts.
+*** configuration
+Once you have installed MySQL, we should activate it with this
+command:
+#+begin_src sh
+sudo mysql_install_db
+#+end_src
+
+Finish up by running the MySQL set up script:
+#+begin_src sh
+sudo /usr/bin/mysql_secure_installation
+#+end_src
+
+It’s easiest just to say Yes to all the options. At the end, MySQL
+will reload and implement the new changes.
+#+begin_src sh
+By default, a MySQL installation has an anonymous user, allowing anyone
+to log into MySQL without having to have a user account created for
+them.  This is intended only for testing, and to make the installation
+go a bit smoother.  You should remove them before moving into a
+production environment.
+
+Remove anonymous users? [Y/n] y                                            
+ ... Success!
+
+Normally, root should only be allowed to connect from 'localhost'.  This
+ensures that someone cannot guess at the root password from the network.
+
+Disallow root login remotely? [Y/n] y
+... Success!
+
+By default, MySQL comes with a database named 'test' that anyone can
+access.  This is also intended only for testing, and should be removed
+before moving into a production environment.
+
+Remove test database and access to it? [Y/n] y
+ - Dropping test database...
+ ... Success!
+ - Removing privileges on test database...
+ ... Success!
+
+Reloading the privilege tables will ensure that all changes made so far
+will take effect immediately.
+
+Reload privilege tables now? [Y/n] y
+ ... Success!
+
+Cleaning up...
+#+end_src
+** Install nginx
+#+begin_src sh
+sudo apt-get install nginx
+#+end_src
+
+start nginx
+#+begin_src sh
+sudo service nginx start
+#+end_src
+
+You can confirm that nginx has installed an your web server by
+directing your browser to your IP address. You can run the following
+command to reveal your VPS's IP address.
+#+begin_src sh
+ifconfig eth0 | grep inet | awk '{ print $2 }'
+#+end_src
+** Install PHP
+#+begin_src sh
+sudo apt-get install php5-fpm
+#+end_src
+** Configure php
+#+begin_src sh
+sudo nano /etc/php5/fpm/php.ini
+cgi.fix_pathinfo=0
+#+end_src
+Find the line, cgi.fix_pathinfo=1, and change the 1 to 0.
+
+If this number is kept as 1, the php interpreter will do its best to
+process the file that is as near to the requested file as possible.
+This is a possible security risk. If this number is set to 0,
+conversely, the interpreter will only process the exact file path—a
+much safer alternative.
+
+We need to make another small change in the php5-fpm configuration.
+#+begin_src sh
+sudo nano /etc/php5/fpm/pool.d/www.conf
+listen = /var/run/php5-fpm.sock
+sudo service php5-fpm restart
+#+end_src
+** Configure nginx
+#+begin_src sh
+sudo nano /etc/nginx/sites-available/default
+
+server {
+        listen   80;
+
+        root /usr/share/nginx/www;
+        index index.html index.htm index.php;
+
+        server_name yourdomain.com www.yourdomain.com;
+
+        location / {
+                #try to find the requested uri or redirect to index.php with request args
+                try_files $uri $uri/ /index.php?$args;
+        }
+
+        error_page 404 /404.html;
+
+        error_page 500 502 503 504 /50x.html;
+        location = /50x.html {
+                root /usr/share/nginx/www;
+        }
+
+        # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
+        #
+        location ~ \.php$ {
+                fastcgi_split_path_info ^(.+\.php)(/.+)$;
+                fastcgi_pass unix:/var/run/php5-fpm.sock;
+                fastcgi_index index.php;
+                include fastcgi_params;
+        }
+
+}
+#+end_src
+** Create a php Info Page for Test[option]
+#+begin_src sh
+sudo nano /usr/share/nginx/www/info.php
+#Add in the following line:
+<?php
+phpinfo();
+?>
+#Restart nginx
+sudo service nginx restart
+#visiting http://youripaddress/info.php
+#+end_src
+
+* Migrate Wordpress to Nginx[fn:6][fn:7]
+** Restore Database
+#+begin_src sh
+mysql -u root -p
+CREATE DATABASE wordpress;
+CREATE USER wordpressuser@localhost;
+SET PASSWORD FOR wordpressuser@localhost= PASSWORD("password");
+GRANT ALL PRIVILEGES ON wordpress.* TO wordpressuser@localhost;
+FLUSH PRIVILEGES;
+mysql -h localhost -u wordpressuser  -p wordpress < ./wordpress.sql
+#+end_src
+** Basic NGINX Optimization
+Increase or decrease the number of workers depending on your system's
+specs:
+#+begin_src sh
+sudo nano /etc/nginx/nginx.conf
+worker_processes 1;
+#NGINX limits the number of connections that a worker can maintain at one time, if your websites have many visitors you might want to increase the limit of connections
+worker_connections 768;
+#Enabling Gzip
+gzip on;
+gzip_types text/css text/x-component application/x-javascript application/javascript text/javascript text/x-js text/richtext image/svg+xml text/plain text/xsd text/xsl text/xml image/x-icon;
+#+end_src
+Files can be compressed using Gzip to accelerate WordPress, the
+smaller the data size requested by the user, the faster the response.
+Think about CSS files & HTML files, they have many similar strings,
+repeated text and white spaces.
+** Creating NGINX .conf files
+create 3 files that will hold our configurations:
+
++ common.conf: Configurations applicable to all sites.
++ wordpress.conf: Configurations applicable to all WordPress sites.
++ multisite.conf: Special configurations for WordPress multisite with
+  sub-directories.
+*** create the dir
+#+begin_src sh
+sudo mkdir /etc/nginx/global
+cd /etc/nginx/global
+#+end_src
+*** common.conf file
+#+begin_src sh
+sudo nano common.conf
+
+# Global configuration file.
+# ESSENTIAL : Configure Nginx Listening Port
+listen 80;
+# ESSENTIAL : Default file to serve. If the first file isn't found, 
+index index.php index.html index.htm;
+# ESSENTIAL : no favicon logs
+location = /favicon.ico {
+    log_not_found off;
+    access_log off;
+}
+# ESSENTIAL : robots.txt
+location = /robots.txt {
+    allow all;
+    log_not_found off;
+    access_log off;
+}
+# ESSENTIAL : Configure 404 Pages
+error_page 404 /404.html;
+# ESSENTIAL : Configure 50x Pages
+error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/www;
+    }
+# SECURITY : Deny all attempts to access hidden files .abcde
+location ~ /\. {
+    deny all;
+}
+# PERFORMANCE : Set expires headers for static files and turn off logging.
+location ~* ^.+\.(js|css|swf|xml|txt|ogg|ogv|svg|svgz|eot|otf|woff|mp4|ttf|rss|atom|jpg|jpeg|gif|png|ico|zip|tgz|gz|rar|bz2|doc|xls|exe|ppt|tar|mid|midi|wav|bmp|rtf)$ {
+    access_log off; log_not_found off; expires 30d;
+}
+#+end_src
+
+=location = /robots.txt {allow all;}= allows the access to robots.txt,
+if you want to specify another directory for the robots.txt you can
+add an alias:
+
+#+begin_src sh
+location /robots.txt {
+    alias /var/www/example.com/public/sample_robots.txt;
+}
+#+end_src
+=location ~ /\. {deny all;}= in the Linux operating system a hidden
+file begins with a ".", access to some hidden files, such as
+=.htaccess=, should be blocked for security reasons.
+
+
+=location ~* ^.+\.(js|css|swf...= expires headers tell the browser
+whether they should request a specific file from the server or whether
+they should grab it from the browser's cache. With expires 30d we are
+telling the browser to store static files such as pictures for 30
+days.
+
+*** wordpress.conf file
+#+begin_src sh
+sudo nano wordpress.conf
+
+# WORDPRESS : Rewrite rules, sends everything through index.php and keeps the appended query string intact
+location / {
+    try_files $uri $uri/ /index.php?q=$uri&$args;
+}
+
+# SECURITY : Deny all attempts to access PHP Files in the uploads directory
+location ~* /(?:uploads|files)/.*\.php$ {
+    deny all;
+}
+# REQUIREMENTS : Enable PHP Support
+location ~ \.php$ {
+    # SECURITY : Zero day Exploit Protection
+    try_files $uri =404;
+    # ENABLE : Enable PHP, listen fpm sock
+    fastcgi_split_path_info ^(.+\.php)(/.+)$;
+    fastcgi_pass unix:/var/run/php5-fpm.sock;
+    fastcgi_index index.php;
+    include fastcgi_params;
+}
+#+end_src
+
+=try_files $uri $uri/ /index.php?q=$uri&$args= rewrite rule required
+to allow you to choose your custom permalink structure on WordPress.
+
+=location ~* /(?:uploads|files)/.*\.php$ {deny all;}= this will
+prevent malicious code from being uploaded and executed from the
+WordPress media directory.
+
+=location ~ \.php$ {...}= since WordPress is a php site, we need to
+tell NGINX how to a pass our php scripts to PHP5.
+
+=try_files $uri =404;= this is a security rule, you only want to
+either serve a determined php file or go to a 404 error.
+
+*** multisite.conf file
+#+begin_src sh
+sudo nano multisite.conf
+
+# Rewrite rules for WordPress Multi-site.
+if (!-e $request_filename) {
+rewrite /wp-admin$ $scheme://$host$uri/ permanent;
+rewrite ^/[_0-9a-zA-Z-]+(/wp-.*) $1 last;
+rewrite ^/[_0-9a-zA-Z-]+(/.*\.php)$ $1 last;
+}
+
+#+end_src
+
+** Creating Server Blocks
+Have two blogs: =blog.dreamrunner.org= and =other.dreamrunner.org=.
+#+begin_src sh
+#disable the default server block:
+sudo rm /etc/nginx/sites-enabled/default
+
+#And create a server block file:
+sudo nano /etc/nginx/sites-available/dreamrun
+#+end_src
+Add:
+#+begin_src sh
+server {
+    server_name blog.dreamrunner.org;
+    root /home/shougang/www/laogangzhi;
+    access_log /var/log/nginx/blog.dreamrunner.org.access.log;
+    error_log /var/log/nginx/blog.dreamrunner.org.error.log;
+    include global/common.conf;
+    include global/wordpress.conf;
+    include global/multisite.conf;
+}
+
+server {
+    server_name other.dreamrunner.org;
+    root /home/shougang/www/dreamrunner;
+    access_log /var/log/nginx/other.dreamrunner.org.access.log;
+    error_log /var/log/nginx/other.dreamrunner.org.error.log;
+    include global/common.conf;
+    include global/wordpress.conf;
+    include global/multisite.conf;
+}
+#+end_src
++ =server_name=: Determine which server block is used for a given URL.
++ =root=: The path where your site is stored.
++ =access log & error log=: Set the paths for your logs
+** Restore Wordpress Files
+Copy the Wordpress files to =/home/username/www/= and upzip;
+#+begin_src sh
+sudo chown www-data:www-data * -R 
+sudo usermod -a -G www-data [username]
+#in the wp-config.php file add
+define( 'FS_METHOD', 'direct' )
+#+end_src
+
+* MySQL Tips
+** list MySQL user
+#+begin_src sh
+SELECT User FROM mysql.user;
+#+end_src
+** Create and Delete a MySQL Database
+#+begin_src sh
+SHOW DATABASES;
+CREATE DATABASE database name;
+DROP DATABASE database name;
+#+end_src
+** Access a MySQL Database
+#+begin_src sh
+USE events;
+SHOW tables; 
+#+end_src
+** Create a MySQL Table
+#+begin_src sh
+CREATE TABLE potluck (id INT NOT NULL PRIMARY KEY AUTO_INCREMENT, 
+name VARCHAR(20),
+food VARCHAR(30),
+confirmed CHAR(1), 
+signup_date DATE);
+#the table’s organization with this command:
+DESCRIBE potluck;
+#+end_src
+** Add Information to a MySQL Table
+#+begin_src sh
+INSERT INTO `potluck` (`id`,`name`,`food`,`confirmed`,`signup_date`) VALUES (NULL, "John", "Casserole","Y", '2012-04-11');
+SELECT * FROM potluck;
+#+end_src
+** Update Information in the Table
+#+begin_src sh
+UPDATE `potluck` 
+SET 
+`confirmed` = 'Y' 
+WHERE `potluck`.`name` ='Sandy';
+#+end_src
+** Add and Delete a Column
+#+begin_src sh
+ALTER TABLE potluck ADD email VARCHAR(40);
+# place that column in a specific spot in the table
+ALTER TABLE potluck ADD email VARCHAR(40) AFTER name; 
+ALTER TABLE potluck DROP email;
+#+end_src
+** Delete a Row
+#+begin_src sh
+DELETE from [table name] where [row name]=[field text];
+#+end_src
+* How To Create a SSL Certificate on nginx for Ubuntu 12.04
+** Create a Directory for the Certificate
+The SSL certificate has 2 parts main parts: the certificate itself and
+the public key.
+#+begin_src sh
+sudo mkdir /etc/nginx/ssl
+cd /etc/nginx/ssl
+#+end_src
+** Create the Server Key and Certificate Signing Request
+Start by creating the private server key. During this process, you
+will be asked to enter a specific passphrase. Be sure to note this
+phrase carefully, if you forget it or lose it, you will not be able to
+access the certificate.
+#+begin_src sh
+sudo openssl genrsa -des3 -out server.key 1024
+#Follow up by creating a certificate signing request:
+sudo openssl req -new -key server.key -out server.csr
+#+end_src
+This command will prompt terminal to display a lists of fields that need to be filled in.
+
+The most important line is "Common Name". Enter your official domain
+name here or, if you don't have one yet, your site's IP address. Leave
+the challenge password and optional company name blank.
+** Remove the Passphrase
+ However, it would serve us to remove the passphrase. Although having
+ the passphrase in place does provide heightened security, the issue
+ starts when one tries to reload nginx. In the event that nginx
+ crashes or needs to reboot, you will always have to re-enter your
+ passphrase to get your entire web server back online.
+#+begin_src sh
+sudo cp server.key server.key.org
+sudo openssl rsa -in server.key.org -out server.key
+#+end_src
+** Sign your SSL Certificate
+Keep in mind that you can specify how long the certificate should
+remain valid by changing the 365 to the number of days you prefer. As
+it stands this certificate will expire after one year.
+#+begin_src sh
+sudo openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt
+#+end_src
+** Set Up the Certificate for Test [option]
+#+begin_src sh
+sudo cp /etc/nginx/sites-available/default /etc/nginx/sites-available/example
+sudo nano /etc/nginx/sites-available/example
+
+# HTTPS server
+server {
+        listen 443;
+        server_name example.com;
+
+        root /usr/share/nginx/www;
+        index index.html index.htm;
+
+        ssl on;
+        ssl_certificate /etc/nginx/ssl/server.crt;
+        ssl_certificate_key /etc/nginx/ssl/server.key; 
+}
+#+end_src
+** Activate the Virtual Host
+#+begin_src sh
+sudo ln -s /etc/nginx/sites-available/example /etc/nginx/sites-enabled/example
+sudo service nginx restart
+#+end_src
+
+* Footnotes
+
+[fn:1] https://www.digitalocean.com/community/articles/initial-server-setup-with-ubuntu-12-04
+
+[fn:2] https://www.digitalocean.com/community/articles/how-to-protect-ssh-with-fail2ban-on-ubuntu-12-04
+
+[fn:3] https://www.digitalocean.com/community/articles/how-to-install-denyhosts-on-ubuntu-12-04
+
+[fn:4] https://www.digitalocean.com/community/articles/how-to-add-swap-on-ubuntu-12-04
+
+[fn:5] https://www.digitalocean.com/community/articles/how-to-install-linux-nginx-mysql-php-lemp-stack-on-ubuntu-12-04
+
+[fn:6]
+https://www.digitalocean.com/community/articles/how-to-configure-single-and-multiple-wordpress-site-settings-with-nginx
+
+[fn:7]
+https://www.digitalocean.com/community/articles/how-to-migrate-wordpress-from-shared-hosting-to-a-cloud-server-with-zero-downtime
+
+
+
