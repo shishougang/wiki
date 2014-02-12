@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Digital Ocean</title>
-<!-- 2014-02-07 Fri 00:14 -->
+<!-- 2014-02-12 Wed 20:03 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -479,15 +479,10 @@ sudo chmod 0600 /swapfile
 <div class="org-src-container">
 
 <pre class="src src-sh">sudo apt-get install mysql-server mysql-client
-sudo apt-get install php5-mysql php5-gd php5-xdebug php-apc
 </pre>
 </div>
-<p>
-php5-gd: This package provides a module for handling graphics directly
-from PHP scripts. It supports the PNG, JPEG, XPM formats as well as
-Freetype/ttf fonts.
-</p>
 </div>
+
 <ul class="org-ul"><li>configuration<br  /><div class="outline-text-4" id="text-6-2-1">
 <p>
 Once you have installed MySQL, we should activate it with this
@@ -589,11 +584,50 @@ command to reveal your VPS's IP address.
 <div class="org-src-container">
 
 <pre class="src src-sh">sudo apt-get install php5-fpm
+sudo apt-get install php5-mysql php5-gd php5-xdebug php-apc
 </pre>
 </div>
-</div>
-</div>
+<p>
+php5-gd: This package provides a module for handling graphics directly
+from PHP scripts. It supports the PNG, JPEG, XPM formats as well as
+Freetype/ttf fonts.
+</p>
 
+<p>
+More:
+</p>
+<ul class="org-ul">
+<li>APC (php-pecl-apc) – APC caches and optimizes PHP intermediate code
+</li>
+<li>CLI (php-cli) – Command-line interface for PHP
+</li>
+<li>PEAR (php-pear) – PHP Extension and Application Repository framework
+</li>
+<li>PDO (php-pdo) – A database access abstraction module for PHP applications
+</li>
+<li>MySQL (php-mysqlnd) – A module for PHP applications that use MySQL databases
+</li>
+<li>PostgreSQL (php-pgsql) – A PostgreSQL database module for PHP
+</li>
+<li>MongoDB (php-pecl-mongo) – PHP MongoDB database driver
+</li>
+<li>SQLite (php-sqlite) – Extension for the SQLite V2 Embeddable SQL Database Engine
+</li>
+<li>Memcache (php-pecl-memcache) – Extension to work with the Memcached caching daemon
+</li>
+<li>Memcached (php-pecl-memcached) – Extension to work with the Memcached caching daemon
+</li>
+<li>GD (php-gd) – A module for PHP applications for using the gd graphics library
+</li>
+<li>XML (php-xml) – A module for PHP applications which use XML
+</li>
+<li>MBString (php-mbstring) – A module for PHP applications which need multi-byte string handling
+</li>
+<li>MCrypt (php-mcrypt) – Standard PHP module provides mcrypt library support
+</li>
+</ul>
+</div>
+</div>
 <div id="outline-container-sec-6-5" class="outline-3">
 <h3 id="sec-6-5">Configure php</h3>
 <div class="outline-text-3" id="text-6-5">
@@ -1252,17 +1286,120 @@ Swap:       524284          0     524284
 </div>
 </li>
 
-<li><br  /></li></ul>
+<li><code>nginx.conf</code><br  /><div class="outline-text-4" id="text-10-2-2">
+<div class="org-src-container">
+
+<pre class="src src-sh">worker_processes [number of processor cores];
+
+cat /proc/cpuinfo |grep processor
+processor       : 0
+
+worker_processes 1;
+</pre>
+</div>
+</div>
+</li>
+<li>under <code>/etc/nginx/conf.d/</code><br  /><div class="outline-text-4" id="text-10-2-3">
+<p>
+create <code>user.conf</code>:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">The charset directive will not only cause Nginx to re-encode </span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">anything that is not in the defined character set, </span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">it will also add it to the Content-Type HTTP header so browsers know.</span>
+charset utf-8;
+
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">The default Nginx client_max_body_size is 1mb. </span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">That&#8217;s too small for most everything these days</span>
+client_max_body_size 32m;
+client_body_buffer_size 128k;
+
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Hide Nginx Server Tokens / Hide Nginx version number</span>
+server_tokens off;
+</pre>
+</div>
+
+<p>
+create <code>ssl.conf</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">we want to enable ssl session resumption to avoid</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">having to start the handshake from scratch each page load</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">so first we enable a shared cache, named SSL (creative!) that is 10mb large</span>
+ssl_session_cache shared:SSL:10m;
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">save things in the cache for 3 minutes</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">if you're not making a request at least every 3 minutes, this isn't going</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">to accomplish anything anyway</span>
+ssl_session_timeout 3m;
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">now we're going to change a bunch related to SSL ciphers and protocol</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">the primary goal here is to be more secure, and i've generally tried to</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">go with things that comply with the Federal Information Processing Standard (FIPS)</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">set by the US government for non-military government use</span>
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">we don't want to support SSLv3, it's known to be insecure</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">FIPS 140-2 compliance, TLS1+ only</span>
+ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">now we go through a couple different options for the SSL ciphers to support, mainly just to</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">give you a bunch of options to pick from</span>
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">this is a very concise definition of ciphers that don't allow anonymous DH or MD5 - the big weaknesses</span>
+<span style="color: #ff7f24;">#       </span><span style="color: #ff7f24;">per: https://calomel.org/nginx.html</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">ssl_ciphers HIGH:!ADH!MD5:@STRENGTH;</span>
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">this is a very (not so) short list of very secure ciphers that may be incompatible with older browsers</span>
+<span style="color: #ff7f24;">#       </span><span style="color: #ff7f24;">per: https://calomel.org/nginx.html </span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">ssl_ciphers ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:AES256-GCM-SHA384:AES256-SHA256:AES256-SHA:AES128-SHA;</span>
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">this excludes insecure ciphers and sorts the others by strength</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">it is BEAST-resistant, prioritizing RC4</span>
+<span style="color: #ff7f24;">#       </span><span style="color: #ff7f24;">per: http://groups.drupal.org/node/179344</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">ssl_ciphers !aNULL:!LOW:!MD5:!EXP:RC4:CAMELLIA:AES128:3DES:SEED:AES256@STRENGTH;</span>
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">this is a combination of everything above and openssl docs - very secure, FIPS-compliant, ordered by strength</span>
+ssl_ciphers !aNULL:!eNULL:FIPS@STRENGTH;
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">don't let the client decide what ciphers to use, we've told the server which to allow</span>
+ssl_prefer_server_ciphers on;
+</pre>
+</div>
+</div>
+</li></ul>
 </div>
 
 <div id="outline-container-sec-10-3" class="outline-3">
 <h3 id="sec-10-3">PHP5-FPM</h3>
 <div class="outline-text-3" id="text-10-3">
+</div><ul class="org-ul"><li>the Configuration Files<br  /><div class="outline-text-4" id="text-10-3-1">
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-sh"><span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">Main configuration file ##</span>
+/etc/php5/fpm/php-fpm.conf
+
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">last line of php-fpm.conf:include=/etc/php5/fpm/pool.d/*.conf</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">Other config files on (if needed) ##</span>
+/etc/php5/fpm/pool.d/
+</pre>
 </div>
 </div>
+</li>
+
+<li><code>pool.d/www.conf</code><br  /><div class="outline-text-4" id="text-10-3-2">
+<div class="org-src-container">
+
+<pre class="src src-sh">pm.max_children = 5
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+<span style="color: #eedd82;">listen</span> = /var/run/php5-fpm.socket
+</pre>
+</div>
+</div>
+</li></ul>
 </div>
 </div>
 <div id="footnotes">
@@ -1302,7 +1439,7 @@ Swap:       524284          0     524284
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-02-07 Fri 00:14</p>
+<p class="date">Created: 2014-02-12 Wed 20:03</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

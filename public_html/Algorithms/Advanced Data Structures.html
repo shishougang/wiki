@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Advanced Data Structures</title>
-<!-- 2014-01-01 Wed 13:36 -->
+<!-- 2014-02-12 Wed 20:03 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -86,7 +86,7 @@
     { background-color: #ffff00; color: #000000; font-weight: bold; }
   /*]]>*/-->
 </style>
-<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<link rel="stylesheet" type="text/css" href="../assets/stylesheet.css" />
 <script type="text/javascript">
 /*
 @licstart  The following is the entire license notice for the
@@ -141,19 +141,268 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1"></a></li>
+<li><a href="#sec-1">Trie</a>
+<ul>
+<li><a href="#sec-1-1">simple Trie implementation in C</a></li>
+<li><a href="#sec-1-2">Trie implementation in C++</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">Rope</a>
+<ul>
+<li><a href="#sec-2-1">Rope implementation in C++</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">Skip list</a>
+<ul>
+<li><a href="#sec-3-1">William Pugh in "Skip Lists: A Probabilistic Alternative to Balanced Trees"</a></li>
+<li><a href="#sec-3-2">Redis ordered set implementation uses skip list</a></li>
+<li><a href="#sec-3-3">Skip list implementation in C++</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">R-tree</a>
+<ul>
+<li><a href="#sec-4-1">R-tree implementation in C++</a></li>
+</ul>
+</li>
 </ul>
 </div>
 </div>
 
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1"></h2>
+<h2 id="sec-1">Trie</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+<a href="http://en.wikipedia.org/wiki/Trie">Trie</a> is an  efficient information retrieval data structure. Using
+trie, search complexities can be brought to optimal limit (key
+length). If we store keys in binary search tree, a well balanced BST
+will need time proportional to M * log N, where M is maximum string
+length and N is number of keys in tree. Using trie, we can search the
+key in O(M) time. However the penalty is on trie storage requirements.
+</p>
+</div>
+
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">simple Trie implementation in C</h3>
+<div class="outline-text-3" id="text-1-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string.h&gt;</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">ARRAY_SIZE</span>(<span style="color: #eedd82;">a</span>)  <span style="color: #00ffff;">sizeof</span>(a) / <span style="color: #00ffff;">sizeof</span>(a[0])
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ALPHABET_SIZE</span> (26)
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">only use key a-z </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">CHAR_TO_INDEX</span>(<span style="color: #eedd82;">c</span>)   (c - <span style="color: #ffa07a;">'a'</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">LEAF_VALUE</span>   1
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">TrieNode_</span> <span style="color: #98fb98;">TrieNode</span>;
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">TrieNode_</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">val</span>;
+  <span style="color: #98fb98;">TrieNode</span> *<span style="color: #eedd82;">children</span>[ALPHABET_SIZE];
+};
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Trie_</span> <span style="color: #98fb98;">Trie</span>;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Trie_</span> {
+  <span style="color: #98fb98;">TrieNode</span> *<span style="color: #eedd82;">root</span>;
+};
+
+<span style="color: #98fb98;">TrieNode</span> *<span style="color: #87cefa;">GetNode</span>(<span style="color: #98fb98;">void</span>)
+{
+  <span style="color: #98fb98;">TrieNode</span> *<span style="color: #eedd82;">pNode</span>;
+  pNode = (<span style="color: #98fb98;">TrieNode</span> *) malloc(<span style="color: #00ffff;">sizeof</span>(TrieNode));
+
+  <span style="color: #00ffff;">if</span>(pNode == <span style="color: #7fffd4;">NULL</span>){
+    fprintf(stderr, <span style="color: #ffa07a;">"malloc failed\n"</span>);
+    exit (EXIT_FAILURE);
+  }
+  pNode-&gt;val = 0;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> ;
+  <span style="color: #00ffff;">for</span>(i = 0; i &lt; ALPHABET_SIZE; i++){
+    pNode-&gt;children[i] = <span style="color: #7fffd4;">NULL</span>;
+  }
+  <span style="color: #00ffff;">return</span> pNode;
+}
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Initialize trie </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">InitialTrie</span>(<span style="color: #98fb98;">Trie</span> *<span style="color: #eedd82;">pTrie</span>)
+{
+  pTrie-&gt;root = GetNode();
+}
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">If not present, insert key into trie.</span>
+<span style="color: #ff7f24;"> * If the key is prefix of trie node, just mark leaf node</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">insert</span>(<span style="color: #98fb98;">Trie</span> *<span style="color: #eedd82;">pTrie</span>, <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">key</span>[])
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">level</span>, <span style="color: #eedd82;">index</span>;
+  <span style="color: #98fb98;">TrieNode</span> *<span style="color: #eedd82;">p</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">length</span> = strlen(key);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+
+  <span style="color: #00ffff;">if</span>(pTrie-&gt;root == <span style="color: #7fffd4;">NULL</span>)
+    InitialTrie(pTrie);
+  p = pTrie-&gt;root;
+
+  <span style="color: #00ffff;">for</span>(level = 0; level &lt; length; level++){
+    index = CHAR_TO_INDEX(key[level]);
+    <span style="color: #00ffff;">if</span>(p-&gt;children[index] == <span style="color: #7fffd4;">NULL</span>)
+      p-&gt;children[index] = GetNode();
+    p = p-&gt;children[index];
+  }
+  p-&gt;val = LEAF_VALUE;
+}
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">return non zero, if key is in the Trie </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">search</span>(<span style="color: #98fb98;">Trie</span> *<span style="color: #eedd82;">pTrie</span>, <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">key</span>[])
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">level</span>, <span style="color: #eedd82;">index</span>;
+  <span style="color: #98fb98;">TrieNode</span> *<span style="color: #eedd82;">p</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">length</span> = strlen(key);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+
+  <span style="color: #00ffff;">if</span>(pTrie-&gt;root == <span style="color: #7fffd4;">NULL</span>)
+    <span style="color: #00ffff;">return</span> 0;
+  p = pTrie-&gt;root;
+  <span style="color: #00ffff;">for</span>(level = 0; level &lt; length; level++){
+    index = CHAR_TO_INDEX(key[level]);
+    <span style="color: #00ffff;">if</span>(p-&gt;children[index] == <span style="color: #7fffd4;">NULL</span>)
+      <span style="color: #00ffff;">return</span> 0;
+    p = p-&gt;children[index];
+  }
+  <span style="color: #00ffff;">return</span> ((p != <span style="color: #7fffd4;">NULL</span>) &amp;&amp; (p-&gt;val));
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[])
+{
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">keys</span>[][8] = {<span style="color: #ffa07a;">"the"</span>, <span style="color: #ffa07a;">"a"</span>, <span style="color: #ffa07a;">"there"</span>, <span style="color: #ffa07a;">"answer"</span>, <span style="color: #ffa07a;">"any"</span>, <span style="color: #ffa07a;">"by"</span>, <span style="color: #ffa07a;">"bye"</span>, <span style="color: #ffa07a;">"their"</span>};
+  <span style="color: #98fb98;">Trie</span> <span style="color: #eedd82;">trie</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">output</span>[][32] = {<span style="color: #ffa07a;">"Not present in trie"</span>, <span style="color: #ffa07a;">"Present in trie"</span>};
+
+  InitialTrie(&amp;trie);
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Construct trie</span>
+  <span style="color: #00ffff;">for</span>(i = 0; i &lt; ARRAY_SIZE(keys); i++)
+  {
+    insert(&amp;trie, keys[i]);
+  }
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Search for different keys</span>
+  printf(<span style="color: #ffa07a;">"%s --- %s\n"</span>, <span style="color: #ffa07a;">"the"</span>, output[search(&amp;trie, <span style="color: #ffa07a;">"the"</span>)] );
+  printf(<span style="color: #ffa07a;">"%s --- %s\n"</span>, <span style="color: #ffa07a;">"these"</span>, output[search(&amp;trie, <span style="color: #ffa07a;">"these"</span>)] );
+  printf(<span style="color: #ffa07a;">"%s --- %s\n"</span>, <span style="color: #ffa07a;">"their"</span>, output[search(&amp;trie, <span style="color: #ffa07a;">"their"</span>)] );
+  printf(<span style="color: #ffa07a;">"%s --- %s\n"</span>, <span style="color: #ffa07a;">"thaw"</span>, output[search(&amp;trie, <span style="color: #ffa07a;">"thaw"</span>)] );
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2">Trie implementation in C++</h3>
+<div class="outline-text-3" id="text-1-2">
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Rope</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+<a href="http://en.wikipedia.org/wiki/Rope_%28data_structure%29">Rope</a> is a data structure composed of smaller strings that is used for
+efficiently storing and manipulating a very long string.
+</p>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Rope implementation in C++</h3>
+<div class="outline-text-3" id="text-2-1">
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Skip list</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+<a href="http://en.wikipedia.org/wiki/Skip_list">Skip list</a> is  a data structure that allows fast search within an
+ordered sequence of elements. Fast search is made possible by
+maintaining a linked hierarchy of subsequences, each skipping over
+fewer elements. 
+</p>
+</div>
+
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">William Pugh in "Skip Lists: A Probabilistic Alternative to Balanced Trees"</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+<a href="./Files/skiplists.pdf">Skip Lists: A Probabilistic Alternative to Balanced Trees</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">Redis ordered set implementation uses skip list</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+<a href="https://github.com/antirez/redis/blob/unstable/src/t_zset.c">https://github.com/antirez/redis/blob/unstable/src/t_zset.c</a>
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">Skip list implementation in C++</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+<a href="http://eternallyconfuzzled.com/tuts/datastructures/jsw_tut_skip.aspx">http://eternallyconfuzzled.com/tuts/datastructures/jsw_tut_skip.aspx</a>
+</p>
+
+
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">R-tree</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+<a href="http://en.wikipedia.org/wiki/R-tree">R-trees</a> are tree data structures used for spatial access methods,
+i.e., for indexing multi-dimensional information such as geographical
+coordinates, rectangles or polygons.
+</p>
+</div>
+
+<div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">R-tree implementation in C++</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+<a href="http://superliminal.com/sources/sources.htm#C%20&%20C++%20Code">http://superliminal.com/sources/sources.htm#C%20&%20C++%20Code</a>
+</p>
+
+<p>
+<a href="https://pypi.python.org/pypi/Rtree/">https://pypi.python.org/pypi/Rtree/</a>
+</p>
+</div>
+</div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-01-01 Wed 13:36</p>
+<p class="date">Created: 2014-02-12 Wed 20:03</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

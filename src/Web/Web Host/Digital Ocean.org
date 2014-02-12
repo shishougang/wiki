@@ -133,11 +133,8 @@ sudo apt-get update
 ** Install MySQL
 #+begin_src sh
 sudo apt-get install mysql-server mysql-client
-sudo apt-get install php5-mysql php5-gd php5-xdebug php-apc
 #+end_src
-php5-gd: This package provides a module for handling graphics directly
-from PHP scripts. It supports the PNG, JPEG, XPM formats as well as
-Freetype/ttf fonts.
+
 *** configuration
 Once you have installed MySQL, we should activate it with this
 command:
@@ -205,7 +202,28 @@ ifconfig eth0 | grep inet | awk '{ print $2 }'
 ** Install PHP
 #+begin_src sh
 sudo apt-get install php5-fpm
+sudo apt-get install php5-mysql php5-gd php5-xdebug php-apc
 #+end_src
+php5-gd: This package provides a module for handling graphics directly
+from PHP scripts. It supports the PNG, JPEG, XPM formats as well as
+Freetype/ttf fonts.
+
+More:
++ APC (php-pecl-apc) – APC caches and optimizes PHP intermediate code
++ CLI (php-cli) – Command-line interface for PHP
++ PEAR (php-pear) – PHP Extension and Application Repository framework
++ PDO (php-pdo) – A database access abstraction module for PHP applications
++ MySQL (php-mysqlnd) – A module for PHP applications that use MySQL databases
++ PostgreSQL (php-pgsql) – A PostgreSQL database module for PHP
++ MongoDB (php-pecl-mongo) – PHP MongoDB database driver
++ SQLite (php-sqlite) – Extension for the SQLite V2 Embeddable SQL Database Engine
++ Memcache (php-pecl-memcache) – Extension to work with the Memcached caching daemon
++ Memcached (php-pecl-memcached) – Extension to work with the Memcached caching daemon
++ GD (php-gd) – A module for PHP applications for using the gd graphics library
++ XML (php-xml) – A module for PHP applications which use XML
++ MBString (php-mbstring) – A module for PHP applications which need multi-byte string handling
++ MCrypt (php-mcrypt) – Standard PHP module provides mcrypt library support
+
 ** Configure php
 #+begin_src sh
 sudo nano /etc/php5/fpm/php.ini
@@ -616,12 +634,96 @@ Swap:       524284          0     524284
 ## Other config files on (if needed) ##
 /etc/nginx/conf.d/
 #+end_src
-*** 
-** PHP5-FPM
+*** =nginx.conf=
 #+begin_src sh
+worker_processes [number of processor cores];
 
+cat /proc/cpuinfo |grep processor
+processor	: 0
+
+worker_processes 1;
+#+end_src
+
+*** under =/etc/nginx/conf.d/=
+create =user.conf=:
+#+begin_src sh
+#The charset directive will not only cause Nginx to re-encode 
+#anything that is not in the defined character set, 
+#it will also add it to the Content-Type HTTP header so browsers know.
+charset utf-8;
+
+#The default Nginx client_max_body_size is 1mb. 
+#That’s too small for most everything these days
+client_max_body_size 32m;
+client_body_buffer_size 128k;
+
+#Hide Nginx Server Tokens / Hide Nginx version number
+server_tokens off;
+#+end_src
+
+create =ssl.conf=
+#+begin_src sh
+# we want to enable ssl session resumption to avoid
+# having to start the handshake from scratch each page load
+# so first we enable a shared cache, named SSL (creative!) that is 10mb large
+ssl_session_cache shared:SSL:10m;
+ 
+# save things in the cache for 3 minutes
+# if you're not making a request at least every 3 minutes, this isn't going
+# to accomplish anything anyway
+ssl_session_timeout 3m;
+ 
+# now we're going to change a bunch related to SSL ciphers and protocol
+# the primary goal here is to be more secure, and i've generally tried to
+# go with things that comply with the Federal Information Processing Standard (FIPS)
+# set by the US government for non-military government use
+ 
+# we don't want to support SSLv3, it's known to be insecure
+# FIPS 140-2 compliance, TLS1+ only
+ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+ 
+# now we go through a couple different options for the SSL ciphers to support, mainly just to
+# give you a bunch of options to pick from
+ 
+# this is a very concise definition of ciphers that don't allow anonymous DH or MD5 - the big weaknesses
+#	per: https://calomel.org/nginx.html
+#ssl_ciphers HIGH:!ADH!MD5:@STRENGTH;
+ 
+# this is a very (not so) short list of very secure ciphers that may be incompatible with older browsers
+#	per: https://calomel.org/nginx.html 
+#ssl_ciphers ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:AES256-GCM-SHA384:AES256-SHA256:AES256-SHA:AES128-SHA;
+ 
+# this excludes insecure ciphers and sorts the others by strength
+# it is BEAST-resistant, prioritizing RC4
+#	per: http://groups.drupal.org/node/179344
+#ssl_ciphers !aNULL:!LOW:!MD5:!EXP:RC4:CAMELLIA:AES128:3DES:SEED:AES256@STRENGTH;
+ 
+# this is a combination of everything above and openssl docs - very secure, FIPS-compliant, ordered by strength
+ssl_ciphers !aNULL:!eNULL:FIPS@STRENGTH;
+ 
+# don't let the client decide what ciphers to use, we've told the server which to allow
+ssl_prefer_server_ciphers on;
+#+end_src
+** PHP5-FPM
+*** the Configuration Files
+#+begin_src sh
+## Main configuration file ##
+/etc/php5/fpm/php-fpm.conf
+
+## last line of php-fpm.conf:include=/etc/php5/fpm/pool.d/*.conf
+## Other config files on (if needed) ##
+/etc/php5/fpm/pool.d/
 
 #+end_src
+*** =pool.d/www.conf=
+#+begin_src sh
+pm.max_children = 5
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+listen = /var/run/php5-fpm.socket
+#+end_src
+
 * Footnotes
 
 [fn:1] https://www.digitalocean.com/community/articles/initial-server-setup-with-ubuntu-12-04

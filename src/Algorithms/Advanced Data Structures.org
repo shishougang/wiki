@@ -1,6 +1,171 @@
-#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
 #+TITLE: Advanced Data Structures
 #+OPTIONS: num:nil H:2
 
 
-* 
+* Trie
+[[http://en.wikipedia.org/wiki/Trie][Trie]] is an  efficient information retrieval data structure. Using
+trie, search complexities can be brought to optimal limit (key
+length). If we store keys in binary search tree, a well balanced BST
+will need time proportional to M * log N, where M is maximum string
+length and N is number of keys in tree. Using trie, we can search the
+key in O(M) time. However the penalty is on trie storage requirements.
+
+** simple Trie implementation in C
+#+begin_src c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define ARRAY_SIZE(a)  sizeof(a) / sizeof(a[0])
+
+#define ALPHABET_SIZE (26)
+/* only use key a-z */
+#define CHAR_TO_INDEX(c)   (c - 'a')
+#define LEAF_VALUE   1
+
+typedef struct TrieNode_ TrieNode;
+
+struct TrieNode_ {
+  int val;
+  TrieNode *children[ALPHABET_SIZE];
+};
+
+typedef struct Trie_ Trie;
+struct Trie_ {
+  TrieNode *root;
+};
+
+TrieNode *GetNode(void)
+{
+  TrieNode *pNode;
+  pNode = (TrieNode *) malloc(sizeof(TrieNode));
+
+  if(pNode == NULL){
+    fprintf(stderr, "malloc failed\n");
+    exit (EXIT_FAILURE);
+  }
+  pNode->val = 0;
+  int i ;
+  for(i = 0; i < ALPHABET_SIZE; i++){
+    pNode->children[i] = NULL;
+  }
+  return pNode;
+}
+
+/* Initialize trie */
+void InitialTrie(Trie *pTrie)
+{
+  pTrie->root = GetNode();
+}
+
+/* If not present, insert key into trie.
+ * If the key is prefix of trie node, just mark leaf node
+ */
+void insert(Trie *pTrie, char key[])
+{
+  int level, index;
+  TrieNode *p;
+  int length = strlen(key);
+  int i;
+
+  if(pTrie->root == NULL)
+    InitialTrie(pTrie);
+  p = pTrie->root;
+
+  for(level = 0; level < length; level++){
+    index = CHAR_TO_INDEX(key[level]);
+    if(p->children[index] == NULL)
+      p->children[index] = GetNode();
+    p = p->children[index];
+  }
+  p->val = LEAF_VALUE;
+}
+                      
+/* return non zero, if key is in the Trie */
+int search(Trie *pTrie, char key[])
+{
+  int level, index;
+  TrieNode *p;
+  int length = strlen(key);
+  int i;
+
+  if(pTrie->root == NULL)
+    return 0;
+  p = pTrie->root;
+  for(level = 0; level < length; level++){
+    index = CHAR_TO_INDEX(key[level]);
+    if(p->children[index] == NULL)
+      return 0;
+    p = p->children[index];
+  }
+  return ((p != NULL) && (p->val));
+}
+
+int main(int argc, char *argv[])
+{
+  char keys[][8] = {"the", "a", "there", "answer", "any", "by", "bye", "their"};
+  Trie trie;
+  int i;
+ 
+  char output[][32] = {"Not present in trie", "Present in trie"};
+ 
+  InitialTrie(&trie);
+ 
+    // Construct trie
+  for(i = 0; i < ARRAY_SIZE(keys); i++)
+  {
+    insert(&trie, keys[i]);
+  }
+ 
+    // Search for different keys
+  printf("%s --- %s\n", "the", output[search(&trie, "the")] );
+  printf("%s --- %s\n", "these", output[search(&trie, "these")] );
+  printf("%s --- %s\n", "their", output[search(&trie, "their")] );
+  printf("%s --- %s\n", "thaw", output[search(&trie, "thaw")] );
+  return 0;
+}
+#+end_src
+
+** Trie implementation in C++
+#+begin_src c
+
+#+end_src
+
+* Rope
+[[http://en.wikipedia.org/wiki/Rope_%28data_structure%29][Rope]] is a data structure composed of smaller strings that is used for
+efficiently storing and manipulating a very long string.
+
+** Rope implementation in C++
+#+begin_src c
+
+#+end_src
+
+* Skip list
+[[http://en.wikipedia.org/wiki/Skip_list][Skip list]] is  a data structure that allows fast search within an
+ordered sequence of elements. Fast search is made possible by
+maintaining a linked hierarchy of subsequences, each skipping over
+fewer elements. 
+
+** William Pugh in "Skip Lists: A Probabilistic Alternative to Balanced Trees"
+[[./Files/skiplists.pdf][Skip Lists: A Probabilistic Alternative to Balanced Trees]]
+** Redis ordered set implementation uses skip list
+https://github.com/antirez/redis/blob/unstable/src/t_zset.c
+
+** Skip list implementation in C++
+http://eternallyconfuzzled.com/tuts/datastructures/jsw_tut_skip.aspx
+
+
+#+begin_src c
+
+#+end_src
+* R-tree
+[[http://en.wikipedia.org/wiki/R-tree][R-trees]] are tree data structures used for spatial access methods,
+i.e., for indexing multi-dimensional information such as geographical
+coordinates, rectangles or polygons.
+
+** R-tree implementation in C++
+http://superliminal.com/sources/sources.htm#C%20&%20C++%20Code
+
+https://pypi.python.org/pypi/Rtree/
+
