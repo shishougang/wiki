@@ -1,0 +1,476 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: C++测试驱动开发与单元测试实例
+#+OPTIONS: num:nil H:2
+
+* 测试驱动开发基础
+** 测试驱动开发
+[[http://en.wikipedia.org/wiki/Test-driven_development][测试驱动开发(TDD)]]是一种软件开发流程，依赖于重复如下一小段开发周期：
+1. 开发者定义一个初始将失败的自动测试用例，这个用例用来实现需要的改进或新的功能;
+2. 写出最小的代码来通过此测试;
+3. [[http://en.wikipedia.org/wiki/Code_refactoring][重构]]这段新代码来符合规范。
+
+TDD有它自身的
+[[http://en.wikipedia.org/wiki/Test-driven_development#Benefits][优点]]与
+[[http://en.wikipedia.org/wiki/Test-driven_development#Vulnerabilities][缺点]]
+
+TDD的一个周期可以总结如下:[fn:1]
+1. 快速加一个测试
+2. 运行所有测试，然后发现新测试失败
+3. 修改代码，让新测试通过
+4. 运行所有测试并都通过
+5. 重构代码
+[[./Files/Test-driven_development.PNG]]
+
+** 单元测试与其框架
+[[http://en.wikipedia.org/wiki/Unit_testing][单元测试(unit testing)]]是测试一小段独立代码其是否正确的一种方法。
+
+单元测试的目标是隔离程序的每个部件并证明这些单个部件是正确的。一个单元测
+试提供了代码片断需要满足的严密的规约。因此，单元测试带来了一些益处：
+1. 尽早找出问题。在TDD开发中，一般单元测试程序先写与代码。
+2. 适应变更。单元测试允许程序员在未来重构代码时，确保代码依然工作正确。
+3. 简化集成。单元测试消除程序单元的不可靠，适合于自底向上的测试方法。通
+   过先测试程序部件再测试部件组装，使集成测试变得更加简单。
+4. 文档记录。单元测试提供了系统的一种文档记录。借助于查看单元测试提供
+   的功能和单元测试中如何使用程序单元，开发人员可以直观的理解程序单元
+   的基础API。
+5. 表达设计。在测试驱动开发的软件实践中，单元测试可以取代正式的设计。
+   每一个单元测试案例均可以视为一项类、方法和待观察行为等设计元素。
+
+*** 单元测试的框架
+为了简单与系统化单元测试过程，基本借助于单元测试框架。如今基本任何编程
+语言都有几套自身的单元测试框架。而且广泛使用的框架都是[[http://en.wikipedia.org/wiki/XUnit][属于xUnit家族]]
+（CppUnit, JUnit, PyUnit, and etc.)。xUnit系的框架易于使用，提供一套自
+动化测试的方案。所有的xUint框架拥有如下的基本元件框架：
++ Assertions。验证程序某一结果。
++ Test case（测试用例）。包含某个功能的多个Assertions。
++ Test suites（测试套件）。包含多个相关的测试用例。
++ Test fixtures（测试夹具）。提供测试开始时执行数据或状态的初始化，结
+  束时执行数据或状态的清理工作。
++ 同时包括Test runner，Test execution和Test result formatter。
+*** 模仿对象
+在单元测试中，模拟对象可以模拟复杂的、真实的（非模拟）对象的行为， 如
+果真实的对象无法放入单元测试中，使用模拟对象就很有帮助。
+
+在下面的情形，可能使用模拟对象来代替真实对象更好:
++ 真实对象的行为是不确定的（例如，当前的时间或当前的温度）；
++ 真实对象很难搭建起来；
++ 真实对象的行为很难触发（例如，网络错误）；
++ 真实对象速度很慢（例如，一个完整的数据库，在测试之前可能需要初始化）；
++ 真实对象可能还不存在或之后会改动；
++ 真实对象可能包含不能用作测试（而不是为实际工作）的信息和方法。
+
+模拟对象具有和要模拟的真实对象的相同的接口，可以让调用该接口的对象不知
+道在使用真实对象还是模拟对象。现有的许多模拟对象框架允许程序员指定模拟
+对象上的哪些方法，将按照什么顺序被调用，以及传入什么参数，将返回什么值。
+这样，复杂对象（例如网络套接字）的行为将可以使用模拟对象来模拟，允许程
+序员来发现被测对象在可能各种存在的状态是否响应正确。
+
+典型的流程基本如下：
+1. 指定你需要测试的类的接口
+2. 根据接口，用某个模拟框架来创建一个模拟类
+3. 接下来就如单元测试一样，建立测试用例，用这个模拟对象代替实际的对象。
+   一般按照如下进行：
+   + 首先创建模拟类实例
+   + 针对模拟类，设置它的预期的行为。也就是那个方法被会被调用，数据返
+     回什么对于特定调用等。
+   + 针对模拟类的行为，调用并判断预期的结果是否符合实际要求。
+** 如何组织测试实例
+应该为所有外部可以访问的函数创建单元测试：没有定义为static的自由函数，
+类里的公共函数。单元测试应该涵盖函数的主要运行路径，包括不同的分支，循
+环等。必须处理细小的，边缘情况，提供错误或随即的数据，使得你能测试你的
+错误处理功能。
+
+如何写好单元测试（比如每个测试只做一件事，测试需要短小而简洁等），需要
+好好设计与思考，比较好的单元测试指南[[http://geosoft.no/development/unittesting.html][这里]].
+
+把很多个测试用例组合到一个大的函数中，是否更好提供代码的可读性与提高它
+的简洁性呢。并不是，这样做并不好，参考[[http://www.boost.org/doc/libs/1_45_0/libs/test/doc/html/utf/user-guide/test-organization.html][这里]].
+
+代码的可测试性同样依赖于代码的设计上。很多时候很难写好单元测试，是因为
+要测试的功能隐藏在很多个接口里，或存在很多的互相依赖以致很难正确初始化
+它们。基本的代码设计原则是：
++ 代码需要松耦合——类或函数越少的依赖越好;
++ 避免设计复杂的大函数，尽量一个函数做一件事情;
++ 尽量减少公共接口。
+
+更多的模式设计原则在
+[[http://googletesting.blogspot.hk/2008/08/by-miko-hevery-so-you-decided-to.html][Google Test Blog]]
+
+* 面向C++的测试实例
+** 面向C++的单元测试
+使用GTest做单元测试和使用Gmock做模拟类测试。
+
+*** 面向C++的单元测试和GTest实践
+现在有很多C++的[[http://en.wikipedia.org/wiki/List_of_unit_testing_frameworks#C.2B.2B][单元测试框架]]。最受欢迎的是[[https://code.google.com/p/googletest/][Google C++ Testing Framework]]
+和[[http://www.boost.org/doc/libs/1_55_0/libs/test/doc/html/index.html][Boost.Test]]。 两者有很多相似之处，这里针对Google Testing Framework展
+开一个简单的实例。整个代码可以在github下载。
+
+Google C++ Testing Framework提供比较完善的文档，现在更新到V1.7：
++ [[https://code.google.com/p/googletest/wiki/V1_7_Primer][入门]]
++ [[https://code.google.com/p/googletest/wiki/V1_7_Samples][例子]]
++ [[https://code.google.com/p/googletest/wiki/V1_7_AdvancedGuide][高级指南]]
++ [[https://code.google.com/p/googletest/wiki/V1_7_FAQ][FAQ]]
+
+使用Google C++ Testing Framework基本流程：
+1. 建立要测试类或函数的单元测试文件，一般命名 =name_unittest.cc=, 包含
+   =<gtest/gtest.h>= 头文件；
+2. 针对类或函数的功能，建立相对应的测试用例，一般就是一大堆的assertion，
+   检验希望得到的返回值是否正确；
+3. 编译后，链接GTest相应的库 =gtest gtest_main= ；
+4. 运行单元测试程序，或输出测试结果，或直接查看
+
+**** 使用Google Test提供的第一个实例
+=sample1.c= 有两个需要测试的函数：
+#+begin_src c
+int Factorial(int n) {
+  int result = 1;
+  for (int i = 1; i <= n; i++) {
+    result *= i;
+  }
+
+  return result;
+}
+
+// Returns true iff n is a prime number.
+bool IsPrime(int n) {
+  // Trivial case 1: small numbers
+  if (n <= 1) return false;
+
+  // Trivial case 2: even numbers
+  if (n % 2 == 0) return n == 2;
+
+  // Now, we have that n is odd and n >= 3.
+
+  // Try to divide n by every odd number i, starting from 3
+  for (int i = 3; ; i += 2) {
+    // We only have to try i up to the squre root of n
+    if (i > n/i) break;
+
+    // Now, we have i <= n/i < n.
+    // If n is divisible by i, n is not prime.
+    if (n % i == 0) return false;
+  }
+
+  // n has no integer factor in the range (1, n), and thus is prime.
+  return true;
+}
+#+end_src
+
+创建它的一个单元测试文件 =sample1_unittest.c= 。
+单元测试文件清晰的设计了各个测试。
+#+begin_src c
+TEST(FactorialTest, Negative) {
+  // This test is named "Negative", and belongs to the "FactorialTest"
+  // test case.
+  EXPECT_EQ(1, Factorial(-5));
+  EXPECT_EQ(1, Factorial(-1));
+  EXPECT_GT(Factorial(-10), 0);
+
+  // <TechnicalDetails>
+  //
+  // EXPECT_EQ(expected, actual) is the same as
+  //
+  //   EXPECT_TRUE((expected) == (actual))
+  //
+  // except that it will print both the expected value and the actual
+  // value when the assertion fails.  This is very helpful for
+  // debugging.  Therefore in this case EXPECT_EQ is preferred.
+  //
+  // On the other hand, EXPECT_TRUE accepts any Boolean expression,
+  // and is thus more general.
+  //
+  // </TechnicalDetails>
+}
+
+// Tests factorial of 0.
+TEST(FactorialTest, Zero) {
+  EXPECT_EQ(1, Factorial(0));
+}
+
+// Tests factorial of positive numbers.
+TEST(FactorialTest, Positive) {
+  EXPECT_EQ(1, Factorial(1));
+  EXPECT_EQ(2, Factorial(2));
+  EXPECT_EQ(6, Factorial(3));
+  EXPECT_EQ(40320, Factorial(8));
+}
+
+
+// Tests IsPrime()
+
+// Tests negative input.
+TEST(IsPrimeTest, Negative) {
+  // This test belongs to the IsPrimeTest test case.
+
+  EXPECT_FALSE(IsPrime(-1));
+  EXPECT_FALSE(IsPrime(-2));
+  EXPECT_FALSE(IsPrime(INT_MIN));
+}
+
+// Tests some trivial cases.
+TEST(IsPrimeTest, Trivial) {
+  EXPECT_FALSE(IsPrime(0));
+  EXPECT_FALSE(IsPrime(1));
+  EXPECT_TRUE(IsPrime(2));
+  EXPECT_TRUE(IsPrime(3));
+}
+
+// Tests positive input.
+TEST(IsPrimeTest, Positive) {
+  EXPECT_FALSE(IsPrime(4));
+  EXPECT_TRUE(IsPrime(5));
+  EXPECT_FALSE(IsPrime(6));
+  EXPECT_TRUE(IsPrime(23));
+}
+#+end_src
+
+编译并运行单元测试程序[下面说如何把GTest框架融合进自己的工程里]
+
+#+begin_src sh
+Running main() from gtest_main.cc
+[==========] Running 6 tests from 2 test cases.
+[----------] Global test environment set-up.
+[----------] 3 tests from FactorialTest
+[ RUN      ] FactorialTest.Negative
+[       OK ] FactorialTest.Negative (0 ms)
+[ RUN      ] FactorialTest.Zero
+[       OK ] FactorialTest.Zero (0 ms)
+[ RUN      ] FactorialTest.Positive
+[       OK ] FactorialTest.Positive (0 ms)
+[----------] 3 tests from FactorialTest (0 ms total)
+
+[----------] 3 tests from IsPrimeTest
+[ RUN      ] IsPrimeTest.Negative
+[       OK ] IsPrimeTest.Negative (0 ms)
+[ RUN      ] IsPrimeTest.Trivial
+[       OK ] IsPrimeTest.Trivial (0 ms)
+[ RUN      ] IsPrimeTest.Positive
+[       OK ] IsPrimeTest.Positive (0 ms)
+[----------] 3 tests from IsPrimeTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 6 tests from 2 test cases ran. (0 ms total)
+[  PASSED  ] 6 tests.
+#+end_src
+
+*** 如何把GTest融合进你的CMake工程里
+[[https://code.google.com/p/googletest/wiki/V1_7_FAQ#Why_is_it_not_recommended_to_install_a_pre-compiled_copy_of_Goog][GTest文档并不建议使用提前编译好复制的GTest]], 因为如果你编译Google Test
+和你的测试代码使用不同的编译标志，他们可能会看到不同定义但是相同的类或
+函数或变量（比如：因为使用 =#if= 在Google Test中）。当程序链接起来，连
+接器可能并不能捕捉到错误（因为在C++标准中并没有要求捕捉这样的违规),那
+么当它们链接起来后，程序在运行时会产生一些不可预期的行为，使得非常难调
+试。
+
+所以这里我们把Google Test的源代码直接融合进我们的CMake工程里，让它一起
+编译，并把测试用例添加入 =make test= , 具体见。
+
+1. 把gtest的工程放在我们工程的thirdparty文件里。
+2. 定义gtest的library和包含其目录编译它
+
+#+begin_src sh
+SET (MAINFOLDER ${PROJECT_SOURCE_DIR})
+add_subdirectory(${MAINFOLDER}/thirdparty/gtest)
+set(GTEST_ROOT ${MAINFOLDER}/thirdparty/gtest)
+set(GTEST_INCLUDE_DIR ${GTEST_ROOT}/include)
+set(GTEST_LIBRARIES gtest gtest_main)
+include_directories(${GTEST_INCLUDE_DIR})
+include(gtest)   
+#+end_src
+
+3. 编译单元测试时链接gtest的lib
+#+begin_src sh
+# Define an executable and adds a test for it using the most basic libraries
+# Args:
+#    name  - name of test. Must have a source file in test/<name>.cc
+#    ...   - optional list of additional library dependencies
+function(project_test name)
+  add_executable(${name} test/${name}.cc)
+  foreach (lib "${ARGN}")
+    target_link_libraries(${name} ${lib})
+  endforeach()
+  target_linK_libraries(${name} ${GTEST_LIBRARIES})
+  add_test(${name} ${EXECUTABLE_OUTPUT_PATH}/${name})
+endfunction()
+
+if (build_tests)
+  project_test(sample1_unittest sample1)
+endif()
+#+end_src
+
+*** GMock实践
+现在针对Ｃ＋＋的模拟框架有：[[https://code.google.com/p/googlemock/][ Google C++ mocking framework]], [[http://www.assembla.com/wiki/show/hippomocks][HippoMocks]],
+[[https://code.google.com/p/amop/][AMOP]], [[http://sourceforge.net/apps/mediawiki/turtle/index.php?title=Turtle][Turtle]] 等。其中Google mocking framework比较完善并持续维护，我们
+将使用它。
+
+Google mocking framework有完善的文档，在其
+[[https://code.google.com/p/googlemock/w/list][wiki 页面]]。现在的Mocking版本里已经包括Google C++ Testing Framework，不
+需要分别编译和安装。
+
+使用Google Mocking Framework基本流程：
+1. 对所给类创建它的一个模拟对象。使用提供的很多宏来定义需要模拟的函数，
+   也提供了一个工具 =gmock_gen.py= 在Google Mock的目录
+   =scripts/generator/= 下， 用它自动生成模拟类的定义。
+2. 对你的模拟类，创建相应的测试用例。一般流程是：
+   + 创建模拟类，使用提供的宏或函数，针对不同的场景，设置模拟类接口相
+     应的行为，比如调用多少次，返回什么值等等
+   + 有了这个模拟类，测试需要用到它的接口或功能。创建相应的测试用例
+**** 需要模拟的源文件
+现在有一个简单的Offset类，其中有一个虚函数接口 =virtual int
+DoSetOffset(int offset) = 0;= ，暂时没有创建继承类来实现这个接口，先用
+Gmock模拟这个接口（必须是虚函数才能被覆盖模拟它）行为来做到单元测试这
+个类。
+
+#+begin_src c
+//sample.h
+class MyOffset{
+ public:
+  MyOffset() {}
+  virtual ~MyOffset() {}
+
+  /*
+   * Set the offsest
+   */
+  int SetOffset(int offset);
+
+  /*
+   * Returns the current offset
+   */
+  int offset() const { return offset_; }
+
+ protected:
+  /*
+   * Set the offset
+   *
+   * This method is called by the public SetOffset() method.
+   */
+  virtual int DoSetOffset(int offset) = 0;
+  
+ private:
+  int offset_; 
+};
+#+end_src
+
+函数 =int SetOffset(int offset);= 是外部接口，内部调用虚函数 =int
+DoSetOffset(int offset)=
+
+#+begin_src c
+//sample.c
+int MyOffset::SetOffset(int offset) {
+  if (offset < 0) {
+    offset_ = -1;
+    return -1;
+  }
+  offset_ = DoSetOffset(offset);
+  return offset_;
+}
+#+end_src
+
+**** 利用GMock创建模拟类
+在单元测试文件（ =sample_test.cc= ）里包含GMock和GTest的头文件
+#+begin_src c
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+#+end_src
+
+创建模拟类：
+#+begin_src c
+class MockMyOffset : public MyOffset {
+ public:
+  MockMyOffset() {}
+  virtual ~MockMyOffset() {}
+
+  MOCK_METHOD1(DoSetOffset, int(int offset));
+};
+#+end_src
+
+**** 配置模拟类的行为并创建测试用例
+有了模拟类，配置模拟类中的函数的行为，并利用GTest做结果验证：
+
+#+begin_src c
+  TEST(MyOffsetTest, SetOffset) {
+    MockMyOffset my_offset;
+    /* 当DoSetOffset的进入参数是10,就返回一次10 */
+    EXPECT_CALL(my_offset, DoSetOffset(10)).WillOnce(Return(10));
+    EXPECT_EQ(10, my_offset.SetOffset(10));
+    EXPECT_EQ(10, my_offset.offset());
+  
+    EXPECT_CALL(my_offset, DoSetOffset(5)).WillOnce(Return(5));
+    EXPECT_EQ(5, my_offset.SetOffset(5));
+    EXPECT_EQ(5, my_offset.offset());
+  
+    EXPECT_CALL(my_offset, DoSetOffset(20)).WillOnce(Return(1));
+    EXPECT_EQ(1, my_offset.SetOffset(20));
+    EXPECT_EQ(1, my_offset.offset());
+  
+    EXPECT_CALL(my_offset, DoSetOffset(10)).WillOnce(Return(-1));
+    EXPECT_EQ(-1, my_offset.SetOffset(10));
+    EXPECT_EQ(-1, my_offset.offset());
+  }
+#+end_src
+
+*** 如何把GMock融合进你的CMake工程里
+和GTest一样，同样我们把包含GTest的GMock融合进我们的CMake工程里，和我们
+工程一同编译。
+
+
+1. 把gmock的工程放在我们工程的thirdparty文件里。
+2. 定义gtest和gmock的library和包含其目录编译它
+
+#+begin_src sh
+set(GMOCK_ROOT ${MAINFOLDER}/thirdparty/gmock)
+add_subdirectory(${GMOCK_ROOT})
+set(GMOCK_INCLUDE_DIR ${GMOCK_ROOT}/include)
+set(GMOCK_LIBRARIES gmock)
+include_directories(${GMOCK_INCLUDE_DIR})
+ include(gmock)
+  #gtest
+set(GTEST_ROOT ${GMOCK_ROOT}/gtest)
+set(GTEST_INCLUDE_DIR ${GTEST_ROOT}/include)
+set(GTEST_LIBRARIES gtest gtest_main)
+include_directories(${GTEST_INCLUDE_DIR}) 
+#+end_src
+
+3. 编译单元测试时链接gtest和gmock的lib
+
+#+begin_src sh
+# Define an executable and adds a test for it using the most basic libraries
+# Args:
+#    name  - name of test. Must have a source file in test/<name>.cc
+#    ...   - optional list of additional library dependencies
+function(project_test name)
+  add_executable(${name} test/${name}.cc)
+  foreach (lib "${ARGN}")
+    target_link_libraries(${name} ${lib})
+  endforeach()
+  target_linK_libraries(${name} ${GTEST_LIBRARIES})
+  target_linK_libraries(${name} ${GMOCK_LIBRARIES})
+  add_test(${name} ${EXECUTABLE_OUTPUT_PATH}/${name})
+endfunction()
+
+if (build_tests)
+  project_test(sample_test sample)
+endif()
+#+end_src
+* 其他资料
+** Books:
++ Kent Beck. Test-driven development: By example;
++ David Astels. Test Driven Development: A Practical Guide;
++ Robert C. Martin. Clean Code: A Handbook of Agile Software Craftsmanship (this book is mostly for Java developers);
++ Michael Feathers. Working Effectively with Legacy Code;
++ Martin Fowler, Kent Beck, John Brant, William Opdyke, Don Roberts. Refactoring: Improving the Design of Existing Code;
++ Steve McConnell, Code Complete, 2ed 
+** Online resources:
++ [[http://stackoverflow.com/questions/tagged/unit-testing][Unit testing topic at StackOverflow]];
++ [[http://googletesting.blogspot.com/][Google Testing Blog]];
++ Wiki at [[http://c2.com/cgi/wiki?UnitTest][c2.com]];
++ [[http://www.lenholgate.com/blog/2004/05/practical-testing.html][Practical Testing]] — series of blog posts on testing.
++ [[http://alexott.net/en/cpp/CppTestingIntro.html][Boost.Test and GMock Tutorial]]
+
+* Footnotes
+
+[fn:1] http://en.wikipedia.org/wiki/Test-Driven_Development_by_Example
+
+
+
+
+  
