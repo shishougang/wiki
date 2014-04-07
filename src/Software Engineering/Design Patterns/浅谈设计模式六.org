@@ -1,0 +1,129 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: 浅谈设计模式六: 单例模式(Singleton)
+#+OPTIONS: num:nil H:2
+
+* 实例
+对于一些类来说只有一个实例是很重要的。如，仅有一个文件系统，一个窗口管
+理者。一个数字滤波器只有一个模数转换器。
+
+那么我们如何确保一个类只有一个实例，而且这个实例能容易的访问？
+
+1. 全局变量。一个全局变量能使对象任意访问，但是它并不能防止你实例化多
+   个对象。
+2. 单例模式。更好方法是让类自己负责保存它唯一的实例。这个类能保证没有
+   其他实例被创建（通过截断创建新对象的请求），而且它提供获取这个实例
+   的方法。
+* 单例模式(Singleton)
+** 传统方式
+#+begin_src c++ -n
+//header file
+class Singleton {
+ public:
+  static Singleton* instance();
+ private:
+  static Singleton* pInstance;
+  virtual ~Singleton();
+};
+
+//cc file
+Singleton* Singleton::pInstance = NULL;
+
+Singleton::~Singleton() {
+}
+
+Singleton* Singleton::instance() {
+  if(pInstance == NULL) {
+    pInstance = new Singleton();
+  }
+  return pInstance;
+}
+#+end_src
+
+在单线程环境中，除了中断会有问题，其他基本没问题。
+
+但是，这个实现在多线程环境下是不可靠的。
+1. 假如线程A进入 =instance= 函数，执行到 =17行= ，然后被挂起。在这个挂
+   起点，它刚刚判断出 =pInstance= 是 =null= 的。
+2. 线程B现在进入 =instance= 然后执行 =17行= ，它发现 =pInstance= 是
+   =null= 的，所以它运行 =18行= 来创建 =pInstance= 指向的 =Singleton=
+   。然后它把 =pInstance= 返回给 =instance= 的调用者。
+3. 不久后，线程A被允许继续运行，它立即运行 =18行= ，创建另外一个
+   =Singleton= 并使 =pInstance= 指向它。
+明显这违背了单例的概念，因为现在有两个 =Singleton= 的对象。
+** 线程安全的传统方式
+使得传统方式线程安全，只要在判断 =pInstance= 前获取锁就行。
+#+begin_src c++
+  Singleton* Singleton::instance() {
+    Lock lock;    // acquire lock (params omitted for simplicity)
+    if(pInstance == NULL) {
+      pInstance = new Singleton();
+    }
+    return pInstance;
+  }  // release lock (via Lock destructor)
+#+end_src
+
+但是这个方法开销比较大。每次获取 =Singleton= 都要获取一个锁，但是实际
+上，我们只有当初始化 =pInstance= 时才需要一个锁。也就是只发生在第一次
+调用 =instance= 时。如果在一个程序运行时， =instance= 被调用了n次，我
+们只需要锁在第一次调用时。当我们知道那n-1次锁是没必要的，那为什么要负
+担那n次去获取锁？DCLP被设计出来防止这。
+** The Double-Checked Locking Pattern[fn:1]
+*** DCLP
+DCLP的关键点是发现，大多数 =instance= 的调用将看到 =pInstance= 是非空
+的，因此根本没必要去尝试初始化它。因此，DCLP判断 =pInstance= 是否为空
+在尝试获取锁前。只有当判断成功（ =pInstance= 还没有被初始化）才去获取
+锁，然后之后这个判断在此进行一次确保 =pInstance= 是仍然空的。（所以名
+字叫双重检查锁）。第二个检查是有必要的，因为从上可以看到，另外的线程可
+能碰巧初始化了  =pInstance= 在 =pInstance= 被第一次判断和获取锁之间。
+
+DCLP的实现：
+#+begin_src c++
+  Singleton* Singleton::instance() {
+    if(pInstance == 0) { // 1st test
+      Lock lock;
+      if(pInstance == 0) { // 2nd test
+        pInstance =newSingleton;
+      }
+    }
+    return pInstance;
+  }
+#+end_src
+
+《Double-Checked Locking》[fn:1]文章还进一步讨论了很多其他一些实现问题
+（ =volatile= 的重要性，多线程系统中的缓存问题等），但是没有提到更基础
+的问题，就是确保DCLP的机器指令以一定的顺序执行。《C++ and the Perils
+of Double-Checked Locking》[fn:2] 详细的讲述了这个问题，在以下引用它的
+内容来说明。
+
+*** 指令顺序
+
+* 总结
+** 单例模式(Singleton)结构
+[[./images/singleton/singleton_structure.jpeg]]   
+** 组成
++ 单例
+  1. 定义一个实例化的操作来让客户能访问它唯一的实例。实例化就是一个函
+     数操作（静态函数在C++里）。
+  2. 对创建自己唯一的实例负责。
+
+** 目的
+确保一个类只有一个实例，并且提供一个访问它的全局点。
+** 应用场景
++ 必须仅有一个类的实例，而且它需要从一个明了的地方被客户访问到。
++ 当这个唯一的实例应该能被子类扩展，而且客户应该无需更改它们的代码直接
+  使用扩展的实例。
+
+** aa
+
+http://blog.csdn.net/weiwangchao_/article/details/7477706
+
+#+begin_src c++
+
+#+end_src
+
+* Footnotes
+
+[fn:1] http://www.cs.wustl.edu/~schmidt/PDF/DC-Locking.pdf
+
+[fn:2] http://www.aristeia.com/Papers/DDJ_Jul_Aug_2004_revised.pdf
+

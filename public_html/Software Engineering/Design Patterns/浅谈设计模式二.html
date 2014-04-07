@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>浅谈设计模式二: 观察者模式(Observer)</title>
-<!-- 2014-03-20 Thu 19:38 -->
+<!-- 2014-04-07 Mon 22:41 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -141,7 +141,7 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">问题</a></li>
+<li><a href="#sec-1">实例</a></li>
 <li><a href="#sec-2">观察者模式(Observer)</a>
 <ul>
 <li><a href="#sec-2-1">目的</a></li>
@@ -150,8 +150,10 @@ for the JavaScript code in this tag.
 </li>
 <li><a href="#sec-3">总结</a>
 <ul>
-<li><a href="#sec-3-1">结构</a></li>
-<li><a href="#sec-3-2">应用场景</a></li>
+<li><a href="#sec-3-1">观察者模式(Observer)结构</a></li>
+<li><a href="#sec-3-2">组成</a></li>
+<li><a href="#sec-3-3">应用场景</a></li>
+<li><a href="#sec-3-4">缺点</a></li>
 </ul>
 </li>
 </ul>
@@ -159,14 +161,40 @@ for the JavaScript code in this tag.
 </div>
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">问题</h2>
+<h2 id="sec-1">实例</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 有一个气候观测应用，包括三部分：
 </p>
 <ol class="org-ol">
-<li></li>
+<li>气候站(WeatherStation):物理设备用来采集实际天气数据;
+</li>
+<li>气候数据对象(WeatherData)追踪来自气候站的数据和更新显示;
+</li>
+<li>给用户现在气候情况的显示(xxDisplay)
+</li>
 </ol>
+
+<p>
+现在气候收集这3个数据：温度，湿度和气压。有3种不同的显示：现在的天气情况，天气统计信息和天气预测信息。
+</p>
+
+<p>
+直观的话是在 <code>WeatherData</code> 类里的 <code>measurementsChanged()</code> 里直接调用不同显示器的 <code>update()</code> 来更新数据，如下：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #7fffd4;">WeatherData</span>::<span style="color: #87cefa;">measurementsChanged</span>() {
+currentConditionsDisplay.update(temp_, humidity_, pressure_);
+statisticsDisplay.update(temp_, humidity_, pressure_);
+forecastDisplay.update(temp_, humdity_, pressure_);
+</pre>
+</div>
+
+<p class="info">
+1. WeatherData和Display比较紧的耦合。在函数内直接使用实例，每次增加或较少Display都要在这个函数内修改。<br>
+2. 以具体实例来编码，使得不能动态的添加和减少显示元素，唯有修改这段代码
+</p>
 </div>
 </div>
 <div id="outline-container-sec-2" class="outline-2">
@@ -174,27 +202,174 @@ for the JavaScript code in this tag.
 <div class="outline-text-2" id="text-2">
 </div><div id="outline-container-sec-2-1" class="outline-3">
 <h3 id="sec-2-1">目的</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+在对象间，定义一对多的依赖关系，那么当这一个对象改变状态时，所有它的依赖对象得到自动通知和更新。
+<img src="./images/observer/subject_observer.jpeg" alt="subject_observer.jpeg" />
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-2-2" class="outline-3">
 <h3 id="sec-2-2">实现</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+这里一对多的依赖关系，我们把这单一的对象称为目标对象(Subject)，而所有依赖于它的称为观察者对象(Observer)。分别定义Subject和Observer的对象。
+<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/observer">代码实例在这里</a>。
+</p>
+</div>
+<ul class="org-ul"><li>目标对象(Subject)接口<br  /><div class="outline-text-4" id="text-2-2-1">
+<ol class="org-ol">
+<li>先建立好目标对象;
+</li>
+<li>然后观察者对象可以动态调用 <code>registerObserver</code> 来加入目标对象的更新列表内，调用 <code>registerObserver</code> 来从目标对象更新列表中移出;
+</li>
+<li>目标对象通过 <code>notifyObservers</code> 通知和更新观察者列表
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Subject</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">registerObserver</span>(<span style="color: #98fb98;">Observer</span> *<span style="color: #eedd82;">o</span>) = 0;
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">removeObserver</span>(<span style="color: #98fb98;">Observer</span> *<span style="color: #eedd82;">o</span>) = 0;
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">notifyObservers</span>() = 0;
+};
+</pre>
 </div>
 </div>
+</li>
+
+<li>观察者对象(Observer)接口<br  /><div class="outline-text-4" id="text-2-2-2">
+<p>
+观察者对象(Observer)接口只需要一个更新功能，使得目标对象通过
+<code>notifyObservers</code> 分别调用观察者的 <code>update</code> 函数来更新参数。
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Observer</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">update</span>(<span style="color: #98fb98;">float</span> <span style="color: #eedd82;">temp</span>, <span style="color: #98fb98;">float</span> <span style="color: #eedd82;">humdity</span>, <span style="color: #98fb98;">float</span> <span style="color: #eedd82;">pressure</span>) = 0;
+};
+</pre>
+</div>
+</div>
+</li>
+
+<li>整合起来<br  /><div class="outline-text-4" id="text-2-2-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">WeatherData</span> *<span style="color: #eedd82;">weather_data</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">WeatherData</span>();
+<span style="color: #98fb98;">CurrentConditionsDisplay</span> *<span style="color: #eedd82;">current_display</span> =
+    <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">CurrentConditionsDisplay</span>(weather_data);
+<span style="color: #98fb98;">StatisticsDisplay</span> *<span style="color: #eedd82;">statistics_display</span> =
+    <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">StatisticsDisplay</span>(weather_data);
+<span style="color: #98fb98;">ForecastDisplay</span> *<span style="color: #eedd82;">forecast_display</span> =
+    <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">ForecastDisplay</span>(weather_data);
+
+weather_data-&gt;setMeasurements(80, 65, 30.4f);
+weather_data-&gt;setMeasurements(82, 70, 29.2f);
+</pre>
+</div>
+</div>
+</li>
+
+<li>总的框架<br  /><div class="outline-text-4" id="text-2-2-4">
+
+<div class="figure">
+<p><img src="./images/observer/whole_structure.jpeg" alt="whole_structure.jpeg" />
+</p>
+</div>
+</div>
+</li></ul>
+</div>
+</div>
+
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">总结</h2>
 <div class="outline-text-2" id="text-3">
 </div><div id="outline-container-sec-3-1" class="outline-3">
-<h3 id="sec-3-1">结构</h3>
+<h3 id="sec-3-1">观察者模式(Observer)结构</h3>
+<div class="outline-text-3" id="text-3-1">
+
+<div class="figure">
+<p><img src="./images/observer/observer_structure.jpg" alt="observer_structure.jpg" />
+</p>
+</div>
+</div>
 </div>
 
 <div id="outline-container-sec-3-2" class="outline-3">
-<h3 id="sec-3-2">应用场景</h3>
+<h3 id="sec-3-2">组成</h3>
+<div class="outline-text-3" id="text-3-2">
+<ul class="org-ul">
+<li>目标（Subject）
+<ol class="org-ol">
+<li>知道它的观察者。任意多的观察者对象可以观察一个目标对象。
+</li>
+<li>提供一个附加和分离观察者对象的接口。
+</li>
+</ol>
+</li>
+<li>观察者（Observer）
+<ol class="org-ol">
+<li>为在目标中得到改变通知的对象定义一个更新接口。
+</li>
+</ol>
+</li>
+<li>具体目标（ConcreteSubject）
+<ol class="org-ol">
+<li>存储具体观察对象感兴趣的状态。
+</li>
+<li>当状态改变时，发送更新给它的观察对象。
+</li>
+</ol>
+</li>
+<li>具体观察者（ConcreteObserver)
+<ol class="org-ol">
+<li>维持一个具体目标对象的引用。
+</li>
+<li>存储要和目标保持一致的状态。
+</li>
+<li>实现观察者更新接口来使得它的状态与目标保持一致。
+</li>
+</ol>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">应用场景</h3>
+<div class="outline-text-3" id="text-3-3">
+<ul class="org-ul">
+<li>当一个抽象类有2个方面，一个依赖另外一个。把这些不同的方面封装成独立的对象来让你独立的改变和复用他们。
+</li>
+<li>当改变一个对象需要改变其他的对象们，而且你不知道有多少对象需要改变
+</li>
+<li>当一个对象需要能通知其他对象们，但不需要对这些对象们做任何假定。也就是说，你不想这些对象紧耦合。
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">缺点</h3>
+<div class="outline-text-3" id="text-3-4">
+<ul class="org-ul">
+<li>不可预期的更新。因为观察对象们不知道各自的存在，他们会忽略改变目标的最终代价。一个在目标（subject）看似无害的操作可能造成观察者和依赖它们的观察者的级联式更新。而且，没有很好定义或维护的依赖准则经常导致虚假的更新，这些都很难去追踪。
+
+<p>
+简单的更新协议没有提供任何细节关于 <b>什么</b> 会在目标内改变的事实加重了这个问题。没有附加的协议来帮助观察者发现什么改变了，它们可能必须努力的去推测这些改变。
+</p>
+</li>
+</ul>
+</div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-03-20 Thu 19:38</p>
+<p class="date">Created: 2014-04-07 Mon 22:41</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

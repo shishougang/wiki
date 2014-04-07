@@ -2,22 +2,109 @@
 #+TITLE: 浅谈设计模式二: 观察者模式(Observer)
 #+OPTIONS: num:nil H:2
 
-* 问题
+* 实例
 有一个气候观测应用，包括三部分：
-1. 
+1. 气候站(WeatherStation):物理设备用来采集实际天气数据;
+2. 气候数据对象(WeatherData)追踪来自气候站的数据和更新显示;
+3. 给用户现在气候情况的显示(xxDisplay)
+
+现在气候收集这3个数据：温度，湿度和气压。有3种不同的显示：现在的天气情
+况，天气统计信息和天气预测信息。
+
+直观的话是在 =WeatherData= 类里的 =measurementsChanged()= 里直接调用不
+同显示器的 =update()= 来更新数据，如下：
+#+begin_src c++
+WeatherData::measurementsChanged() {
+currentConditionsDisplay.update(temp_, humidity_, pressure_);
+statisticsDisplay.update(temp_, humidity_, pressure_);
+forecastDisplay.update(temp_, humdity_, pressure_);
+#+end_src
+
+#+begin_html
+<p class="info">
+1. WeatherData和Display比较紧的耦合。在函数内直接使用实例，每次增加或较少Display都要在这个函数内修改。<br>
+2. 以具体实例来编码，使得不能动态的添加和减少显示元素，唯有修改这段代码
+</p>
+#+end_html
 
 * 观察者模式(Observer)
 ** 目的
-
+在对象间，定义一对多的依赖关系，那么当这一个对象改变状态时，所有它的依
+赖对象得到自动通知和更新。
+[[./images/observer/subject_observer.jpeg]]
 ** 实现
+这里一对多的依赖关系，我们把这单一的对象称为目标对象(Subject)，而所有
+依赖于它的称为观察者对象(Observer)。分别定义Subject和Observer的对象。
+[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/observer][代码实例在这里]]。
+*** 目标对象(Subject)接口
+1. 先建立好目标对象;
+2. 然后观察者对象可以动态调用 =registerObserver= 来加入目标对象的更新
+   列表内，调用 =registerObserver= 来从目标对象更新列表中移出;
+3. 目标对象通过 =notifyObservers= 通知和更新观察者列表
+#+begin_src c++
+class Subject {
+ public:
+  virtual void registerObserver(Observer *o) = 0;
+  virtual void removeObserver(Observer *o) = 0;
+  virtual void notifyObservers() = 0;
+};
+#+end_src
+*** 观察者对象(Observer)接口
+观察者对象(Observer)接口只需要一个更新功能，使得目标对象通过
+=notifyObservers= 分别调用观察者的 =update= 函数来更新参数。
+#+begin_src c++
+class Observer {
+ public:
+  virtual void update(float temp, float humdity, float pressure) = 0;
+};
+#+end_src
+*** 整合起来
+#+begin_src c++
+  WeatherData *weather_data = new WeatherData();
+  CurrentConditionsDisplay *current_display =
+      new CurrentConditionsDisplay(weather_data);
+  StatisticsDisplay *statistics_display =
+      new StatisticsDisplay(weather_data);
+  ForecastDisplay *forecast_display =
+      new ForecastDisplay(weather_data);
 
+  weather_data->setMeasurements(80, 65, 30.4f);
+  weather_data->setMeasurements(82, 70, 29.2f);
+#+end_src
+*** 总的框架
+[[./images/observer/whole_structure.jpeg]]
 * 总结
-
-** 结构
-
+** 观察者模式(Observer)结构
+[[./images/observer/observer_structure.jpg]]
+** 组成
++ 目标（Subject）
+  1. 知道它的观察者。任意多的观察者对象可以观察一个目标对象。
+  2. 提供一个附加和分离观察者对象的接口。
++ 观察者（Observer）
+  1. 为在目标中得到改变通知的对象定义一个更新接口。
++ 具体目标（ConcreteSubject）
+  1. 存储具体观察对象感兴趣的状态。
+  2. 当状态改变时，发送更新给它的观察对象。
++ 具体观察者（ConcreteObserver)
+  1. 维持一个具体目标对象的引用。
+  2. 存储要和目标保持一致的状态。
+  3. 实现观察者更新接口来使得它的状态与目标保持一致。
 ** 应用场景
++ 当一个抽象类有2个方面，一个依赖另外一个。把这些不同的方面封装成独立
+  的对象来让你独立的改变和复用他们。
++ 当改变一个对象需要改变其他的对象们，而且你不知道有多少对象需要改变
++ 当一个对象需要能通知其他对象们，但不需要对这些对象们做任何假定。也就
+  是说，你不想这些对象紧耦合。
 
-
+** 缺点
++ 不可预期的更新。因为观察对象们不知道各自的存在，他们会忽略改变目标的
+  最终代价。一个在目标（subject）看似无害的操作可能造成观察者和依赖它
+  们的观察者的级联式更新。而且，没有很好定义或维护的依赖准则经常导致虚
+  假的更新，这些都很难去追踪。
+  
+  简单的更新协议没有提供任何细节关于 *什么* 会在目标内改变的事实加重了
+  这个问题。没有附加的协议来帮助观察者发现什么改变了，它们可能必须努力
+  的去推测这些改变。
 
 
 

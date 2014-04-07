@@ -1,0 +1,163 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: 浅谈设计模式五: 抽象工厂模式(Abstract Factory)
+#+OPTIONS: num:nil H:2
+
+* 实例
+继续扩展模式四中的批萨店实例，加入批萨配料对象。不同的地区的批萨店有一
+组共同的产品(如生面，酱汁，芝士等等），但是根据不同地区的口味有不同的
+实现。整个系统变得有点复杂了，
+1. 有不同的批萨原料，同样的批萨原料在不同的地区有不同的作法；
+2. 每个店有不同种类的批萨（即各种原料搭配不同）；
+3. 整个批萨连锁在不同地区有不同的店。
+
+如何清晰而易维护的设计整个批萨连锁店系统呢？
+* 抽象工厂模式(Abstract Factory)
+** 目的
+为创建一组相关或相依赖的对象提供一个接口，而不用指定它们具体的类。
+** 实现
+[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/abstract_factory][代码实例在这里]]。
+*** 定义各个原料的接口
+比如 =Douge=
+#+begin_src c++
+class Dough {
+ public:
+  virtual string toString() = 0;
+};
+#+end_src
+
+比如 =Sauce=
+#+begin_src c++
+class Sauce {
+ public:
+  virtual string toString() = 0;
+};
+#+end_src
+
+其他原料等。
+*** 根据原料接口定义原料
+比如 =Douge=
+#+begin_src c++
+class ThickCrustDough : public Dough {
+ public:
+  string toString();
+};
+#+end_src
+
+#+begin_src c++
+class ThinCrustDough : public Dough {
+ public:
+  string toString();
+};
+#+end_src
+*** 定义批萨原料创建抽象工厂接口
+#+begin_src c++
+class PizzaIngredientFactory {
+ public:
+  virtual ~PizzaIngredientFactory() {}
+  virtual Dough* createDough() = 0;
+  virtual Sauce* createSauce() = 0;
+  virtual Cheese* createCheese() = 0;
+  virtual Clams* createClam() = 0;
+}
+#+end_src
+*** 根据原料抽象工厂接口不同地区定义不同原料
+比如 =Chicago=
+#+begin_src c++
+Dough* ChicagoPizzaIngredientFactory::createDough() {
+  return new ThickCrustDough();
+}
+
+Sauce* ChicagoPizzaIngredientFactory::createSauce() {
+  return new PlumTomatoSauce();
+}
+
+Cheese* ChicagoPizzaIngredientFactory::createCheese() {
+  return new MozzarellaCheese();
+}
+
+Clams* ChicagoPizzaIngredientFactory::createClam() {
+  return new FrozenClams();
+}
+#+end_src
+*** 定义不同批萨的接口
+#+begin_src c++
+class Pizza {
+ public:
+  Pizza();
+  virtual ~Pizza();
+  string name();
+  void set_name(string name);
+  virtual void prepare() = 0;
+  virtual void bake();
+  virtual void cut();
+  virtual void box();
+  string toString();
+ protected:
+  string name_;
+  Dough *dough_;
+  Sauce *sauce_;
+  Cheese *cheese_;
+  Clams *clam_;
+};
+#+end_src
+*** 根据批萨接口实现不同皮赛
+比如 =Cheese Pizza= ， 同样的Cheese Pizza在不同地区的制作流程和配料种
+类相同，但同类的配料在不同的地区不同，利用原料抽象工厂接口来决定配料的
+不同。
+
+#+begin_src c++
+CheesePizza::CheesePizza(PizzaIngredientFactory *ingredient_factory) :
+    ingredient_factory_(ingredient_factory) {
+}
+void CheesePizza::prepare() {
+  cout << "Preparing " << name_ << endl;
+  dough_ = ingredient_factory_->createDough();
+  sauce_ = ingredient_factory_->createSauce();
+  cheese_ = ingredient_factory_->createCheese();
+}
+#+end_src
+*** 整合到一起
+比如New York Pizza Store，通过传入New York抽象工厂原料类来创建New York
+自己的批萨。
+#+begin_src c++
+Pizza* NYPizzaStore::createPizza(string item) {
+  Pizza *pizza = NULL;
+  PizzaIngredientFactory* ingredientFactory =
+      new NYPizzaIngredientFactory();
+  if (item == "cheese") {
+    pizza = new CheesePizza(ingredientFactory);
+    pizza->set_name("New York Style Cheese Pizza");
+  } else if (item == "clam") {
+    pizza = new ClamPizza(ingredientFactory);
+    pizza->set_name("New York Style Clam Pizza");
+  }
+  return pizza;
+}
+#+end_src
+*** 总的框架
+[[./images/abstractFactory/pizzastore_structure.jpeg]]
+* 总结
+** 抽象工厂模式(Abstract Factory)结构
+[[./images/abstractFactory/abstractfactory_structure.jpeg]]
+** 组成
++ 抽象工厂（AbstractFactory）
+  为创建抽象产品类操作定义接口
++ 具体工厂（ConcreteFactory）
+  实现创建具体产品类的操作
++ 抽象产品（AbstractProduct）
+  为一种产品类定义一个接口
++ 具体产品（Concrete Product）
+  1. 定义一个将被相应的具体工厂类创建的产品对象
+  2. 实现抽象产品（AbstractProduct）的接口
++ 客户（Client）
+  只使用抽象工厂（AbstractFactory）和抽象产品（AbstractProduct）类声明
+  的接口
+** 应用场景
++ 一个系统要独立于它的产品如何创建，如何组成和如何表示
++ 一个系统需要被一家族产品之一来配置
++ 一家族相关的产品对象要设计成一起使用，你需要强制这个约束
++ 你想提供一类库的产品，而且你想只暴露它们的接口，而不是它们的实现细节。
+** 缺点
+支持新的产品种类较难。扩展抽象工厂来产生新的产品种类并不容易。那是因为
+抽象工厂接口固定能创建的产品集合。支持新的产品种类要求扩展工厂接口，那
+这涉及更改抽象工厂类和它的所有子类。
