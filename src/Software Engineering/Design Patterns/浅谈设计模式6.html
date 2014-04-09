@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>浅谈设计模式六: 单例模式(Singleton)</title>
-<!-- 2014-04-08 Tue 23:27 -->
+<!-- 2014-04-09 Wed 22:49 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -520,12 +520,98 @@ DCLP能用仅当step1和2在step 3之前完成，但是没有办法表达这一�
 使用之前的线程安全的传统方式，使用来自线程库的锁来确保线程安全的
 Singleton初始化，然后做时间开销的统计看是否需要担心。
 </p>
+
+<p>
+这里用 <code>pthread</code> 库，写出完整的代码，<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/singleton">代码实例在这里</a>。
+</p>
+
+<ol class="org-ol">
+<li>首先封装 <code>pthread_mutex_t</code>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">PThreadMutex</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">PThreadMutex</span>(<span style="color: #7fffd4;">base</span>::LinkerInitialized) {
+    pthread_mutex_init(&amp;mutex_, <span style="color: #7fffd4;">NULL</span>);
+  }
+  <span style="color: #87cefa;">PThreadMutex</span>() { pthread_mutex_init(&amp;mutex_, <span style="color: #7fffd4;">NULL</span>); }
+  ~<span style="color: #87cefa;">PThreadMutex</span>() { pthread_mutex_destroy(&amp;mutex_); }
+
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Lock</span>() {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rc</span> = pthread_mutex_lock(&amp;mutex_);
+    assert(rc == 0);
+  }
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Unlock</span>() {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rc</span> = pthread_mutex_unlock(&amp;mutex_);
+    assert(rc == 0);
+  }
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">pthread_mutex_t</span> <span style="color: #eedd82;">mutex_</span>;
+  DISALLOW_COPY_AND_ASSIGN(<span style="color: #98fb98;">PThreadMutex</span>);
+};
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">PThreadMutex</span> <span style="color: #98fb98;">Mutex</span>;
+</pre>
+</div>
+</li>
+
+<li>继承封装成一个 <code>MutexLock</code> 
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">MutexLock</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">MutexLock</span>(<span style="color: #98fb98;">Mutex</span>* <span style="color: #eedd82;">mutex</span>) : mutex_(mutex) { mutex-&gt;Lock(); }
+  ~<span style="color: #87cefa;">MutexLock</span>() { mutex_-&gt;Unlock(); }
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">Mutex</span>* <span style="color: #eedd82;">mutex_</span>;
+  DISALLOW_COPY_AND_ASSIGN(<span style="color: #98fb98;">MutexLock</span>);
+};
+</pre>
+</div>
+</li>
+
+<li>线程安全 <code>Singleton</code> 主函数
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">Singleton</span>* <span style="color: #7fffd4;">Singleton</span>::<span style="color: #87cefa;">instance</span>() {
+  cout &lt;&lt; <span style="color: #ffa07a;">"call the singleton instance"</span> &lt;&lt; endl;
+  <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">Mutex</span> <span style="color: #eedd82;">mutex_</span>(<span style="color: #7fffd4;">base</span>::LINKER_INITIALIZED);
+  MutexLock <span style="color: #98fb98;">l</span>(&amp;<span style="color: #eedd82;">mutex_</span>);
+  <span style="color: #00ffff;">if</span> (pInstance == <span style="color: #7fffd4;">NULL</span>) {
+    cout &lt;&lt; <span style="color: #ffa07a;">"In the Lock"</span> &lt;&lt; endl;
+    pInstance = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Singleton</span>();
+  }
+  <span style="color: #00ffff;">return</span> pInstance;
+}  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">release MutexLock (via MutexLock destructor)</span>
+</pre>
+</div>
+</li>
+</ol>
+
+<p>
+然后在每个需要要到访问这个单例对象的线程开始，调用 <code>instance</code> ，在本地线程内存缓存返回的指针，如下：
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">Singleton</span>* <span style="color: #00ffff;">const</span> <span style="color: #eedd82;">instance</span> =
+<span style="color: #7fffd4;">Singleton</span>::instance(); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">cache instance pointer</span>
+instance-&gt;transmogrify();
+instance-&gt;metamorphose();
+instance-&gt;transmute();
+</pre>
+</div>
+</div>
+</li>
+
+<li>提前初始化<br  /><div class="outline-text-4" id="text-2-4-2">
+<p>
+另一种安全的做法是提前初始化，也就是初始化单例资源在程序最开始运行时。因为多线程程序基本以单线程开始，这个方法可以把一些对象初始化放到单线程的那部分代码，来达到消除需要担心在初始化时的线程问题。
+</p>
 </div>
 </li></ul>
 </div>
 </div>
-
-
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">总结</h2>
 <div class="outline-text-2" id="text-3">
@@ -597,7 +683,7 @@ Singleton初始化，然后做时间开销的统计看是否需要担心。
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-04-08 Tue 23:27</p>
+<p class="date">Created: 2014-04-09 Wed 22:49</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

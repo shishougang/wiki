@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>浅谈设计模式三: 装饰器模式(Decorator)</title>
+<!-- 2014-04-09 Wed 22:50 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  pre.src-sh:before    { content: 'sh'; }
+  pre.src-bash:before  { content: 'sh'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-R:before     { content: 'R'; }
+  pre.src-perl:before  { content: 'Perl'; }
+  pre.src-java:before  { content: 'Java'; }
+  pre.src-sql:before   { content: 'SQL'; }
+
+  table { border-collapse:collapse; }
+  td, th { vertical-align:top;  }
+  th.right  { text-align: center;  }
+  th.left   { text-align: center;   }
+  th.center { text-align: center; }
+  td.right  { text-align: right;  }
+  td.left   { text-align: left;   }
+  td.center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara:nth-child(2) { display: inline; }
+  .footpara { display: block; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  /*]]>*/-->
+</style>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">浅谈设计模式三: 装饰器模式(Decorator)</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">实例</a></li>
+<li><a href="#sec-2">装饰器模式(Decorator)</a>
+<ul>
+<li><a href="#sec-2-1">目的</a></li>
+<li><a href="#sec-2-2">实现</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">总结</a>
+<ul>
+<li><a href="#sec-3-1">装饰器模式(Decorator)结构</a></li>
+<li><a href="#sec-3-2">组成</a></li>
+<li><a href="#sec-3-3">应用场景</a></li>
+<li><a href="#sec-3-4">缺点</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">实例</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+星巴克以咖啡文明，现在为它设计它的咖啡订餐系统。
+</p>
+<ol class="org-ol">
+<li>先定义一类饮料的基类 <code>Beverage</code> ，为不同咖啡做好一个接口。
+</li>
+<li>每种不同的咖啡继承这个基类，覆盖各自的特性，比如描述，价格等。
+</li>
+</ol>
+
+<p>
+每种咖啡都有很多中附加，比如拿铁咖啡就有，加糖拿铁，加奶拿铁，加奶加糖拿铁等等。所以按照上面的设计来设计咖啡订餐系统，那么整个系统类结构如下：
+</p>
+
+
+<div class="figure">
+<p><img src="./images/decorator/beverage_structure.jpeg" alt="beverage_structure.jpeg" />
+</p>
+</div>
+
+<p class="info">
+每种咖啡不同的附加组合导致太多类。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">装饰器模式(Decorator)</h2>
+<div class="outline-text-2" id="text-2">
+</div><div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">目的</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+为一个对象动态的附加额外的职责。装饰器（Decorators)提供除了用子类的另外一种灵活的扩充功能方法。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">实现</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/decorator">代码实例在这里</a>。
+</p>
+</div>
+<ul class="org-ul"><li>定义组件抽象接口和具体组件<br  /><div class="outline-text-4" id="text-2-2-1">
+<p>
+1.定义组件抽象接口：咖啡和装饰器的基类
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Beverage</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">Beverage</span>();
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Beverage</span>();
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">string</span> <span style="color: #87cefa;">description</span>();
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">double</span> <span style="color: #87cefa;">cost</span>() = 0;
+ <span style="color: #00ffff;">protected</span>:
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">description_</span>;
+};
+</pre>
+</div>
+
+<p>
+2.定义不同的组件：不同类型的咖啡
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">DarkRoast</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">Beverage</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">DarkRoast</span>();
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">DarkRoast</span>();
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">double</span> <span style="color: #87cefa;">cost</span>();
+};
+</pre>
+</div>
+</div>
+</li>
+<li>定义抽象装饰器和具体装饰器<br  /><div class="outline-text-4" id="text-2-2-2">
+<p class="info">
+装饰器和被装饰的对象必须拥有相同的基类。
+</p>
+<p>
+1.定义装饰器抽象接口（继承于组件抽象接口）：装饰器的基类
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">CondimentDecorator</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">Beverage</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">CondimentDecorator</span>() {}
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">string</span> <span style="color: #87cefa;">description</span>() = 0;
+};
+</pre>
+</div>
+<p>
+2.定义不同的装饰器：不同咖啡的配料维持组件对象的一个引用，并定义与组件接口一致的接口。
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Milk</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">CondimentDecorator</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">Milk</span>(<span style="color: #98fb98;">Beverage</span> *<span style="color: #eedd82;">beverage</span>);
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Milk</span>();
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">string</span> <span style="color: #87cefa;">description</span>();
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">double</span> <span style="color: #87cefa;">cost</span>();
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">Beverage</span> *<span style="color: #eedd82;">beverage_</span>;
+};
+</pre>
+</div>
+</div>
+</li>
+
+<li>整合到一起<br  /><div class="outline-text-4" id="text-2-2-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">Beverage</span> *<span style="color: #eedd82;">beverage2</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">DarkRoast</span>();
+beverage2 = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Mocha</span>(beverage2);
+beverage2 = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Mocha</span>(beverage2);
+beverage2 = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Whip</span>(beverage2);
+cout &lt;&lt; beverage2-&gt;description() &lt;&lt; <span style="color: #ffa07a;">" $"</span> &lt;&lt; beverage2-&gt;cost() &lt;&lt; endl;
+</pre>
+</div>
+</div>
+</li>
+
+<li>总的框架<br  /><div class="outline-text-4" id="text-2-2-4">
+
+<div class="figure">
+<p><img src="./images/decorator/beverage.jpeg" alt="beverage.jpeg" />
+</p>
+</div>
+</div>
+</li></ul>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">总结</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">装饰器模式(Decorator)结构</h3>
+<div class="outline-text-3" id="text-3-1">
+
+<div class="figure">
+<p><img src="./images/decorator/decorator_structure.jpg" alt="decorator_structure.jpg" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">组成</h3>
+<div class="outline-text-3" id="text-3-2">
+<ul class="org-ul">
+<li>抽象组件（Component）定义一个对象接口，使得装饰对象能动态加入到组件中。
+</li>
+<li>具体组件（ConcreteComponent）定义一个能附加职责的类。
+</li>
+<li>抽象装饰器（Decorator）维持组件对象的一个引用，并定义与组件接口一致的接口。
+</li>
+<li>具体装饰器（ConcreteDecorator）添加职责给组件。
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">应用场景</h3>
+<div class="outline-text-3" id="text-3-3">
+<ul class="org-ul">
+<li>为独立的对象动态并透明的添加职责，也就是，不影响其他对象。
+</li>
+<li>处理能收回的职责。
+</li>
+<li>当不能通过子类来扩充时。有时候一大堆独立的扩充是可能的，但将激增子类来支持每种扩充间的组合。或者一个类的定义可能被隐藏或不能用于生成子类。
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">缺点</h3>
+<div class="outline-text-3" id="text-3-4">
+<ol class="org-ol">
+<li>装饰器和它的组件不是一样的。一个装饰器扮演着透明的附加。但是从对象标识的角度来看，一个被装饰的组件和组件本身并不一致。所以当你使用装饰器时，不应该依赖对象标识。
+</li>
+<li>许多小的对象。一个使用装饰器的设计经常导致系统被许多类似的小的对象所组成。这些小的对象仅仅不同在它们内在的关联，不是它们的类或参数的值。虽然这些系统很容易被熟知他们的人定置，但它们很难被了解和调试。
+</li>
+</ol>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2014-04-09 Wed 22:50</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
