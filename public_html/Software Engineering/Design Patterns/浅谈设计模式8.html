@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>浅谈设计模式八: 适配器模式(Adapter)</title>
-<!-- 2014-04-11 Fri 22:43 -->
+<!-- 2014-04-12 Sat 23:15 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -153,7 +153,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3-1">适配器模式(Adapter)结构</a></li>
 <li><a href="#sec-3-2">组成</a></li>
 <li><a href="#sec-3-3">应用场景</a></li>
-<li><a href="#sec-3-4">缺点</a></li>
+<li><a href="#sec-3-4">效果</a></li>
 </ul>
 </li>
 </ul>
@@ -162,6 +162,11 @@ for the JavaScript code in this tag.
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">实例</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+如果有一只乌龟走的像一只鸭子，发生声音也类似鸭子，鸭子的接口已经存在了，现在想把乌龟添加到鸭子实例的调用者里，那么调用者能如何继续用鸭子的接口去调用乌龟呢？
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
@@ -169,12 +174,52 @@ for the JavaScript code in this tag.
 <div class="outline-text-2" id="text-2">
 </div><div id="outline-container-sec-2-1" class="outline-3">
 <h3 id="sec-2-1">目的</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+把一个类的接口转换成另外一个类中用户需要的接口。适配器模式能让原本因为接口不兼容而不能一起协作的类能一起协作。
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-2-2" class="outline-3">
 <h3 id="sec-2-2">实现</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+适配器模式分为类适配器和对象适配器，这里使用对象适配器来实现接口不兼容的转换。<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/adapter">代码实例在这里</a>。
+</p>
+
+<p>
+<code>TrukeyAdapter</code> 继承于目标接口类 <code>Duck</code> 并保存被适配类的引用 <code>Turkey*
+turkey</code>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">TurkeyAdapter</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">Duck</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">TurkeyAdapter</span>(<span style="color: #98fb98;">Turkey</span>* <span style="color: #eedd82;">turkey</span>);
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">TurkeyAdapter</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">quack</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">fly</span>();
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">Turkey</span>* <span style="color: #eedd82;">turkey_</span>;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">TurkeyAdapter</span>::<span style="color: #87cefa;">quack</span>() {
+  turkey_-&gt;gobble();
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">TurkeyAdapter</span>::<span style="color: #87cefa;">fly</span>() {
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; 5; ++i) {
+    turkey_-&gt;fly();
+  }
+}
+</pre>
 </div>
 </div>
+</div>
+</div>
+
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">总结</h2>
 <div class="outline-text-2" id="text-3">
@@ -224,19 +269,62 @@ for the JavaScript code in this tag.
 <ul class="org-ul">
 <li>你想使用一个已经存在的类，但是它的接口不符合你的需求。
 </li>
-<li>你想创建一个可复用的类，并与不相关或不可预见的类
+<li>你想创建一个可复用的类，并与不相关或不可预见的类(就是没有必要有兼容接口的类）合作
+</li>
+<li>（仅适用于对象适配）你需要使用一些已经存在的子类，但是通过子类化每一个来匹配它们的接口是不实际的。一个对象适配器能适配它们的父类接口，从而子类接口得到匹配。
 </li>
 </ul>
 </div>
 </div>
 <div id="outline-container-sec-3-4" class="outline-3">
-<h3 id="sec-3-4">缺点</h3>
+<h3 id="sec-3-4">效果</h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+类和对象适配器有不同的权衡。
+</p>
+
+<p>
+<b>类适配器:</b>
+</p>
+<ul class="org-ul">
+<li>使用一个具体的Adaptee类来把Adaptee适配到Target。因此，类适配器不能工作当我们想适配一个类或所有的子类时。
+</li>
+<li>能让Adapter重定义一些Adaptee的行为，因为Adapter是Adaptee的子类。
+</li>
+<li>只引入一个对象，并不需要多余的指针来间接得到adaptee。
+</li>
+</ul>
+
+<p>
+<b>对象适配器</b>
+</p>
+<ul class="org-ul">
+<li>能让一个Adapter处理多个Adaptee——也就是，Adaptee本身和它的所有子类（如果有的话）。Adapter也可以一次给所有Adpatee添加功能。
+</li>
+<li>使得更难重定义Adaptee行为。它需要子类化Adaptee，且使得Adapter引用这个子类，而不是Adaptee本身。
+</li>
+</ul>
+
+<p>
+当使用适配器需要考虑的一些其他的因素：
+</p>
+<ol class="org-ol">
+<li>Adapter到底做多少的适配工作？ 把Adaptee匹配到Traget接口的工作量在适配器间不一样。那有一段可能工作量从最简单的接口转换到支持整个不同的操作集合。Adpater的工作量取决于Traget的接口到Adaptee的接口的相似度。
+</li>
+
+<li>可插入的适配器。一个类更具复用性是当你减少其他类使用它作的假设条件。通过创建接口适配到一个类中，那么你就消除了其他类看到同样接口的假设。也就是说，接口适配让我们把我们的类整合到可能需要对这些类使用不同接口的现有系统里去。
+</li>
+<li>使用双向适配器提供透明性。适配器一个潜在的问题是它们不能对所有客户透明。一个被适配的对象不在与Adaptee的接口一致时，那么它就不能在
+Adaptee对象任意使用的地方去使用了。 <b>双向适配器</b> 能提供如此的透明性，当两个不同的客户需要不同方式查看同一个对象时，双向适配器非常适用。
+</li>
+</ol>
+</div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-04-11 Fri 22:43</p>
+<p class="date">Created: 2014-04-12 Sat 23:15</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

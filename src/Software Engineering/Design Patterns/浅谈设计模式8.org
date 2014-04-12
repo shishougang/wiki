@@ -3,12 +3,41 @@
 #+OPTIONS: num:nil H:2
 
 * 实例
-
+如果有一只乌龟走的像一只鸭子，发生声音也类似鸭子，鸭子的接口已经存在了，
+现在想把乌龟添加到鸭子实例的调用者里，那么调用者能如何继续用鸭子的接口
+去调用乌龟呢？
 * 适配器模式(Adapter)
 ** 目的
-
+把一个类的接口转换成另外一个类中用户需要的接口。适配器模式能让原本因为
+接口不兼容而不能一起协作的类能一起协作。
 ** 实现
+适配器模式分为类适配器和对象适配器，这里使用对象适配器来实现接口不兼容
+的转换。[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/adapter][代码实例在这里]]。
 
+=TrukeyAdapter= 继承于目标接口类 =Duck= 并保存被适配类的引用 =Turkey*
+turkey=
+
+#+begin_src c++
+class TurkeyAdapter : public Duck {
+ public:
+  explicit TurkeyAdapter(Turkey* turkey);
+  virtual ~TurkeyAdapter();
+  void quack();
+  void fly();
+ private:
+  Turkey* turkey_;
+}
+
+void TurkeyAdapter::quack() {
+  turkey_->gobble();
+}
+
+void TurkeyAdapter::fly() {
+  for (int i = 0; i < 5; ++i) {
+    turkey_->fly();
+  }
+}
+#+end_src
 * 总结
 ** 适配器模式(Adapter)结构
 1. 类适配器使用多重继承来使一个接口适配另外一个：
@@ -26,6 +55,41 @@
   适配被适配对象（Adaptee）接口到目标（Target）接口。
 ** 应用场景
 + 你想使用一个已经存在的类，但是它的接口不符合你的需求。
-+ 你想创建一个可复用的类，并与不相关或不可预见的类
++ 你想创建一个可复用的类，并与不相关或不可预见的类(就是没有必要有兼容
+  接口的类）合作
++ （仅适用于对象适配）你需要使用一些已经存在的子类，但是通过子类化每一
+  个来匹配它们的接口是不实际的。一个对象适配器能适配它们的父类接口，从
+  而子类接口得到匹配。
 
-** 缺点
+** 效果
+类和对象适配器有不同的权衡。
+
+*类适配器:*
++ 使用一个具体的Adaptee类来把Adaptee适配到Target。因此，类适配器不能工
+  作当我们想适配一个类或所有的子类时。
++ 能让Adapter重定义一些Adaptee的行为，因为Adapter是Adaptee的子类。
++ 只引入一个对象，并不需要多余的指针来间接得到adaptee。
+
+*对象适配器*
++ 能让一个Adapter处理多个Adaptee——也就是，Adaptee本身和它的所有子类
+  （如果有的话）。Adapter也可以一次给所有Adpatee添加功能。
++ 使得更难重定义Adaptee行为。它需要子类化Adaptee，且使得Adapter引用这
+  个子类，而不是Adaptee本身。
+
+当使用适配器需要考虑的一些其他的因素：
+1. Adapter到底做多少的适配工作？ 把Adaptee匹配到Traget接口的工作量在适
+   配器间不一样。那有一段可能工作量从最简单的接口转换到支持整个不同的
+   操作集合。Adpater的工作量取决于Traget的接口到Adaptee的接口的相似度。
+
+2. 可插入的适配器。一个类更具复用性是当你减少其他类使用它作的假设条件
+   。通过创建接口适配到一个类中，那么你就消除了其他类看到同样接口的假
+   设。也就是说，接口适配让我们把我们的类整合到可能需要对这些类使用不
+   同接口的现有系统里去。
+3. 使用双向适配器提供透明性。适配器一个潜在的问题是它们不能对所有客户
+   透明。一个被适配的对象不在与Adaptee的接口一致时，那么它就不能在
+   Adaptee对象任意使用的地方去使用了。 *双向适配器* 能提供如此的透明性，
+   当两个不同的客户需要不同方式查看同一个对象时，双向适配器非常适用。
+
+
+
+
