@@ -1,15 +1,109 @@
 #+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
-#+TITLE: 浅谈设计模式: 模板方法模式(Template method)
-#+OPTIONS: num:nil H:2
+#+TITLE: 浅谈设计模式十: 模板方法模式(Template method)
+#+OPTIONS: num:nil H:3
 
 * 实例
+有些人喜欢喝茶，有些人喜欢喝咖啡，所以现在有咖啡和茶两个类，基本代码如
+下：
 
+=Coffee= 类：
+#+begin_src c++
+  class Coffee {
+   public:
+    virtual ~Coffee();
+    void prepareRecipe();
+   protected:
+    void boilWater();
+    void brewCoffeeGrinds();
+    void pourInCup();
+    void addSugarAndMilk();
+  };
+#+end_src
+
+=Tea= 类：
+#+begin_src c++
+  class Tea {
+   public:
+    virtual ~Tea();
+    void prepareRecipe();
+   protected:
+    void boilWater();
+    void steepTeaBag();
+    void pourInCup();
+    void addLemon();
+  };
+#+end_src
+
+我们发现代码有重复： =void boilWater()= 和 =void pourInCup()= 。那么如
+何整合代码消除重复代码呢？
 * 模板方法模式(Template method)
 ** 目的
 为操作中的算法定义一个构架，把一些步骤延迟到子类来完成。模板方法让子类
 能不改变算法框架的前提下重定义这算法的一些步骤。
 ** 实现
-代码实例在这里]]。
+[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/templatemethod][代码实例在这里]]。
+*** 提取不变，抽象变化
+提取出不变的地方，在基类类定义并实现，然子类共同拥有，抽象变化地方为抽
+象接口，延迟到让子类来实现。
+
+[[./images/templatemethod/compare_class.jpeg]]
+
+#+begin_src c++
+class CaffeineBeverage {
+ public:
+  virtual ~CaffeineBeverage();
+  void prepareRecipe();
+ protected:
+  void boilWater();
+  void pourInCup();
+  virtual void brew() = 0;
+  virtual void addCondiments() = 0;
+};
+#+end_src
+*** =Coffee= 类实现自己功能
+=Coffee= 类继承基类 =CaffeineBeverage= ，并实现抽象接口来完成自己的算
+法功能。
+
+#+begin_src c++
+class Coffee : public CaffeineBeverage {
+ public:
+  virtual ~Coffee();
+ protected:
+  virtual void brew();
+  virtual void addCondiments();
+};
+
+void Coffee::brew() {
+  cout << "Dripping Coffee through filter" << endl;
+}
+
+void Coffee::addCondiments() {
+  cout << "Adding Sugar and Milk" << endl;
+}
+#+end_src
+*** =Tea= 类实现自己功能
+=Tea= 类继承基类 =CaffeineBeverage= ，并实现抽象接口来完成自己的算
+法功能。
+
+#+begin_src c++
+class Tea : public CaffeineBeverage {
+ public:
+  virtual ~Tea();
+ protected:
+  virtual void brew();
+  virtual void addCondiments();
+};
+
+void Tea::brew() {
+  cout << "Steeping the tea" << endl;
+}
+
+void Tea::addCondiments() {
+  cout << "Adding Lemon" << endl;
+}
+#+end_src
+*** 总的模式设计
+[[./images/templatemethod/template_whole.jpeg]]
 * 总结
 ** 模板方法模式(Template method)结构
 [[./images/templatemethod/template_method_structure.jpg]]

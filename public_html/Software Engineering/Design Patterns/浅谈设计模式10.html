@@ -3,8 +3,8 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<title>浅谈设计模式: 模板方法模式(Template method)</title>
-<!-- 2014-04-12 Sat 23:15 -->
+<title>浅谈设计模式十: 模板方法模式(Template method)</title>
+<!-- 2014-04-28 Mon 20:22 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -136,7 +136,7 @@ for the JavaScript code in this tag.
 </head>
 <body>
 <div id="content">
-<h1 class="title">浅谈设计模式: 模板方法模式(Template method)</h1>
+<h1 class="title">浅谈设计模式十: 模板方法模式(Template method)</h1>
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
@@ -145,7 +145,14 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2">模板方法模式(Template method)</a>
 <ul>
 <li><a href="#sec-2-1">目的</a></li>
-<li><a href="#sec-2-2">实现</a></li>
+<li><a href="#sec-2-2">实现</a>
+<ul>
+<li><a href="#sec-2-2-1">提取不变，抽象变化</a></li>
+<li><a href="#sec-2-2-2"><code>Coffee</code> 类实现自己功能</a></li>
+<li><a href="#sec-2-2-3"><code>Tea</code> 类实现自己功能</a></li>
+<li><a href="#sec-2-2-4">总的模式设计</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#sec-3">总结</a>
@@ -161,6 +168,51 @@ for the JavaScript code in this tag.
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">实例</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+有些人喜欢喝茶，有些人喜欢喝咖啡，所以现在有咖啡和茶两个类，基本代码如下：
+</p>
+
+<p>
+<code>Coffee</code> 类：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Coffee</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Coffee</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">prepareRecipe</span>();
+ <span style="color: #00ffff;">protected</span>:
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">boilWater</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">brewCoffeeGrinds</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">pourInCup</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">addSugarAndMilk</span>();
+};
+</pre>
+</div>
+
+<p>
+<code>Tea</code> 类：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Tea</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Tea</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">prepareRecipe</span>();
+ <span style="color: #00ffff;">protected</span>:
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">boilWater</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">steepTeaBag</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">pourInCup</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">addLemon</span>();
+};
+</pre>
+</div>
+
+<p>
+我们发现代码有重复： <code>void boilWater()</code> 和 <code>void pourInCup()</code> 。那么如何整合代码消除重复代码呢？
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
@@ -179,8 +231,106 @@ for the JavaScript code in this tag.
 <h3 id="sec-2-2">实现</h3>
 <div class="outline-text-3" id="text-2-2">
 <p>
-代码实例在这里]]。
+<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/templatemethod">代码实例在这里</a>。
 </p>
+</div>
+<div id="outline-container-sec-2-2-1" class="outline-4">
+<h4 id="sec-2-2-1">提取不变，抽象变化</h4>
+<div class="outline-text-4" id="text-2-2-1">
+<p>
+提取出不变的地方，在基类类定义并实现，然子类共同拥有，抽象变化地方为抽象接口，延迟到让子类来实现。
+</p>
+
+
+<div class="figure">
+<p><img src="./images/templatemethod/compare_class.jpeg" alt="compare_class.jpeg" />
+</p>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">CaffeineBeverage</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">CaffeineBeverage</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">prepareRecipe</span>();
+ <span style="color: #00ffff;">protected</span>:
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">boilWater</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">pourInCup</span>();
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">brew</span>() = 0;
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">addCondiments</span>() = 0;
+};
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2-2" class="outline-4">
+<h4 id="sec-2-2-2"><code>Coffee</code> 类实现自己功能</h4>
+<div class="outline-text-4" id="text-2-2-2">
+<p>
+<code>Coffee</code> 类继承基类 <code>CaffeineBeverage</code> ，并实现抽象接口来完成自己的算法功能。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Coffee</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">CaffeineBeverage</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Coffee</span>();
+ <span style="color: #00ffff;">protected</span>:
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">brew</span>();
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">addCondiments</span>();
+};
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Coffee</span>::<span style="color: #87cefa;">brew</span>() {
+  cout &lt;&lt; <span style="color: #ffa07a;">"Dripping Coffee through filter"</span> &lt;&lt; endl;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Coffee</span>::<span style="color: #87cefa;">addCondiments</span>() {
+  cout &lt;&lt; <span style="color: #ffa07a;">"Adding Sugar and Milk"</span> &lt;&lt; endl;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2-3" class="outline-4">
+<h4 id="sec-2-2-3"><code>Tea</code> 类实现自己功能</h4>
+<div class="outline-text-4" id="text-2-2-3">
+<p>
+<code>Tea</code> 类继承基类 <code>CaffeineBeverage</code> ，并实现抽象接口来完成自己的算法功能。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Tea</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">CaffeineBeverage</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Tea</span>();
+ <span style="color: #00ffff;">protected</span>:
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">brew</span>();
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">addCondiments</span>();
+};
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Tea</span>::<span style="color: #87cefa;">brew</span>() {
+  cout &lt;&lt; <span style="color: #ffa07a;">"Steeping the tea"</span> &lt;&lt; endl;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Tea</span>::<span style="color: #87cefa;">addCondiments</span>() {
+  cout &lt;&lt; <span style="color: #ffa07a;">"Adding Lemon"</span> &lt;&lt; endl;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2-4" class="outline-4">
+<h4 id="sec-2-2-4">总的模式设计</h4>
+<div class="outline-text-4" id="text-2-2-4">
+
+<div class="figure">
+<p><img src="./images/templatemethod/template_whole.jpeg" alt="template_whole.jpeg" />
+</p>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -233,7 +383,7 @@ for the JavaScript code in this tag.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-04-12 Sat 23:15</p>
+<p class="date">Created: 2014-04-28 Mon 20:22</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
