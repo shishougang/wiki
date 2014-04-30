@@ -3,16 +3,142 @@
 #+OPTIONS: num:nil H:3
 
 * 实例
-  
+[[./images/state/machine_state_diagram.jpeg]]
+
+实现如上运行的糖果机，基本的做法就是定义好每个状态，然后把每个状态转换
+的行为定义为一个函数方法来实现状态间的转换。
+#+begin_src c++
+  class GumballMachine {
+   public:
+    explicit GumballMachine(int cout);
+    void insertQuarter();
+    void ejectQuarter();
+    void turnCrank();
+    void dispense();
+   private:
+    const int SOLD_OUT = 0;
+    const int NO_QUARTER = 1;
+    const int HAS_QUARTER = 2;
+    const int SOLD = 3;
+    int state;
+    int count;
+  };
+#+end_src
+
+现在糖果机生产商想新添加一个幸运机制，添加一个 =winner= 状态，有1/10的
+概率成为Winner，免费获得一个糖果，状态机图如下：
+
+[[./images/state/machine_winner_state_diagram.jpeg]]
+
+在原有的代码上新添加这个状态，需要在每个转换函数里修改，以致很多处修改，
+容易产生错误。分析这个设计的缺陷：
++ 状态转换不明显，一堆判断语句在每个转换函数里;
++ 没有封装好变化部分和不变化部分，使得两者纠缠在一起;
++ 进一步添加与修改容易产生bugs。
 * 状态模式(State)
 ** 目的
 允许一个对象当它的内部状态改变时改变它的行为。这个对象看起来改变了它的
 类。
 ** 实现
-#+begin_src c++
+按照状态模式：
+1. 定义抽象状态接口，包含糖果机每个状态转换行为的方法;
+2. 根据接口为糖果机每个状态独立实现状态类；
+3. 糖果机摆脱大量的判断语句，把状态如何转换的功能由各个状态类独立实现。
 
+如此把整个复杂的状态机整理的比较清晰，最后状态类图如下,[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/state][代码实例在这里]]。
+[[./images/state/machine_class.jpeg]]
+*** 定义抽象状态接口
+#+begin_src c++
+class State {
+ public:
+  virtual ~State() {}
+  virtual void insertQuarter() = 0;
+  virtual void ejectQuarter() = 0;
+  virtual void turnCrank() = 0;
+  virtual void dispense() = 0;
+  virtual string toString() = 0;
+};
 #+end_src
-[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/state][代码实例在这里]]。
+*** 实现状态类
+为糖果机每个状态独立实现状态类，这里 =NoQuarterState= 类为例如下，
+=NoQuarterState= 类保存 =GumballMachine= 的实例，来实现设置糖果机状态
+的改变。
+#+begin_src c++
+class NoQuarterState : public State {
+ public:
+  explicit NoQuarterState(GumballMachine *gumball_machine);
+  virtual ~NoQuarterState();
+  virtual void insertQuarter();
+  virtual void ejectQuarter();
+  virtual void turnCrank();
+  virtual void dispense();
+  virtual string toString();
+ private:
+  GumballMachine *gumball_machine_;
+};
+
+void NoQuarterState::insertQuarter() {
+  cout << "You inserted a quarter" << endl;
+  gumball_machine_->setState(gumball_machine_->has_quarter_state());
+}
+
+void NoQuarterState::ejectQuarter() {
+  cout << "You haven't inserted a quarter" << endl;
+}
+
+void NoQuarterState::turnCrank() {
+  cout << "You turned, but there's no quarter" << endl;
+}
+
+void NoQuarterState::dispense() {
+  cout << "You need to pay first" << endl;
+}
+
+string NoQuarterState::toString() {
+  return "waiting for quarter";
+}
+#+end_src
+*** 重作 =GumballMachine= 类
+糖果机摆脱大量的判断语句，把状态如何转换的功能由各个状态类独立实现，整
+个类显得很清晰：
+#+begin_src c++
+GumballMachine::GumballMachine(int number_gumballs) :
+    count_(number_gumballs), state_(sold_out_state_) {
+  sold_out_state_ = new SoldOutState(this);
+  no_quarter_state_ = new NoQuarterState(this);
+  has_quarter_state_ = new HasQuarterState(this);
+  sold_state_ = new SoldState(this);
+  if (count_ > 0) {
+    state_ = no_quarter_state_;
+  }
+}
+
+void GumballMachine::insertQuarter() {
+  state_->insertQuarter();
+}
+
+void GumballMachine::ejectQuarter() {
+  state_->ejectQuarter();
+}
+
+void GumballMachine::turnCrank() {
+  state_->turnCrank();
+  state_->dispense();
+}
+
+void GumballMachine::releaseBall() {
+  cout << "A gumball comes rolling out the slot..." << endl;
+  if (count_ != 0) {
+    count_--;
+  }
+}
+
+void GumballMachine::refill(int count) {
+  count_ = count;
+  state_ = no_quarter_state_;
+}
+#+end_src
+
 * 总结
 ** 状态模式(State)结构
 [[./images/state/state_structure.jpeg]]

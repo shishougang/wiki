@@ -3,16 +3,52 @@
 #+OPTIONS: num:nil H:3
 
 * 实例
-
+在酒吧，有不同的酒和喝酒者对象，一开始，喝酒者都能喝酒，没有任何限制。之
+后，规定年纪小于16岁的不应该喝酒。那么如何在不改动众多的酒类的情况下，
+限制喝酒的年纪呢？
 * 代理模式(Proxy)
 ** 目的
 为其他的对象提供一个代理来控制访问某个对象。
 ** 实现
-#+begin_src c++
+这里仅仅是保护代理的一个例子，保护代理控制对原对象的访问。
 
+为酒类添加个代理类，有代理类控制喝酒的年纪，喝酒者如同使用实际酒类一样，使
+用代理酒类，因为代理酒类和实际酒类拥有共同的基类接口。[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/proxy][代码实例在这里]]。
+
+1. =ProxyBear= 与 =Bear= 都继承于 =Wine=;
+2. =ProxyBear= 维护一个实际 =Bear= 的实例，由它代理访问实际对象;
+3. 在 =ProxyBear= 的 =drink= 函数中，添加年纪控制。
+
+#+begin_src c++
+class ProxyBear : public Wine {
+ public:
+  explicit ProxyBear(Drinker *drinker);
+  virtual ~ProxyBear();
+  virtual void drink();
+ private:
+  Wine *real_bear_;
+  Drinker *drinker_;
+};
+
+#define kDrinkAge 16
+ProxyBear::ProxyBear(Drinker *drinker) : drinker_(drinker) {
+  real_bear_ = new Bear();
+}
+
+ProxyBear::~ProxyBear() {
+  delete real_bear_;
+  delete drinker_;
+}
+
+void ProxyBear::drink() {
+  if (drinker_->age() < kDrinkAge) {
+    cout << "Sorry the drinker is too young to drink" << endl;
+  } else {
+    real_bear_->drink();
+  }
+}
 #+end_src
 
-[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/proxy][代码实例在这里]]。
 * 总结
 ** 代理模式(Proxy)结构
 [[./images/proxy/proxy_structure.jpeg]]
