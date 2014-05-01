@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>浅谈设计模式十五: 生成器模式(Builder)</title>
-<!-- 2014-04-29 Tue 23:14 -->
+<!-- 2014-05-01 Thu 23:31 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -145,7 +145,15 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2">生成器模式(Builder)</a>
 <ul>
 <li><a href="#sec-2-1">目的</a></li>
-<li><a href="#sec-2-2">实现</a></li>
+<li><a href="#sec-2-2">实现</a>
+<ul>
+<li><a href="#sec-2-2-1">批萨的基类</a></li>
+<li><a href="#sec-2-2-2">生成器抽象类</a></li>
+<li><a href="#sec-2-2-3">Clam批萨的生成器</a></li>
+<li><a href="#sec-2-2-4">Cheese批萨的生成器</a></li>
+<li><a href="#sec-2-2-5"><code>Waiter</code> 制作批萨</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#sec-3">总结</a>
@@ -162,6 +170,11 @@ for the JavaScript code in this tag.
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">实例</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+批萨店有不同种类的批萨，每种批萨的制作流程类似，如果每个批萨都创建一个类，并且在各自类中完成各自的制作，那么制作流程的代码就会重复，并且制作过程与对象本身融合在一起，那么如何把所有批萨类似的制作流程分离出来，并消除代码冗余呢？
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
@@ -179,14 +192,118 @@ for the JavaScript code in this tag.
 <div id="outline-container-sec-2-2" class="outline-3">
 <h3 id="sec-2-2">实现</h3>
 <div class="outline-text-3" id="text-2-2">
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
+<p>
+利用生成器模式，把批萨制作流程分离出来，从而不同批萨能使用同样的制作流程。<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/builder">代码实例在这里</a>。
+</p>
 </div>
 
+<div id="outline-container-sec-2-2-1" class="outline-4">
+<h4 id="sec-2-2-1">批萨的基类</h4>
+<div class="outline-text-4" id="text-2-2-1">
 <p>
-<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/builder">代码实例在这里</a>。
+批萨的基类定义生成器可以配置不同的参数，从而达到同样的流程创建不同的对象。
 </p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Pizza</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">Pizza</span>() {}
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Pizza</span>() {}
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_dough</span>(<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">dough</span>) { dough_ = dough; }
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_sauce</span>(<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">sauce</span>) { sauce_ = sauce; }
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_topping</span>(<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">topping</span>) { topping_ = topping; }
+};
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2-2" class="outline-4">
+<h4 id="sec-2-2-2">生成器抽象类</h4>
+<div class="outline-text-4" id="text-2-2-2">
+<p>
+维护一个批萨的实例，并声明生成器制作接口。
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">PizzaBuilder</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">PizzaBuilder</span>() {}
+  <span style="color: #98fb98;">Pizza</span>* <span style="color: #87cefa;">get_pizza</span>() { <span style="color: #00ffff;">return</span> pizza_; }
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">createPizza</span>() { pizza_ = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Pizza</span>(); }
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">buildDough</span>() = 0;
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">buildSauce</span>() = 0;
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">buildTopping</span>() = 0;
+ <span style="color: #00ffff;">protected</span>:
+  <span style="color: #98fb98;">Pizza</span> *<span style="color: #eedd82;">pizza_</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-2-3" class="outline-4">
+<h4 id="sec-2-2-3">Clam批萨的生成器</h4>
+<div class="outline-text-4" id="text-2-2-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">ClamPizzaBuilder</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">PizzaBuilder</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">ClamPizzaBuilder</span>() {}
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">buildDough</span>() { pizza_-&gt;set_dough(<span style="color: #ffa07a;">"thinCrust"</span>); }
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">buildSauce</span>() { pizza_-&gt;set_sauce(<span style="color: #ffa07a;">"marinaSauce"</span>); }
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">buildTopping</span>() { pizza_-&gt;set_topping(<span style="color: #ffa07a;">"pepperoni"</span>); }
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-2-4" class="outline-4">
+<h4 id="sec-2-2-4">Cheese批萨的生成器</h4>
+<div class="outline-text-4" id="text-2-2-4">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">CheesePizzaBuilder</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">PizzaBuilder</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">CheesePizzaBuilder</span>() {}
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">buildDough</span>() { pizza_-&gt;set_dough(<span style="color: #ffa07a;">"thickCrust"</span>); }
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">buildSauce</span>() { pizza_-&gt;set_sauce(<span style="color: #ffa07a;">"plumTomato"</span>); }
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">buildTopping</span>() { pizza_-&gt;set_topping(<span style="color: #ffa07a;">"pineapple"</span>); }
+};
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2-5" class="outline-4">
+<h4 id="sec-2-2-5"><code>Waiter</code> 制作批萨</h4>
+<div class="outline-text-4" id="text-2-2-5">
+<p>
+维护一个不同批萨生成器的实例，通过不同生成器和同样的流程制作批萨，达到制作和产品本身的分离。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Waiter</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Waiter</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_pizza_builder</span>(<span style="color: #98fb98;">PizzaBuilder</span> *<span style="color: #eedd82;">pizza_builder</span>) {
+    pizza_builder_ = pizza_builder;
+  }
+  <span style="color: #98fb98;">Pizza</span>* <span style="color: #87cefa;">get_pizza</span>() { <span style="color: #00ffff;">return</span> pizza_builder_-&gt;get_pizza(); }
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">constructPizza</span>();
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">PizzaBuilder</span> *<span style="color: #eedd82;">pizza_builder_</span>;
+};
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Waiter</span>::<span style="color: #87cefa;">constructPizza</span>() {
+  pizza_builder_-&gt;createPizza();
+  pizza_builder_-&gt;buildDough();
+  pizza_builder_-&gt;buildSauce();
+  pizza_builder_-&gt;buildTopping();
+}
+</pre>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -253,7 +370,7 @@ for the JavaScript code in this tag.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-04-29 Tue 23:14</p>
+<p class="date">Created: 2014-05-01 Thu 23:31</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

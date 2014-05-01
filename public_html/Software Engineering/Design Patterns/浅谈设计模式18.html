@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>浅谈设计模式十八: 享元模式(Flyweight)</title>
-<!-- 2014-04-29 Tue 23:14 -->
+<!-- 2014-05-01 Thu 23:31 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -145,7 +145,13 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2">享元模式(Flyweight)</a>
 <ul>
 <li><a href="#sec-2-1">目的</a></li>
-<li><a href="#sec-2-2">实现</a></li>
+<li><a href="#sec-2-2">实现</a>
+<ul>
+<li><a href="#sec-2-2-1">享元类： <code>CIrcle</code></a></li>
+<li><a href="#sec-2-2-2">享元工厂类</a></li>
+<li><a href="#sec-2-2-3">学员共享图形实例</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#sec-3">总结</a>
@@ -162,6 +168,11 @@ for the JavaScript code in this tag.
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">实例</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+绘画培训班内，一次绘图课上，每个学员要练习大量不同颜色的圆形，那么如果为每个学员都实例和维护不同颜色圆的实例话，将产生很多重复颜色的圆，占用很多存储开销，那么如何大家共享这些圆的实例呢？
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
@@ -179,18 +190,98 @@ for the JavaScript code in this tag.
 <div id="outline-container-sec-2-2" class="outline-3">
 <h3 id="sec-2-2">实现</h3>
 <div class="outline-text-3" id="text-2-2">
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
-
 <p>
-<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/flyweight">代码实例在这里</a>。
+这里圆形作为享元类，可以被大家所共享，并建立相应的享元工厂类来创建和管理享元对象。并确保合理的共享享元类。当一个客户请求一个享元类时，享元工厂对象提供一个已存在的实例或如果不存在就创建一个。<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/flyweight">代码实例在这里</a>。
 </p>
 </div>
-</div>
-</div>
+<div id="outline-container-sec-2-2-1" class="outline-4">
+<h4 id="sec-2-2-1">享元类： <code>CIrcle</code></h4>
+<div class="outline-text-4" id="text-2-2-1">
+<p>
+颜色作为它的一个状态。
+</p>
 
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Circle</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">Shape</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">Circle</span>(<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">color</span>);
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Circle</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_x</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>) {x_ = x;}
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_y</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>) {y_ = y;}
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_radius</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">radius</span>) {radius_ = radius;}
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">draw</span>();
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">color_</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x_</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y_</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">radius_</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-2-2" class="outline-4">
+<h4 id="sec-2-2-2">享元工厂类</h4>
+<div class="outline-text-4" id="text-2-2-2">
+<p>
+利用 <code>map</code> 把颜色作为标识来存储享元类。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">ShapeFactory</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">ShapeFactory</span>();
+  <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">Shape</span>* <span style="color: #87cefa;">getCircle</span>(<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">color</span>);
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">map</span>&lt;<span style="color: #98fb98;">string</span>, <span style="color: #98fb98;">Shape</span>*&gt; *<span style="color: #eedd82;">map_</span>;
+};
+
+<span style="color: #98fb98;">Shape</span>* <span style="color: #7fffd4;">ShapeFactory</span>::<span style="color: #87cefa;">getCircle</span>(<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">color</span>) {
+  <span style="color: #7fffd4;">map</span>&lt;<span style="color: #98fb98;">string</span>, <span style="color: #98fb98;">Shape</span>*&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it</span>;
+  it = map_-&gt;find(color);
+  <span style="color: #00ffff;">if</span> (it != map_-&gt;end()) {
+    <span style="color: #00ffff;">return</span> it-&gt;second;
+  }
+  <span style="color: #98fb98;">Circle</span> *<span style="color: #eedd82;">circle</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Circle</span>(color);
+  map_-&gt;insert(<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">pair</span>&lt;<span style="color: #98fb98;">string</span>, <span style="color: #98fb98;">Shape</span>*&gt;(color, circle));
+  cout &lt;&lt; <span style="color: #ffa07a;">"Creating circle of color:"</span> &lt;&lt; color &lt;&lt; endl;
+  <span style="color: #00ffff;">return</span> circle;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-2-3" class="outline-4">
+<h4 id="sec-2-2-3">学员共享图形实例</h4>
+<div class="outline-text-4" id="text-2-2-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">string</span>&gt; <span style="color: #eedd82;">colors</span>;
+  colors.push_back(<span style="color: #ffa07a;">"Red"</span>);
+  colors.push_back(<span style="color: #ffa07a;">"Green"</span>);
+  colors.push_back(<span style="color: #ffa07a;">"Blue"</span>);
+  colors.push_back(<span style="color: #ffa07a;">"White"</span>);
+  colors.push_back(<span style="color: #ffa07a;">"Black"</span>);
+
+  <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; 20; ++i) {
+    <span style="color: #98fb98;">Circle</span> *<span style="color: #eedd82;">circle</span> = <span style="color: #00ffff;">dynamic_cast</span>&lt;Circle *&gt;(<span style="color: #7fffd4;">ShapeFactory</span>::getCircle(
+        getRandomColor(colors)));
+    circle-&gt;set_x(getRandomX());
+    circle-&gt;set_y(getRandomY());
+    circle-&gt;set_radius(100);
+    circle-&gt;draw();
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">总结</h2>
 <div class="outline-text-2" id="text-3">
@@ -266,7 +357,7 @@ for the JavaScript code in this tag.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-04-29 Tue 23:14</p>
+<p class="date">Created: 2014-05-01 Thu 23:31</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

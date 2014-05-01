@@ -3,17 +3,67 @@
 #+OPTIONS: num:nil H:3
 
 * 实例
-
+画圆可以顺时针或逆时针，但只能使用一种方法，不能同时既顺时针又逆时针。
+比较直观的做法就是定义两种不同的圆，但同时继承于圆的基本特性基类。但如
+果不采用继承并在运行时选取画圆的方法呢？
 * 桥接模式(Bridge)
 ** 目的
 从对象的具体实现中解藕出抽象部分，使它们可以各自独立的变化。
 ** 实现
+把顺时针和逆时针的画法抽取出来成为独立的实现者类，由圆运行时可以选取自
+己的画法。[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/bridge][代码实例在这里]]。
+
+*** 定义实现者抽象接口
+#+begin_src c++
+class Drawing {
+ public:
+  virtual ~Drawing() {}
+  virtual void drawCircle(double x, double y, double radius) = 0;
+};
+#+end_src
+*** 顺时针实现类
+#+begin_src c++
+class DrawingClockwise : public Drawing {
+ public:
+  virtual ~DrawingClockwise() {}
+  virtual void drawCircle(double x, double y, double radius) {
+    printf("draw the circle at %f,%f, radius %f by clockwise\n", x, y, radius);
+  }
+};
+#+end_src
+*** 逆时针实现类
+#+begin_src c++
+class DrawingCounterClockwise : public Drawing {
+ public:
+  virtual ~DrawingCounterClockwise() {}
+  virtual void drawCircle(double x, double y, double radius) {
+    printf("draw the circle at %f,%f, radius %f by counter clockwise\n",
+           x, y, radius);
+  }
+};
+#+end_src
+*** 圆类
+维护一个实现者的实例并使用它完成相应的行为。
 
 #+begin_src c++
+class CircleShape : public Shape {
+ public:
+  virtual ~CircleShape();
+  CircleShape(double x, double y, double radius, Drawing *drawing);
+  virtual void draw();
+  virtual void resizeByPercentage(double pct);
+ private:
+  double x_;
+  double y_;
+  double radius_;
+  Drawing *drawing_;
+};
 
+void CircleShape::draw() {
+    drawing_->drawCircle(x_, y_, radius_);
+}
 #+end_src
 
-[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/bridge][代码实例在这里]]。
 * 总结
 ** 桥接模式(Bridge)结构
 [[./images/bridge/bridge_structure.jpeg]]
@@ -42,4 +92,4 @@
 + 当你想在多个对象见共享一个实现部分（可能使用引用计数），并想把这个事
   实从客户那隐藏掉时。
 
-** 缺点
+

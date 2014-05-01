@@ -3,16 +3,83 @@
 #+OPTIONS: num:nil H:3
 
 * 实例
-
+绘画培训班内，一次绘图课上，每个学员要练习大量不同颜色的圆形，那么如果
+为每个学员都实例和维护不同颜色圆的实例话，将产生很多重复颜色的圆，占用
+很多存储开销，那么如何大家共享这些圆的实例呢？
 * 享元模式(Flyweight)
 ** 目的
 使用共享机制来有效支持大量细粒度的对象。
 ** 实现
-#+begin_src c++
+这里圆形作为享元类，可以被大家所共享，并建立相应的享元工厂类来创建和管
+理享元对象。并确保合理的共享享元类。当一个客户请求一个享元类时，享元工
+厂对象提供一个已存在的实例或如果不存在就创建一个。[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/flyweight][代码实例在这里]]。
+*** 享元类： =CIrcle=
+颜色作为它的一个状态。
 
+#+begin_src c++
+class Circle : public Shape {
+ public:
+  explicit Circle(string color);
+  virtual ~Circle();
+  void set_x(int x) {x_ = x;}
+  void set_y(int y) {y_ = y;}
+  void set_radius(int radius) {radius_ = radius;}
+  virtual void draw();
+ private:
+  string color_;
+  int x_;
+  int y_;
+  int radius_;
+};
 #+end_src
 
-[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/flyweight][代码实例在这里]]。
+*** 享元工厂类
+利用 =map= 把颜色作为标识来存储享元类。
+
+#+begin_src c++
+class ShapeFactory {
+ public:
+  virtual ~ShapeFactory();
+  static Shape* getCircle(string color);
+ private:
+  static map<string, Shape*> *map_;
+};
+
+Shape* ShapeFactory::getCircle(string color) {
+  map<string, Shape*>::iterator it;
+  it = map_->find(color);
+  if (it != map_->end()) {
+    return it->second;
+  }
+  Circle *circle = new Circle(color);
+  map_->insert(std::pair<string, Shape*>(color, circle));
+  cout << "Creating circle of color:" << color << endl;
+  return circle;
+}
+#+end_src
+
+*** 学员共享图形实例
+#+begin_src c++
+int main(int argc, char *argv[]) {
+  vector<string> colors;
+  colors.push_back("Red");
+  colors.push_back("Green");
+  colors.push_back("Blue");
+  colors.push_back("White");
+  colors.push_back("Black");
+
+  for(int i = 0; i < 20; ++i) {
+    Circle *circle = dynamic_cast<Circle *>(ShapeFactory::getCircle(
+        getRandomColor(colors)));
+    circle->set_x(getRandomX());
+    circle->set_y(getRandomY());
+    circle->set_radius(100);
+    circle->draw();
+  }
+  return 0;
+}
+#+end_src
+
 * 总结
 ** 享元模式(Flyweight)结构
 [[./images/flyweight/flyweight_structure.jpeg]]

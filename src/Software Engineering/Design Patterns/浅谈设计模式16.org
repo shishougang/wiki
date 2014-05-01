@@ -3,17 +3,71 @@
 #+OPTIONS: num:nil H:3
 
 * 实例
+有一个系统中有很多系统配置和用户简况：
+1. 初始读取配置或用户简况需要花一些时间（比如用一些系统调用或读取数据
+   库等），但并非实时数据，只需初始化读一编;
+2. 因为众多系统配置和用户简况需要初始化，每次手动初始化比较繁琐，希望
+   能一个类其中管理并快速创建实例
 
+那么如何能不每次手动初始化对象，并能克隆初始化的数据到新的实例呢？
 * 原型模式(Prototype)
 ** 目的
 使用一个原型的实例来创建一些特定的对象，然后当创建这些新的对象时通过拷
 贝这个原型。
 ** 实现
-#+begin_src c++
+使用原型模式：
+1. 第一次花一段时间初始化系统配置和用户简况的数据，存入相应的变量内;
+2. 原型管理类其中管理需要克隆的类，直接克隆初始化好的实例的数据变量值，
+   不再需要去或系统调用或读取来初始化数据。
+3. 客户直接使用原型管理类获取实例，不再需要手动实例化它们。
+[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/prototype][代码实例在这里]]。
 
+*** 定义原型抽象接口
+为克隆声明一个接口。
+#+begin_src c++
+class Prototype {
+ public:
+  virtual ~Prototype() {}
+  virtual Prototype* Clone() = 0;
+};
 #+end_src
 
-[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/prototype][代码实例在这里]]。
+*** 系统配置类继承原型基类
+#+begin_src c++
+class Configuration : public Prototype {
+ public:
+  virtual ~Configuration();
+  void GetFileInformation();
+  virtual Prototype* Clone();
+  void ShowInformation();
+ private:
+  string file_information_;
+};
+#+end_src
+*** 用户简况类继承原型基类
+#+begin_src c++
+class UserProfile : public Prototype {
+ public:
+  virtual ~UserProfile();
+  void GetDatabaseInformation();
+  virtual Prototype* Clone();
+  void ShowInformation();
+ private:
+  string database_information_;
+};
+#+end_src
+*** 原型管理类管理原型克隆
+=AddPrototype= 添加原型实例， =GetPrototype= 克隆原型实例返回新的实例。
+#+begin_src c++
+void PrototypeManager::AddPrototype(Prototype *p, int index) {
+  (*prototype_map_)[index] = p;
+}
+      
+
+Prototype* PrototypeManager::GetPrototype(int index) {
+  return prototype_map_->at(index)->Clone();
+}
+#+end_src
 * 总结
 ** 原型模式(Prototype)结构
 [[./images/prototype/prototype_structure.jpeg]]

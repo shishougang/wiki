@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>浅谈设计模式十七: 桥接模式(Bridge)</title>
-<!-- 2014-04-29 Tue 23:14 -->
+<!-- 2014-05-01 Thu 23:31 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -145,7 +145,14 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2">桥接模式(Bridge)</a>
 <ul>
 <li><a href="#sec-2-1">目的</a></li>
-<li><a href="#sec-2-2">实现</a></li>
+<li><a href="#sec-2-2">实现</a>
+<ul>
+<li><a href="#sec-2-2-1">定义实现者抽象接口</a></li>
+<li><a href="#sec-2-2-2">顺时针实现类</a></li>
+<li><a href="#sec-2-2-3">逆时针实现类</a></li>
+<li><a href="#sec-2-2-4">圆类</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a href="#sec-3">总结</a>
@@ -153,7 +160,6 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3-1">桥接模式(Bridge)结构</a></li>
 <li><a href="#sec-3-2">组成</a></li>
 <li><a href="#sec-3-3">应用场景</a></li>
-<li><a href="#sec-3-4">缺点</a></li>
 </ul>
 </li>
 </ul>
@@ -162,6 +168,11 @@ for the JavaScript code in this tag.
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">实例</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+画圆可以顺时针或逆时针，但只能使用一种方法，不能同时既顺时针又逆时针。比较直观的做法就是定义两种不同的圆，但同时继承于圆的基本特性基类。但如果不采用继承并在运行时选取画圆的方法呢？
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
@@ -179,18 +190,92 @@ for the JavaScript code in this tag.
 <div id="outline-container-sec-2-2" class="outline-3">
 <h3 id="sec-2-2">实现</h3>
 <div class="outline-text-3" id="text-2-2">
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
-
 <p>
-<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/bridge">代码实例在这里</a>。
+把顺时针和逆时针的画法抽取出来成为独立的实现者类，由圆运行时可以选取自己的画法。<a href="https://github.com/shishougang/DesignPattern-CPP/tree/master/src/bridge">代码实例在这里</a>。
 </p>
 </div>
+
+<div id="outline-container-sec-2-2-1" class="outline-4">
+<h4 id="sec-2-2-1">定义实现者抽象接口</h4>
+<div class="outline-text-4" id="text-2-2-1">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Drawing</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Drawing</span>() {}
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">drawCircle</span>(<span style="color: #98fb98;">double</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">y</span>, <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">radius</span>) = 0;
+};
+</pre>
+</div>
 </div>
 </div>
 
+<div id="outline-container-sec-2-2-2" class="outline-4">
+<h4 id="sec-2-2-2">顺时针实现类</h4>
+<div class="outline-text-4" id="text-2-2-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">DrawingClockwise</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">Drawing</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">DrawingClockwise</span>() {}
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">drawCircle</span>(<span style="color: #98fb98;">double</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">y</span>, <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">radius</span>) {
+    printf(<span style="color: #ffa07a;">"draw the circle at %f,%f, radius %f by clockwise\n"</span>, x, y, radius);
+  }
+};
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2-3" class="outline-4">
+<h4 id="sec-2-2-3">逆时针实现类</h4>
+<div class="outline-text-4" id="text-2-2-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">DrawingCounterClockwise</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">Drawing</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">DrawingCounterClockwise</span>() {}
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">drawCircle</span>(<span style="color: #98fb98;">double</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">y</span>, <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">radius</span>) {
+    printf(<span style="color: #ffa07a;">"draw the circle at %f,%f, radius %f by counter clockwise\n"</span>,
+           x, y, radius);
+  }
+};
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2-4" class="outline-4">
+<h4 id="sec-2-2-4">圆类</h4>
+<div class="outline-text-4" id="text-2-2-4">
+<p>
+维护一个实现者的实例并使用它完成相应的行为。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">CircleShape</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">Shape</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">CircleShape</span>();
+  <span style="color: #87cefa;">CircleShape</span>(<span style="color: #98fb98;">double</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">y</span>, <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">radius</span>, <span style="color: #98fb98;">Drawing</span> *<span style="color: #eedd82;">drawing</span>);
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">draw</span>();
+  <span style="color: #00ffff;">virtual</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">resizeByPercentage</span>(<span style="color: #98fb98;">double</span> <span style="color: #eedd82;">pct</span>);
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">x_</span>;
+  <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">y_</span>;
+  <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">radius_</span>;
+  <span style="color: #98fb98;">Drawing</span> *<span style="color: #eedd82;">drawing_</span>;
+};
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">CircleShape</span>::<span style="color: #87cefa;">draw</span>() {
+    drawing_-&gt;drawCircle(x_, y_, radius_);
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">总结</h2>
 <div class="outline-text-2" id="text-3">
@@ -246,14 +331,11 @@ for the JavaScript code in this tag.
 </ul>
 </div>
 </div>
-<div id="outline-container-sec-3-4" class="outline-3">
-<h3 id="sec-3-4">缺点</h3>
-</div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-04-29 Tue 23:14</p>
+<p class="date">Created: 2014-05-01 Thu 23:31</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
