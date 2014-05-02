@@ -3,18 +3,128 @@
 #+OPTIONS: num:nil H:3
 
 * 实例
-
+一辆汽车的结构是定的，但是对方不同部件的操作确实会时常变化，比如查看汽
+车各个部件，发动汽车对各个部件操作或修理部件等。那么如何在不改变汽车部
+件类的前提下，对其定义不同的操作呢？
 * 访问者模式(Visitor)
 ** 目的
 表示在对象结构元素上进行的一个操作。访问者模式让你在不改变一个类的前提
 下，对这个类的元素定义新的操作。 
 ** 实现
+利用访问者设计模式，能很好的解决这个问题，一旦定义好汽车各个部件类，不
+用去修改它们，也能对它们定义新的操作。[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/visitor][代码实例在这里]]。
+*** 抽象元素类
+定义一个以访问类为参数的 =Accept= 操作。
 #+begin_src c++
-
+class CarElement {
+ public:
+  virtual ~CarElement() {}
+  virtual void accept(CarElementVisitor *visitor) = 0;
+};
 #+end_src
 
+*** 汽车具体元素类
+这里仅仅定义了汽车部分结构类为例子，分别定义汽车的轮胎类，引擎类和车身
+类。都实现以访问类为参数的 =Accept= 操作。
+#+begin_src c++
+class Wheel : public CarElement {
+ public:
+  explicit Wheel(string name);
+  virtual ~Wheel();
+  virtual void accept(CarElementVisitor *visitor);
+  string name() const {return name_;}
+ private:
+  string name_;
+};
 
-[[https://github.com/shishougang/DesignPattern-CPP/tree/master/src/visitor][代码实例在这里]]。
+class Engine : public CarElement {
+ public:
+  virtual ~Engine();
+  virtual void accept(CarElementVisitor *visitor);
+};
+
+class Body : public CarElement {
+ public:
+  virtual ~Body();
+  virtual void accept(CarElementVisitor *visitor);
+};
+#+end_src
+*** 对象结构
+整辆车的组合，能枚举它的各个部件，用 =vector= 维护一个无序的汽车元素集
+合。
+#+begin_src c++
+class Car {
+ public:
+  Car();
+  virtual ~Car();
+  void visit_car(CarElementVisitor *visitor);
+ private:
+  void visit_elements(CarElementVisitor *visitor);
+  vector<CarElement *> elements_array_;
+};
+
+Car::Car() {
+  elements_array_.push_back(new Wheel("front left"));
+  elements_array_.push_back(new Wheel("front right"));
+  elements_array_.push_back(new Body());
+  elements_array_.push_back(new Engine());
+}
+
+Car::~Car() {
+  for(unsigned int i = 0; i < elements_array_.size(); ++i) {
+    CarElement *element = elements_array_[i];
+    delete element;
+  }
+}
+
+void Car::visit_car(CarElementVisitor *visitor) {
+  visit_elements(visitor);
+}
+
+void Car::visit_elements(CarElementVisitor *visitor) {
+  for(unsigned int i = 0; i < elements_array_.size(); ++i) {
+    CarElement *element = elements_array_[i];
+    element->accept(visitor);
+  }
+}
+#+end_src
+*** 抽象访问类
+为结构中的具体元素类（ConcreteElement）类声明一个访问操作。
+#+begin_src c++
+class CarElement {
+ public:
+  virtual ~CarElement() {}
+  virtual void accept(CarElementVisitor *visitor) = 0;
+};
+#+end_src
+*** 具体访问类1：访问汽车部件
+#+begin_src c++
+void CarElementPrintVisitor::visit(Wheel *wheel) {
+  cout << "Visiting " << wheel->name() << " wheel" << endl;
+}
+
+void CarElementPrintVisitor::visit(Engine *engine) {
+  cout << "Visiting engine" << endl;
+}
+
+void CarElementPrintVisitor::visit(Body *body) {
+  cout << "Visiting body" << endl;
+}
+#+end_src
+*** 具体访问类2：启动汽车部件
+#+begin_src c++
+void CarElementDoVisitor::visit(Wheel *wheel) {
+  cout << "Kicking my " << wheel->name() << " wheel" << endl;
+}
+
+void CarElementDoVisitor::visit(Engine *engine) {
+  cout << "Starting my engine" << endl;
+}
+
+void CarElementDoVisitor::visit(Body *body) {
+  cout << "Moving my body" << endl;
+}
+#+end_src
 * 总结
 ** 访问者模式(Visitor)结构
 [[./images/visitor/visitor_structure.jpeg]]
@@ -31,7 +141,7 @@
   定义一个以访问类为参数的 =Accept= 操作。
 + 具体元素类（ConcreteElement）
   实现一个以访问类为参数的 =Accept= 操作。
-+ 对象结构
++ 对象结构(ObjectStrucutre)
   1. 能枚举它的元素。
   2. 可以提供允许访问类访问它的元素的上层接口。
   3. 可以是一个组合或一个如列表或无序集合的集合。
@@ -54,3 +164,4 @@
 + 破坏封装性。访问者的方法假定具体元素类（ConcreteElement）接口足够强
   大让访问者对它元素进行操作。因而，这个模式强迫你提供能访问元素内部状
   态的公开操作，从而导致破坏了它的封装性。
+  
