@@ -3,34 +3,451 @@
 #+OPTIONS: num:nil H:2
 
 * Book notes
-
 ** A
 一个文件中有4十亿的32位整数，已随机排序，如何找如一个不在这个文件中的
 32位数？有足够的内存如何解决？如果你可以用很多外部存储文件但是只有几百个字
 节的主内存，如何解决？
-
 *** 足够的内存
 利用Column1的比特映射技能，
 1. 把所有的数一一映射到内存中的比特位;
 2. 扫描比特位，是0的就是确实的数所在位置。
 两次扫描，复杂度$\mathcal{O}(N)$
 *** 有限的内存
-               
+Ed Reingold 的方法：
+1. 扫描数字文件，以第一个比特位是否为0,分成两组：是0的一组为组0，是1的
+   一组为组1;
+2. 若组0个数<组1个数，那么缺失数这一位是0，Step 3选择组0;
+   若组1个数<组0个数，那么缺失数这一位是1，Step 3选组组1;
+   若相等，随便选一组（两组中都有缺失数，这里仅找出一个缺失数），并相
+   应得到么缺失数这一位是;
+3. 回到Step 1, 扫描文件为Step 2所选取的，扫描比特位的位置+1。
+
+这里以两组内存数组代表外部存储文件：
+#+begin_src c++
+int find_missing(int *array, int len, int nbits) {
+  int leading_zero[len / 2 + 1];
+  int leading_one[len / 2 + 1];
+  int n = len;
+  int res = 0;
+  int *p_in = array;
+
+  while (nbits--) {
+    int count_leading_zero = 0;
+    int count_leading_one = 0;
+    int leading_bit = 1 << nbits;
+    for (int i = 0; i < n; ++i) {
+      if (p_in[i] & leading_bit) {
+        leading_one[count_leading_one++] = p_in[i];
+      } else {
+        leading_zero[count_leading_zero++] = p_in[i];
+      }
+    }
+    if (count_leading_one <= count_leading_zero) {
+      res |= leading_bit;
+      n = count_leading_one;
+      p_in = leading_one;
+    } else {
+      n = count_leading_zero;
+      p_in = leading_zero;
+    }
+  }
+  return res;
+}
+#+end_src
+
 ** B
 在第i个位置翻转一个n个元素的一维数组。比如n=8,i=3,数组abcdefgh翻转到
 defghabc。
 
+*** Juggling法
+是把前面的元素翻转到后面，逐个移位，翻转位为k：
+1. t存储元素 =x[0]= ;
+2. 移动 =x[k]= --> =x[0]=, =x[2k]= --> =x[k]=, 并偏移i×k是总数n的模;
+3. 当 =(i*k)%n= 回到 Step 1中的起始元素时，用t赋值，并停止Step 2
+4. 若所有元素都得到移动，结束整个算法，
+   若有元素没有得到移动，选取Step 1中的下一个元素啊继续进行Step1-4.
+
+在Step4中判断所有元素是否得到移动，比较不易，那么如果知道一共要进行
+Step1-4几次呢？
+
+Step1的起始位i，Step2中移位位置 =(i+j*k)/n= ,什么时候等于i呢？
+j*k第一次被k整除，也就是j*k是k与n的最小工倍数（lcm, least common
+multiple), Step1-4运行一次移动 =lcm/k= 个元素，一共需要次数
+~n/(lcm/k)=n*k/lcm~ 也就是k与n的最大公约数。
+
+Step1-4一共运行n和k的最大公约数次。
+
+#+begin_src c++
+int gcd(int m, int n) {
+  if (m < n) {
+    int temp;
+    temp = m;
+    m = n;
+    n = m;
+  }
+  while (n) {
+    int temp = n;
+    n = m % n;
+    m = temp;
+  }
+  return m;
+}
+
+void rotate(char *array, int n, int k) {
+  int num_gcd = gcd(n, k);
+  for (int i = 0; i < num_gcd; ++i) {
+    char temp = array[i];
+    int prev = i;
+    int next;
+    while (true) {
+      next = prev + k;
+      if (next >= n) {
+        next -= n;
+      }
+      if (next == i) {
+        break;
+      }
+      array[prev] = array[next];
+      prev = next;
+    }
+    array[prev] = temp;
+  }
+}
+#+end_src
+*** Block Swap法
+翻转数组x，相当于翻转ab到ba，假如a的长度短于b，
+1. 把b分为ab_l b_r 并且 b_r 长度与a相同
+2. 交换a与b_r 得到 b_r b_l a;
+3. a达到最终位置，继续处理 b_r b_l ，回到step 1.
+
+#+begin_src c++
+void swap(char *array, int m, int n, int len) {
+  //swap array[m..m+len], array[n..n+len]
+  for(int i = 0; i < len; ++i) {
+    int temp = array[m + i];
+    array[m + i] = array[n + i];
+    array[n + i] = temp;
+  }
+}
+
+void rotate(char *array, int n, int k) {
+  if (k == 0 || k == n) {
+    return;
+  }
+  /* array[0..p-i-1]:final stage
+   * array[p-i..p-1]:the string a to be swaped
+   * array[p..p+j-1]:the string b to be swaped
+   * array[p+j..n-1]:final stage
+   */
+  int p = k;
+  int i = k;
+  int j = n - k;
+  while (i != j) {
+    if (i < j) {
+      swap(array, p - i, p + j - i, i);
+      j -= i;
+    } else {
+      swap(array, p - i, p, j);
+      i -= j;
+    }
+  }
+  swap(array, p - i, p, i);
+}
+#+end_src
+*** Reversal法
+翻转数组x，相当于翻转ab到ba
+1. 翻转a， a^r b,
+2. 翻转b， a^r b^r,
+3. 整个翻转， ba
+
+#+begin_src c++
+void reverse(char *array, int s, int e) {
+  while (s < e) {
+    int temp = array[s];
+    array[s] = array[e];
+    array[e] = temp;
+    s++;
+    e--;
+  }
+}
+void rotate(char *array, int n, int k) {
+  reverse(array, 0, k - 1);
+  reverse(array, k, n - 1);
+  reverse(array, 0, n - 1);
+}
+#+end_src
 
 ** C
 在一个英文字典中，找出所有回文单词。
 
-* Problems
-
-** 1
-
-* cc
+1. 为每个单词生成相对应的特征码 pans --> anps pans;
+2. 按照特征码排序;
+3. 按照相同的特征码，提取相应回文单词组。
 
 #+begin_src c++
+#include <iostream> // NOLINT
+using std::cout;
+using std::endl;
+using std::cin;
+#include <string>
+using std::string;
+#include <vector>
+using std::vector;
+#include <map>
+using std::multimap;
+#include <algorithm>
+using std::sort;
+#include <utility>
+using std::pair;
 
+struct classcomp {
+  bool operator() (const string &lhs, const string &rhs) const {
+    if (lhs.compare(rhs) < 0) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+};
+
+bool stringcomp(char a, char b) {
+  return a < b;
+}
+
+void signWord(multimap<string, string, classcomp> *words_map,
+              const string &word) {
+  string sign = word;
+  sort(sign.begin(), sign.end(), stringcomp);
+  words_map->insert(pair<string, string>(sign, word));
+}
+
+void squash(multimap<string, string, classcomp> *words_map,
+            vector<vector<string> > *anagram_words) {
+  string old_sig;
+  old_sig = words_map->begin()->first;
+  vector<string> anagram_vector;
+  for (multimap<string, string, classcomp>::iterator it = words_map->begin();
+       it != words_map->end(); ++it) {
+    if ((*it).first == old_sig) {
+      anagram_vector.push_back((*it).second);
+    } else {
+      anagram_words->push_back(anagram_vector);
+      old_sig = (*it).first;
+      anagram_vector.clear();
+      anagram_vector.push_back(old_sig);
+    }
+  }
+}
+
+int main(int argc, char *argv[]) {
+  string word;
+  multimap<string, string, classcomp> *words_map = new
+      multimap<string, string, classcomp>();
+  while (cin >> word) {
+    signWord(words_map, word);
+  }
+  vector<vector<string> > *anagram_words = new vector<vector<string> >();
+  squash(words_map, anagram_words);
+
+  for (vector<vector<string> >::iterator it = anagram_words->begin();
+       it != anagram_words->end(); ++it) {
+    for (vector<string>::iterator it_inter = it->begin();
+        it_inter != it->end(); ++it_inter) {
+      cout << *it_inter << " ";
+    }
+    cout << endl;
+  }
+
+  return 0;
+}
 #+end_src
+* Problems
+** 1
+给一个单词，在字典中找出它的所有回文单词。
+
+1. 不能预处理词典。
+   顺序的读取词典，算出每个单词的特征码，与给定单词的特征码比较
+2. 可以预处理
+   读取词典，算出每个单词的特征码，并按照特征码排序。
+   二分搜索与给定单词特征码相等的回文单词。
+** 2
+给定一个包含4300000000个32位整数的顺序文件，请问如何找到一个至少出现两
+次的整数？
+
+*** 内存足够
+bitmap映射法：
+1. 申请足够的bit位，并初始化为0;
+2. 把每个数一一映射到内存中相应bit位，若发现相应位置为0,则置为1,反之，
+   找到重复元素。
+
+*** 内存不够
+4300000000大于2的32次方，同上面找缺失元素类似
+1. 扫描数字文件，以第一个比特位是否为0,分成两组：是0的一组为组0，是1的
+   一组为组1;
+2. 若组0个数<组1个数，那么缺失数这一位是1，Step 3选择组0;
+   若组1个数<组0个数，那么缺失数这一位是0，Step 3选组组1;
+   若相等，随便选一组（两组中都有重复数，这里仅找出一个缺失数），并相
+   应得到么缺失数这一位是;
+3. 回到Step 1, 扫描文件为Step 2所选取的，扫描比特位的位置+1。
+
+*** 若总数并不大于范围数
+一个大小为n的数组，里面的数范围[0,n-1],有不确定的重复元素，找到至少一
+个重复元素，要求 $\mathcal{O}(1)$ 空间和 $\mathcal{O}(N)$ 时间。
+
+利用Radix排序的思想实现：
+#+begin_src c++
+enum FindErrors {
+  kFind = 0,
+  kNotFind,
+};
+
+FindErrors RadixFindDuplicate(int *array, int n, int *dup_num) {
+  for (int i = 0; i < n; ++i) {
+    while (i != array[i]) {
+      if (array[i] == array[array[i]]) {
+        *dup_num = array[i];
+        return kFind;
+      }
+      swap(array[i], array[array[i]]);
+    }
+  }
+  return kNotFind;
+}
+#+end_src
+** 3
+参考如上问题A。
+** 4
+比较书中问题A的3个不同算法。
+
+缓存机制影响。
+** 5
+翻转abc数组到cba。
+
+1. 翻转a， a^r b c,
+2. 翻转b， a^r b^r c,
+3. 翻转c， a^r b^r c^r ,
+4. 整个翻转， cba.
+** 6
+9键电话拨号，号码上有字母，拨一个号产生一个英文名字序列。现在给出一个
+名字的拨号序列，找出电话本冲突的名字？
+
+1. 算出所有电话本里名字对应的拨号序列。
+2. 二分法：排序拨号序列，然后用给出的拨号序列二分搜索找出所有相同的序
+   列所对应的人名。
+   Hash或数据库：把拨号需类hash化或存储在数据库中，然后用给定的拨号序
+   列直接查找得到相应人名。
+** 7
+转置矩阵。
+
+为每条记录加上行号与列号。然后调用排序算法，先按列排序，然后按行排序。
+最后删除行号与列号得到转置矩阵。
+
+#+begin_src c++
+struct MatrixElem {
+  MatrixElem(int i_data, int i_row, int i_col) {
+    data = i_data;
+    row = i_row;
+    col = i_col;
+  }
+  int data;
+  int row;
+  int col;
+};
+  
+/*bool RowComp(const MatrixElem &lhs, const MatrixElem &rhs) {
+  return lhs.row < rhs.row;
+  }*/
+
+bool MatrixElemComp(const MatrixElem &lhs, const MatrixElem &rhs) {
+  if (lhs.col == rhs.col) {
+    return lhs.row < rhs.row;
+  } else {
+    return lhs.col < rhs.col;
+  }
+}
+
+void TransposeMatrix(const vector<vector<int> > &matrix, 
+                     vector<vector<int> > *trans_matrix) {
+  vector<MatrixElem> matrix_vector;
+  int n_row;
+  int n_col;
+  n_row = matrix.size();
+  if (n_row < 1) {
+    return;
+  }
+  n_col = matrix[0].size();
+  
+  for (int row = 0; row < n_row; ++row) {
+    for (int col = 0; col < n_col; ++col) {
+      MatrixElem elem = MatrixElem(matrix[row][col], row, col);
+      matrix_vector.push_back(elem);
+    }
+  }
+
+  sort(matrix_vector.begin(), matrix_vector.end(), MatrixElemComp);
+
+  trans_matrix->resize(n_row);
+  for (int row = 0;  row < n_row; ++row) {
+    (trans_matrix->at(row)).resize(n_col);
+  }
+  
+  for(int i = 0; i < matrix_vector.size(); ++i) {
+    (*trans_matrix)[i / n_row][i % n_row] = matrix_vector[i].data;
+  }
+}
+#+end_src
+** 8
+给定n个实数，一个实数t，和整数k，如何快速确定是否存在一个k元子集，其元
+素之和不超过t。
+
+也就是找出n个中的k个最小数问题。
+
+*** 堆
+1. 建立一个k大小的最大堆;
+2. 遍历n个实数，与最大堆比较
+3. 最大堆k个元素即k个最小值，相加所有与t比较。
+算法复杂度：  $\mathcal{O}(n*logk)$ 。
+*** Random Selection
+1. 随机选定一个值作为pivot，然后通过swap，使得最终pivot左边的数都小于
+   pivot，pivot右边的数都大于pivot。
+2. 如果返回pivot的index小于k，则在pivot的右半段递归查找。
+3. 如果返回pivot的index大于k，则在pivot的做半段递归查找。
+
+#+begin_src c++
+unsigned int seed = time(NULL);
+int randint(int m, int n) {
+  return m + rand_r(&seed) / (RAND_MAX / (n + 1 - m) + 1);
+}
+
+void RandomSelectionK(int *array, int l, int u, int k) {
+  if (l >= u) {
+    return;
+  }
+  swap(array[l], array[randint(l, u)]);
+  int pivot = array[l];
+  int i = l;
+  int j = u + 1;
+  while (true) {
+    do {
+      ++i;
+    } while (i <= u && array[i] < pivot);
+    do {
+      --j;
+    } while (array[j] > pivot);
+    if (i > j) {
+      break;
+    }
+    swap(array[i], array[j]);
+  }
+  swap(array[l], array[j]);
+  if (j < k) {
+    RandomSelectionK(array, j + 1, u, k);
+  } else if (j > k) {
+    RandomSelectionK(array, l, j - 1, k);
+  }
+}
+#+end_src
+
+算法平均时间复杂度： $\mathcal{O}(n)$ 。
+
 

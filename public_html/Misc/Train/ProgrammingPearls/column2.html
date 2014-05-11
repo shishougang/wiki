@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Programming Pearls: Column2</title>
-<!-- 2014-05-09 Fri 23:34 -->
+<!-- 2014-05-11 Sun 16:32 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -193,9 +193,15 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2">Problems</a>
 <ul>
 <li><a href="#sec-2-1">1</a></li>
+<li><a href="#sec-2-2">2</a></li>
+<li><a href="#sec-2-3">3</a></li>
+<li><a href="#sec-2-4">4</a></li>
+<li><a href="#sec-2-5">5</a></li>
+<li><a href="#sec-2-6">6</a></li>
+<li><a href="#sec-2-7">7</a></li>
+<li><a href="#sec-2-8">8</a></li>
 </ul>
 </li>
-<li><a href="#sec-3">cc</a></li>
 </ul>
 </div>
 </div>
@@ -211,7 +217,6 @@ for the JavaScript code in this tag.
 32位数？有足够的内存如何解决？如果你可以用很多外部存储文件但是只有几百个字节的主内存，如何解决？
 </p>
 </div>
-
 <ul class="org-ul"><li>足够的内存<br  /><div class="outline-text-4" id="text-1-1-1">
 <p>
 利用Column1的比特映射技能，
@@ -228,7 +233,59 @@ for the JavaScript code in this tag.
 </div>
 </li>
 
-<li>有限的内存<br  /></li></ul>
+<li>有限的内存<br  /><div class="outline-text-4" id="text-1-1-2">
+<p>
+Ed Reingold 的方法：
+</p>
+<ol class="org-ol">
+<li>扫描数字文件，以第一个比特位是否为0,分成两组：是0的一组为组0，是1的一组为组1;
+</li>
+<li>若组0个数&lt;组1个数，那么缺失数这一位是0，Step 3选择组0;
+若组1个数&lt;组0个数，那么缺失数这一位是1，Step 3选组组1;
+若相等，随便选一组（两组中都有缺失数，这里仅找出一个缺失数），并相应得到么缺失数这一位是;
+</li>
+<li>回到Step 1, 扫描文件为Step 2所选取的，扫描比特位的位置+1。
+</li>
+</ol>
+
+<p>
+这里以两组内存数组代表外部存储文件：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">find_missing</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nbits</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">leading_zero</span>[len / 2 + 1];
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">leading_one</span>[len / 2 + 1];
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = len;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">res</span> = 0;
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">p_in</span> = array;
+
+  <span style="color: #00ffff;">while</span> (nbits--) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count_leading_zero</span> = 0;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count_leading_one</span> = 0;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">leading_bit</span> = 1 &lt;&lt; nbits;
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; n; ++i) {
+      <span style="color: #00ffff;">if</span> (p_in[i] &amp; leading_bit) {
+        leading_one[count_leading_one++] = p_in[i];
+      } <span style="color: #00ffff;">else</span> {
+        leading_zero[count_leading_zero++] = p_in[i];
+      }
+    }
+    <span style="color: #00ffff;">if</span> (count_leading_one &lt;= count_leading_zero) {
+      res |= leading_bit;
+      n = count_leading_one;
+      p_in = leading_one;
+    } <span style="color: #00ffff;">else</span> {
+      n = count_leading_zero;
+      p_in = leading_zero;
+    }
+  }
+  <span style="color: #00ffff;">return</span> res;
+}
+</pre>
+</div>
+</div>
+</li></ul>
 </div>
 <div id="outline-container-sec-1-2" class="outline-3">
 <h3 id="sec-1-2">B</h3>
@@ -238,37 +295,568 @@ for the JavaScript code in this tag.
 defghabc。
 </p>
 </div>
-</div>
 
+<ul class="org-ul"><li>Juggling法<br  /><div class="outline-text-4" id="text-1-2-1">
+<p>
+是把前面的元素翻转到后面，逐个移位，翻转位为k：
+</p>
+<ol class="org-ol">
+<li>t存储元素 <code>x[0]</code> ;
+</li>
+<li>移动 <code>x[k]</code> &#x2013;&gt; <code>x[0]</code>, <code>x[2k]</code> &#x2013;&gt; <code>x[k]</code>, 并偏移i×k是总数n的模;
+</li>
+<li>当 <code>(i*k)%n</code> 回到 Step 1中的起始元素时，用t赋值，并停止Step 2
+</li>
+<li>若所有元素都得到移动，结束整个算法，若有元素没有得到移动，选取Step 1中的下一个元素啊继续进行Step1-4.
+</li>
+</ol>
+
+<p>
+在Step4中判断所有元素是否得到移动，比较不易，那么如果知道一共要进行
+Step1-4几次呢？
+</p>
+
+<p>
+Step1的起始位i，Step2中移位位置 <code>(i+j*k)/n</code> ,什么时候等于i呢？
+j*k第一次被k整除，也就是j*k是k与n的最小工倍数（lcm, least common
+multiple), Step1-4运行一次移动 <code>lcm/k</code> 个元素，一共需要次数
+<code>n/(lcm/k)=n*k/lcm</code> 也就是k与n的最大公约数。
+</p>
+
+<p>
+Step1-4一共运行n和k的最大公约数次。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">gcd</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>) {
+  <span style="color: #00ffff;">if</span> (m &lt; n) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">temp</span>;
+    temp = m;
+    m = n;
+    n = m;
+  }
+  <span style="color: #00ffff;">while</span> (n) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">temp</span> = n;
+    n = m % n;
+    m = temp;
+  }
+  <span style="color: #00ffff;">return</span> m;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">rotate</span>(<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">num_gcd</span> = gcd(n, k);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; num_gcd; ++i) {
+    <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">temp</span> = array[i];
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">prev</span> = i;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">next</span>;
+    <span style="color: #00ffff;">while</span> (<span style="color: #7fffd4;">true</span>) {
+      next = prev + k;
+      <span style="color: #00ffff;">if</span> (next &gt;= n) {
+        next -= n;
+      }
+      <span style="color: #00ffff;">if</span> (next == i) {
+        <span style="color: #00ffff;">break</span>;
+      }
+      array[prev] = array[next];
+      prev = next;
+    }
+    array[prev] = temp;
+  }
+}
+</pre>
+</div>
+</div>
+</li>
+
+<li>Block Swap法<br  /><div class="outline-text-4" id="text-1-2-2">
+<p>
+翻转数组x，相当于翻转ab到ba，假如a的长度短于b，
+</p>
+<ol class="org-ol">
+<li>把b分为ab<sub>l</sub> b<sub>r</sub> 并且 b<sub>r</sub> 长度与a相同
+</li>
+<li>交换a与b<sub>r</sub> 得到 b<sub>r</sub> b<sub>l</sub> a;
+</li>
+<li>a达到最终位置，继续处理 b<sub>r</sub> b<sub>l</sub> ，回到step 1.
+</li>
+</ol>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>) {
+  <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">swap array[m..m+len], array[n..n+len]</span>
+  <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; len; ++i) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">temp</span> = array[m + i];
+    array[m + i] = array[n + i];
+    array[n + i] = temp;
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">rotate</span>(<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>) {
+  <span style="color: #00ffff;">if</span> (k == 0 || k == n) {
+    <span style="color: #00ffff;">return</span>;
+  }
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">array[0..p-i-1]:final stage</span>
+<span style="color: #ff7f24;">   * array[p-i..p-1]:the string a to be swaped</span>
+<span style="color: #ff7f24;">   * array[p..p+j-1]:the string b to be swaped</span>
+<span style="color: #ff7f24;">   * array[p+j..n-1]:final stage</span>
+<span style="color: #ff7f24;">   */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">p</span> = k;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = k;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = n - k;
+  <span style="color: #00ffff;">while</span> (i != j) {
+    <span style="color: #00ffff;">if</span> (i &lt; j) {
+      swap(array, p - i, p + j - i, i);
+      j -= i;
+    } <span style="color: #00ffff;">else</span> {
+      swap(array, p - i, p, j);
+      i -= j;
+    }
+  }
+  swap(array, p - i, p, i);
+}
+</pre>
+</div>
+</div>
+</li>
+
+<li>Reversal法<br  /><div class="outline-text-4" id="text-1-2-3">
+<p>
+翻转数组x，相当于翻转ab到ba
+</p>
+<ol class="org-ol">
+<li>翻转a， a<sup>r</sup> b,
+</li>
+<li>翻转b， a<sup>r</sup> b<sup>r</sup>,
+</li>
+<li>整个翻转， ba
+</li>
+</ol>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">reverse</span>(<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">e</span>) {
+  <span style="color: #00ffff;">while</span> (s &lt; e) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">temp</span> = array[s];
+    array[s] = array[e];
+    array[e] = temp;
+    s++;
+    e--;
+  }
+}
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">rotate</span>(<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>) {
+  reverse(array, 0, k - 1);
+  reverse(array, k, n - 1);
+  reverse(array, 0, n - 1);
+}
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
 <div id="outline-container-sec-1-3" class="outline-3">
 <h3 id="sec-1-3">C</h3>
 <div class="outline-text-3" id="text-1-3">
 <p>
 在一个英文字典中，找出所有回文单词。
 </p>
+
+<ol class="org-ol">
+<li>为每个单词生成相对应的特征码 pans &#x2013;&gt; anps pans;
+</li>
+<li>按照特征码排序;
+</li>
+<li>按照相同的特征码，提取相应回文单词组。
+</li>
+</ol>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span> <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">cout</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">endl</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">cin</span>;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span>;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;vector&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">vector</span>;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;map&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">multimap</span>;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;algorithm&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">sort</span>;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;utility&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">pair</span>;
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">classcomp</span> {
+  <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">()</span> (<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">lhs</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">rhs</span>) <span style="color: #00ffff;">const</span> {
+    <span style="color: #00ffff;">if</span> (lhs.compare(rhs) &lt; 0) {
+      <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+    } <span style="color: #00ffff;">else</span> {
+      <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+    }
+  }
+};
+
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">stringcomp</span>(<span style="color: #98fb98;">char</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">b</span>) {
+  <span style="color: #00ffff;">return</span> a &lt; b;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">signWord</span>(<span style="color: #98fb98;">multimap</span>&lt;<span style="color: #98fb98;">string</span>, <span style="color: #98fb98;">string</span>, <span style="color: #98fb98;">classcomp</span>&gt; *<span style="color: #eedd82;">words_map</span>,
+              <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">word</span>) {
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">sign</span> = word;
+  sort(sign.begin(), sign.end(), stringcomp);
+  words_map-&gt;insert(pair&lt;string, string&gt;(sign, word));
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">squash</span>(<span style="color: #98fb98;">multimap</span>&lt;<span style="color: #98fb98;">string</span>, <span style="color: #98fb98;">string</span>, <span style="color: #98fb98;">classcomp</span>&gt; *<span style="color: #eedd82;">words_map</span>,
+            <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">string</span>&gt; &gt; *<span style="color: #eedd82;">anagram_words</span>) {
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">old_sig</span>;
+  old_sig = words_map-&gt;begin()-&gt;first;
+  <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">string</span>&gt; <span style="color: #eedd82;">anagram_vector</span>;
+  <span style="color: #00ffff;">for</span> (multimap&lt;string, string, classcomp&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it</span> = words_map-&gt;begin();
+       it != words_map-&gt;end(); ++it) {
+    <span style="color: #00ffff;">if</span> ((*it).first == old_sig) {
+      anagram_vector.push_back((*it).second);
+    } <span style="color: #00ffff;">else</span> {
+      anagram_words-&gt;push_back(anagram_vector);
+      old_sig = (*it).first;
+      anagram_vector.clear();
+      anagram_vector.push_back(old_sig);
+    }
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">word</span>;
+  <span style="color: #98fb98;">multimap</span>&lt;<span style="color: #98fb98;">string</span>, <span style="color: #98fb98;">string</span>, <span style="color: #98fb98;">classcomp</span>&gt; *<span style="color: #eedd82;">words_map</span> = <span style="color: #00ffff;">new</span>
+      <span style="color: #98fb98;">multimap</span>&lt;string, <span style="color: #eedd82;">string</span>, <span style="color: #eedd82;">classcomp</span>&gt;();
+  <span style="color: #00ffff;">while</span> (cin &gt;&gt; word) {
+    signWord(words_map, word);
+  }
+  <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">string</span>&gt; &gt; *<span style="color: #eedd82;">anagram_words</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">vector</span>&lt;string&gt; &gt;();
+  squash(words_map, anagram_words);
+
+  <span style="color: #00ffff;">for</span> (<span style="color: #7fffd4;">vector</span>&lt;<span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">string</span>&gt; &gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it</span> = anagram_words-&gt;begin();
+       it != anagram_words-&gt;end(); ++it) {
+    <span style="color: #00ffff;">for</span> (<span style="color: #7fffd4;">vector</span>&lt;<span style="color: #98fb98;">string</span>&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it_inter</span> = it-&gt;begin();
+        it_inter != it-&gt;end(); ++it_inter) {
+      cout &lt;&lt; *it_inter &lt;&lt; <span style="color: #ffa07a;">" "</span>;
+    }
+    cout &lt;&lt; endl;
+  }
+
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
 </div>
 </div>
+</div>
+
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">Problems</h2>
 <div class="outline-text-2" id="text-2">
 </div><div id="outline-container-sec-2-1" class="outline-3">
 <h3 id="sec-2-1">1</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+给一个单词，在字典中找出它的所有回文单词。
+</p>
+
+<ol class="org-ol">
+<li>不能预处理词典。顺序的读取词典，算出每个单词的特征码，与给定单词的特征码比较
+</li>
+<li>可以预处理读取词典，算出每个单词的特征码，并按照特征码排序。二分搜索与给定单词特征码相等的回文单词。
+</li>
+</ol>
 </div>
 </div>
-<div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">cc</h2>
-<div class="outline-text-2" id="text-3">
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">2</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+给定一个包含4300000000个32位整数的顺序文件，请问如何找到一个至少出现两次的整数？
+</p>
+</div>
+
+<ul class="org-ul"><li>内存足够<br  /><div class="outline-text-4" id="text-2-2-1">
+<p>
+bitmap映射法：
+</p>
+<ol class="org-ol">
+<li>申请足够的bit位，并初始化为0;
+</li>
+<li>把每个数一一映射到内存中相应bit位，若发现相应位置为0,则置为1,反之，找到重复元素。
+</li>
+</ol>
+</div>
+</li>
+<li>内存不够<br  /><div class="outline-text-4" id="text-2-2-2">
+<p>
+4300000000大于2的32次方，同上面找缺失元素类似
+</p>
+<ol class="org-ol">
+<li>扫描数字文件，以第一个比特位是否为0,分成两组：是0的一组为组0，是1的一组为组1;
+</li>
+<li>若组0个数&lt;组1个数，那么缺失数这一位是1，Step 3选择组0;
+若组1个数&lt;组0个数，那么缺失数这一位是0，Step 3选组组1;
+若相等，随便选一组（两组中都有重复数，这里仅找出一个缺失数），并相应得到么缺失数这一位是;
+</li>
+<li>回到Step 1, 扫描文件为Step 2所选取的，扫描比特位的位置+1。
+</li>
+</ol>
+</div>
+</li>
+<li>若总数并不大于范围数<br  /><div class="outline-text-4" id="text-2-2-3">
+<p>
+一个大小为n的数组，里面的数范围[0,n-1],有不确定的重复元素，找到至少一个重复元素，要求 \(\mathcal{O}(1)\) 空间和 \(\mathcal{O}(N)\) 时间。
+</p>
+
+<p>
+利用Radix排序的思想实现：
+</p>
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c++"><span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">FindErrors</span> {
+  <span style="color: #eedd82;">kFind</span> = 0,
+  <span style="color: #eedd82;">kNotFind</span>,
+};
+
+<span style="color: #98fb98;">FindErrors</span> <span style="color: #87cefa;">RadixFindDuplicate</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">dup_num</span>) {
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; n; ++i) {
+    <span style="color: #00ffff;">while</span> (i != array[i]) {
+      <span style="color: #00ffff;">if</span> (array[i] == array[array[i]]) {
+        *dup_num = array[i];
+        <span style="color: #00ffff;">return</span> kFind;
+      }
+      swap(array[i], array[array[i]]);
+    }
+  }
+  <span style="color: #00ffff;">return</span> kNotFind;
+}
+</pre>
 </div>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">3</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+参考如上问题A。
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">4</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+比较书中问题A的3个不同算法。
+</p>
+
+<p>
+缓存机制影响。
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5">5</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+翻转abc数组到cba。
+</p>
+
+<ol class="org-ol">
+<li>翻转a， a<sup>r</sup> b c,
+</li>
+<li>翻转b， a<sup>r</sup> b<sup>r</sup> c,
+</li>
+<li>翻转c， a<sup>r</sup> b<sup>r</sup> c<sup>r</sup> ,
+</li>
+<li>整个翻转， cba.
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-6" class="outline-3">
+<h3 id="sec-2-6">6</h3>
+<div class="outline-text-3" id="text-2-6">
+<p>
+9键电话拨号，号码上有字母，拨一个号产生一个英文名字序列。现在给出一个名字的拨号序列，找出电话本冲突的名字？
+</p>
+
+<ol class="org-ol">
+<li>算出所有电话本里名字对应的拨号序列。
+</li>
+<li>二分法：排序拨号序列，然后用给出的拨号序列二分搜索找出所有相同的序列所对应的人名。
+Hash或数据库：把拨号需类hash化或存储在数据库中，然后用给定的拨号序列直接查找得到相应人名。
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-7" class="outline-3">
+<h3 id="sec-2-7">7</h3>
+<div class="outline-text-3" id="text-2-7">
+<p>
+转置矩阵。
+</p>
+
+<p>
+为每条记录加上行号与列号。然后调用排序算法，先按列排序，然后按行排序。最后删除行号与列号得到转置矩阵。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MatrixElem</span> {
+  <span style="color: #87cefa;">MatrixElem</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i_data</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i_row</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i_col</span>) {
+    data = i_data;
+    row = i_row;
+    col = i_col;
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">data</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">row</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">col</span>;
+};
+
+<span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">bool RowComp(const MatrixElem &amp;lhs, const MatrixElem &amp;rhs) {</span>
+<span style="color: #ff7f24;">  return lhs.row &lt; rhs.row;</span>
+<span style="color: #ff7f24;">  }*/</span>
+
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">MatrixElemComp</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">MatrixElem</span> &amp;<span style="color: #eedd82;">lhs</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">MatrixElem</span> &amp;<span style="color: #eedd82;">rhs</span>) {
+  <span style="color: #00ffff;">if</span> (lhs.col == rhs.col) {
+    <span style="color: #00ffff;">return</span> lhs.row &lt; rhs.row;
+  } <span style="color: #00ffff;">else</span> {
+    <span style="color: #00ffff;">return</span> lhs.col &lt; rhs.col;
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">TransposeMatrix</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">int</span>&gt; &gt; &amp;<span style="color: #eedd82;">matrix</span>, 
+                     <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">int</span>&gt; &gt; *<span style="color: #eedd82;">trans_matrix</span>) {
+  <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">MatrixElem</span>&gt; <span style="color: #eedd82;">matrix_vector</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n_row</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n_col</span>;
+  n_row = matrix.size();
+  <span style="color: #00ffff;">if</span> (n_row &lt; 1) {
+    <span style="color: #00ffff;">return</span>;
+  }
+  n_col = matrix[0].size();
+
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">row</span> = 0; row &lt; n_row; ++row) {
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">col</span> = 0; col &lt; n_col; ++col) {
+      <span style="color: #98fb98;">MatrixElem</span> <span style="color: #eedd82;">elem</span> = MatrixElem(matrix[row][col], row, col);
+      matrix_vector.push_back(elem);
+    }
+  }
+
+  sort(matrix_vector.begin(), matrix_vector.end(), MatrixElemComp);
+
+  trans_matrix-&gt;resize(n_row);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">row</span> = 0;  row &lt; n_row; ++row) {
+    (trans_matrix-&gt;at(row)).resize(n_col);
+  }
+
+  <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; matrix_vector.size(); ++i) {
+    (*trans_matrix)[i / n_row][i % n_row] = matrix_vector[i].data;
+  }
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-8" class="outline-3">
+<h3 id="sec-2-8">8</h3>
+<div class="outline-text-3" id="text-2-8">
+<p>
+给定n个实数，一个实数t，和整数k，如何快速确定是否存在一个k元子集，其元素之和不超过t。
+</p>
+
+<p>
+也就是找出n个中的k个最小数问题。
+</p>
+</div>
+
+<ul class="org-ul"><li>堆<br  /><div class="outline-text-4" id="text-2-8-1">
+<ol class="org-ol">
+<li>建立一个k大小的最大堆;
+</li>
+<li>遍历n个实数，与最大堆比较
+</li>
+<li>最大堆k个元素即k个最小值，相加所有与t比较。
+</li>
+</ol>
+<p>
+算法复杂度：  \(\mathcal{O}(n*logk)\) 。
+</p>
+</div>
+</li>
+
+<li>Random Selection<br  /><div class="outline-text-4" id="text-2-8-2">
+<ol class="org-ol">
+<li>随机选定一个值作为pivot，然后通过swap，使得最终pivot左边的数都小于
+pivot，pivot右边的数都大于pivot。
+</li>
+<li>如果返回pivot的index小于k，则在pivot的右半段递归查找。
+</li>
+<li>如果返回pivot的index大于k，则在pivot的做半段递归查找。
+</li>
+</ol>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">seed</span> = time(<span style="color: #7fffd4;">NULL</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">randint</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>) {
+  <span style="color: #00ffff;">return</span> m + rand_r(&amp;seed) / (RAND_MAX / (n + 1 - m) + 1);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">RandomSelectionK</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>) {
+  <span style="color: #00ffff;">if</span> (l &gt;= u) {
+    <span style="color: #00ffff;">return</span>;
+  }
+  swap(array[l], array[randint(l, u)]);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pivot</span> = array[l];
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = l;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = u + 1;
+  <span style="color: #00ffff;">while</span> (<span style="color: #7fffd4;">true</span>) {
+    <span style="color: #00ffff;">do</span> {
+      ++i;
+    } <span style="color: #00ffff;">while</span> (i &lt;= u &amp;&amp; array[i] &lt; pivot);
+    <span style="color: #00ffff;">do</span> {
+      --j;
+    } <span style="color: #00ffff;">while</span> (array[j] &gt; pivot);
+    <span style="color: #00ffff;">if</span> (i &gt; j) {
+      <span style="color: #00ffff;">break</span>;
+    }
+    swap(array[i], array[j]);
+  }
+  swap(array[l], array[j]);
+  <span style="color: #00ffff;">if</span> (j &lt; k) {
+    RandomSelectionK(array, j + 1, u, k);
+  } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (j &gt; k) {
+    RandomSelectionK(array, l, j - 1, k);
+  }
+}
+</pre>
+</div>
+
+<p>
+算法平均时间复杂度： \(\mathcal{O}(n)\) 。
+</p>
+</div>
+</li></ul>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-05-09 Fri 23:34</p>
+<p class="date">Created: 2014-05-11 Sun 16:32</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
