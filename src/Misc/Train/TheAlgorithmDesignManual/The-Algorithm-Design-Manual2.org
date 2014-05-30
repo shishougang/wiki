@@ -1,0 +1,339 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-3.org
+#+TITLE: Algorithm Design Manual Chapter 2
+#+OPTIONS: num:nil H:2
+
+* Book Notes
+Our two most important tools are (1) the RAM model of
+computation and (2) the asymptotic analysis of worst-case complexity.
+
+* Exercises
+** 1
+What value is returned by the following function? Express your answer
+as a function of n. Give the worst-case running time using the Big Oh
+notation.
+
+#+begin_src sh  
+function mystery(n)
+      r:=0
+      for i:=1 to n-1 do
+          for j:=i+1 to n do
+              for k:=1 to j do
+                  r:=r+1
+       return(r)
+#+end_src
+
+\begin{equation}
+\begin{align}
+\sum_{i=1}^{n-1}\sum_{j=i+1}^{n}\sum_{k=1}^{j}1 = 
+\sum_{i=1}^{n-1}\sum_{j=i+1}^{n}j =
+\sum_{i=1}^{n-1}(\sum_{j=1}^{n}j - \sum_{j=1}^{i}j) = \\
+\sum_{i=1}^{n-1}(\frac{n(n+1)}{2} - \frac{i(i+1)}{2} = 
+\frac{1}{2}\sum_{i=1}^{n-1}(n^2+n-i^2-i) = \\
+\frac{1}{2}((n-1)n^2+(n-1)n-(\frac{n(n+1)(2n+1)}{6}-n^2)-(\frac{n(n+1)}{2}-n))
+\end{align}
+\end{equation}
+
+Time: O(n^3)
+** 2
+What value is returned by the following function? Express your answer as a
+function of n. Give the worst-case running time using Big Oh notation.
+
+#+begin_src sh
+ function pesky(n)
+       r:=0
+       for i:=1 to n do
+           for j:=1 to i do
+               for k:=j to i+j do
+                   r:=r+1
+       return(r)
+#+end_src
+\begin{equation}
+\begin{align}
+f(n) = \frac{n(n+1)(n+2)}{3}
+\end{align}
+\end{equation}
+
+Time: O(n^3).
+** 3
+What value is returned by the following function? Express your answer as a
+function of n. Give the worst-case running time using Big Oh notation.
+
+#+begin_src sh
+function prestiferous(n)
+       r:=0
+       for i:=1 to n do
+           for j:=1 to i do
+               for k:=j to i+j do
+                   for l:=1 to i+j-k do
+                       r:=r+1
+       return(r)
+#+end_src
+
+\begin{equation}
+\begin{align}
+f(n) = \frac{n(n+1)(n+2)}{3}
+\end{align}
+\end{equation}
+
+Time: O(n^4).
+** 19
+\begin{equation}
+\begin{align}
+(1/3)^n < 6 < loglogn < logn = lnn < (logn)^2 < n^\frac{1}{3}+logn < \sqrt{n}
+ < \frac{n}{logn} < n < nlogn < n^2 = n^2+logn < n^3 < n-n^3+7n^5 < (3/2)^2 
+= 2^n < n!
+\end{align}
+\end{equation}
+** 34
+Assume that Christmas hasndays. Exactly how many presents did my “true
+love” send me? (Do some research if you do not understand this
+question.)
+
+假设一共有ｎ天，每i天收到的礼物数是： 
+\begin{equation}
+\begin{align}
+p_i = \sum_{k=1}^{i}k
+\end{align}
+\end{equation}
+
+总的礼物数：
+\begin{equation}
+\begin{align}
+\sum_{i=1}^{n} p_i = \sum_{i=1}^{n}\sum_{k=1}^{i}k=\frac{n^3+3n^2+2n}{6}
+\end{align}
+\end{equation}
+** 43
+You are given a set S of n numbers. You must pick a subset S' of k
+numbers from S such that the probability of each element of S
+occurring in S' is equal (i.e., each is selected with probability k /
+n). You may make only one pass over the numbers. What if n is unknown?
+
+[[http://wiki.dreamrunner.org/public_html/Algorithms/Theory%20of%20Algorithms/Reservoir%20Sampling.html][Reservoir sampling issue]].
+** 44
+ We have 1,000 data items to store on 1,000 nodes. Each node can store
+ copies of exactly three different items. Propose a replication scheme
+ to minimize data loss as nodes fail. What is the expected number of
+ data entries that get lost when three random nodes fail?
+
+不考虑RAID的XOR做法这里。
+
+1000个数据做3份拷贝，如何做3份拷贝呢？
+
+1. 随机的3个点失败只损失一个数据
+3份拷贝以相邻一格的方式存储，如下
+#+begin_src sh
+nodes:    1       2        3   ...   1000
+copy1:   data1    data2    data3 ..  data1000
+copy2:   data1000 data1    data2 ..  data999
+copy3:   data999  data1000 data1 ..  data998
+#+end_src
+
+随机选取3个点的组合个数： $\binom{1000}{3}$ 
+其中丢失数据点的组合个数： 1000, 每种组合丢失一个数据
+所以丢失数据期望 $1000 / \binom{1000}{3} = 6.01804e-06$ 
+
+2. 随机的3个点失败损失3个数据
+每3个点共享3个拷贝点，如下
+#+begin_src sh
+nodes:    1       2        3   ...   1000
+copy1:   data1    data2    data3 ..  data1000
+copy2:   data3    data1    data2 ..  data999
+copy3:   data2    data3    data1 ..  data998
+#+end_src
+随机选取3个点的组合个数： $\binom{1000}{3}$ 
+其中丢失数据点的组合个数： 1000/3, 每种组合丢失3个数据，
+所以丢失数据期望 $1000/3×3 / \binom{1000}{3} = 6.01804e-06$ 
+** 45
+Consider the following algorithm to find the minimum element in an
+array of numbers . One extra variable tmp is allocated to hold the
+current minimum value. Start from =A[0]=; "tmp" is compared against
+=A[1], A[2], , A[N]= in order. When =A[i] < tmp, tmp = A[i]=. What is the
+expected number of times that the assignment operation tmp = A[i] is
+performed?
+
+期望的次数是第ｎ个元素是最小值的概率的总和。ｎ个元素平均分布，任意元素
+是最小值的概率是1/ｎ。
+
+~E(n) = E(n-1) +1/n， E[1] = 1~
+
+\begin{equation}
+\begin{align}
+E(n) = \sum_{i=1}^{n}\frac{1}{i} \approx lnn
+\end{align}
+\end{equation}
+
+** 46
+You have a 100-story building and a couple of marbles. You must
+identify the lowest floor for which a marble will break if you drop it
+from this floor. How fast can you find this floor if you are given an
+infinite supply of marbles? What if you have only two marbles?
+
+1. 无限个玻璃球，采用二分搜索法，celing(log100) = 7. 最快7次。
+2. 如果只有2个玻璃球
+n个球时在总楼层r中某个楼层x抛，两种情况： 1.破碎，剩下的总楼层x-1用剩
+下的n-1个球; 2.没破碎，剩下的总楼层r-x用n个球
+
+如此把问题分解成小问题。如下代码求得最快的次数为14。
+其中一条最坏情况：
+9-->22-->34-->45-->55-->64-->72-->79-->85-->90-->94-->97-->99
+
+
+#+begin_src c++
+/* Drop Marbles
+   n: num of marbles
+   r: num of floors
+   drop_qeq: the drop sequence
+   marble_drop: minimum number of trails needed to find the critical floor in
+   worst case
+   marble_drop[n][r] = 1 + min{max(marble_drop[n-1][x-1], marble[n][r-x]) :
+   x in {1,2,...,r}}
+*/
+int DropMarbles(int n, int r, int **drop_seq) {
+  int marble_drop[n+1][r+1];
+  int i, j;
+  for (j = 0; j <= r; ++j) {
+    marble_drop[1][j] = j;
+  }
+  for (i = 0; i <= n; ++i) {
+    marble_drop[i][1] = 1;
+    marble_drop[i][0] = 0;
+  }
+  int min_sofar;
+  for (i = 2; i <= n; ++i) {
+    for (j = 2; j <= r; ++j) {
+      marble_drop[i][j] = numeric_limits<int>::max();
+      for (int x = 1; x <= j; ++x) {
+        min_sofar = 1 + max(marble_drop[i-1][x-1], marble_drop[i][j-x]);
+        if (min_sofar < marble_drop[i][j]) {
+          marble_drop[i][j] = min_sofar;
+          drop_seq[i][j] = x;
+        }
+      }
+    }
+  }
+  return marble_drop[n][r];
+}
+#+end_src
+
+** 47
+You are given 10 bags of gold coins. Nine bags contain coins that each
+weigh 10 grams. One bag contains all false coins that weigh one gram
+less. You must identify this bag in just one weighing. You have a
+digital balance that reports the weight of what is placed on it.
+
+一共10袋bag1-10, 分别从bag1中取1个金币，bag2中取2个金币……bag10中取10
+个金币，称重总的重量W。如果每个金币都是10grams的话，所以金币总重量
+是550。N=550-W。得到缺失的重量，也是bag的号数，所以bagN中含有错误金币。
+
+** 48
+You have eight balls all of the same size. Seven of them weigh the
+same, and one of them weighs slightly more. How can you find the ball
+that is heavier by using a balance and only two weighings?
+
+8==> 3,3,2
+
+1. 称重3和3两组
+2. 若不同，选出重的一组，3==> 1,1,1 称重1和1,不同，那么重的就是，相同，
+   另外个是。
+3. 若相同，2==>1,1，称重1和1,重的就是
+** 49
+Suppose we start with n companies that eventually merge into one big
+company. How many different ways are there for them to merge?
+
+1. 2个公司(a,b)时，合并只有一种方法[ab]
+2. 当有n个公司时，如何把它用n-1个公司表示，f(n)=f(n-1)g(n)
+3. n个公司第一步从中选择两个公司合并，连带合并后的新公司一共n-1个公司，
+   化简到n-1个公司表示。
+4. n个选2个的组合个数是： $\binom{1000}{2}=n(n-1)/2$
+
+所以
+\begin{equation}
+f(n) = \sum_{i=2}^{n}\frac{i(i-1)}{2} = \frac{n!(n-1)!}{2^{n-2}}
+\end{equation}
+
+** 50
+A Ramanujam number can be written two different ways as the sum of two
+cubes---i.e., there exist distinct a, b, c, and d such that a3 + b3 =
+c3 + d3. Generate all Ramanujam numbers where a,b,c,d < n.
+
+#+begin_src c++
+#include <vector>
+using std::vector;
+
+bool FindEqual(const vector<int> &num_cube, int low, int high, const int &sum,
+               vector<int> *res) {
+  if (low >= high) {
+    return false;
+  }
+  int i, j;
+  i = low;
+  j = high;
+  int add;
+  while (i < j) {
+    add = num_cube[i] + num_cube[j];
+    if (add == sum) {
+      res->push_back(i);
+      res->push_back(j);
+      return true;
+    }
+    if (add > sum) {
+      --j;
+    } else {
+      ++i;
+    }
+  }
+  return false;
+}
+
+void RamanujamNum(int n, vector<vector<int> > *res) {
+  vector<int> num_cube(n);
+  int i, j;
+  for (i = 0; i < n; ++i) {
+    num_cube[i] = i*i*i;
+  }
+  vector<int> ram_num;
+  bool find;
+  for (i = 0; i < n - 1; ++i) {
+    for (j = i + 3; j < n; ++j) {
+      find = FindEqual(num_cube, i+1, j-1, num_cube[i] + num_cube[j], &ram_num);
+      if (find) {
+        ram_num.push_back(i);
+        ram_num.push_back(j);
+        res->push_back(ram_num);
+        ram_num.clear();
+      }
+    }
+  }
+}
+#+end_src
+
+** 51
+Six pirates must divide $300 dollars among themselves. The division is
+to proceed as follows. The senior pirate proposes a way to divide the
+money. Then the pirates vote. If the senior pirate gets at least half
+the votes he wins, and that division remains. If he doesn't, he is
+killed and then the next senior-most pirate gets a chance to do the
+division. Now you have to tell what will happen and why (i.e., how
+many pirates survive and how the division is done)? All the pirates
+are intelligent and the first priority is to stay alive and the next
+priority is to get as much money as possible.
+
+从后往前推
++ 2个海盗，(1, 2) ---> (0, 300)
++ 3个海盗，(1, 2, 3) ---> (1, 0, 299)
++ 4个海盗，(1, 2, 3, 4) ---> (0, 1, 0, 299)
++ 5个海盗，(1, 2, 3, 4, 5) ---> (1, 0, 1, 0, 298)
++ 6个海盗，(1, 2, 3, 4, 5, 6) ---> (0, 1, 0, 1, 298)
+
+** 52
+Reconsider the pirate problem above, where only one indivisible dollar
+is to be divided. Who gets the dollar and how many are killed?
+
++ 2: (1, 2) ---> (0, 1)
++ 3: (1, 2, 3) ---> （1, 0, 0)
++ 4: (1, 2, 3, 4) ---> (0, 0, 1, 0)
++ 5: dead
++ 6: (1, 2, 3, 4, 5, 6) ---> (0, 0, 0, 1, 0, 0)
+要至少一半的同意，间隔要有一半的人会死去才会同意之前那个人，所以之后每
+2+2^K (K>=1)的海盗才能活。
+
