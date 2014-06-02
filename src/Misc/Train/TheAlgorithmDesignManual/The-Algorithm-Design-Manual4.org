@@ -1,0 +1,79 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-3.org
+#+TITLE: Algorithm Design Manual Chapter 4
+#+OPTIONS: num:nil H:2
+
+
+* Book Notes
+** 4.3 Heapsort: Fast Sorting via Data Structures
+*** Where in the Heap?
+Problem: Given an array-based heap on n elements and a real number x,
+efficiently determine whether the kth smallest element in the heap is
+greater than or equal to x. Your algorithm should be O(k) in the
+worst-case, independent of the size of the heap. Hint: you do not have
+to find the kth smallest element; you need only determine its
+relationship to x.
+
+Solution: There are at least two different ideas that lead to correct
+but inefficient algorithms for this problem:
+
+1. Call extract-minktimes, and test whether all of these are less
+   thanx. This explicitly sorts the firstkelements and so gives us
+   more information than the desired answer, but it takes O(klogn) time
+   to do so.
+2. The kth smallest element cannot be deeper than the kth level of the
+   heap, since the path from it to the root must go through elements
+   of decreasing value. Thus we can look at all the elements on the
+   first k levels of the heap, and count how many of them are less
+   thanx, stopping when we either find k of them or run out of
+   elements. This is correct, but takes O(min(n,2^k-1)) time, since
+   the top k elements have 2^k-1 elements.
+
+An O(k) solution can look at only k elements smaller than x, plus at
+most O(k) elements greater than x. Consider the following recursive
+procedure, called at the root with i= 1 with count=k:
+
+#+begin_src c++
+  int heap_compare(priority_queue *q, int i, int count, int x)
+  {
+    if ((count <= 0) || (i > q->n)) return(count);
+    if (q->q[i] < x) {
+      count = heap_compare(q, pq_young_child(i), count-1, x);
+      count = heap_compare(q, pq_young_child(i)+1, count, x);
+    }
+    return(count);
+  }
+#+end_src
+
+If the root of the min-heap is ≥ x, then no elements in the heap can
+be less than x, as by definition the root must be the smallest
+element. This procedure searches the children of all nodes of weight
+smaller than x until either (a) we have found k of them, when it returns
+0, or (b) they are exhausted, when it returns a value greater than
+zero. Thus it will find enough small elements if they exist.
+
+But how long does it take? The only nodes whose children we look at
+are those < x, and at most k of these in total. Each have at most
+visited two children, so we visit at most 3k nodes, for a total time
+of O(k).
+** 4.5 Mergesort: Sorting by Divide-and-Conquer
+Mergesort is a great algorithm for sorting linked lists, because it
+does not rely on random access to elements as does heapsort or
+quicksort. Its primary disadvantage is the need for an auxilliary
+buffer when sorting arrays. It is easy to merge two sorted linked
+lists without using any extra space, by just rearranging the pointers.
+However, to merge two sorted arrays (or portions of an array), we need
+use a third array to store the result of the merge to avoid stepping
+on the component arrays
+
+** 4.6 Quicksort: Sorting by Randomization
+
+* Exercises
+* cc
+
+
+#+begin_src c++
+
+#+end_src
+
+
+
