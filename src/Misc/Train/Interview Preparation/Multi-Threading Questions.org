@@ -1,0 +1,142 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-3.org
+#+TITLE: Multi-Threading Questions
+#+OPTIONS: num:nil H:2
+
+* What is the difference between a thread and a process?
+** heavyweight vs lightweight
+Processes are always used to execute "heavyweight" jobs such as
+running different applications, while threads are always used to
+execute smaller "lightweight" jobs such as auto saving.
+** create 
+New threads are easily created, whereas new processes require
+duplication of the parent process.
+
+Creating a new process can be expensive. It takes time. (A call into
+the operating system is needed, and if the process creation triggers
+process rescheduling activity, the operating system's
+context-switching mechanism will become involved.) IT takes memory.
+(The entire process must be replicated.) 
+
+Threads can be created without replicating an entire process.
+** Sharing Resources
+Independent processes share nothing. Each process runs in a separate
+address space. Changes made to the parent processes donot affect the
+child processes.
+
+Threads share such process resources and global variables and file
+descriptions.  If one thread
+changes the value of any such resource, the change will be evident to
+any other thread in the process, if anyone cares to look. The sharing
+of process resources among threads is one of the multithreaded
+programming model's major performance advantages, as well as one of
+its most difficult programming aspects. Having all of this context
+available to all threads in the same memory facilitates communication
+between threads. However, at the same time, it makes it easy to
+introduce errors of the sort in which one thread affects the value of
+a variable used by another thread in ways the other thread did not
+expect.
+
+Then switching between threads is much simpler and faster then
+switching between processes.
+** Communication
+Threads can directly communicate with other threads of its process;
+processes must use inter-process communication mechanisms to
+communicate with sibling processes.
+
+Multiple processes can use any of the many other UNIX Interprocess
+Communication (IPC) mechanisms: sockets, shared memory, and messages,
+to name a few. The multiprocess version of our program uses shared
+memory, but the other methods are equally valid. Even the waitpid call
+in our program could be used to exchange information, if the program
+checked its return value. However, in the multiprocess world, all
+types of IPC involve a call into the operating system—to initialize
+shared memory or a message structure, for instance. This makes
+communication between processes more expensive than communication
+between threads. Add to this the cost of
+interprocess communication and synchronization of shared data, which
+also may involve calls into the operating system kernel.
+
+When processes
+synchronize, they usually have to issue system calls, a relatively
+expensive operation that involves trapping into the kernel. But
+threads can synchronize by simply monitoring a variable—in other
+words, staying within the user address space of the program.
+** similarities
+A thread can do anything that a process can do. They are both able to
+reproduce(Processes create child process and threads create more
+threads.), and they both have ID, priority and etc.
+
+* primary benefits to multithreading
+http://www.quora.com/What-is-the-difference-between-a-process-and-a-thread
+
+There are four primary benefits to multithreading:
+
++ Programming abstraction. Dividing up work and assigning each
+  division to a unit of execution (a thread) is a natural approach to
+  many problems. Programming patterns that utilize this approach
+  include the reactor, thread-per-connection, and thread pool
+  patterns. Some, however, view threads as an anti-pattern. The
+  inimitable Alan Cox summed this up well with the quote, "threads are
+  for people who can't program state machines."
+
++ Parallelism. In machines with multiple processors, threads provide
+  an efficient way to achieve true parallelism. As each thread
+  receives its own virtualized processor and is an
+  independently-schedulable entity, multiple threads may run on
+  multiple processors at the same time, improving a system's
+  throughput. To the extent that threads are used to achieve
+  parallelism—that is, there are no more threads than processors—the
+  "threads are for people who can't program state machines" quote does
+  not apply.
+
++ Blocking I/O. Without threads, blocking I/O halts the whole process.
+  This can be detrimental to both throughput and latency. In a
+  multithreaded process, individual threads may block, waiting on I/O,
+  while other threads make forward progress. Asynchronous &
+  non-blocking I/O are alternative solutions to threads for this
+  issue.
+
++ Memory savings. Threads provide an efficient way to share memory yet
+  utilize multiple units of execution. In this manner they are an
+  alternative to multiple processes.
+
+The cost of these benefits of threading are increased complexity in
+the form of needing to manage concurrency through mechanisms such as
+mutexes and condition variables. Given the growing trend toward
+processors sporting multiple cores and systems sporting multiple
+processors, threading is only going to become a more important tool in
+system programming.
+
+
+Advantages and Disadvantages
+
+Thread Advantages
+
++ Threads are memory efficient. Many threads can be efficiently contained within a single EXE, while each process can incur the overhead of an entire EXE.
++ Threads share a common program space, which among other things, means that messages can be passed by queuing only a pointer to the message. Since processes do not share a common program space, the kernel must either copy the entire message from process A's program space to process B's program space - a tremendous disadvantage for large messages, or provide some mechanism by which process B can access the message.
++ Thread task switching time is faster, since a thread has less context to save than a process.
++ With threads the kernel is linked in with the user code to create a single EXE. This means that all the kernel data structures like the ready queue are available for viewing with a debugger. This is not the case with a process, since the process is an autonomous application and the kernel is separate, which makes for a less flexible environment.
+
+Thread Disadvantages
+
++ Threads are typically not loadable. That is, to add a new thread, you must add the new thread to the source code, then compile and link to create the new executable. Processes are loadable, thus allowing a multi-tasking system to be characterized dynamically. For example, depending upon system conditions, certain processes can be loaded and run to characterize the system. However, the same can be accomplished with threads by linking in all the possible threads required by the system, but only activating those that are needed, given the conditions. The really big advantage of loadability is that the process concept allows processes (applications) to be developed by different companies and offered as tools to be loaded and used by others in their multi-tasking applications.
++ Threads can walk over the data space of other threads. This cannot
+  happen with processes. If an attempt is made to walk on another
+  process an exception error will occur.
+
+
+
+
+* cc
+#+begin_src python
+
+#+end_src
+
+#+begin_src c++
+
+#+end_src
+
+
+#+begin_src sh
+
+#+end_src

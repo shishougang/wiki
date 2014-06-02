@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Algorithm Design Manual Chapter 4</title>
-<!-- 2014-06-02 Mon 12:17 -->
+<!-- 2014-06-02 Mon 22:57 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -133,6 +133,48 @@ for the JavaScript code in this tag.
  }
 /*]]>*///-->
 </script>
+<script type="text/javascript" src="http://orgmode.org/mathjax/MathJax.js"></script>
+<script type="text/javascript">
+<!--/*--><![CDATA[/*><!--*/
+    MathJax.Hub.Config({
+        // Only one of the two following lines, depending on user settings
+        // First allows browser-native MathML display, second forces HTML/CSS
+        //  config: ["MMLorHTML.js"], jax: ["input/TeX"],
+            jax: ["input/TeX", "output/HTML-CSS"],
+        extensions: ["tex2jax.js","TeX/AMSmath.js","TeX/AMSsymbols.js",
+                     "TeX/noUndefined.js"],
+        tex2jax: {
+            inlineMath: [ ["\\(","\\)"] ],
+            displayMath: [ ['$$','$$'], ["\\[","\\]"], ["\\begin{displaymath}","\\end{displaymath}"] ],
+            skipTags: ["script","noscript","style","textarea","pre","code"],
+            ignoreClass: "tex2jax_ignore",
+            processEscapes: false,
+            processEnvironments: true,
+            preview: "TeX"
+        },
+        showProcessingMessages: true,
+        displayAlign: "center",
+        displayIndent: "2em",
+
+        "HTML-CSS": {
+             scale: 100,
+             availableFonts: ["STIX","TeX"],
+             preferredFont: "TeX",
+             webFont: "TeX",
+             imageFont: "TeX",
+             showMathMenu: true,
+        },
+        MMLorHTML: {
+             prefer: {
+                 MSIE:    "MML",
+                 Firefox: "MML",
+                 Opera:   "HTML",
+                 other:   "HTML"
+             }
+        }
+    });
+/*]]>*///-->
+</script>
 </head>
 <body>
 <div id="content">
@@ -145,10 +187,19 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-1-1">4.3 Heapsort: Fast Sorting via Data Structures</a></li>
 <li><a href="#sec-1-2">4.5 Mergesort: Sorting by Divide-and-Conquer</a></li>
-<li><a href="#sec-1-3">4.6 Quicksort: Sorting by Randomization</a></li>
+<li><a href="#sec-1-3">4.9 Binary Search and Related Algorithms</a></li>
+<li><a href="#sec-1-4">4.10 Divide-and-Conquer</a></li>
 </ul>
 </li>
-<li><a href="#sec-2">Exercises</a></li>
+<li><a href="#sec-2">Exercises</a>
+<ul>
+<li><a href="#sec-2-1">1</a></li>
+<li><a href="#sec-2-2">2</a></li>
+<li><a href="#sec-2-3">3</a></li>
+<li><a href="#sec-2-4">4</a></li>
+<li><a href="#sec-2-5">5</a></li>
+</ul>
+</li>
 <li><a href="#sec-3">cc</a></li>
 </ul>
 </div>
@@ -247,12 +298,209 @@ on the component arrays
 </div>
 </div>
 <div id="outline-container-sec-1-3" class="outline-3">
-<h3 id="sec-1-3">4.6 Quicksort: Sorting by Randomization</h3>
+<h3 id="sec-1-3">4.9 Binary Search and Related Algorithms</h3>
+<div class="outline-text-3" id="text-1-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">binary_search</span>(<span style="color: #98fb98;">item_type</span> <span style="color: #eedd82;">s</span>[], <span style="color: #98fb98;">item_type</span> <span style="color: #eedd82;">key</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">low</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">high</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">middle</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">index of middle element */</span>
+  <span style="color: #00ffff;">if</span> (low &gt; high) <span style="color: #00ffff;">return</span> (-1); <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">key not found */</span>
+  middle = (low+high)/2;
+  <span style="color: #00ffff;">if</span> (s[middle] == key) <span style="color: #00ffff;">return</span>(middle);
+  <span style="color: #00ffff;">if</span> (s[middle] &gt; key)
+    <span style="color: #00ffff;">return</span> (binary_search(s,key,low,middle-1));
+  <span style="color: #00ffff;">else</span>
+    <span style="color: #00ffff;">return</span> (binary_search(s,key,middle+1,high));
+}
+</pre>
+</div>
+</div>
+
+<ul class="org-ul"><li>Counting Occurrences<br  /><div class="outline-text-4" id="text-1-3-1">
+<p>
+This algorithm runs inO(lgn+s), wheresis the number of occurrences of
+the key. This can be as bad as linear if the entire array consists of
+identical keys. A faster algorithm results by modifying binary search
+to search for the boundary of the block containing k, instead of
+kitself. Suppose we delete the equality test
+</p>
+
+<p>
+<code>if (s[middle] == key) return(middle);</code>
+</p>
+
+<p>
+from the implementation above and return the index <code>low</code> instead of
+<code>−1</code> on each unsuccessful search. All searches will now be
+unsuccessful, since there is no equality test. The search will proceed
+to the right half whenever the key is compared to an identical array
+element, eventually terminating at the <b>right boundary</b>. Repeating the
+search after reversing the direction of the binary comparison will
+lead us to the <b>left boundary</b>. Each search takes O(lgn) time, so we can
+count the occurrences in logarithmic time regardless of the size of
+the block.
+</p>
+</div>
+</li>
+<li>One-Sided Binary Search<br  /><div class="outline-text-4" id="text-1-3-2">
+<p>
+Now suppose we have an array A consisting of a run of 0’s, followed
+by an unbounded run of 1’s, and would like to identify the exact
+point of transition between them. Binary search on the array would
+provide the transition point in lgn tests, if we had a bound non the
+number of elements in the array. In the absence of such
+a bound, we can test repeatedly at larger intervals (<code>A[1], A[2],
+A[4], A[8], A[16],...</code>) until we find a first nonzero value. Now we
+have a window containing the target and can proceed with binary
+search. This <i>one-sided binary search</i> finds the transition pointpusing at
+most 2lgp comparisons, regardless of how large the array actually is.
+</p>
+</div>
+</li>
+<li>Square and Other Roots<br  /><div class="outline-text-4" id="text-1-3-3">
+<p>
+First, observe that the square root ofn≥1 must be at least 1 and at
+most n. Let <code>l = 1</code> and <code>r = n</code>. Consider the midpoint of this
+interval, <code>m=(l+r)/2</code>. How does m<sup>2</sup> compare to n? If n≥m<sup>2</sup> , then the
+square root must be greater than m, so the algorithm repeats with
+<code>l=m</code>. If n&lt;m<sup>2</sup> , then the square root must be less than m, so the
+algorithm repeats with <code>r=m</code>. 
+</p>
+
+<p>
+Suppose that we start with values l and r such that f(l)&gt;0 and f(r)&lt;0.
+If f is a continuous function, there must exist a root between l and
+r. Depending upon the sign of f(m), where <code>m=(l+r)/2</code>, we can cut this
+window containing the root in half with each test and stop soon as our
+estimate becomes sufficiently accurate.
+</p>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-1-4" class="outline-3">
+<h3 id="sec-1-4">4.10 Divide-and-Conquer</h3>
+<div class="outline-text-3" id="text-1-4">
+<p>
+divide-and-conquer recurrences of the form T(n)=aT(n/b)+f(n)
+</p>
+
+<ol class="org-ol">
+<li>If \(f(n) = O(n^{log_{b}^{a-\epsilon}})\) for some constant \(\epsilon
+   > 0\), then \(T(n) = \Theta(n^{log_{b}^a})\).
+</li>
+<li>If \(f(n) = O(n^{log_{b}^{a}})\), then \(T(n) =
+   \Theta(n^{log_{b}^a}lgn)\).
+</li>
+<li>If \(f(n) = O(n^{log_{b}^{a+\epsilon}})\) for some constant \(\epsilon
+   > 0\) and if \(af(n/b) \leq cf(n)\) for some \(c<1\), then \(T(n) =
+   \Theta(f(n))\).
+</li>
+</ol>
+</div>
 </div>
 </div>
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">Exercises</h2>
+<div class="outline-text-2" id="text-2">
+</div><div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">1</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+The Grinch is given the job of partitioning 2n players into two teams
+of n players each. Each player has a numerical rating that measures
+how good he/she is at the game. He seeks to divide the players as
+unfairly as possible, so as to create the biggest possible talent
+imbalance between team A and team B. Show how the Grinch can do the
+job in O(nlogn) time.
+</p>
 </div>
+</div>
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">2</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+For each of the following problems, give an algorithm that finds the
+desired numbers within the given amount of time. To keep your answers
+brief, feel free to use algorithms from the book as subroutines. For
+the example,S={6,13,19,3,8}, 19−3 maximizes the difference, while 8−6
+minimizes the difference.
+</p>
+
+
+<p>
+(a) LetSbe anunsortedarray ofnintegers. Give an algorithm that finds the pair
+x, y∈S that maximizes|x−y|. Your algorithm must run in O(n) worst-case
+time.
+</p>
+
+<p>
+(b) Let Sbe asorted array ofnintegers. Give an algorithm that finds
+the pair x, y∈S that maximizes |x−y|. Your algorithm must run in O(1)
+worst-case time.
+</p>
+
+<p>
+(c) LetSbe anunsortedarray ofnintegers. Give an algorithm that finds
+the pair x, y∈S that minimizes |x−y|, for x &ne; y. Your algorithm must run
+in O(nlogn) worst-case time.
+</p>
+
+<p>
+(d) Let Sbe asorted array ofnintegers. Give an algorithm that finds the pair
+x, y∈S that minimizes |x−y|,forx &ne; y. Your algorithm must run in O(n)
+worst-case time.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">3</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+Take a sequence of 2nreal numbers as input. Design an O(nlogn)
+algorithm that partitions the numbers intonpairs, with the property
+that the partition minimizes the maximum sum of a pair. For example,
+say we are given the numbers (1,3,5,9). The possible partitions are
+((1,3),(5,9)), ((1,5),(3,9)), and ((1,9),(3,5)). The pair sums for
+these partitions are (4,14), (6,12), and (10,8). Thus the third
+partition has 10 as its maximum sum, which is the minimum over the
+three partitions.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">4</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+Assume that we are givennpairs of items as input, where the first item
+is a and the second item is one of three colors (red, blue, or
+yellow). Further assume that the items are sorted by number. Give
+anO(n) algorithm to sort the items by color (all reds before all blues
+before all yellows) such that the numbers for identical colors stay
+sorted. For example: (1,blue), (3,red), (4,blue), (6,yellow), (9,red)
+should become (3,red), (9,red), (1,blue), (4,blue), (6,yellow).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5">5</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+Themodeof a set of numbers is the number that occurs most frequently in the
+set. The set (4,6,2,4,3,1) has a mode of 4. Give an efficient and correct algorithm
+to compute the mode of a set of n numbers.
+</p>
+</div>
+</div>
+</div>
+
+
+
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">cc</h2>
 <div class="outline-text-2" id="text-3">
@@ -265,7 +513,7 @@ on the component arrays
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-06-02 Mon 12:17</p>
+<p class="date">Created: 2014-06-02 Mon 22:57</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
