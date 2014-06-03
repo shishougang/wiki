@@ -207,51 +207,93 @@ kilogram at most.
   it into the partially filled bin with the smallest amount of extra
   room after the object is inserted.. If no such bin exists, start a new
   bin. Design an algorithm that implements the best-fit heuristic
-  (taking as input the n weights w1,w2, ..., wnand outputting the
+  (taking as input the n weights w1,w2, ..., wn and outputting the
   number of bins used) in O(nlogn)time.
 
 + Repeat the above using the worst-fit heuristic, where we put the next
   object in the partially filled bin with the largest amount of extra
-  roomafterthe object is inserted.
+  room after the object is inserted.
 
+使用BST。主要找到能容纳这个元素的最小bin，若所有bin都小于这个元素大小，就插入一个新的。
+#+begin_src c++
+    min_node = NULL;
+    while node != NULL:
+        if (node->weight >= w && node->left < w) {
+          min_node = node;
+          break;
+        } else if (node->left >= w) {
+          node = node->left;
+        } else {
+          node = node->right;
+        }
+    if (min_node == NULL) {
+      bst->insert(new node(w));
+    } else {
+      bst->delete(min_node);
+      min_node->weight -= w;
+      bst->insert(min_node);
+    }
+#+end_src
 
+最大堆使用。每次选最大容量的bin。若最大bin小于这个元素大小，就插入一个新的。
 ** 11
-Suppose that we are given a sequence ofnvaluesx1,x2, ..., xn and seek to
-quickly answer repeated queries of the form: giveni andj, find the smallest value
-in xi,...,xj.
+Suppose that we are given a sequence of n values x1,x2, ..., xn and seek
+to quickly answer repeated queries of the form: given i and j, find the
+smallest value in xi,...,xj.
 
 (a) Design a data structure that uses O(n^2) space and answers queries in O(1)
 time.
 
-(b) Design a data structure that usesO(n) space and answers queries inO(logn)
-time. For partial credit, your data structure can useO(nlogn) space and have
-O(logn) query time.
+(b) Design a data structure that uses O(n) space and answers queries
+in O(logn) time. For partial credit, your data structure can
+use O(nlogn) space and have O(logn) query time.
+
+1. n*n的矩阵，i,j中存的就是i-j的最小元素。
+
+2. 使用[[http://en.wikipedia.org/wiki/Cartesian_tree][Cartesian tree]]或[[http://en.wikipedia.org/wiki/Treap][Treap]]。
 
 ** 12
-Suppose you are given an input setSofnnumbers, and a black box that if
-given any sequence of real numbers and an integerkinstantly and correctly answers
-whether there is a subset of input sequence whose sum is exactlyk. Show how to
-use the black boxO(n) times to find a subset of S that adds up to k.
+Suppose you are given an input set S of n numbers, and a black box
+that if given any sequence of real numbers and an integer k instantly
+and correctly answers whether there is a subset of input sequence
+whose sum is exactly k. Show how to use the black box O(n) times to
+find a subset of S that adds up to k.
+
+#+begin_src c++
+  R = S
+  for i = 1 to n:
+    if bb(R/{si}) is True:
+        R = R / {si}
+#+end_src
 
 ** 13
-LetA[1..n]beanarrayofrealnumbers.Designanalgorithmtoperformany
-sequence of the following operations:
+Let A[1..n] be an array of real numbers. Design an algorithm to perform
+any sequence of the following operations:
 
-• Add(i,y)– Add the valueyto theith number.
+• Add(i,y)– Add the value y to the ith number.
 
 • Partial-sum(i)– Return the sum of the first i numbers
 
-There are no insertions or deletions; the only change is to the values of the numbers.
-Each operation should take O(logn) steps. You may use one additional array of size
-nas a work space.
+There are no insertions or deletions; the only change is to the values
+of the numbers. Each operation should take O(logn) steps. You may use
+one additional array of size n as a work space.
+
+建立叶节点数ｎ的balanced binary tree，ｎ个叶节点依次存储A[1..n]，书的
+内节点存储子树的和。
+1. Add(i,y)，比较ｉ与n/2，决定左子树还是右子树，依次遍历到叶节点，并增
+   加相应子树和，最后找到第ｉ个元素相加。
+2. Partial-sum(i)，比较ｉ与n/2，决定左子树还是右子树，每当遍历右子树，
+   加上左子树的和，最后到叶节点，得到总的和。
 
 ** 14
 Extend the data structure of the previous problem to support insertions and
-deletions. Each element now has both akeyand avalue. An element is accessed
-by its key. The addition operation is applied to the values, but the elements are
-accessed by its key. The Partial sum operation is different.
-+ Add(k,y)– Add the valueyto the item with key k.
-+ Insert(k,y)– Insert a new item with keyk and value y.
+deletions. Each element now has both a key and a value. An element is accessed
+by its key. The addition operation is applied to the values, but the
+elements are accessed by its key. The Partial sum operation is
+different.
+
++ Add(k,y)– Add the value y to the item with key k.
++ Insert(k,y)– Insert a new item with key k and value y.
 + Delete(k)– Delete the item with key k.
 + Partial-sum(k)– Return the sum of all the elements currently in the
   set whose key is less than y,
@@ -259,34 +301,55 @@ accessed by its key. The Partial sum operation is different.
 The worst case running time should still be O(nlogn) for any sequence
 of O(n) operations.
 
-** 15
-Design a data structure that allows one to search, insert, and delete an integer
-X in O(1) time (i.e. , constant time, independent of the total number of integers
-stored). Assume that 1≤X≤nand that there arem+nunits of space available,
-wheremis the maximum number of integers that can be in the table at any one
-time. (Hint: use two arraysA[1..n]andB[1..m].) You are not allowed to initialize
-eitherAorB,asthatwouldtakeO(m)orO(n) operations. This means the arrays
-are full of random garbage to begin with, so you must be very careful.
+建立以key排序的平衡搜索二叉树，并每个节点中添加一个左子树和的值。
 
-** 17
-A Caesar shift (see Section 18.6 (page 641)) is a very simple class of ciphers for
-secret messages. Unfortunately, they can be broken using statistical properties of
-English. Develop a program capable of decrypting Caesar shifts of sufficiently long
-texts.
++ Add(k,y)：随着搜索key k，依次加左子树和，最后key k加上y。
++ Insert(k,y)：随着搜索key k插入位置，依次加左子树和，最后插入key k的
+  元素。
++ Delete(k)：：随着搜索key k，依次减少左子树和，最后删除key k元素。
++ Partial-sum(k)：随着搜索key k，依次加上左子树的和（因为左边的元素是
+  小于的元素）。
+
+** 15
+Design a data structure that allows one to search, insert, and delete
+an integer X in O(1) time (i.e. , constant time, independent of the
+total number of integers stored). Assume that 1≤X≤n and that there
+are m+n units of space available, where m is the maximum number of
+integers that can be in the table at any one time. (Hint: use two
+arrays A[1..n] and B[1..m].) You are not allowed to initialize
+either A or B, as that would take O(m) or O(n) operations. This means
+the arrays are full of random garbage to begin with, so you must be
+very careful.
+
+与[[http://dreamrunner.org/blog/2014/05/10/column1/][Programming Pearls]]的Column课后题一样。
+
+建立两个数组A[1..n]，B[1..m]和一个表示元素个数的变量k。
+
+1. insert X: k = k + 1，A[X] = k, B[k] = X;
+2. search X: return (A[X] <= k) && B[A[X]] == X;
+3. delete X: 把A[X]与末端A[B[k]]交换，A[B[k]] = A[X], B[A[X]] = B[k];
+   k = k - 1;
 
 ** 18
 What method would you use to look up a word in a dictionary?
 
+Hash Table.
 ** 19
-Imagine you have a closet full of shirts. What can you do to organize your shirts
-for easy retrieval?
+Imagine you have a closet full of shirts. What can you do to organize
+your shirts for easy retrieval?
+
+以颜色排序，并二分搜索查找。
 
 ** 20
 Write a function to find the middle node of a singly-linked list.
 
+
 ** 21
-Write a function to compare whether two binary trees are identical. Identical
-trees have the same key value at each position and the same structure.
+Write a function to compare whether two binary trees are identical.
+Identical trees have the same key value at each position and the same
+structure.
+
+
 
 ** 22
 Write a program to convert a binary search tree into a linked list
