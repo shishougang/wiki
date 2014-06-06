@@ -12,7 +12,7 @@ Node* FindMidNode(Node *head) {
   p = head;
   q = head;
   i = 0;
-  while (p->next != NULL) {
+  while (p != NULL) {
     i++;
     p = p->next;
     if (i == 2) {

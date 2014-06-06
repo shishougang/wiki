@@ -1,0 +1,176 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-3.org
+#+TITLE: Algorithm Design Manual Chapter 5
+#+OPTIONS: num:nil H:2
+
+
+* Book Notes
+** 5.1 Flavors of Graphs
++ Undirected vs. Directed
++ Weighted vs. Unweighted
++ Simple vs. Non-simple
++ Sparse vs. Dense
++ Cyclic vs. Acyclic
++ Embedded vs. Topological
++ Implicit vs. Explicit
++ Labeled vs. Unlabeled
+
+** 5.2 Data Structures for Graphs
++ Adjacency Matrix: We can represent G using an n×n matrix M, where
+  element M[i, j] = 1 if(i, j) is an edge of G, and 0 if it isn’t.
++ Adjacency Lists: We can more efficiently represent sparse graphs by
+  using linked lists to store the neighbors adjacent to each vertex.
+
+Adjacency lists are the right data structure for most applications of
+graphs.
+
+*Adjacency Lists*
+
+#+begin_src c++
+#define MAXV 1000  // maximum number of vertices
+
+typedef struct {
+  int y;  // adjacency info
+  int weight;  // edge weight, if any
+  struct edgenode *next;  // next edge in list
+} edgenode;
+
+typedef struct {
+  edgenode *edges[MAXV + 1];   // adjacency info
+  int degree[MAXV + 1];  // outdegree of each vertex
+  int nvertices;  // number of vertices in graph
+  int nedges;  // number of edges in graph
+  bool directed;  // is the graph directed
+} graph;
+
+void initialize_graph(graph *g, bool directed) {
+  int i;
+  g->nvertices = 0;
+  g->nedges = 0;
+  g->directed = directed;
+  for (i = 1; i <= NMAX; ++i) {
+    g->degree[i] = 0;
+    g->edges[i] = NULL;
+  }
+}
+
+void insert_edge(graph *g, int x, int y, bool directed) {
+  edgenode *p;
+  p = new edgenode;
+  p-> weight = 0;
+  p->y = y;
+  p->next = g->edges[x];
+  g->edges[x] = p;
+  g->degree[x]++;
+  if (directed == false) {
+    insert_edge(g, y, x, true);
+  } else {
+    g->nedges++;
+  }
+}
+
+void read_graph(graph *g, bool directed) {
+  int i;
+  int m;
+  int x, y;
+  initialize_graph(g, directed);
+  scanf("%d %d", &(g->nvertices), &m);
+  for (i = 1; i <= m; ++i) {
+    scanf("$d %d", &x, &y);
+    insert_edge(g, x, y, directed);
+  }
+}
+
+print_graph(graph *g) {
+  int i;
+  edgenode *p;
+  for (i = 1; i <= g->nvertices; ++i) {
+    printf("%d: ", i);
+    p = g->edges[i];
+    while (p != NULL) {
+      printf("%d ", p->y);
+      p = p->next;
+    }
+    printf("\n");
+  }
+}
+#+end_src
+
+** 5.5 Traversing a Graph
+The key idea behind graph traversal is to mark each vertex when we
+first visit it and keep track of what we have not yet completely
+explored. Although bread crumbs or unraveled threads have been used to
+mark visited places in fairy-tale mazes, we will rely on Boolean flags
+or enumerated types.
+
+Each vertex will exist in one of three states:
++ undiscovered– the vertex is in its initial, virgin state.
++ discovered– the vertex has been found, but we have not yet checked
+  out all its incident edges.
++ processed– the vertex after we have visited all its incident edges.
+
+** 5.6 Breadth-First Search
+#+begin_src c++
+      bool processed[MAXV+1]; /* which vertices have been processed */
+      bool discovered[MAXV+1]; /* which vertices have been found */
+      int parent[MAXV+1]; /* discovery relation */
+      
+      initialize_search(graph *g)
+      {
+        int i; /* counter */
+        for (i=1; i<=g->nvertices; i++) {
+          processed[i] = discovered[i] = FALSE;
+          parent[i] = -1;
+        }
+      }
+    
+    bfs(graph *g, int start)
+    {
+      queue q; /* queue of vertices to visit */
+      int v; /* current vertex */
+      int y; /* successor vertex */
+      edgenode *p; /* temporary pointer */
+      init_queue(&q);
+      enqueue(&q,start);
+      discovered[start] = TRUE;
+      while (empty_queue(&q) == FALSE) {
+        v = dequeue(&q);
+        process_vertex_early(v);
+        processed[v] = TRUE;
+        p = g->edges[v];
+        while (p != NULL) {
+          y = p->y;
+          if ((processed[y] == FALSE) || g->directed)
+            process_edge(v,y);
+          if (discovered[y] == FALSE) {
+            enqueue(&q,y);
+            discovered[y] = TRUE;
+            parent[y] = v;
+          }
+          p = p->next;
+        }
+        process_vertex_late(v);
+      }
+    }
+  
+  find_path(int start, int end, int parents[])
+  {
+    if ((start == end) || (end == -1))
+      printf("\n%d",start);
+    else {
+      find_path(start,parents[end],parents);
+      printf(" %d",end);
+    }
+  }
+#+end_src
+
+** 
+* Exercises
+* cc
+
+
+#+begin_src c++
+
+#+end_src
+
+
+

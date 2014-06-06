@@ -343,60 +343,194 @@ your shirts for easy retrieval?
 ** 20
 Write a function to find the middle node of a singly-linked list.
 
+#+begin_src c++
+struct Node {
+  int value;
+  Node *next;
+};
 
+Node* FindMidNode(Node *head) {
+  Node *p, *q;
+  p = head;
+  q = head;
+  i = 0;
+  while (p != NULL) {
+    i++;
+    p = p->next;
+    if (i == 2) {
+      q = q->next;
+      i = 0;
+    }
+  }
+  return q;
+}
+#+end_src
 ** 21
 Write a function to compare whether two binary trees are identical.
 Identical trees have the same key value at each position and the same
 structure.
 
+#+begin_src c++
+struct Node {
+  int value;
+  Node *left;
+  Node *right;
+};
 
+bool CompareBinaryTree(Node *head_m, Node *head_n) {
+  if (head_m == NULL && head_n == NULL) {
+    return true;
+  }
+  if (head_m == NULL || head_n == NULL) {
+    return false;
+  }
+  return (head_m->value == head_n->value) &&
+      CompareBinaryTree(head_m->left, head_n->left) &&
+      CompareBinaryTree(head_m->right, head_n->right);
+}
+#+end_src
 
 ** 22
 Write a program to convert a binary search tree into a linked list
 
+#+begin_src c++
+struct Node {
+  int value;
+  Node *next;
+};
+
+struct TNode {
+  int value;
+  TNode *left;
+  TNode *right;
+  TNode(int value_in) {
+    value = value_in;
+    left = NULL;
+    right = NULL;
+  }
+};
+
+void InsertToList(Node **head, int value) {
+  Node *new_node = new Node;
+  new_node->value = value;
+  new_node->next = *head;
+  *head = new_node;
+}
+
+void ConvertTreeToList(const TNode *root, Node **head) {
+  if (root == NULL) {
+    return;
+  }
+  ConvertTreeToList(root->right, head);
+  InsertToList(head, root->value);
+  ConvertTreeToList(root->left, head);
+}
+#+end_src
 ** 23
 Implement an algorithm to reverse a linked list. Now do it without
 recursion.
 
+#+begin_src c++
+void ReverseLinkedList(Node **head) {
+  if (!head || *head == NULL) {
+    return;
+  }
+  Node *prev, *p, *next;
+  prev = *head;
+  p = prev->next;
+  prev->next = NULL;
+  while (p != NULL) {
+    next = p->next;
+    p->next = prev;
+    prev = p;
+    p = next;
+  }
+  *head = prev;
+}
+#+end_src
 ** 24
 What is the best data structure for maintaining URLs that have been visited by
 a Web crawler? Give an algorithm to test whether a given URL has already been
 visited, optimizing both space and time.
 
-** 25
-You are given a search string and a magazine. You seek to generate all the characters in search string by cutting them out from the magazine. Give an algorithm
-to efficiently determine whether the magazine contains all the letters in the search
-string.
+Hash Table.
 
 ** 26
 Reverse the words in a sentence—i.e., “My name is Chris” becomes “Chris is
 name My.” Optimize for time and space.
 
+1. reverse 每个单词;
+2. reverse 整句。
+
+#+begin_src c++
+void Reverse(char *begin, char *end) {
+  char temp;
+  while (begin < end) {
+    temp = *begin;
+    *begin = *end;
+    *end = temp;
+    begin++;
+    end--;
+  }
+}
+
+void ReverseWords(char *str) {
+  char *word_begin;
+  word_begin = NULL;
+  char *p;
+  p = str;
+  while (*p != '\0') {
+    if (word_begin == NULL && *p != ' ') {
+      word_begin = p;
+    }
+    if (word_begin != NULL && (*(p+1) == ' ' || *(p+1) == '\0')) {
+      Reverse(word_begin, p);
+      word_begin = NULL;
+    }
+    ++p;
+  }
+  Reverse(str, p - 1);
+}
+#+end_src
+
 ** 27
-Determine whether a linked list contains a loop as quickly as possible without
-using any extra storage. Also, identify the location of the loop.
+Determine whether a linked list contains a loop as quickly as possible
+without using any extra storage. Also, identify the location of the
+loop.
+
+利用两个指针，一个快指针和一个慢指针，快的每次都比慢的多前进一个节点，
+如果存在loop,快的总会与慢的相重叠。
+
+loop的起始点：
+1. 当快的与慢的指针相重叠时，验证有loop，之后慢的指针不动，通过快的指
+   针计算出loop的长度
+2. 重新从链表头开始，快指针比慢指针先前进loop的长度距离，提增慢和快指
+   针，直到第一次相遇，相遇点就是loop的起始点。
 
 ** 28
-You have an unordered arrayXofnintegers. Find the array Mcontaining
-nelements whereMi is the product of all integers in Xexcept forXi. You may
+You have an unordered array X of n integers. Find the array M containing
+n elements where Mi is the product of all integers in X except for Xi. You may
 not use division. You can use extra memory. (Hint: There are solutions
 faster than O(n^2).)
 
+对数组X扫描2次计算出如下2组数组：
+
+\begin{equation}
+\begin{align}
+P_{0} = 1; P_{k}=X_{k}P_{k-1}=\prod_{i=1}^{k}X_{i} \newline
+Q_{n+1} = 1; Q_{k}=X_{k}Q_{k+1}=\prod_{i=k}^{n}X_{i}
+\end{align}
+\end{equation}
+
+所以得到M：
+\begin{equation}
+\begin{align}
+M_{i} = P_{i-1} Q_{i+1}, i\in[1,n]
+\end{align}
+\end{equation}
 ** 29
-Give an algorithm for finding an ordered word pair (e.g., “New York”) occurring
-with the greatest frequency in a given webpage. Which data structures would you
-use? Optimize both time and space.
+Give an algorithm for finding an ordered word pair (e.g., “New
+York”) occurring with the greatest frequency in a given webpage.
+Which data structures would you use? Optimize both time and space.
 
-
-
-
-
-* cc
-
-
-#+begin_src c++
-
-#+end_src
-
-
-
+Hash Table.
