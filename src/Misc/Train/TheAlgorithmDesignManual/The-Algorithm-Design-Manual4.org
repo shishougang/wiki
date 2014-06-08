@@ -362,17 +362,79 @@ appear more than once in the union.
 Given a set S of n integers and an integer T, give an O(n^{k − 1}logn)
 algorithm to test whether k of the integers in S add up to T.
 
-
+1. O(nlogn）对数组排序
+2. (k-1)个数的组合有n^{k-1}，并计算k-1个数的和sum
+3. 用binary search在数组中搜索T-sum
 ** 11
 Design an O(n) algorithm that, given a list of n elements, finds all
 the elements that appear more than n / 2 times in the list. Then,
 design an O(n) algorithm that, given a list of n elements, finds all
 the elements that appear more than n / 4 times.
 
+Hash Table 可以解决。或
+
+*** Find the elements that appear more than n / 2 times
+数组中最多有一个数超过重复n/2次，并且排序后的第ceiling(n/2)个数必定是
+这个数。
+1. method1
+   + 利用[[http://wiki.dreamrunner.org/public_html/Algorithms/Theory%20of%20Algorithms/Median%20Problem.html#sec-5][BFPRT]] 以O(n)的复杂度找到第ceiling(n/2)个小数;
+   + 扫描数组，计数这个数的重复数是否大于n/2.
+2. method2
+   #+begin_src c++
+     #include <stack>
+     using std::stack;
+     
+     bool FindMoreThanHalf(int *array, int n, int *res) {
+       stack<int> stk;
+       int i;
+       for (i = 0; i < n; ++i) {
+         if (stk.empty()) {
+           stk.push(array[i]);
+         } else {
+           if (stk.top() == array[i]) {
+             stk.push(array[i]);
+           } else {
+             stk.pop();
+           }
+         }
+       }
+       if (stk.empty()) {
+         return false;
+       }
+       int candidate = stk.top();
+       int times = 0;
+       for (i = 0; i < n; ++i) {
+         if (array[i] == candidate) {
+           times++;
+         }
+       }
+       if (times > n / 2) {
+         ,*res = candidate;
+         return true;
+       }
+       return false;
+     }
+   #+end_src
+*** Find the elements that appear more than n / 4 times
++ method1
+  1. 利用[[http://wiki.dreamrunner.org/public_html/Algorithms/Theory%20of%20Algorithms/Median%20Problem.html#sec-5][BFPRT]] 以O(n)的复杂度找到中间数，验证中中间数是否重复
+     n/4(O(n));
+  2. 以中间元素划分数组为两部分(O(n));
+  3. 在上下半部分n/2中重复n/4次数的元素，同第一个问题一样找(O(n));
++ method2
+  1. 初始3个空的槽，想对应的槽的3个计数为0;
+  2. 对于数组中每个元素：
+     + 若等于其中任何一个槽中数，增加计数;
+     + 若有槽空，放入这个槽，并计数为1;
+     + 否则，对所有槽内数的计数减1
+  3. 对槽内剩下的数，扫描一遍数组，计算它们重复次数是否符合要求。
 
 ** 12
 Devise an algorithm for finding the k smallest elements of an unsorted
 set of n integers in O(n + klogn).
+
+1. O(n)的复杂度建立一个最小堆;
+2. 连续k次取出最小值，最后得到第k个最小值。
 
 ** 13
 You wish to store a set of n numbers in either a max-heap or a sorted
@@ -384,8 +446,48 @@ better, or if it does not matter. Explain your answers.
 3. Want to be able to form the structure quickly.
 4. Want to find the minimum element quickly.
 
-** 14
+1. 都开销O(1)。
+2. 若知道删除的地方，max-heap花费O(logn)，sorted array花费O(n)。
+   若不知道删除的地方，max-heap花费O(n)查找，删除花费O(logn); sorted
+   array binary search花费O(logn)，删除花费O(n)。
+3. max-heap花费O(n);sorted array花费O(logn)。
+4. max-heap花费O(n);sorted array花费O(1)。
 
+** 14
+Give an O(nlogk)-time algorithm that merges k sorted lists with a
+total of n elements into one sorted list. (Hint: use a heap to speed
+up the elementary O(kn)-time algorithm).
+
+1. 扫描k组sorted lists组成一个大小k的min-heap;
+2. 从min-heap中取出最小值放入结果list。
+** 15
+(a) Give an efficient algorithm to find the second-largest key among n
+keys. You can do better than 2n − 3 comparisons. (b) Then, give an
+efficient algorithm to find the third-largest key among n keys. How
+many key comparisons does your algorithm do in the worst case? Must
+your algorithm determine which key is largest and second-largest in
+the process?
+
+
+
+** 16
+ Use the partitioning idea of quicksort to give an algorithm that
+ finds the median element of an array of n integers in expected O(n)
+ time. (Hint: must you look at both sides of the partition?)
+
+** 17
+The median of a set of n values is the $\lceil n/2 \rceil$ th smallest
+value.
+1. Suppose quicksort always pivoted on the median of the current
+   sub-array. How many comparisons would Quicksort make then in the
+   worst case?
+
+2. Suppose quicksort were always to pivot on the $\lceil n/3 \rceil$ th
+   smallest value of the current sub-array. How many comparisons would
+   be made then in the worst case?
+
+** 18
+** 19
 
 * cc
 
