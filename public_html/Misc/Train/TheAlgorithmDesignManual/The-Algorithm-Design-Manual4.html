@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Algorithm Design Manual Chapter 4</title>
-<!-- 2014-06-08 Sun 13:10 -->
+<!-- 2014-06-11 Wed 19:53 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -211,10 +211,27 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2-16">16</a></li>
 <li><a href="#sec-2-17">17</a></li>
 <li><a href="#sec-2-18">18</a></li>
-<li><a href="#sec-2-19">19</a></li>
+<li><a href="#sec-2-19">21</a></li>
+<li><a href="#sec-2-20">22-23</a></li>
+<li><a href="#sec-2-21">24</a></li>
+<li><a href="#sec-2-22">25</a></li>
+<li><a href="#sec-2-23">27</a></li>
+<li><a href="#sec-2-24">30</a></li>
+<li><a href="#sec-2-25">31</a></li>
+<li><a href="#sec-2-26">32</a></li>
+<li><a href="#sec-2-27">33</a></li>
+<li><a href="#sec-2-28">34</a></li>
+<li><a href="#sec-2-29">35</a></li>
+<li><a href="#sec-2-30">36</a></li>
+<li><a href="#sec-2-31">40</a></li>
+<li><a href="#sec-2-32">41</a></li>
+<li><a href="#sec-2-33">42</a></li>
+<li><a href="#sec-2-34">43</a></li>
+<li><a href="#sec-2-35">44</a></li>
+<li><a href="#sec-2-36">45</a></li>
+<li><a href="#sec-2-37">46</a></li>
 </ul>
 </li>
-<li><a href="#sec-3">cc</a></li>
 </ul>
 </div>
 </div>
@@ -960,9 +977,23 @@ many key comparisons does your algorithm do in the worst case? Must
 your algorithm determine which key is largest and second-largest in
 the process?
 </p>
-</div>
-</div>
 
+<ul class="org-ul">
+<li>找第二大元素：大小为2个的数组初始化为第一二个元素，之后每个元素与这数组对比，剔除最小的，最后数组内2个元组对比得到最大和第二大元素，一共比较2(n-2)+1=2n-3，找出第二大元素。
+</li>
+<li>找第三大元素：同样已大小为3的数组，最后比较数3(n-3)+2=3n-7。
+</li>
+</ul>
+
+<p>
+<a href="http://wiki.dreamrunner.org/public_html/Algorithms/Theory%20of%20Algorithms/Selection%20Problem.html#sec-4">Random Selection</a>可以找出任意的第几大值，平均时间复杂度：O(n)，比较次数将是n的倍数，最坏时间复杂度可以达到：O(nlogn)。
+</p>
+
+<p>
+<a href="http://wiki.dreamrunner.org/public_html/Algorithms/Theory%20of%20Algorithms/Selection%20Problem.html#sec-6">Tournament Algorithm</a>找第二大元素比较次数O(n+logn);找第k个最大元素，比较次数为O(n+klogn)。
+</p>
+</div>
+</div>
 
 <div id="outline-container-sec-2-16" class="outline-3">
 <h3 id="sec-2-16">16</h3>
@@ -972,6 +1003,43 @@ Use the partitioning idea of quicksort to give an algorithm that
 finds the median element of an array of n integers in expected O(n)
 time. (Hint: must you look at both sides of the partition?)
 </p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">seed</span> = time(<span style="color: #7fffd4;">NULL</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">randint</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>) {
+  <span style="color: #00ffff;">return</span> m + rand_r(&amp;seed) / (RAND_MAX / (n + 1 - m) + 1);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">RandomSelectionK</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>) {
+  <span style="color: #00ffff;">if</span> (l &gt;= u) {
+    <span style="color: #00ffff;">return</span>;
+  }
+  swap(array[l], array[randint(l, u)]);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pivot</span> = array[l];
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = l;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = u + 1;
+  <span style="color: #00ffff;">while</span> (<span style="color: #7fffd4;">true</span>) {
+    <span style="color: #00ffff;">do</span> {
+      ++i;
+    } <span style="color: #00ffff;">while</span> (i &lt;= u &amp;&amp; array[i] &lt; pivot);
+    <span style="color: #00ffff;">do</span> {
+      --j;
+    } <span style="color: #00ffff;">while</span> (array[j] &gt; pivot);
+    <span style="color: #00ffff;">if</span> (i &gt; j) {
+      <span style="color: #00ffff;">break</span>;
+    }
+    swap(array[i], array[j]);
+  }
+  swap(array[l], array[j]);
+  <span style="color: #00ffff;">if</span> (j &lt; k) {
+    RandomSelectionK(array, j + 1, u, k);
+  } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (j &gt; k) {
+    RandomSelectionK(array, l, j - 1, k);
+  }
+}
+</pre>
+</div>
 </div>
 </div>
 <div id="outline-container-sec-2-17" class="outline-3">
@@ -992,28 +1060,603 @@ smallest value of the current sub-array. How many comparisons would
 be made then in the worst case?
 </li>
 </ol>
+
+<p>
+f(n) = 2*f(n/2) + n ==&gt; f(n) = 2<sup>k</sup> * f(n/2<sup>k</sup>) + kn = (n+2)logn
+</p>
+
+<p>
+f(n) = f(n/3) + f(2n/3) + n ==&gt; f(n) = O(nlogn)
+</p>
 </div>
 </div>
+
 <div id="outline-container-sec-2-18" class="outline-3">
 <h3 id="sec-2-18">18</h3>
+<div class="outline-text-3" id="text-2-18">
+<p>
+Suppose an array A consists of n elements, each of which is red,
+white, or blue. We seek to sort the elements so that all the reds come
+before all the whites, which come before all the blues The only
+operation permitted on the keys are
+</p>
+
+<ul class="org-ul">
+<li>Examine(A,i) &#x2013; report the color of the ith element of A.
+</li>
+<li>Swap(A,i,j) &#x2013; swap the ith element of A with the jth element.
+</li>
+</ul>
+<p>
+Find a correct and efficient algorithm for red-white-blue sorting.
+There is a linear-time solution.
+</p>
+
+<p>
+2次扫描。
+</p>
+<ul class="org-ul">
+<li>第一次：把red和white当成一样，用quick的partition分开与blue。
+</li>
+<li>第二次：只区分red和white的子区间。   
+</li>
+</ul>
 </div>
+</div>
+
 <div id="outline-container-sec-2-19" class="outline-3">
-<h3 id="sec-2-19">19</h3>
+<h3 id="sec-2-19">21</h3>
+<div class="outline-text-3" id="text-2-19">
+<p>
+Stable sorting algorithms leave equal-key items in the same relative
+order as in the original permutation. Explain what must be done to
+ensure that mergesort is a stable sorting algorithm.
+</p>
+
+<p>
+在合并时元素相等时选index小的元素在前。
+</p>
 </div>
 </div>
-<div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">cc</h2>
-<div class="outline-text-2" id="text-3">
+
+<div id="outline-container-sec-2-20" class="outline-3">
+<h3 id="sec-2-20">22-23</h3>
+<div class="outline-text-3" id="text-2-20">
+<p>
+Show that n positive integers in the range 1 to k can be sorted in
+O(nlogk) time. The interesting case is when k &lt; &lt; n.
+</p>
+
+<p>
+We seek to sort a sequence S of n integers with many duplications,
+such that the number of distinct integers in S is O(logn). Give an
+O(nloglogn) worst-case time algorithm to sort such sequences.
+</p>
+
+<p>
+balanced binary search tree.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-21" class="outline-3">
+<h3 id="sec-2-21">24</h3>
+<div class="outline-text-3" id="text-2-21">
+<p>
+Let A[1..n] be an array such that the first \(n-\sqrt n\)  elements are
+already sorted (though we know nothing about the remaining elements).
+Give an algorithm that sorts A in substantially better than nlogn
+steps.
+</p>
+
+<ul class="org-ul">
+<li>\(O(\sqrt{n}log(\sqrt{n})\) 排序后面的 \(\sqrt{n}\) 个元素。
+</li>
+<li>O(n)去mergesort前半部分和后半部分。
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-22" class="outline-3">
+<h3 id="sec-2-22">25</h3>
+<div class="outline-text-3" id="text-2-22">
+<p>
+Assume that the array A[1..n] only has numbers from \(\{1,\ldots, n^2\}\)
+but that at most loglogn of these numbers ever appear. Devise an
+algorithm that sorts A in substantially less than O(nlogn).
+</p>
+
+<p>
+和23一样，用balanced binary search tree，树的高度不超过loglogn,最后的复杂度O(n*logloglogn)。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-23" class="outline-3">
+<h3 id="sec-2-23">27</h3>
+<div class="outline-text-3" id="text-2-23">
+<p>
+Let P be a simple, but not necessarily convex, polygon and q an
+arbitrary point not necessarily in P. Design an efficient algorithm
+to find a line segment originating from q that intersects the maximum
+number of edges of P. In other words, if standing at point q, in what
+direction should you aim a gun so the bullet will go through the
+largest number of walls. A bullet through a vertex of P gets credit
+for only one wall. An O(nlogn) algorithm is possible.
+</p>
+
+<ol class="org-ol">
+<li>以ｑ为中心点，顺时针旋转，Ｐ中所有边随着顺时针旋转都有一个起始点
+(head)和结束点（end），计算它们的极角（polar angle）; O(n)
+</li>
+<li>对所有head和end按照angle大小排序，若相等，head在前; O(nlogn)
+</li>
+<li>扫描这个排序好的队列，遇到head加1,遇到end减1,最后算出这个区间的最大值。O(n)
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-2-24" class="outline-3">
+<h3 id="sec-2-24">30</h3>
+<div class="outline-text-3" id="text-2-24">
+<p>
+A company database consists of 10,000 sorted names, 40% of whom are known as good customers and who together account for 60% of the accesses to the database. There are two data structure options to consider for representing the database:
+</p>
+<ol class="org-ol">
+<li>Put all the names in a single array and use binary search.
+</li>
+<li>Put the good customers in one array and the rest of them in a
+second array.
+</li>
+</ol>
+
+<p>
+Only if we do not find the query name on a binary search of the first
+array do we do a binary search of the second array. Demonstrate which
+option gives better expected performance. Does this change if linear
+search on an unsorted array is used instead of binary search for both
+options?
+</p>
+
+<ul class="org-ul">
+<li>single array: log10000=4
+</li>
+<li>two array: 0.6*log4000+0.4*(log4000+log6000) = 5.11
+</li>
+</ul>
+<p>
+single array is better.
+</p>
+
+<ul class="org-ul">
+<li>single array: 10000
+</li>
+<li>two array: 0.6*4000+0.4*6000 = 6400
+</li>
+</ul>
+<p>
+two array is better.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-25" class="outline-3">
+<h3 id="sec-2-25">31</h3>
+<div class="outline-text-3" id="text-2-25">
+<p>
+Suppose you are given an array A of n sorted numbers that has been
+circularly shifted k positions to the right. For example,
+{35,42,5,15,27,29} is a sorted array that has been circularly shifted
+k = 2 positions, while {27,29,35,42,5,15} has been shifted k = 4
+positions.
+</p>
+
+<ol class="org-ol">
+<li>Suppose you know what k is. Give an O(1) algorithm to find the
+largest number in A.
+</li>
+
+<li>Suppose you do not know what k is. Give an O(lgn) algorithm to find
+the largest number in A. For partial credit, you may give an O(n)
+algorithm.
+</li>
+</ol>
+
+
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c++"><span style="color: #00ffff;">if</span> (k == 0) {
+  <span style="color: #00ffff;">return</span> A[n-1];
+} <span style="color: #00ffff;">else</span> {
+  <span style="color: #00ffff;">return</span> A[k-1];
+}
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FindLargestNumber</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">h</span>) {
+  <span style="color: #00ffff;">if</span> (array[l] &lt; array[h]) {
+    <span style="color: #00ffff;">return</span> array[h];
+  }
+  <span style="color: #00ffff;">if</span> (l == h) {
+    <span style="color: #00ffff;">return</span> array[h];
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mid</span>;
+  mid = (l + h) / 2;
+  <span style="color: #00ffff;">if</span> ((mid + 1 &lt;= h) &amp;&amp; array[mid] &gt; array[mid + 1]) {
+    <span style="color: #00ffff;">return</span> array[mid];
+  }
+  <span style="color: #00ffff;">if</span> ((mid - 1 &gt;= l) &amp;&amp; array[mid - 1] &gt; array[mid]) {
+    <span style="color: #00ffff;">return</span> array[mid - 1];
+  }
+  <span style="color: #00ffff;">if</span> (array[mid] &lt; array[h]) {
+    <span style="color: #00ffff;">return</span> FindLargestNumber(array, l, mid - 1);
+  } <span style="color: #00ffff;">else</span> {
+    <span style="color: #00ffff;">return</span> FindLargestNumber(array, mid + 1, h);
+  }
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-26" class="outline-3">
+<h3 id="sec-2-26">32</h3>
+<div class="outline-text-3" id="text-2-26">
+<p>
+Consider the numerical 20 Questions game. In this game, Player 1
+thinks of a number in the range 1 to n. Player 2 has to figure out
+this number by asking the fewest number of true/false questions.
+Assume that nobody cheats.
+</p>
+
+<ol class="org-ol">
+<li>What is an optimal strategy if n is known?
+</li>
+<li>What is a good strategy if n is not known?
+</li>
+</ol>
+
+
+<ol class="org-ol">
+<li>binary search.
+</li>
+<li>2<sup>i</sup>随机选一个i，若数小，增加到2<sup>i+1</sup>,若大就二分搜索。
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-27" class="outline-3">
+<h3 id="sec-2-27">33</h3>
+<div class="outline-text-3" id="text-2-27">
+<p>
+Suppose that you are given a sorted sequence of distinct integers .
+Give an O(lgn) algorithm to determine whether there exists an i index
+such as ai = i. For example, in { − 10, − 3,3,5,7}, a3 = 3. In
+{2,3,4,5,6,7}, there is no such i.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">CheckEqualIndex</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">h</span>) {
+  <span style="color: #00ffff;">while</span> (l &lt;= h) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mid</span> = (l + h) / 2;
+    <span style="color: #00ffff;">if</span> (array[mid] &gt; (mid + 1)) {
+      h = mid - 1;
+    } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (array[mid] &lt; (mid + 1)) {
+      l = mid + 1;
+    } <span style="color: #00ffff;">else</span> {
+      <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+    }
+  }
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-28" class="outline-3">
+<h3 id="sec-2-28">34</h3>
+<div class="outline-text-3" id="text-2-28">
+<p>
+Suppose that you are given a sorted sequence of distinct integers ,
+drawn from 1 to m where n &lt; m. Give an O(lgn) algorithm to find an
+integer  that is not present in a. For full credit, find the smallest
+such integer.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FindMissingElement</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">h</span>) {
+  <span style="color: #00ffff;">while</span> (l &lt;= h) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mid</span> = (l + h) / 2;
+    <span style="color: #00ffff;">if</span> (array[mid] &gt; (mid + 1)) {
+      h = mid - 1;
+    } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (array[mid] &lt;= (mid + 1)) {
+      l = mid + 1;
+    }
+  }
+  <span style="color: #00ffff;">return</span> l + 1;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-29" class="outline-3">
+<h3 id="sec-2-29">35</h3>
+<div class="outline-text-3" id="text-2-29">
+<p>
+Let M be an n*m  integer matrix in which the entries of each row are
+sorted in increasing order (from left to right) and the entries in
+each column are in increasing order (from top to bottom). Give an
+efficient algorithm to find the position of an integer x in M, or to
+determine that x is not there. How many comparisons of x with matrix
+entries does your algorithm use in worst case?
+</p>
+
+<p>
+O(m+n)
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">FindElement</span>(<span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">pos_x</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">pos_y</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">row</span> = 0, <span style="color: #eedd82;">col</span> = m - 1;
+  <span style="color: #00ffff;">while</span> (row &lt; n &amp;&amp; col &gt;= 0) {
+    <span style="color: #00ffff;">if</span> (array[row][col] == x) {
+      *pos_x = row;
+      *pos_y = col;
+      <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+    } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (array[row][col] &gt; x) {
+      col--;
+    } <span style="color: #00ffff;">else</span> {
+      row++;
+    }
+  }
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-30" class="outline-3">
+<h3 id="sec-2-30">36</h3>
+<div class="outline-text-3" id="text-2-30">
+<p>
+Consider an n*n  array A containing integer elements (positive, negative,
+and zero). Assume that the elements in each row of A are in strictly
+increasing order, and the elements of each column of A are in strictly
+decreasing order. (Hence there cannot be two zeroes in the same row or
+the same column.) Describe an efficient algorithm that counts the
+number of occurrences of the element 0 in A. Analyze its running time.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">CountZero</span>(<span style="color: #98fb98;">int</span> **<span style="color: #eedd82;">array</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">row</span> = n - 1, <span style="color: #eedd82;">col</span> = n - 1;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span> = 0;
+  <span style="color: #00ffff;">while</span> (row &gt;=0 &amp;&amp; col &gt;= 0) {
+    <span style="color: #00ffff;">if</span> (array[row][col] == 0) {
+      count++;
+      row--;
+    } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span>(array[row][col] &gt; 0) {
+      col--;
+    } <span style="color: #00ffff;">else</span> {
+      row--;
+    }
+  }
+  <span style="color: #00ffff;">return</span> count;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-31" class="outline-3">
+<h3 id="sec-2-31">40</h3>
+<div class="outline-text-3" id="text-2-31">
+<p>
+If you are given a million integers to sort, what algorithm would you
+use to sort them? How much time and memory would that consume?
+</p>
+
+<ol class="org-ol">
+<li>一个整数４字节，10<sup>9</sup>*4=4G,需要4G的内存，可以用快排等O(nlogn)的排序算法．
+</li>
+<li>用bitmap,需要10<sup>9</sup>/8=128M的内存.
+</li>
+<li>若内存有限,就external merge sort,利用外部存储多进行几次.
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-32" class="outline-3">
+<h3 id="sec-2-32">41</h3>
+<div class="outline-text-3" id="text-2-32">
+<p>
+Describe advantages and disadvantages of the most popular sorting
+algorithms.
+</p>
+
+<p>
+<b>Merge sort:</b>
+</p>
+<ul class="org-ul">
+<li>优点:适合链表,适合外排.
+</li>
+<li>缺点:需要多余的内存来保存合并的数据.
+</li>
+</ul>
+
+<p>
+<b>Insertion/Selection sort:</b>
+</p>
+<ul class="org-ul">
+<li>优点:简单实现.
+</li>
+<li>缺点:太慢,当数据很大时,运行不实际.
+</li>
+</ul>
+
+<p>
+<b>Heap sort:</b>
+</p>
+<ul class="org-ul">
+<li>优点:不需要递归,适合大数据.
+</li>
+<li>缺点:时常慢于merge sort和quick sort.
+</li>
+</ul>
+
+<p>
+<b>Quick sort:</b>
+</p>
+<ul class="org-ul">
+<li>优点:很快.
+</li>
+<li>缺点:递归,最坏情况比较慢.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-33" class="outline-3">
+<h3 id="sec-2-33">42</h3>
+<div class="outline-text-3" id="text-2-33">
+<p>
+Implement an algorithm that takes an input array and returns only the
+unique elements in it.
+</p>
+
+<p>
+排序,然后扫描输出.O(nlogn).
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-34" class="outline-3">
+<h3 id="sec-2-34">43</h3>
+<div class="outline-text-3" id="text-2-34">
+<p>
+You have a computer with only 2Mb of main memory. How do you use it to
+sort a large file of 500 Mb that is on disk?
+</p>
+
+<p>
+利用<a href="http://en.wikipedia.org/wiki/External_sorting">external merge sort</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-35" class="outline-3">
+<h3 id="sec-2-35">44</h3>
+<div class="outline-text-3" id="text-2-35">
+<p>
+Design a stack that supports push, pop, and retrieving the minimum
+element in constant time. Can you do this?
+</p>
+
+<p>
+只有一个stack办不到.如果两个stack,可以利用另外一个stack存储最小值.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-36" class="outline-3">
+<h3 id="sec-2-36">45</h3>
+<div class="outline-text-3" id="text-2-36">
+<p>
+Given a search string of three words, find the smallest snippet of the
+document that contains all three of the search words&#x2014;i.e., the
+snippet with smallest number of words in it. You are given the index
+positions where these words occur in the document, such as word1: (1,
+4, 5), word2: (3, 9, 10), and word3: (2, 6, 15). Each of the lists are
+in sorted order, as above.
+</p>
+
+<ol class="org-ol">
+<li>选取每个字母index的首个元素作为起始方案。
+</li>
+<li>如何改进它的长度：a.增加最小的位置，b.减小最大的位置，这里只能增加最小的位置。
+</li>
+<li>用heap来保存位置，每次取出最小的位置为O(logk).
+</li>
+</ol>
+
+<p>
+复杂度：O(nlogk)，n是所有字母的位置个数，k是字母个数。这里k=3,所以O(n)
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;queue&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">priority_queue</span>;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;utility&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">make_pair</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">pair</span>;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;vector&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">vector</span>;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;algorithm&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">max</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">min</span>;
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;limits&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">numeric_limits</span>;
+
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FindSmallestSnippet</span>(<span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">int</span>&gt; &gt; &amp;<span style="color: #eedd82;">index_positions</span>) {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">max-priority, select smallest position, use -index_positions[i][j], (i,j)</span>
+  <span style="color: #98fb98;">priority_queue</span>&lt;<span style="color: #98fb98;">pair</span>&lt;<span style="color: #98fb98;">int</span>, <span style="color: #98fb98;">pair</span>&lt;<span style="color: #98fb98;">int</span> ,<span style="color: #98fb98;">int</span>&gt; &gt; &gt; <span style="color: #eedd82;">queue</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">max_pos</span> = 0; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">the max pos of  the snippet</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt; index_positions.size(); ++i) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pos</span> = index_positions[i][0];
+    max_pos = max(max_pos, pos);
+    queue.push(make_pair(-pos, make_pair(i, 0)));
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">smallest_len</span> = <span style="color: #7fffd4;">numeric_limits</span>&lt;<span style="color: #98fb98;">int</span>&gt;::max();
+  <span style="color: #00ffff;">while</span> (queue.size() == index_positions.size()) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">min_pos</span> = -queue.top().first;
+    smallest_len = min(smallest_len, max_pos - min_pos + 1);
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">word_pos</span> = queue.top().second.first;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">index</span> = queue.top().second.second;
+    queue.pop();
+    ++index;
+    <span style="color: #00ffff;">if</span> (index &lt; index_positions[word_pos].size()) {
+      <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">next_pos</span> = index_positions[word_pos][index];
+      max_pos = max(max_pos, next_pos);
+      queue.push(make_pair(-next_pos, make_pair(word_pos, index)));
+    }
+  }
+  <span style="color: #00ffff;">return</span> smallest_len;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-37" class="outline-3">
+<h3 id="sec-2-37">46</h3>
+<div class="outline-text-3" id="text-2-37">
+<p>
+You are given 12 coins. One of them is heavier or lighter than the
+rest. Identify this coin in just three weighings.
+</p>
+
+<ol class="org-ol">
+<li>分3组,每组4个,其中两组称重,若相等,重的在第三组.若不等,重的在重的那一组.
+</li>
+<li>重的那组分4组,每组1个,第一组和第二组称重,谁重就重的那个.
+</li>
+<li>若step2相等,剩下第三组和第四组称重,谁重就重的那个.
+</li>
+</ol>
 </div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-06-08 Sun 13:10</p>
+<p class="date">Created: 2014-06-11 Wed 19:53</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

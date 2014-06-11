@@ -109,6 +109,8 @@ Each vertex will exist in one of three states:
 + processed– the vertex after we have visited all its incident edges.
 
 ** 5.6 Breadth-First Search
+先遍历完一个点的所有相邻点。
+
 #+begin_src c++
       bool processed[MAXV+1]; /* which vertices have been processed */
       bool discovered[MAXV+1]; /* which vertices have been found */
@@ -163,8 +165,339 @@ Each vertex will exist in one of three states:
   }
 #+end_src
 
-** 
+Because vertices are discovered in order of increasing distance from the root,
+this tree has a very important property. The unique tree path from the root to
+each node x∈V uses the smallest number of edges (or equivalently, intermediate
+nodes) possible on any root-to-xpath in the graph.
+
+There are *two points* to remember when using breadth-first search to find a
+shortest path fromxtoy: First, the shortest path tree is only useful if BFS was
+performed with x as the root of the search. Second, BFS gives the shortest path
+only if the graph is unweighted.
+
+** 5.7 Applications of Breadth-First Search
+Properly implemented using adjacency lists, any such algorithm is
+destined to be linear, since BFS runs in O(n+m) time on both directed
+and undirected graphs. This is optimal, since it is as fast as one can
+hope to read any n-vertex, m-edge graph.
+** 5.8 Depth-First Search
+The difference between BFS and DFS results is in the order in which they
+explore vertices. This order depends completely upon the container
+data structure used to store the discovered but not processed
+vertices.
+
++ Queue– By storing the vertices in a first-in, first-out (FIFO)
+  queue, we explore the oldest unexplored vertices first. Thus our
+  explorations radiate out slowly from the starting vertex, defining a
+  breadth-first search.
+
++ Stack– By storing the vertices in a last-in, first-out (LIFO) stack,
+  we explore the vertices by lurching along a path, visiting a new
+  neighbor if one is available, and backing up only when we are
+  surrounded by previously discovered vertices. Thus, our explorations
+  quickly wanderaway from our starting point, defining a depth-first
+  search.
+
+DFS organizes vertices by entry/exit times, and edges into tree and
+back edges. This organization is what gives DFS its real power.
+
+*Implementation*
+
+The beauty of implementingdfsrecursively is that recursion eliminates
+the need to keep an explicit stack:
+
+#+begin_src c++
+  dfs(graph *g, int v)
+  {
+    edgenode *p; /* temporary pointer */
+    int y; /* successor vertex */
+    if (finished) return; /* allow for search termination */
+    discovered[v] = TRUE;
+    time = time + 1;
+    entry_time[v] = time;
+    process_vertex_early(v);
+    p = g->edges[v];
+    while (p != NULL) {
+      y = p->y;
+      if (discovered[y] == FALSE) {
+        parent[y] = v;
+        process_edge(v,y);
+        dfs(g,y);
+      }
+      else if ((!processed[y]) || (g->directed))
+        process_edge(v,y);
+      if (finished) return;
+      p = p->next;
+    }
+    process_vertex_late(v);
+    time = time + 1;
+    exit_time[v] = time;
+    processed[v] = TRUE;
+  }
+#+end_src
+
+** 5.9 Applications of Depth-First Search
+*** Finding Cycles
+But any back edge going from x to an ancestorycreates a cycle with the
+tree path fromytox. Such a cycle is easy to find using dfs:
+
+#+begin_src c++
+  process_edge(int x, int y)
+  {
+    if (parent[x] != y) { /* found back edge! */
+      printf("Cycle from %d to %d:",y,x);
+      find_path(y,x,parent);
+      printf("\n\n");
+      finished = TRUE;
+    }
+  }
+#+end_src
+*** Articulation Vertices
+Observe that there is a single point of failure—a single vertex whose
+deletion disconnects a connected component of the graph. Such a vertex
+is called an articulation vertex or cut-node.
+
+More robust graphs without such a vertex are said to be biconnected.
+
+Temporarily delete each vertex v, and then do a BFS or DFS traversal
+of the remaining graph to establish whether it is still connected. The
+total time fornsuch traversals is O(n(m+n)). There is a clever
+linear-time algorithm, however, that tests all the vertices of a
+connected graph using a single depth-first search.
+
+Let =reachable_ancestor[v]= denote the earliest reachable ancestor of
+vertex v, meaning the oldest ancestor ofvthat we can reach by a
+combination of tree edges and back edges. Initially,
+~reachable_ancestor[v] = v~:
+
+#+begin_src c++
+  int reachable_ancestor[MAXV+1]; /*earliestreachableancestorofv*/
+  int tree_out_degree[MAXV+1];  /* DFStree outdegree ofv*/
+  process_vertex_early(int v)
+  {
+    reachable_ancestor[v] = v;
+  }
+#+end_src
+
+We update =reachable_ancestor[v]= whenever we encounter a back edge
+that takes us to an earlier ancestor than we have previously seen. The
+relative age/rank of our ancestors can be determined from
+their =entry_time’s=:
+
+#+begin_src c++
+  process_edge(int x, int y)
+  {
+    int class; /* edge class */
+    class = edge_classification(x,y);
+    if (class == TREE)
+      tree_out_degree[x] = tree_out_degree[x] + 1;
+    if ((class == BACK) && (parent[x] != y)) {
+      if (entry_time[y] < entry_time[ reachable_ancestor[x] ] )
+        reachable_ancestor[x] = y;
+    }
+  }
+#+end_src
+
+The key issue is determining how the reachability relation impacts
+whether vertexv is an articulation vertex. There are three cases:
++ Root cut-nodes– If the root of the DFS tree has two or more
+  children, it must be an articulation vertex. No edges from the
+  subtree of the second child can possibly connect to the subtree of
+  the first child.
+
++ Bridge cut-nodes– If the earliest reachable vertex fromvis v, then
+  deleting the single edge (parent[v],v) disconnects the graph.
+  Clearlyparent[v] must be an articulation vertex, since it cuts v from
+  the graph. Vertex vis also an articulation vertex unless it is a
+  leaf of the DFS tree. For any leaf, nothing falls off when you cut it.
++ Parent cut-nodes– If the earliest reachable vertex fromvis the
+  parent of v, then deleting the parent must severvfrom the tree
+  unless the parent is the root.
+
+[[./images/articulation_vertices.jpg]]
+
+The routine below systematically evaluates each of the three
+conditions as we back up from the vertex after traversing all outgoing
+edges. We use =entry_time[v]= to represent the age of vertex v. The
+reachability time =time_v= calculated below denotes the oldest vertex that
+can be reached using back edges.
+
+#+begin_src c++
+  process_vertex_late(int v)
+  {
+    bool root; /* is the vertex the root of the DFS tree? */
+    int time_v; /* earliest reachable time for v */
+    int time_parent; /* earliest reachable time for parent[v] */
+    if (parent[v] < 1) { /* test if v is the root */
+      if (tree_out_degree[v] > 1)
+        printf("root articulation vertex: %d \n",v);
+      return;
+    }
+    root = (parent[parent[v]] < 1); /* is parent[v] the root? */
+    if ((reachable_ancestor[v] == parent[v]) && (!root))
+      printf("parent articulation vertex: %d \n",parent[v]);
+    if (reachable_ancestor[v] == v) {
+      printf("bridge articulation vertex: %d \n",parent[v]);
+      if (tree_out_degree[v] > 0) /* test if v is not a leaf */
+        printf("bridge articulation vertex: %d \n",v);
+    }
+    time_v = entry_time[reachable_ancestor[v]];
+    time_parent = entry_time[ reachable_ancestor[parent[v]] ];
+    if (time_v < time_parent)
+      reachable_ancestor[parent[v]] = reachable_ancestor[v];
+  }
+#+end_src
+
+We can alternately talk about reliability in terms of edge failures
+instead of vertex failures. 
+
+In fact
+all bridges can be identified in the same O(n+m) time. Edge (x, y) is a
+bridge if (1) it is a tree edge, and (2) no back edge connects from
+yor below toxor above. This can be computed with a minor modification
+of the =reachable_ancestor= function.
+
+** 5.10 Depth-First Search on Directed Graphs
+For directed graphs, depth-first search labelings can take on a wider
+range of possibilities. Indeed, all four of the edge cases in Figure
+below can occur in traversing directed graphs.
+
+[[./images/edge_cases_for_traversl.jpg]]
+
+The correct labeling of each edge can be readily determined from the
+state, discovery time, and parent of each vertex, as encoded in the
+following function:
+
+#+begin_src c++
+  int edge_classification(int x, int y)
+  {
+    if (parent[y] == x) return(TREE);
+    if (discovered[y] && !processed[y]) return(BACK);
+    if (processed[y] && (entry_time[y]>entry_time[x])) return(FORWARD);
+    if (processed[y] && (entry_time[y]<entry_time[x])) return(CROSS);
+    printf("Warning: unclassified edge (%d,%d)\n",x,y);
+  }
+#+end_src
+
+*** Strongly Connected Components
+A directed graph isstrongly connectedif there is a directed path
+between any two vertices.
+
+[[./images/strongly_connected_components.jpg]]
+
+The algorithm is based on the observation that it is easy to find a
+directed cycle using a depth-first search, since any back edge plus
+the down path in the DFS tree gives such a cycle. All vertices in this
+cycle must be in the same strongly connected component. Thus, we can
+shrink (contract) the vertices on this cycle down to a single vertex
+representing the component, and then repeat. This process terminates
+when no directed cycle remains, and each vertex represents a different
+strongly connected component.
+
+We update our notion of the oldest reachable vertex in response to (1)
+nontree edges and (2) backing up from a vertex.
+
+#+begin_src c++
+  strong_components(graph *g)
+  {
+    int i; /* counter */
+    for (i=1; i<=(g->nvertices); i++) {
+      low[i] = i;
+      scc[i] = -1;
+    }
+    components_found = 0;
+    init_stack(&active);
+    initialize_search(&g);
+    for (i=1; i<=(g->nvertices); i++)
+      if (discovered[i] == FALSE) {
+        dfs(g,i);
+      }
+  }
+#+end_src
+
+Define low[v]to be the oldest vertex known to be in the same strongly
+connected component asv. This vertex is not necessarily an ancestor,
+but may also be a distant cousin of v because of cross edges. Cross
+edges that point vertices from previous strongly connected components
+of the graph cannot help us, because there can be no way back from
+them tov, but otherwise cross edges are fair game. Forward edges have
+no impact on reachability over the depth-first tree edges, and hence
+can be disregarded:
+
+#+begin_src c++
+  int low[MAXV+1]; /* oldest vertex surely in component of v */
+  int scc[MAXV+1]; /* strong component number for each vertex */
+  process_edge(int x, int y)
+  {
+    int class; /* edge class */
+    class = edge_classification(x,y);
+    if (class == BACK) {
+      if (entry_time[y] < entry_time[ low[x] ] )
+        low[x] = y;
+    }
+    if (class == CROSS) {
+      if (scc[y] == -1) /* component not yet assigned */
+        if (entry_time[y] < entry_time[ low[x] ] )
+          low[x] = y;
+    }
+  }
+#+end_src
+
+A new strongly connected component is found whenever the lowest reachable
+vertex fromvis v. If so, we can clear the stack of this component.
+Otherwise, we give our parent the benefit of the oldest ancestor we
+can reach and backtrack:
+
+#+begin_src c++
+    process_vertex_early(int v)
+    {
+      push(&active,v);
+    }
+  
+  process_vertex_late(int v)
+  {
+    if (low[v] == v) { /* edge (parent[v],v) cuts off scc */
+      pop_component(v);
+    }
+    if (entry_time[low[v]] < entry_time[low[parent[v]]])
+      low[parent[v]] = low[v];
+  }
+  
+  pop_component(int v)
+  {
+    int t; /* vertex placeholder */
+    components_found = components_found + 1;
+    scc[ v ] = components_found;
+    while ((t = pop(&active)) != v) {
+      scc[ t ] = components_found;
+    }
+  }
+#+end_src
+
 * Exercises
+** 5
+Give a linear algorithm to compute the chromatic number of graphs
+where each vertex has degree at most 2. Must such graphs be bipartite?
+** 7
+Given pre-order and in-order traversals of a binary tree, is it
+possible to reconstruct the tree? If so, sketch an algorithm to do it.
+If not, give a counterexample. Repeat the problem if you are given the
+pre-order and post-order traversals.
+** 10
+ Suppose an arithmetic expression is given as a DAG (directed acyclic
+ graph) with common subexpressions removed. Each leaf is an integer
+ and each internal node is one of the standard arithmetical operations
+ ( + , − , * , / ). For example, the expression 2 + 3 * 4 + (3 * 4) /
+ 5 is represented by the DAG in Figure (see book)(b). Give an O(n + m)
+ algorithm for evaluating such a DAG, where there are n nodes and m
+ edges in the DAG. Hint: modify an algorithm for the tree case to
+ achieve the desired efficiency.
+** 12
+The square of a directed graph G = (V,E) is the graph G2 = (V,E2) such
+that  iff there exists  such that  and ; i.e., there is a path of
+exactly two edges from u to w. square of a graph Give efficient
+algorithms for both adjacency lists and matrices.
+
 * cc
 
 

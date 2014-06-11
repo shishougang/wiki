@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Algorithm Design Manual Chapter 5</title>
-<!-- 2014-06-06 Fri 23:11 -->
+<!-- 2014-06-11 Wed 19:53 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -147,10 +147,20 @@ for the JavaScript code in this tag.
 <li><a href="#sec-1-2">5.2 Data Structures for Graphs</a></li>
 <li><a href="#sec-1-3">5.5 Traversing a Graph</a></li>
 <li><a href="#sec-1-4">5.6 Breadth-First Search</a></li>
-<li><a href="#sec-1-5"></a></li>
+<li><a href="#sec-1-5">5.7 Applications of Breadth-First Search</a></li>
+<li><a href="#sec-1-6">5.8 Depth-First Search</a></li>
+<li><a href="#sec-1-7">5.9 Applications of Depth-First Search</a></li>
+<li><a href="#sec-1-8">5.10 Depth-First Search on Directed Graphs</a></li>
 </ul>
 </li>
-<li><a href="#sec-2">Exercises</a></li>
+<li><a href="#sec-2">Exercises</a>
+<ul>
+<li><a href="#sec-2-1">5</a></li>
+<li><a href="#sec-2-2">7</a></li>
+<li><a href="#sec-2-3">10</a></li>
+<li><a href="#sec-2-4">12</a></li>
+</ul>
+</li>
 <li><a href="#sec-3">cc</a></li>
 </ul>
 </div>
@@ -305,6 +315,10 @@ out all its incident edges.
 <div id="outline-container-sec-1-4" class="outline-3">
 <h3 id="sec-1-4">5.6 Breadth-First Search</h3>
 <div class="outline-text-3" id="text-1-4">
+<p>
+先遍历完一个点的所有相邻点。
+</p>
+
 <div class="org-src-container">
 
 <pre class="src src-c++">    <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">processed</span>[MAXV+1]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">which vertices have been processed */</span>
@@ -360,15 +374,477 @@ out all its incident edges.
 }
 </pre>
 </div>
+
+<p>
+Because vertices are discovered in order of increasing distance from the root,
+this tree has a very important property. The unique tree path from the root to
+each node x∈V uses the smallest number of edges (or equivalently, intermediate
+nodes) possible on any root-to-xpath in the graph.
+</p>
+
+<p>
+There are <b>two points</b> to remember when using breadth-first search to find a
+shortest path fromxtoy: First, the shortest path tree is only useful if BFS was
+performed with x as the root of the search. Second, BFS gives the shortest path
+only if the graph is unweighted.
+</p>
 </div>
 </div>
 <div id="outline-container-sec-1-5" class="outline-3">
-<h3 id="sec-1-5"></h3>
+<h3 id="sec-1-5">5.7 Applications of Breadth-First Search</h3>
+<div class="outline-text-3" id="text-1-5">
+<p>
+Properly implemented using adjacency lists, any such algorithm is
+destined to be linear, since BFS runs in O(n+m) time on both directed
+and undirected graphs. This is optimal, since it is as fast as one can
+hope to read any n-vertex, m-edge graph.
+</p>
 </div>
 </div>
 
+<div id="outline-container-sec-1-6" class="outline-3">
+<h3 id="sec-1-6">5.8 Depth-First Search</h3>
+<div class="outline-text-3" id="text-1-6">
+<p>
+The difference between BFS and DFS results is in the order in which they
+explore vertices. This order depends completely upon the container
+data structure used to store the discovered but not processed
+vertices.
+</p>
+
+<ul class="org-ul">
+<li>Queue– By storing the vertices in a first-in, first-out (FIFO)
+queue, we explore the oldest unexplored vertices first. Thus our
+explorations radiate out slowly from the starting vertex, defining a
+breadth-first search.
+</li>
+
+<li>Stack– By storing the vertices in a last-in, first-out (LIFO) stack,
+we explore the vertices by lurching along a path, visiting a new
+neighbor if one is available, and backing up only when we are
+surrounded by previously discovered vertices. Thus, our explorations
+quickly wanderaway from our starting point, defining a depth-first
+search.
+</li>
+</ul>
+
+<p>
+DFS organizes vertices by entry/exit times, and edges into tree and
+back edges. This organization is what gives DFS its real power.
+</p>
+
+<p>
+<b>Implementation</b>
+</p>
+
+<p>
+The beauty of implementingdfsrecursively is that recursion eliminates
+the need to keep an explicit stack:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #87cefa;">dfs</span>(<span style="color: #98fb98;">graph</span> *<span style="color: #eedd82;">g</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>)
+{
+  <span style="color: #98fb98;">edgenode</span> *<span style="color: #eedd82;">p</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">temporary pointer */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">successor vertex */</span>
+  <span style="color: #00ffff;">if</span> (finished) <span style="color: #00ffff;">return</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">allow for search termination */</span>
+  discovered[v] = TRUE;
+  time = time + 1;
+  entry_time[v] = time;
+  process_vertex_early(v);
+  p = g-&gt;edges[v];
+  <span style="color: #00ffff;">while</span> (p != <span style="color: #7fffd4;">NULL</span>) {
+    y = p-&gt;y;
+    <span style="color: #00ffff;">if</span> (discovered[y] == FALSE) {
+      parent[y] = v;
+      process_edge(v,y);
+      dfs(g,y);
+    }
+    <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> ((!processed[y]) || (g-&gt;directed))
+      process_edge(v,y);
+    <span style="color: #00ffff;">if</span> (finished) <span style="color: #00ffff;">return</span>;
+    p = p-&gt;next;
+  }
+  process_vertex_late(v);
+  time = time + 1;
+  exit_time[v] = time;
+  processed[v] = TRUE;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-1-7" class="outline-3">
+<h3 id="sec-1-7">5.9 Applications of Depth-First Search</h3>
+<div class="outline-text-3" id="text-1-7">
+</div><ul class="org-ul"><li>Finding Cycles<br  /><div class="outline-text-4" id="text-1-7-1">
+<p>
+But any back edge going from x to an ancestorycreates a cycle with the
+tree path fromytox. Such a cycle is easy to find using dfs:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #87cefa;">process_edge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>)
+{
+  <span style="color: #00ffff;">if</span> (parent[x] != y) { <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">found back edge! */</span>
+    printf(<span style="color: #ffa07a;">"Cycle from %d to %d:"</span>,y,x);
+    find_path(y,x,parent);
+    printf(<span style="color: #ffa07a;">"\n\n"</span>);
+    finished = TRUE;
+  }
+}
+</pre>
+</div>
+</div>
+</li>
+
+<li>Articulation Vertices<br  /><div class="outline-text-4" id="text-1-7-2">
+<p>
+Observe that there is a single point of failure—a single vertex whose
+deletion disconnects a connected component of the graph. Such a vertex
+is called an articulation vertex or cut-node.
+</p>
+
+<p>
+More robust graphs without such a vertex are said to be biconnected.
+</p>
+
+<p>
+Temporarily delete each vertex v, and then do a BFS or DFS traversal
+of the remaining graph to establish whether it is still connected. The
+total time fornsuch traversals is O(n(m+n)). There is a clever
+linear-time algorithm, however, that tests all the vertices of a
+connected graph using a single depth-first search.
+</p>
+
+<p>
+Let <code>reachable_ancestor[v]</code> denote the earliest reachable ancestor of
+vertex v, meaning the oldest ancestor ofvthat we can reach by a
+combination of tree edges and back edges. Initially,
+<code>reachable_ancestor[v] = v</code>:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">reachable_ancestor</span>[MAXV+1]; <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">earliestreachableancestorofv*/</span>
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">tree_out_degree</span>[MAXV+1];  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">DFStree outdegree ofv*/</span>
+<span style="color: #87cefa;">process_vertex_early</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>)
+{
+  reachable_ancestor[v] = v;
+}
+</pre>
+</div>
+
+<p>
+We update <code>reachable_ancestor[v]</code> whenever we encounter a back edge
+that takes us to an earlier ancestor than we have previously seen. The
+relative age/rank of our ancestors can be determined from
+their <code>entry_time’s</code>:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #87cefa;">process_edge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #00ffff;">class</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">edge class */</span>
+  <span style="color: #00ffff;">class</span> = edge_classification(x,y);
+  <span style="color: #00ffff;">if</span> (<span style="color: #00ffff;">class</span> == TREE)
+    tree_out_degree[x] = tree_out_degree[x] + 1;
+  <span style="color: #00ffff;">if</span> ((<span style="color: #00ffff;">class</span> == BACK) &amp;&amp; (parent[x] != y)) {
+    <span style="color: #00ffff;">if</span> (entry_time[y] &lt; entry_time[ reachable_ancestor[x] ] )
+      reachable_ancestor[x] = y;
+  }
+}
+</pre>
+</div>
+
+<p>
+The key issue is determining how the reachability relation impacts
+whether vertexv is an articulation vertex. There are three cases:
+</p>
+<ul class="org-ul">
+<li>Root cut-nodes– If the root of the DFS tree has two or more
+children, it must be an articulation vertex. No edges from the
+subtree of the second child can possibly connect to the subtree of
+the first child.
+</li>
+
+<li>Bridge cut-nodes– If the earliest reachable vertex fromvis v, then
+deleting the single edge (parent[v],v) disconnects the graph.
+Clearlyparent[v] must be an articulation vertex, since it cuts v from
+the graph. Vertex vis also an articulation vertex unless it is a
+leaf of the DFS tree. For any leaf, nothing falls off when you cut it.
+</li>
+<li>Parent cut-nodes– If the earliest reachable vertex fromvis the
+parent of v, then deleting the parent must severvfrom the tree
+unless the parent is the root.
+</li>
+</ul>
+
+
+<div class="figure">
+<p><img src="./images/articulation_vertices.jpg" alt="articulation_vertices.jpg" />
+</p>
+</div>
+
+<p>
+The routine below systematically evaluates each of the three
+conditions as we back up from the vertex after traversing all outgoing
+edges. We use <code>entry_time[v]</code> to represent the age of vertex v. The
+reachability time <code>time_v</code> calculated below denotes the oldest vertex that
+can be reached using back edges.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #87cefa;">process_vertex_late</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>)
+{
+  <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">root</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">is the vertex the root of the DFS tree? */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">time_v</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">earliest reachable time for v */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">time_parent</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">earliest reachable time for parent[v] */</span>
+  <span style="color: #00ffff;">if</span> (parent[v] &lt; 1) { <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">test if v is the root */</span>
+    <span style="color: #00ffff;">if</span> (tree_out_degree[v] &gt; 1)
+      printf(<span style="color: #ffa07a;">"root articulation vertex: %d \n"</span>,v);
+    <span style="color: #00ffff;">return</span>;
+  }
+  root = (parent[parent[v]] &lt; 1); <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">is parent[v] the root? */</span>
+  <span style="color: #00ffff;">if</span> ((reachable_ancestor[v] == parent[v]) &amp;&amp; (!root))
+    printf(<span style="color: #ffa07a;">"parent articulation vertex: %d \n"</span>,parent[v]);
+  <span style="color: #00ffff;">if</span> (reachable_ancestor[v] == v) {
+    printf(<span style="color: #ffa07a;">"bridge articulation vertex: %d \n"</span>,parent[v]);
+    <span style="color: #00ffff;">if</span> (tree_out_degree[v] &gt; 0) <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">test if v is not a leaf */</span>
+      printf(<span style="color: #ffa07a;">"bridge articulation vertex: %d \n"</span>,v);
+  }
+  time_v = entry_time[reachable_ancestor[v]];
+  time_parent = entry_time[ reachable_ancestor[parent[v]] ];
+  <span style="color: #00ffff;">if</span> (time_v &lt; time_parent)
+    reachable_ancestor[parent[v]] = reachable_ancestor[v];
+}
+</pre>
+</div>
+
+<p>
+We can alternately talk about reliability in terms of edge failures
+instead of vertex failures. 
+</p>
+
+<p>
+In fact
+all bridges can be identified in the same O(n+m) time. Edge (x, y) is a
+bridge if (1) it is a tree edge, and (2) no back edge connects from
+yor below toxor above. This can be computed with a minor modification
+of the <code>reachable_ancestor</code> function.
+</p>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-1-8" class="outline-3">
+<h3 id="sec-1-8">5.10 Depth-First Search on Directed Graphs</h3>
+<div class="outline-text-3" id="text-1-8">
+<p>
+For directed graphs, depth-first search labelings can take on a wider
+range of possibilities. Indeed, all four of the edge cases in Figure
+below can occur in traversing directed graphs.
+</p>
+
+
+<div class="figure">
+<p><img src="./images/edge_cases_for_traversl.jpg" alt="edge_cases_for_traversl.jpg" />
+</p>
+</div>
+
+<p>
+The correct labeling of each edge can be readily determined from the
+state, discovery time, and parent of each vertex, as encoded in the
+following function:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">edge_classification</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>)
+{
+  <span style="color: #00ffff;">if</span> (parent[y] == x) <span style="color: #00ffff;">return</span>(TREE);
+  <span style="color: #00ffff;">if</span> (discovered[y] &amp;&amp; !processed[y]) <span style="color: #00ffff;">return</span>(BACK);
+  <span style="color: #00ffff;">if</span> (processed[y] &amp;&amp; (entry_time[y]&gt;entry_time[x])) <span style="color: #00ffff;">return</span>(FORWARD);
+  <span style="color: #00ffff;">if</span> (processed[y] &amp;&amp; (entry_time[y]&lt;entry_time[x])) <span style="color: #00ffff;">return</span>(CROSS);
+  printf(<span style="color: #ffa07a;">"Warning: unclassified edge (%d,%d)\n"</span>,x,y);
+}
+</pre>
+</div>
+</div>
+
+<ul class="org-ul"><li>Strongly Connected Components<br  /><div class="outline-text-4" id="text-1-8-1">
+<p>
+A directed graph isstrongly connectedif there is a directed path
+between any two vertices.
+</p>
+
+
+<div class="figure">
+<p><img src="./images/strongly_connected_components.jpg" alt="strongly_connected_components.jpg" />
+</p>
+</div>
+
+<p>
+The algorithm is based on the observation that it is easy to find a
+directed cycle using a depth-first search, since any back edge plus
+the down path in the DFS tree gives such a cycle. All vertices in this
+cycle must be in the same strongly connected component. Thus, we can
+shrink (contract) the vertices on this cycle down to a single vertex
+representing the component, and then repeat. This process terminates
+when no directed cycle remains, and each vertex represents a different
+strongly connected component.
+</p>
+
+<p>
+We update our notion of the oldest reachable vertex in response to (1)
+nontree edges and (2) backing up from a vertex.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #87cefa;">strong_components</span>(<span style="color: #98fb98;">graph</span> *<span style="color: #eedd82;">g</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">counter */</span>
+  <span style="color: #00ffff;">for</span> (i=1; i&lt;=(g-&gt;nvertices); i++) {
+    low[i] = i;
+    scc[i] = -1;
+  }
+  components_found = 0;
+  init_stack(&amp;active);
+  initialize_search(&amp;g);
+  <span style="color: #00ffff;">for</span> (i=1; i&lt;=(g-&gt;nvertices); i++)
+    <span style="color: #00ffff;">if</span> (discovered[i] == FALSE) {
+      dfs(g,i);
+    }
+}
+</pre>
+</div>
+
+<p>
+Define low[v]to be the oldest vertex known to be in the same strongly
+connected component asv. This vertex is not necessarily an ancestor,
+but may also be a distant cousin of v because of cross edges. Cross
+edges that point vertices from previous strongly connected components
+of the graph cannot help us, because there can be no way back from
+them tov, but otherwise cross edges are fair game. Forward edges have
+no impact on reachability over the depth-first tree edges, and hence
+can be disregarded:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">low</span>[MAXV+1]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">oldest vertex surely in component of v */</span>
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">scc</span>[MAXV+1]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">strong component number for each vertex */</span>
+<span style="color: #87cefa;">process_edge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #00ffff;">class</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">edge class */</span>
+  <span style="color: #00ffff;">class</span> = edge_classification(x,y);
+  <span style="color: #00ffff;">if</span> (<span style="color: #00ffff;">class</span> == BACK) {
+    <span style="color: #00ffff;">if</span> (entry_time[y] &lt; entry_time[ low[x] ] )
+      low[x] = y;
+  }
+  <span style="color: #00ffff;">if</span> (<span style="color: #00ffff;">class</span> == CROSS) {
+    <span style="color: #00ffff;">if</span> (scc[y] == -1) <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">component not yet assigned */</span>
+      <span style="color: #00ffff;">if</span> (entry_time[y] &lt; entry_time[ low[x] ] )
+        low[x] = y;
+  }
+}
+</pre>
+</div>
+
+<p>
+A new strongly connected component is found whenever the lowest reachable
+vertex fromvis v. If so, we can clear the stack of this component.
+Otherwise, we give our parent the benefit of the oldest ancestor we
+can reach and backtrack:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++">  <span style="color: #87cefa;">process_vertex_early</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>)
+  {
+    push(&amp;active,v);
+  }
+
+<span style="color: #87cefa;">process_vertex_late</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>)
+{
+  <span style="color: #00ffff;">if</span> (low[v] == v) { <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">edge (parent[v],v) cuts off scc */</span>
+    pop_component(v);
+  }
+  <span style="color: #00ffff;">if</span> (entry_time[low[v]] &lt; entry_time[low[parent[v]]])
+    low[parent[v]] = low[v];
+}
+
+<span style="color: #87cefa;">pop_component</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">vertex placeholder */</span>
+  components_found = components_found + 1;
+  scc[ v ] = components_found;
+  <span style="color: #00ffff;">while</span> ((t = pop(&amp;active)) != v) {
+    scc[ t ] = components_found;
+  }
+}
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+</div>
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">Exercises</h2>
+<div class="outline-text-2" id="text-2">
+</div><div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">5</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+Give a linear algorithm to compute the chromatic number of graphs
+where each vertex has degree at most 2. Must such graphs be bipartite?
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">7</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+Given pre-order and in-order traversals of a binary tree, is it
+possible to reconstruct the tree? If so, sketch an algorithm to do it.
+If not, give a counterexample. Repeat the problem if you are given the
+pre-order and post-order traversals.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">10</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+Suppose an arithmetic expression is given as a DAG (directed acyclic
+graph) with common subexpressions removed. Each leaf is an integer
+and each internal node is one of the standard arithmetical operations
+( + , − , * , / ). For example, the expression 2 + 3 * 4 + (3 * 4) /
+5 is represented by the DAG in Figure (see book)(b). Give an O(n + m)
+algorithm for evaluating such a DAG, where there are n nodes and m
+edges in the DAG. Hint: modify an algorithm for the tree case to
+achieve the desired efficiency.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">12</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+The square of a directed graph G = (V,E) is the graph G2 = (V,E2) such
+that  iff there exists  such that  and ; i.e., there is a path of
+exactly two edges from u to w. square of a graph Give efficient
+algorithms for both adjacency lists and matrices.
+</p>
+</div>
+</div>
 </div>
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">cc</h2>
@@ -382,7 +858,7 @@ out all its incident edges.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-06-06 Fri 23:11</p>
+<p class="date">Created: 2014-06-11 Wed 19:53</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

@@ -468,12 +468,55 @@ many key comparisons does your algorithm do in the worst case? Must
 your algorithm determine which key is largest and second-largest in
 the process?
 
++ 找第二大元素：大小为2个的数组初始化为第一二个元素，之后每个元素与这
+  数组对比，剔除最小的，最后数组内2个元组对比得到最大和第二大元素，一
+  共比较2(n-2)+1=2n-3，找出第二大元素。
++ 找第三大元素：同样已大小为3的数组，最后比较数3(n-3)+2=3n-7。
 
+[[http://wiki.dreamrunner.org/public_html/Algorithms/Theory%20of%20Algorithms/Selection%20Problem.html#sec-4][Random Selection]]可以找出任意的第几大值，平均时间复杂度：O(n)，比较次数
+将是n的倍数，最坏时间复杂度可以达到：O(nlogn)。
 
+[[http://wiki.dreamrunner.org/public_html/Algorithms/Theory%20of%20Algorithms/Selection%20Problem.html#sec-6][Tournament Algorithm]]找第二大元素比较次数O(n+logn);找第k个最大元素，比
+较次数为O(n+klogn)。
 ** 16
  Use the partitioning idea of quicksort to give an algorithm that
  finds the median element of an array of n integers in expected O(n)
  time. (Hint: must you look at both sides of the partition?)
+
+#+begin_src c++
+unsigned int seed = time(NULL);
+int randint(int m, int n) {
+  return m + rand_r(&seed) / (RAND_MAX / (n + 1 - m) + 1);
+}
+
+void RandomSelectionK(int *array, int l, int u, int k) {
+  if (l >= u) {
+    return;
+  }
+  swap(array[l], array[randint(l, u)]);
+  int pivot = array[l];
+  int i = l;
+  int j = u + 1;
+  while (true) {
+    do {
+      ++i;
+    } while (i <= u && array[i] < pivot);
+    do {
+      --j;
+    } while (array[j] > pivot);
+    if (i > j) {
+      break;
+    }
+    swap(array[i], array[j]);
+  }
+  swap(array[l], array[j]);
+  if (j < k) {
+    RandomSelectionK(array, j + 1, u, k);
+  } else if (j > k) {
+    RandomSelectionK(array, l, j - 1, k);
+  }
+}
+#+end_src
 
 ** 17
 The median of a set of n values is the $\lceil n/2 \rceil$ th smallest
@@ -486,15 +529,348 @@ value.
    smallest value of the current sub-array. How many comparisons would
    be made then in the worst case?
 
-** 18
-** 19
+f(n) = 2*f(n/2) + n ==> f(n) = 2^k * f(n/2^{k}) + kn = (n+2)logn
 
-* cc
+f(n) = f(n/3) + f(2n/3) + n ==> f(n) = O(nlogn)
+** 18
+Suppose an array A consists of n elements, each of which is red,
+white, or blue. We seek to sort the elements so that all the reds come
+before all the whites, which come before all the blues The only
+operation permitted on the keys are
+
++ Examine(A,i) -- report the color of the ith element of A.
++ Swap(A,i,j) -- swap the ith element of A with the jth element.
+Find a correct and efficient algorithm for red-white-blue sorting.
+There is a linear-time solution.
+
+2次扫描。
++ 第一次：把red和white当成一样，用quick的partition分开与blue。
++ 第二次：只区分red和white的子区间。   
+** 21
+Stable sorting algorithms leave equal-key items in the same relative
+order as in the original permutation. Explain what must be done to
+ensure that mergesort is a stable sorting algorithm.
+
+在合并时元素相等时选index小的元素在前。
+** 22-23
+Show that n positive integers in the range 1 to k can be sorted in
+O(nlogk) time. The interesting case is when k < < n.
+
+We seek to sort a sequence S of n integers with many duplications,
+such that the number of distinct integers in S is O(logn). Give an
+O(nloglogn) worst-case time algorithm to sort such sequences.
+
+balanced binary search tree.
+** 24
+ Let A[1..n] be an array such that the first $n-\sqrt n$  elements are
+ already sorted (though we know nothing about the remaining elements).
+ Give an algorithm that sorts A in substantially better than nlogn
+ steps.
+
++ $O(\sqrt{n}log(\sqrt{n})$ 排序后面的 $\sqrt{n}$ 个元素。
++ O(n)去mergesort前半部分和后半部分。
+
+** 25
+Assume that the array A[1..n] only has numbers from $\{1,\ldots, n^2\}$
+but that at most loglogn of these numbers ever appear. Devise an
+algorithm that sorts A in substantially less than O(nlogn).
+
+和23一样，用balanced binary search tree，树的高度不超过loglogn,最后的
+复杂度O(n*logloglogn)。
+
+** 27
+ Let P be a simple, but not necessarily convex, polygon and q an
+ arbitrary point not necessarily in P. Design an efficient algorithm
+ to find a line segment originating from q that intersects the maximum
+ number of edges of P. In other words, if standing at point q, in what
+ direction should you aim a gun so the bullet will go through the
+ largest number of walls. A bullet through a vertex of P gets credit
+ for only one wall. An O(nlogn) algorithm is possible.
+
+1. 以ｑ为中心点，顺时针旋转，Ｐ中所有边随着顺时针旋转都有一个起始点
+   (head)和结束点（end），计算它们的极角（polar angle）; O(n)
+2. 对所有head和end按照angle大小排序，若相等，head在前; O(nlogn)
+3. 扫描这个排序好的队列，遇到head加1,遇到end减1,最后算出这个区间的最大
+   值。O(n)
+
+** 30
+A company database consists of 10,000 sorted names, 40% of whom are known as good customers and who together account for 60% of the accesses to the database. There are two data structure options to consider for representing the database:
+1. Put all the names in a single array and use binary search.
+2. Put the good customers in one array and the rest of them in a
+   second array.
+
+Only if we do not find the query name on a binary search of the first
+array do we do a binary search of the second array. Demonstrate which
+option gives better expected performance. Does this change if linear
+search on an unsorted array is used instead of binary search for both
+options?
+
++ single array: log10000=4
++ two array: 0.6*log4000+0.4*(log4000+log6000) = 5.11
+single array is better.
+
++ single array: 10000
++ two array: 0.6*4000+0.4*6000 = 6400
+two array is better.
+
+** 31
+ Suppose you are given an array A of n sorted numbers that has been
+ circularly shifted k positions to the right. For example,
+ {35,42,5,15,27,29} is a sorted array that has been circularly shifted
+ k = 2 positions, while {27,29,35,42,5,15} has been shifted k = 4
+ positions.
+
+1. Suppose you know what k is. Give an O(1) algorithm to find the
+   largest number in A.
+
+2. Suppose you do not know what k is. Give an O(lgn) algorithm to find
+   the largest number in A. For partial credit, you may give an O(n)
+   algorithm.
 
 
 #+begin_src c++
-
+    if (k == 0) {
+      return A[n-1];
+    } else {
+      return A[k-1];
+    }
 #+end_src
 
+#+begin_src c++
+int FindLargestNumber(int *array, int l, int h) {
+  if (array[l] < array[h]) {
+    return array[h];
+  }
+  if (l == h) {
+    return array[h];
+  }
+  int mid;
+  mid = (l + h) / 2;
+  if ((mid + 1 <= h) && array[mid] > array[mid + 1]) {
+    return array[mid];
+  }
+  if ((mid - 1 >= l) && array[mid - 1] > array[mid]) {
+    return array[mid - 1];
+  }
+  if (array[mid] < array[h]) {
+    return FindLargestNumber(array, l, mid - 1);
+  } else {
+    return FindLargestNumber(array, mid + 1, h);
+  }
+}
+#+end_src
+
+** 32
+Consider the numerical 20 Questions game. In this game, Player 1
+thinks of a number in the range 1 to n. Player 2 has to figure out
+this number by asking the fewest number of true/false questions.
+Assume that nobody cheats.
+
+1. What is an optimal strategy if n is known?
+2. What is a good strategy if n is not known?
 
 
+1. binary search.
+2. 2^{i}随机选一个i，若数小，增加到2^{i+1},若大就二分搜索。
+** 33
+ Suppose that you are given a sorted sequence of distinct integers .
+ Give an O(lgn) algorithm to determine whether there exists an i index
+ such as ai = i. For example, in { − 10, − 3,3,5,7}, a3 = 3. In
+ {2,3,4,5,6,7}, there is no such i.
+
+#+begin_src c++
+bool CheckEqualIndex(int *array, int l, int h) {
+  while (l <= h) {
+    int mid = (l + h) / 2;
+    if (array[mid] > (mid + 1)) {
+      h = mid - 1;
+    } else if (array[mid] < (mid + 1)) {
+      l = mid + 1;
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+#+end_src
+
+** 34
+Suppose that you are given a sorted sequence of distinct integers ,
+drawn from 1 to m where n < m. Give an O(lgn) algorithm to find an
+integer  that is not present in a. For full credit, find the smallest
+such integer.
+
+#+begin_src c++
+int FindMissingElement(int *array, int l, int h) {
+  while (l <= h) {
+    int mid = (l + h) / 2;
+    if (array[mid] > (mid + 1)) {
+      h = mid - 1;
+    } else if (array[mid] <= (mid + 1)) {
+      l = mid + 1;
+    }
+  }
+  return l + 1;
+}
+#+end_src
+** 35
+ Let M be an n*m  integer matrix in which the entries of each row are
+ sorted in increasing order (from left to right) and the entries in
+ each column are in increasing order (from top to bottom). Give an
+ efficient algorithm to find the position of an integer x in M, or to
+ determine that x is not there. How many comparisons of x with matrix
+ entries does your algorithm use in worst case?
+
+O(m+n)
+
+#+begin_src c++
+bool FindElement(int **array, int x, int n, int m, int *pos_x, int *pos_y) {
+  int row = 0, col = m - 1;
+  while (row < n && col >= 0) {
+    if (array[row][col] == x) {
+      *pos_x = row;
+      *pos_y = col;
+      return true;
+    } else if (array[row][col] > x) {
+      col--;
+    } else {
+      row++;
+    }
+  }
+  return true;
+}
+#+end_src
+** 36
+Consider an n*n  array A containing integer elements (positive, negative,
+and zero). Assume that the elements in each row of A are in strictly
+increasing order, and the elements of each column of A are in strictly
+decreasing order. (Hence there cannot be two zeroes in the same row or
+the same column.) Describe an efficient algorithm that counts the
+number of occurrences of the element 0 in A. Analyze its running time.
+
+#+begin_src c++
+int CountZero(int **array, int n) {
+  int row = n - 1, col = n - 1;
+  int count = 0;
+  while (row >=0 && col >= 0) {
+    if (array[row][col] == 0) {
+      count++;
+      row--;
+    } else if(array[row][col] > 0) {
+      col--;
+    } else {
+      row--;
+    }
+  }
+  return count;
+}
+#+end_src
+
+** 40
+ If you are given a million integers to sort, what algorithm would you
+ use to sort them? How much time and memory would that consume?
+
+1. 一个整数４字节，10^9*4=4G,需要4G的内存，可以用快排等O(nlogn)的排序算法．
+2. 用bitmap,需要10^{9}/8=128M的内存.
+3. 若内存有限,就external merge sort,利用外部存储多进行几次.
+** 41
+Describe advantages and disadvantages of the most popular sorting
+algorithms.
+
+*Merge sort:*
++ 优点:适合链表,适合外排.
++ 缺点:需要多余的内存来保存合并的数据.
+
+*Insertion/Selection sort:*
++ 优点:简单实现.
++ 缺点:太慢,当数据很大时,运行不实际.
+
+*Heap sort:*
++ 优点:不需要递归,适合大数据.
++ 缺点:时常慢于merge sort和quick sort.
+
+*Quick sort:*
++ 优点:很快.
++ 缺点:递归,最坏情况比较慢.
+
+** 42
+Implement an algorithm that takes an input array and returns only the
+unique elements in it.
+
+排序,然后扫描输出.O(nlogn).
+
+** 43
+You have a computer with only 2Mb of main memory. How do you use it to
+sort a large file of 500 Mb that is on disk?
+
+利用[[http://en.wikipedia.org/wiki/External_sorting][external merge sort]].
+** 44
+Design a stack that supports push, pop, and retrieving the minimum
+element in constant time. Can you do this?
+
+只有一个stack办不到.如果两个stack,可以利用另外一个stack存储最小值.
+** 45
+Given a search string of three words, find the smallest snippet of the
+document that contains all three of the search words---i.e., the
+snippet with smallest number of words in it. You are given the index
+positions where these words occur in the document, such as word1: (1,
+4, 5), word2: (3, 9, 10), and word3: (2, 6, 15). Each of the lists are
+in sorted order, as above.
+
+1. 选取每个字母index的首个元素作为起始方案。
+2. 如何改进它的长度：a.增加最小的位置，b.减小最大的位置，这里只能增加
+   最小的位置。
+3. 用heap来保存位置，每次取出最小的位置为O(logk).
+
+复杂度：O(nlogk)，n是所有字母的位置个数，k是字母个数。这里k=3,所以O(n)
+
+#+begin_src c++
+#include <queue>
+using std::priority_queue;
+#include <utility>
+using std::make_pair;
+using std::pair;
+#include <vector>
+using std::vector;
+#include <algorithm>
+using std::max;
+using std::min;
+#include <limits>
+using std::numeric_limits;
+
+
+int FindSmallestSnippet(vector<vector<int> > &index_positions) {
+  // max-priority, select smallest position, use -index_positions[i][j], (i,j)
+  priority_queue<pair<int, pair<int ,int> > > queue;
+  int max_pos = 0; // the max pos of  the snippet
+  int i;
+  for (i = 0; i < index_positions.size(); ++i) {
+    int pos = index_positions[i][0];
+    max_pos = max(max_pos, pos);
+    queue.push(make_pair(-pos, make_pair(i, 0)));
+  }
+  int smallest_len = numeric_limits<int>::max();
+  while (queue.size() == index_positions.size()) {
+    int min_pos = -queue.top().first;
+    smallest_len = min(smallest_len, max_pos - min_pos + 1);
+    int word_pos = queue.top().second.first;
+    int index = queue.top().second.second;
+    queue.pop();
+    ++index;
+    if (index < index_positions[word_pos].size()) {
+      int next_pos = index_positions[word_pos][index];
+      max_pos = max(max_pos, next_pos);
+      queue.push(make_pair(-next_pos, make_pair(word_pos, index)));
+    }
+  }
+  return smallest_len;
+}
+#+end_src
+** 46
+You are given 12 coins. One of them is heavier or lighter than the
+rest. Identify this coin in just three weighings.
+
+1. 分3组,每组4个,其中两组称重,若相等,重的在第三组.若不等,重的在重的那
+   一组.
+2. 重的那组分4组,每组1个,第一组和第二组称重,谁重就重的那个.
+3. 若step2相等,剩下第三组和第四组称重,谁重就重的那个.
