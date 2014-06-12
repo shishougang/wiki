@@ -478,32 +478,129 @@ can reach and backtrack:
 ** 5
 Give a linear algorithm to compute the chromatic number of graphs
 where each vertex has degree at most 2. Must such graphs be bipartite?
+
+这样的图不必要是bipartite的.反例是:3个顶点,两两相连.
+
+因为每个顶点最多2度,使用DFS遍历,对子顶点着色与父顶点相反的颜色.当遇到
+一个回归的边,那么对当前定点着色与父顶点不同,并且与回归边上的祖先定点不
+同.
+
+只有一次遍历,复杂度O(m+n) (m edges, n vertices).
 ** 7
 Given pre-order and in-order traversals of a binary tree, is it
 possible to reconstruct the tree? If so, sketch an algorithm to do it.
 If not, give a counterexample. Repeat the problem if you are given the
 pre-order and post-order traversals.
-** 10
- Suppose an arithmetic expression is given as a DAG (directed acyclic
- graph) with common subexpressions removed. Each leaf is an integer
- and each internal node is one of the standard arithmetical operations
- ( + , − , * , / ). For example, the expression 2 + 3 * 4 + (3 * 4) /
- 5 is represented by the DAG in Figure (see book)(b). Give an O(n + m)
- algorithm for evaluating such a DAG, where there are n nodes and m
- edges in the DAG. Hint: modify an algorithm for the tree case to
- achieve the desired efficiency.
-** 12
-The square of a directed graph G = (V,E) is the graph G2 = (V,E2) such
-that  iff there exists  such that  and ; i.e., there is a path of
-exactly two edges from u to w. square of a graph Give efficient
-algorithms for both adjacency lists and matrices.
-
-* cc
 
 
 #+begin_src c++
 
 #+end_src
+** 12
+The square of a directed graph G = (V,E) is the graph G^2 = (V,E^{2}) such
+that (u,w)∈E^2 iff there exists v∈V, such that (u,v)∈E  and
+(u,w)∈E; i.e., there is a path of exactly two edges from u to w.
+square of a graph Give efficient algorithms for both adjacency lists
+and matrices.
+
+*adjacency matrices*
+算法复杂度：O(n^3).
+#+begin_src sh
+  MakeSquareGraph(G, n)
+  for i=1 to n
+      for j=1 to n
+          G2[i][j] = 0
+  for i=1 to n
+      for j=1 to n
+          if (G[i][j] == 1)
+             for k=1 to n
+                 if (G[j][k] == 1)
+                    G2[i][k] = 1
+  return G2
+#+end_src
+** 18
+ Consider a set of movies $M_1, M_2, \ldots, M_k$. There is a set of
+ customers, each one of which indicates the two movies they would like
+ to see this weekend. Movies are shown on Saturday evening and Sunday
+ evening. Multiple movies may be screened at the same time. You must
+ decide which movies should be televised on Saturday and which on
+ Sunday, so that every customer gets to see the two movies they
+ desire. Is there a schedule where each movie is shown at most once?
+ Design an efficient algorithm to find such a schedule if one exists.
+
+把问题转换成图问题解决。建立无向图，顶点是每部电影，边E(1,2)表示有个客
+户想看M1和M2.如下图实例，有电影M1-M4,3个客户，1个客户想看M1和M3,一个客
+户想看M1和M4，一个客户想看M2和M4.那么把图分成（M1，M2）和（M3,M4），周
+六日各放一组,满足所有客户要求。
 
 
+若多一个客户想看M3和M4,如下图，无论怎么分图，都有2部电影相连，所以不能
+满足所有客户的要求。可以得出：若原本的图是bipartite graph，那么能找到
+满足客户的放映安排。若不是，就不能满足客户要求。
+** 23
+Your job is to arrange n ill-behaved children in a straight line,
+facing front. You are given a list of m statements of the form i hates
+j. If i hates j, then you do not want put i somewhere behind j,
+because then i is capable of throwing something at j.
+
+1. Give an algorithm that orders the line, (or says that it is not
+   possible) in O(m + n) time.
+
+2. Suppose instead you want to arrange the children in rows such that
+   if i hates j, then i must be in a lower numbered row than j. Give
+   an efficient algorithm to find the minimum number of rows needed,
+   if it is possible.
+
+1. 创建一幅有向图,顶点代表孩子,有向边E(i,j)代表孩子i hates 孩子j;
+2. topological sort得到队列，或BFS时发现环，证明不可能。只BFS遍历一次，
+   O(m + n)。
+
+1. 如题1创建有向图;
+2. 作DFS遍历，用遍历的level作为行号。
+** 31
+Which data structures are used in depth-first and breath-first search?
+1. BFS:使用queue
+2. DFS:使用stack,通常使用递归代替stack.
+
+** 32
+ Write a function to traverse binary search tree and return the ith
+ node in sorted order.
+
+#+begin_src c++
+struct Node {
+  int val;
+  struct Node* left;
+  struct Node* right;
+  Node(int val_in) {
+    val = val_in;
+    left = NULL;
+    right = NULL;
+  }
+};
+
+bool FindIthElementCore(struct Node *root, int ith, int *index, int *value) {
+  if (root == NULL) {
+    return false;
+  }
+  if (FindIthElementCore(root->left, ith, index, value)) {
+    return true;
+  }
+  cout << ith << ": " << *index << ": " << root->val << endl;
+  if (ith == *index) {
+    *value = root->val;
+    return true;
+  }
+  (*index)++;
+  if (FindIthElementCore(root->right, ith, index, value)) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool FindIthElement(struct Node *root, int ith, int *value) {
+  int start = 0;
+  return FindIthElementCore(root, ith, &start, value);
+}
+#+end_src
 
