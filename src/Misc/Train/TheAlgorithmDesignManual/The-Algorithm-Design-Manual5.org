@@ -492,10 +492,63 @@ possible to reconstruct the tree? If so, sketch an algorithm to do it.
 If not, give a counterexample. Repeat the problem if you are given the
 pre-order and post-order traversals.
 
+没有相同元素,给予pre-order and in-order traversals能重构binary search
+tree.代码如下.若有相同元素,给予:
 
-#+begin_src c++
-
+#+begin_src sh
+preorder = {1,1}
+inorder = {1,1}
 #+end_src
+可以重构:
+#+begin_src sh
+  1                     1
+ /           or          \
+1                         1
+#+end_src
+
+每次preorder的数都要去搜索在inoder所在位置,若书是平衡的,那么n个元素每
+次搜索后总的算法复杂度O(nlogn),但不是平衡的,一下就变成O(n^2).
+
+所以利用hash table,先把inorder的元素和位置hash起来,那么总的算法时
+间:O(n).
+
+以下假设元素都小于255,简单的利用数组映射来模拟hash table.
+#+begin_src c++
+struct Node {
+  int val;
+  struct Node* left;
+  struct Node* right;
+  Node(int val_in) {
+    val = val_in;
+    left = NULL;
+    right = NULL;
+  }
+};
+
+const int kMax = 256;
+int map_index[kMax];
+
+void MapToIndex(int inorder[], int n) {
+  for (int i = 0; i < n; ++i) {
+    map_index[inorder[i]] = i;
+  }
+}
+
+Node *BuildInorderPreorder(in in[], in pre[], int n, int offset) {
+  if (n == 0) {
+    return NULL:
+  }
+  int root_val = pre[0];
+  int i = map_index[root_val] - offset;
+  Node *root = new Node(root_val);
+  root->left = BuildInorderPreorder(in, pre+1, i, offset);
+  root->right = BuildInorderPreorder(in+i+1, pre+i+1, offset+i+1);
+  return root;
+}
+#+end_src
+
++ 给予pre-order and post-order traversals, 不能重构binary search tree.
+
 ** 12
 The square of a directed graph G = (V,E) is the graph G^2 = (V,E^{2}) such
 that (u,w)∈E^2 iff there exists v∈V, such that (u,v)∈E  and
@@ -533,10 +586,13 @@ and matrices.
 户想看M1和M4，一个客户想看M2和M4.那么把图分成（M1，M2）和（M3,M4），周
 六日各放一组,满足所有客户要求。
 
+[[./images/movie1.jpg]]
 
 若多一个客户想看M3和M4,如下图，无论怎么分图，都有2部电影相连，所以不能
 满足所有客户的要求。可以得出：若原本的图是bipartite graph，那么能找到
 满足客户的放映安排。若不是，就不能满足客户要求。
+
+[[./images/movie2.jpg]]
 ** 23
 Your job is to arrange n ill-behaved children in a straight line,
 facing front. You are given a list of m statements of the form i hates
@@ -603,4 +659,5 @@ bool FindIthElement(struct Node *root, int ith, int *value) {
   return FindIthElementCore(root, ith, &start, value);
 }
 #+end_src
+
 

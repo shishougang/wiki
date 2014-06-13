@@ -165,7 +165,7 @@ are protected while they execute. They are immune to race conditions,
 and that makes them useful. 
 
 
-* Name three thread design patterns
+* Name three thread design patterns[fn:1]
 1. Thread pool
 2. Peer
 3. Pipeline
@@ -187,42 +187,125 @@ The code between lock and unlock calls to a mutex.
   ordering to the arrival of lock requests. Such mutexes may be slower
   due to increased overhead and the possibility of having to wake
   threads next in line that may be sleeping.
-+ Reader/Writer: allows for
++ Reader/Writer: allows for multiple readers to acquire the lock
+  simultaneously. If existing readers have the lock, a writer request
+  on the lock will block until all readers have given up the lock.
+  This can lead to writer starvation.
++ Scoped: RAII-style semantics regarding lock acquisition and
+  unlocking.
+
 * Define: deadlock
+Two (or more) threads have stopped execution or are spinning
+permanently. For example, a simple deadlock situation: thread 1 locks
+lock A, thread 2 locks lock B, thread 1 wants lock B and thread 2
+wants lock A.
 * How can you prevent deadlocking from occurring?
+You can prevent deadlocks from happening by making sure threads
+acquire locks in an agreed order(i.e. preservation of lock ordering).
+Deadlock can also happen if threads do not unlock mutexes properly.
+
 * Define: race condition
+A race condition is when non-deterministic behavior results from
+threads accessing shared data or resources without following a defined
+synchronization protocol for serializing such access.
 * How can you prevent race conditions from occurring?
+Take steps within your program to enforce serial access to shared file
+descriptors and other external resources.
 * Define: priority inversion
+A higher priority thread can wait behind a lower priority thread if
+the lower priority thread holds a lock for which the higher priority
+thread is waiting.
+
 * Define: Condition Variable
+Condition variables allow threads to synchronize to a value of a
+shared resource. Typically, condition variables are used as a
+notification system between threads.
 * Define: (thread) barriers
+Barriers are a method to synchronize a set of threads at some point in
+time by having all participating threads in the barrier wait until all
+threads have called the said barrier function. This, in essence,
+blocks all threads participating in the barrier until the slowest
+participating thread reaches the barrier call.
 * Semaphores
+Semaphores are another type of synchronization primitive that come in
+two flavors: binary and counting. Binary semaphores act much like
+simple mutexes, while counting semaphores can behave as recursive
+mutexes. Counting semaphores can be initialized to any arbitrary value
+which should depend on how many resources you have available for that
+particular shared data. Many threads can obtain the lock
+simultaneously until the limit is reached. This is referred to as lock
+depth.
+
 * Spinlocks
+Spinlocks are locks which spin on mutexes. Spinning refers to
+continuously polling until a condition has been met. In the case of
+spinlocks, if a thread cannot obtain the mutex, it will keep polling
+the lock until it is free. The advantage of a spinlock is that the
+thread is kept active and does not enter a sleep-wait for mutex to
+become available, thus can perform better in certain cases than
+typical blocking-sleep-wait style mutexes. Mutexes which are heavily
+contended are poor candidates for spinlocks.
 * Six synchronization primitives
-* livestock
+1. Mutex
+2. Join
+3. Condition variable
+4. Barriers
+5. Spinlock
+6. Semaphore
+
+* livelock
+A livelock is simliar to a deadlock, except that the states of the
+processes involved in the livelock constantly change with regard to
+one another, none progressing.
 * What does the term 'lock-free' mean?
+Multithreaded code written such that the threads can never permanently
+lock up.
 * "Busy waiting" and how it can be avoided
+When one thread is waiting for another thread using an active looping
+structure that doesn't do anything. This can be avoided using mutexes.
+
+* How would you maintain concurrency on a shared page being edited by multiple users simultaneously. 
+What if the page is being shared using a client- server mechanism.
+Represent the classes and explain the thread safety mechnism to avoid
+editing conflicts.
+
+Use [[http://en.wikipedia.org/wiki/Optimistic_concurrency_control][Optimistic concurrency control(OCC)]]. OCC assumes that multiple
+transactions can frequently complete without interfering with each
+other. While running, transactions use data resources without
+acquiring locks on those resources. Before committing, each
+transaction verifies that no other transaction has modified the data
+it has read. If the check reveals conflicting modifications, the
+committing transaction rolls back and can be restarted.
+
++ Divide the page into multiple segments. Assign each segment a
+  version number which increments on every update.
++ The list of version numbers is communicated to the clients as well.
++ Before updating a segment, the client gets the latest page and its
+  versions from the server. Updates the page and sends it across to
+  the server along with the versions.
++ f any part of the page is updated, the version on the server would
+  change. If so, reject the clients request along with the latest page
+  and the changed versions.
+
+* Write a multi threaded C code with one thread printing all even numbers 
+and the other all odd numbers. The output should always be in sequence
+ie. 0,1,2,3,4....etc
+
 
 
 * c
-http://quizlet.com/24524062/c-multithreading-practice-interview-questions-flash-cards/
 
-
-http://www.devarticles.com/c/a/Cplusplus/Multithreading-in-C/
+http://softpixel.com/~cwright/programming/threads/threads.c.php
 
 http://www.careercup.com/page?pid=threads-interview-questions
 
 c++ multithreading interview questions
 
-
-#+begin_src python
-
-#+end_src
-
 #+begin_src c++
 
 #+end_src
 
+* Footnotes
 
-#+begin_src sh
+[fn:1] http://quizlet.com/24524062/c-multithreading-practice-interview-questions-flash-cards/
 
-#+end_src

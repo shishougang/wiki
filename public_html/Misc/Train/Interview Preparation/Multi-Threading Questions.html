@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Multi-Threading Questions</title>
-<!-- 2014-06-03 Tue 23:11 -->
+<!-- 2014-06-13 Fri 23:12 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -177,10 +177,12 @@ for the JavaScript code in this tag.
 <li><a href="#sec-26">Semaphores</a></li>
 <li><a href="#sec-27">Spinlocks</a></li>
 <li><a href="#sec-28">Six synchronization primitives</a></li>
-<li><a href="#sec-29">livestock</a></li>
+<li><a href="#sec-29">livelock</a></li>
 <li><a href="#sec-30">What does the term 'lock-free' mean?</a></li>
 <li><a href="#sec-31">"Busy waiting" and how it can be avoided</a></li>
-<li><a href="#sec-32">c</a></li>
+<li><a href="#sec-32">How would you maintain concurrency on a shared page being edited by multiple users simultaneously.</a></li>
+<li><a href="#sec-33">Write a multi threaded C code with one thread printing all even numbers</a></li>
+<li><a href="#sec-34">c</a></li>
 </ul>
 </div>
 </div>
@@ -466,7 +468,7 @@ and that makes them useful.
 </div>
 
 <div id="outline-container-sec-15" class="outline-2">
-<h2 id="sec-15">Name three thread design patterns</h2>
+<h2 id="sec-15">Name three thread design patterns<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
 <div class="outline-text-2" id="text-15">
 <ol class="org-ol">
 <li>Thread pool
@@ -518,63 +520,226 @@ ordering to the arrival of lock requests. Such mutexes may be slower
 due to increased overhead and the possibility of having to wake
 threads next in line that may be sleeping.
 </li>
-<li>Reader/Writer: allows for
+<li>Reader/Writer: allows for multiple readers to acquire the lock
+simultaneously. If existing readers have the lock, a writer request
+on the lock will block until all readers have given up the lock.
+This can lead to writer starvation.
+</li>
+<li>Scoped: RAII-style semantics regarding lock acquisition and
+unlocking.
 </li>
 </ul>
 </div>
 </div>
-
 <div id="outline-container-sec-19" class="outline-2">
 <h2 id="sec-19">Define: deadlock</h2>
+<div class="outline-text-2" id="text-19">
+<p>
+Two (or more) threads have stopped execution or are spinning
+permanently. For example, a simple deadlock situation: thread 1 locks
+lock A, thread 2 locks lock B, thread 1 wants lock B and thread 2
+wants lock A.
+</p>
 </div>
+</div>
+
 <div id="outline-container-sec-20" class="outline-2">
 <h2 id="sec-20">How can you prevent deadlocking from occurring?</h2>
+<div class="outline-text-2" id="text-20">
+<p>
+You can prevent deadlocks from happening by making sure threads
+acquire locks in an agreed order(i.e. preservation of lock ordering).
+Deadlock can also happen if threads do not unlock mutexes properly.
+</p>
+</div>
 </div>
 <div id="outline-container-sec-21" class="outline-2">
 <h2 id="sec-21">Define: race condition</h2>
+<div class="outline-text-2" id="text-21">
+<p>
+A race condition is when non-deterministic behavior results from
+threads accessing shared data or resources without following a defined
+synchronization protocol for serializing such access.
+</p>
 </div>
+</div>
+
 <div id="outline-container-sec-22" class="outline-2">
 <h2 id="sec-22">How can you prevent race conditions from occurring?</h2>
+<div class="outline-text-2" id="text-22">
+<p>
+Take steps within your program to enforce serial access to shared file
+descriptors and other external resources.
+</p>
 </div>
+</div>
+
 <div id="outline-container-sec-23" class="outline-2">
 <h2 id="sec-23">Define: priority inversion</h2>
+<div class="outline-text-2" id="text-23">
+<p>
+A higher priority thread can wait behind a lower priority thread if
+the lower priority thread holds a lock for which the higher priority
+thread is waiting.
+</p>
+</div>
 </div>
 <div id="outline-container-sec-24" class="outline-2">
 <h2 id="sec-24">Define: Condition Variable</h2>
+<div class="outline-text-2" id="text-24">
+<p>
+Condition variables allow threads to synchronize to a value of a
+shared resource. Typically, condition variables are used as a
+notification system between threads.
+</p>
 </div>
+</div>
+
 <div id="outline-container-sec-25" class="outline-2">
 <h2 id="sec-25">Define: (thread) barriers</h2>
+<div class="outline-text-2" id="text-25">
+<p>
+Barriers are a method to synchronize a set of threads at some point in
+time by having all participating threads in the barrier wait until all
+threads have called the said barrier function. This, in essence,
+blocks all threads participating in the barrier until the slowest
+participating thread reaches the barrier call.
+</p>
 </div>
+</div>
+
 <div id="outline-container-sec-26" class="outline-2">
 <h2 id="sec-26">Semaphores</h2>
+<div class="outline-text-2" id="text-26">
+<p>
+Semaphores are another type of synchronization primitive that come in
+two flavors: binary and counting. Binary semaphores act much like
+simple mutexes, while counting semaphores can behave as recursive
+mutexes. Counting semaphores can be initialized to any arbitrary value
+which should depend on how many resources you have available for that
+particular shared data. Many threads can obtain the lock
+simultaneously until the limit is reached. This is referred to as lock
+depth.
+</p>
+</div>
 </div>
 <div id="outline-container-sec-27" class="outline-2">
 <h2 id="sec-27">Spinlocks</h2>
+<div class="outline-text-2" id="text-27">
+<p>
+Spinlocks are locks which spin on mutexes. Spinning refers to
+continuously polling until a condition has been met. In the case of
+spinlocks, if a thread cannot obtain the mutex, it will keep polling
+the lock until it is free. The advantage of a spinlock is that the
+thread is kept active and does not enter a sleep-wait for mutex to
+become available, thus can perform better in certain cases than
+typical blocking-sleep-wait style mutexes. Mutexes which are heavily
+contended are poor candidates for spinlocks.
+</p>
 </div>
+</div>
+
 <div id="outline-container-sec-28" class="outline-2">
 <h2 id="sec-28">Six synchronization primitives</h2>
+<div class="outline-text-2" id="text-28">
+<ol class="org-ol">
+<li>Mutex
+</li>
+<li>Join
+</li>
+<li>Condition variable
+</li>
+<li>Barriers
+</li>
+<li>Spinlock
+</li>
+<li>Semaphore
+</li>
+</ol>
+</div>
 </div>
 <div id="outline-container-sec-29" class="outline-2">
-<h2 id="sec-29">livestock</h2>
+<h2 id="sec-29">livelock</h2>
+<div class="outline-text-2" id="text-29">
+<p>
+A livelock is simliar to a deadlock, except that the states of the
+processes involved in the livelock constantly change with regard to
+one another, none progressing.
+</p>
 </div>
+</div>
+
 <div id="outline-container-sec-30" class="outline-2">
 <h2 id="sec-30">What does the term 'lock-free' mean?</h2>
+<div class="outline-text-2" id="text-30">
+<p>
+Multithreaded code written such that the threads can never permanently
+lock up.
+</p>
 </div>
+</div>
+
 <div id="outline-container-sec-31" class="outline-2">
 <h2 id="sec-31">"Busy waiting" and how it can be avoided</h2>
+<div class="outline-text-2" id="text-31">
+<p>
+When one thread is waiting for another thread using an active looping
+structure that doesn't do anything. This can be avoided using mutexes.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-32" class="outline-2">
+<h2 id="sec-32">How would you maintain concurrency on a shared page being edited by multiple users simultaneously.</h2>
+<div class="outline-text-2" id="text-32">
+<p>
+What if the page is being shared using a client- server mechanism.
+Represent the classes and explain the thread safety mechnism to avoid
+editing conflicts.
+</p>
+
+<p>
+Use <a href="http://en.wikipedia.org/wiki/Optimistic_concurrency_control">Optimistic concurrency control(OCC)</a>. OCC assumes that multiple
+transactions can frequently complete without interfering with each
+other. While running, transactions use data resources without
+acquiring locks on those resources. Before committing, each
+transaction verifies that no other transaction has modified the data
+it has read. If the check reveals conflicting modifications, the
+committing transaction rolls back and can be restarted.
+</p>
+
+<ul class="org-ul">
+<li>Divide the page into multiple segments. Assign each segment a
+version number which increments on every update.
+</li>
+<li>The list of version numbers is communicated to the clients as well.
+</li>
+<li>Before updating a segment, the client gets the latest page and its
+versions from the server. Updates the page and sends it across to
+the server along with the versions.
+</li>
+<li>f any part of the page is updated, the version on the server would
+change. If so, reject the clients request along with the latest page
+and the changed versions.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-33" class="outline-2">
+<h2 id="sec-33">Write a multi threaded C code with one thread printing all even numbers</h2>
+<div class="outline-text-2" id="text-33">
+<p>
+and the other all odd numbers. The output should always be in sequence
+ie. 0,1,2,3,4&#x2026;.etc
+</p>
+</div>
 </div>
 
 
-<div id="outline-container-sec-32" class="outline-2">
-<h2 id="sec-32">c</h2>
-<div class="outline-text-2" id="text-32">
+<div id="outline-container-sec-34" class="outline-2">
+<h2 id="sec-34">c</h2>
+<div class="outline-text-2" id="text-34">
 <p>
-<a href="http://quizlet.com/24524062/c-multithreading-practice-interview-questions-flash-cards/">http://quizlet.com/24524062/c-multithreading-practice-interview-questions-flash-cards/</a>
-</p>
-
-
-<p>
-<a href="http://www.devarticles.com/c/a/Cplusplus/Multithreading-in-C/">http://www.devarticles.com/c/a/Cplusplus/Multithreading-in-C/</a>
+<a href="http://softpixel.com/~cwright/programming/threads/threads.c.php">http://softpixel.com/~cwright/programming/threads/threads.c.php</a>
 </p>
 
 <p>
@@ -585,28 +750,26 @@ threads next in line that may be sleeping.
 c++ multithreading interview questions
 </p>
 
-
-<div class="org-src-container">
-
-<pre class="src src-python"></pre>
-</div>
-
 <div class="org-src-container">
 
 <pre class="src src-c++"></pre>
 </div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://quizlet.com/24524062/c-multithreading-practice-interview-questions-flash-cards/">http://quizlet.com/24524062/c-multithreading-practice-interview-questions-flash-cards/</a>
+</p></div>
 
 
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
 </div>
-</div>
-</div>
-</div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-06-03 Tue 23:11</p>
+<p class="date">Created: 2014-06-13 Fri 23:12</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

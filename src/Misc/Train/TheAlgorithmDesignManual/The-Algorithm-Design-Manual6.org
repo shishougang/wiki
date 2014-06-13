@@ -4,7 +4,6 @@
 
 
 * Book Notes
-
 ** 6.1 Minimum Spanning Trees
 *** 6.1.1 Prim’s Algorithm
 A greedy algorithm suffices for correctness: we always add the
@@ -51,10 +50,213 @@ outside. （选取相邻最近的不在树内的点。）
     }
   }
 #+end_src
+*** 6.1.2 Kruskal’s Algorithm
+The algorithm repeatedly considers the lightest remaining edge and
+tests whether its two endpoints lie within the same connected
+component. (最短边）
 
+a clever data structure calledunion-find,can support such queries
+in O(lgn) time. With this data structure, Kruskal’s algorithm runs in
+O(mlgm) time.
+
+*Implementation*
+#+begin_src c++
+  kruskal(graph *g)
+  {
+    int i; /* counter */
+    set_union s; /* set union data structure */
+    edge_pair e[MAXV+1]; /* array of edges data structure */
+    bool weight_compare();
+    set_union_init(&s, g->nvertices);
+    to_edge_array(g, e); /* sort edges by increasing cost */
+    qsort(&e,g->nedges,sizeof(edge_pair),weight_compare);
+    for (i=0; i<(g->nedges); i++) {
+      if (!same_component(s,e[i].x,e[i].y)) {
+        printf("edge (%d,%d) in MST\n",e[i].x,e[i].y);
+        union_sets(&s,e[i].x,e[i].y);
+      }
+    }
+  }
+#+end_src
+*** 6.1.3 The Union-Find Data Structure
++ Find(i)– Find the root of tree containing elementi, by walking up
+  the parent pointers until there is nowhere to go. Return the label
+  of the root.
+
++ Union(i,j)– Link the root of one of the trees (say
+  containingi)to the root of the tree containing the other
+  (say j) so =find(i)= now equals =find(j)=.
+
+We must double the number of nodes in the tree to get an
+extra unit of height. How many doublings can we do before we use up allnnodes?
+At most, lg2ndoublings can be performed. Thus, we can do both unions and finds
+in O(logn), good enough for Kruskal’s algorithm. In fact, union-find
+can be done even faster, as discussed in Section 12.5.
+
+*Implementation*
+#+begin_src c++
+  typedef struct {
+    int p[SET_SIZE+1]; /* parent element */
+    int size[SET_SIZE+1]; /* number of elements in subtree i */
+    int n; /* number of elements in set */
+  } set_union;
+  
+  set_union_init(set_union *s, int n)
+  {
+    int i; /* counter */
+    for (i=1; i<=n; i++) {
+      s->p[i] = i;
+      s->size[i] = 1;
+    }
+    s->n = n;
+  }
+  int find(set_union *s, int x)
+  {
+    if (s->p[x] == x)
+      return(x);
+    else
+      return( find(s,s->p[x]) );
+  }
+  int union_sets(set_union *s, int s1, int s2)
+  {
+    int r1, r2; /* roots of sets */
+    r1 = find(s,s1);
+    r2 = find(s,s2);
+    if (r1 == r2) return; /* already in same set */
+    if (s->size[r1] >= s->size[r2]) {
+      s->size[r1] = s->size[r1] + s->size[r2];
+      s->p[ r2 ] = r1;
+    }
+    else {
+      s->size[r2] = s->size[r1] + s->size[r2];
+      s->p[ r1 ] = r2;
+    }
+  }
+  bool same_component(set_union *s, int s1, int s2)
+  {
+    return ( find(s,s1) == find(s,s2) );
+  }
+#+end_src
+** 6.3 Shortest Paths
+*** 6.3.1 Dijkstra’s Algorithm
+Given a particular start vertexs, it finds the shortest path from s to
+every other vertex in the graph, including your desired destination t.
+
+*Implementation*
+#+begin_src c++
+  dijkstra(graph *g, int start) /* WAS prim(g,start) */
+  {
+    int i; /* counter */
+    edgenode *p; /* temporary pointer */
+    bool intree[MAXV+1]; /* is the vertex in the tree yet? */
+    int distance[MAXV+1]; /* distance vertex is from start */
+    int v; /* current vertex to process */
+    int w; /* candidate next vertex */
+    int weight; /* edge weight */
+    int dist; /* best current distance from start */
+    for (i=1; i<=g->nvertices; i++) {
+      intree[i] = FALSE;
+      distance[i] = MAXINT;
+      parent[i] = -1;
+    }
+    distance[start] = 0;
+    v = start;
+    while (intree[v] == FALSE) {
+      intree[v] = TRUE;
+      p = g->edges[v];
+      while (p != NULL) {
+        w = p->y;
+        weight = p->weight;
+        /* CHANGED */ if (distance[w] > (distance[v]+weight)) {
+          /* CHANGED */ distance[w] = distance[v]+weight;
+          /* CHANGED */ parent[w] = v;
+        }
+        p = p->next;
+      }
+      v=1;
+      dist = MAXINT;
+      for (i=1; i<=g->nvertices; i++)
+        if ((intree[i] == FALSE) && (dist > distance[i])) {
+          dist = distance[i];
+          v=i;
+        }
+    }
+  }
+#+end_src
+As implemented here, the complexity is O(n^2). 
+
+Dijkstra works correctly only on graphs without negative-cost edges. The reason
+is that midway through the execution we may encounter an edge with weight so
+negative that it changes the cheapest way to get froms to some other vertex
+already in the tree.
+*** 6.3.2 All-Pairs Shortest Path
+#+begin_src c++
+  typedef struct {
+    int weight[MAXV+1][MAXV+1]; /* adjacency/weight info */
+    int nvertices; /* number of vertices in graph */
+  } adjacency_matrix;
+#+end_src
+
+The critical issue in an adjacency matrix implementation is how we denote the
+edges absent from the graph. A common convention for unweighted graphs denotes
+graph edges by 1 and non-edges by 0. This gives exactly the wrong interpretation
+if the numbers denote edge weights, for the non-edges get interpreted
+as a free ride between vertices. Instead, we should initialize each
+non-edge to MAXINT. 
+
+#+begin_src c++
+  floyd(adjacency_matrix *g)
+  {
+    int i,j; /* dimension counters */
+    int k; /* intermediate vertex counter */
+    int through_k; /* distance through vertex k */
+    for (k=1; k<=g->nvertices; k++)
+      for (i=1; i<=g->nvertices; i++)
+        for (j=1; j<=g->nvertices; j++) {
+          through_k = g->weight[i][k]+g->weight[k][j];
+          if (through_k < g->weight[i][j])
+            g->weight[i][j] = through_k;
+        }
+  }
+#+end_src
+
+The Floyd-Warshall all-pairs shortest path runs in O(n^3) time, which
+is asymptotically no better thanncalls to Dijkstra’s algorithm.
+However, the loops are so tight and the program so short that it runs
+better in practice.
+** 6.4 War Story: Dialing for Documents
+“We can get good word-use frequencies and grammatical information
+from a big text database called the Brown Corpus. It contains
+thousands of typical English sentences, each parsed according to parts
+of speech. But how do we factor it all in?” Harald asked.
+
+Each possible sentence interpretation can be thought of as a path in a
+graph. The vertices of this graph are the complete set of possible
+word choices. There will be an edge from each possible choice for the
+ith word to each possible choice for the (i + 1)st word. The cheapest
+path across this graph defines the best interpretation of the
+sentence.
+
+Perhaps we can count how often that pair of words occurred together in
+previous texts. Or we can weigh them by the part of speech of each
+word. Maybe nouns don’t like to be next to nouns as much as they like
+being next to verbs.
+
+We can pay a cost for walking through a particular vertex that depends
+upon the frequency of the word. Our best sentence will be given by the
+shortest path across the graph.
+
+The constraints for many pattern recognition problems can be naturally
+formulated as shortest path problems in graphs. In fact, there is a
+particularly convenient dynamic programming solution for these
+problems (the Viterbi algorithm). Despite the fancy name, the Viterbi
+algorithm is basically solving a shortest path problem on a DAG.
+** 6.5 Network Flows and Bipartite Matching
 
 
 * Exercises
+
+** 1
 
 * cc
 

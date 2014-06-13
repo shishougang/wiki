@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Algorithm Design Manual Chapter 6</title>
-<!-- 2014-06-12 Thu 20:03 -->
+<!-- 2014-06-13 Fri 23:12 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -144,9 +144,16 @@ for the JavaScript code in this tag.
 <li><a href="#sec-1">Book Notes</a>
 <ul>
 <li><a href="#sec-1-1">6.1 Minimum Spanning Trees</a></li>
+<li><a href="#sec-1-2">6.3 Shortest Paths</a></li>
+<li><a href="#sec-1-3">6.4 War Story: Dialing for Documents</a></li>
+<li><a href="#sec-1-4">6.5 Network Flows and Bipartite Matching</a></li>
 </ul>
 </li>
-<li><a href="#sec-2">Exercises</a></li>
+<li><a href="#sec-2">Exercises</a>
+<ul>
+<li><a href="#sec-2-1">1</a></li>
+</ul>
+</li>
 <li><a href="#sec-3">cc</a></li>
 </ul>
 </div>
@@ -209,15 +216,288 @@ outside. （选取相邻最近的不在树内的点。）
 </pre>
 </div>
 </div>
+</li>
+
+<li>6.1.2 Kruskal’s Algorithm<br  /><div class="outline-text-4" id="text-1-1-2">
+<p>
+The algorithm repeatedly considers the lightest remaining edge and
+tests whether its two endpoints lie within the same connected
+component. (最短边）
+</p>
+
+<p>
+a clever data structure calledunion-find,can support such queries
+in O(lgn) time. With this data structure, Kruskal’s algorithm runs in
+O(mlgm) time.
+</p>
+
+<p>
+<b>Implementation</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #87cefa;">kruskal</span>(<span style="color: #98fb98;">graph</span> *<span style="color: #eedd82;">g</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">counter */</span>
+  <span style="color: #98fb98;">set_union</span> <span style="color: #eedd82;">s</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">set union data structure */</span>
+  <span style="color: #98fb98;">edge_pair</span> <span style="color: #eedd82;">e</span>[MAXV+1]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">array of edges data structure */</span>
+  <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">weight_compare</span>();
+  set_union_init(&amp;s, g-&gt;nvertices);
+  to_edge_array(g, e); <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">sort edges by increasing cost */</span>
+  qsort(&amp;e,g-&gt;nedges,<span style="color: #00ffff;">sizeof</span>(edge_pair),weight_compare);
+  <span style="color: #00ffff;">for</span> (i=0; i&lt;(g-&gt;nedges); i++) {
+    <span style="color: #00ffff;">if</span> (!same_component(s,e[i].x,e[i].y)) {
+      printf(<span style="color: #ffa07a;">"edge (%d,%d) in MST\n"</span>,e[i].x,e[i].y);
+      union_sets(&amp;s,e[i].x,e[i].y);
+    }
+  }
+}
+</pre>
+</div>
+</div>
+</li>
+
+<li>6.1.3 The Union-Find Data Structure<br  /><div class="outline-text-4" id="text-1-1-3">
+<ul class="org-ul">
+<li>Find(i)– Find the root of tree containing elementi, by walking up
+the parent pointers until there is nowhere to go. Return the label
+of the root.
+</li>
+
+<li>Union(i,j)– Link the root of one of the trees (say
+containingi)to the root of the tree containing the other
+(say j) so <code>find(i)</code> now equals <code>find(j)</code>.
+</li>
+</ul>
+
+<p>
+We must double the number of nodes in the tree to get an
+extra unit of height. How many doublings can we do before we use up allnnodes?
+At most, lg2ndoublings can be performed. Thus, we can do both unions and finds
+in O(logn), good enough for Kruskal’s algorithm. In fact, union-find
+can be done even faster, as discussed in Section 12.5.
+</p>
+
+<p>
+<b>Implementation</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">p</span>[SET_SIZE+1]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">parent element */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>[SET_SIZE+1]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">number of elements in subtree i */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">number of elements in set */</span>
+} <span style="color: #98fb98;">set_union</span>;
+
+<span style="color: #87cefa;">set_union_init</span>(<span style="color: #98fb98;">set_union</span> *<span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">counter */</span>
+  <span style="color: #00ffff;">for</span> (i=1; i&lt;=n; i++) {
+    s-&gt;p[i] = i;
+    s-&gt;size[i] = 1;
+  }
+  s-&gt;n = n;
+}
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">find</span>(<span style="color: #98fb98;">set_union</span> *<span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>)
+{
+  <span style="color: #00ffff;">if</span> (s-&gt;p[x] == x)
+    <span style="color: #00ffff;">return</span>(x);
+  <span style="color: #00ffff;">else</span>
+    <span style="color: #00ffff;">return</span>( find(s,s-&gt;p[x]) );
+}
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">union_sets</span>(<span style="color: #98fb98;">set_union</span> *<span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s1</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s2</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r1</span>, <span style="color: #eedd82;">r2</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">roots of sets */</span>
+  r1 = find(s,s1);
+  r2 = find(s,s2);
+  <span style="color: #00ffff;">if</span> (r1 == r2) <span style="color: #00ffff;">return</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">already in same set */</span>
+  <span style="color: #00ffff;">if</span> (s-&gt;size[r1] &gt;= s-&gt;size[r2]) {
+    s-&gt;size[r1] = s-&gt;size[r1] + s-&gt;size[r2];
+    s-&gt;p[ r2 ] = r1;
+  }
+  <span style="color: #00ffff;">else</span> {
+    s-&gt;size[r2] = s-&gt;size[r1] + s-&gt;size[r2];
+    s-&gt;p[ r1 ] = r2;
+  }
+}
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">same_component</span>(<span style="color: #98fb98;">set_union</span> *<span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s1</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s2</span>)
+{
+  <span style="color: #00ffff;">return</span> ( find(s,s1) == find(s,s2) );
+}
+</pre>
+</div>
+</div>
 </li></ul>
+</div>
+
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2">6.3 Shortest Paths</h3>
+<div class="outline-text-3" id="text-1-2">
+</div><ul class="org-ul"><li>6.3.1 Dijkstra’s Algorithm<br  /><div class="outline-text-4" id="text-1-2-1">
+<p>
+Given a particular start vertexs, it finds the shortest path from s to
+every other vertex in the graph, including your desired destination t.
+</p>
+
+<p>
+<b>Implementation</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #87cefa;">dijkstra</span>(<span style="color: #98fb98;">graph</span> *<span style="color: #eedd82;">g</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">start</span>) <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">WAS prim(g,start) */</span>
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">counter */</span>
+  <span style="color: #98fb98;">edgenode</span> *<span style="color: #eedd82;">p</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">temporary pointer */</span>
+  <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">intree</span>[MAXV+1]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">is the vertex in the tree yet? */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">distance</span>[MAXV+1]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">distance vertex is from start */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">current vertex to process */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">candidate next vertex */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">weight</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">edge weight */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dist</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">best current distance from start */</span>
+  <span style="color: #00ffff;">for</span> (i=1; i&lt;=g-&gt;nvertices; i++) {
+    intree[i] = FALSE;
+    distance[i] = MAXINT;
+    parent[i] = -1;
+  }
+  distance[start] = 0;
+  v = start;
+  <span style="color: #00ffff;">while</span> (intree[v] == FALSE) {
+    intree[v] = TRUE;
+    p = g-&gt;edges[v];
+    <span style="color: #00ffff;">while</span> (p != <span style="color: #7fffd4;">NULL</span>) {
+      w = p-&gt;y;
+      weight = p-&gt;weight;
+      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">CHANGED */</span> <span style="color: #00ffff;">if</span> (distance[w] &gt; (distance[v]+weight)) {
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">CHANGED */</span> distance[w] = distance[v]+weight;
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">CHANGED */</span> parent[w] = v;
+      }
+      p = p-&gt;next;
+    }
+    v=1;
+    dist = MAXINT;
+    <span style="color: #00ffff;">for</span> (i=1; i&lt;=g-&gt;nvertices; i++)
+      <span style="color: #00ffff;">if</span> ((intree[i] == FALSE) &amp;&amp; (dist &gt; distance[i])) {
+        dist = distance[i];
+        v=i;
+      }
+  }
+}
+</pre>
+</div>
+<p>
+As implemented here, the complexity is O(n<sup>2</sup>). 
+</p>
+
+<p>
+Dijkstra works correctly only on graphs without negative-cost edges. The reason
+is that midway through the execution we may encounter an edge with weight so
+negative that it changes the cheapest way to get froms to some other vertex
+already in the tree.
+</p>
+</div>
+</li>
+
+<li>6.3.2 All-Pairs Shortest Path<br  /><div class="outline-text-4" id="text-1-2-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">weight</span>[MAXV+1][MAXV+1]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">adjacency/weight info */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nvertices</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">number of vertices in graph */</span>
+} <span style="color: #98fb98;">adjacency_matrix</span>;
+</pre>
+</div>
+
+<p>
+The critical issue in an adjacency matrix implementation is how we denote the
+edges absent from the graph. A common convention for unweighted graphs denotes
+graph edges by 1 and non-edges by 0. This gives exactly the wrong interpretation
+if the numbers denote edge weights, for the non-edges get interpreted
+as a free ride between vertices. Instead, we should initialize each
+non-edge to MAXINT. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #87cefa;">floyd</span>(<span style="color: #98fb98;">adjacency_matrix</span> *<span style="color: #eedd82;">g</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>,<span style="color: #eedd82;">j</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">dimension counters */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">intermediate vertex counter */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">through_k</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">distance through vertex k */</span>
+  <span style="color: #00ffff;">for</span> (k=1; k&lt;=g-&gt;nvertices; k++)
+    <span style="color: #00ffff;">for</span> (i=1; i&lt;=g-&gt;nvertices; i++)
+      <span style="color: #00ffff;">for</span> (j=1; j&lt;=g-&gt;nvertices; j++) {
+        through_k = g-&gt;weight[i][k]+g-&gt;weight[k][j];
+        <span style="color: #00ffff;">if</span> (through_k &lt; g-&gt;weight[i][j])
+          g-&gt;weight[i][j] = through_k;
+      }
+}
+</pre>
+</div>
+
+<p>
+The Floyd-Warshall all-pairs shortest path runs in O(n<sup>3</sup>) time, which
+is asymptotically no better thanncalls to Dijkstra’s algorithm.
+However, the loops are so tight and the program so short that it runs
+better in practice.
+</p>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-1-3" class="outline-3">
+<h3 id="sec-1-3">6.4 War Story: Dialing for Documents</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+“We can get good word-use frequencies and grammatical information
+from a big text database called the Brown Corpus. It contains
+thousands of typical English sentences, each parsed according to parts
+of speech. But how do we factor it all in?” Harald asked.
+</p>
+
+<p>
+Each possible sentence interpretation can be thought of as a path in a
+graph. The vertices of this graph are the complete set of possible
+word choices. There will be an edge from each possible choice for the
+ith word to each possible choice for the (i + 1)st word. The cheapest
+path across this graph defines the best interpretation of the
+sentence.
+</p>
+
+<p>
+Perhaps we can count how often that pair of words occurred together in
+previous texts. Or we can weigh them by the part of speech of each
+word. Maybe nouns don’t like to be next to nouns as much as they like
+being next to verbs.
+</p>
+
+<p>
+We can pay a cost for walking through a particular vertex that depends
+upon the frequency of the word. Our best sentence will be given by the
+shortest path across the graph.
+</p>
+
+<p>
+The constraints for many pattern recognition problems can be naturally
+formulated as shortest path problems in graphs. In fact, there is a
+particularly convenient dynamic programming solution for these
+problems (the Viterbi algorithm). Despite the fancy name, the Viterbi
+algorithm is basically solving a shortest path problem on a DAG.
+</p>
 </div>
 </div>
 
+<div id="outline-container-sec-1-4" class="outline-3">
+<h3 id="sec-1-4">6.5 Network Flows and Bipartite Matching</h3>
+</div>
+</div>
 
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">Exercises</h2>
+<div class="outline-text-2" id="text-2">
+</div><div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">1</h3>
 </div>
-
+</div>
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">cc</h2>
 <div class="outline-text-2" id="text-3">
@@ -230,7 +510,7 @@ outside. （选取相邻最近的不在树内的点。）
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-06-12 Thu 20:03</p>
+<p class="date">Created: 2014-06-13 Fri 23:12</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
