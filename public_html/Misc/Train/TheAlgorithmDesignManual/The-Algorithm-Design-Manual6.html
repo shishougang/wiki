@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Algorithm Design Manual Chapter 6</title>
-<!-- 2014-06-13 Fri 23:12 -->
+<!-- 2014-06-14 Sat 22:34 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -147,11 +147,20 @@ for the JavaScript code in this tag.
 <li><a href="#sec-1-2">6.3 Shortest Paths</a></li>
 <li><a href="#sec-1-3">6.4 War Story: Dialing for Documents</a></li>
 <li><a href="#sec-1-4">6.5 Network Flows and Bipartite Matching</a></li>
+<li><a href="#sec-1-5">6.6 Design Graphs, Not Algorithms</a></li>
 </ul>
 </li>
 <li><a href="#sec-2">Exercises</a>
 <ul>
-<li><a href="#sec-2-1">1</a></li>
+<li><a href="#sec-2-1">2-3</a></li>
+<li><a href="#sec-2-2">4</a></li>
+<li><a href="#sec-2-3">5</a></li>
+<li><a href="#sec-2-4">6</a></li>
+<li><a href="#sec-2-5">7</a></li>
+<li><a href="#sec-2-6">8</a></li>
+<li><a href="#sec-2-7">9</a></li>
+<li><a href="#sec-2-8">10</a></li>
+<li><a href="#sec-2-9">23</a></li>
 </ul>
 </li>
 <li><a href="#sec-3">cc</a></li>
@@ -488,6 +497,202 @@ algorithm is basically solving a shortest path problem on a DAG.
 
 <div id="outline-container-sec-1-4" class="outline-3">
 <h3 id="sec-1-4">6.5 Network Flows and Bipartite Matching</h3>
+<div class="outline-text-3" id="text-1-4">
+<p>
+The <i>network flow problem</i> asks for the maximum amount of flow which can
+be sent from vertices s to t in a given weighted graph G while
+respecting the maximum capacities of each pipe.
+</p>
+</div>
+<ul class="org-ul"><li>6.5.1 Bipartite Matching<br  /><div class="outline-text-4" id="text-1-4-1">
+<p>
+The largest bipartite matching can be readily found using network
+flow. Create a source nodes that is connected to every vertex in L by
+an edge of weight 1. Create a sink node t and connect it to every
+vertex in R by an edge of weight 1. Finally, assign each edge in the
+bipartite graph G a weight of 1. Now, the maximum possible flow
+fromstotdefines the largest matching in G.
+</p>
+</div>
+</li>
+
+<li>6.5.2 Computing Network Flows<br  /><div class="outline-text-4" id="text-1-4-2">
+<p>
+The key structure is the residual flow graph, denoted as R(G, f), where Gis
+the input graph andfis the current flow through G. 
+</p>
+
+<p>
+The maximum flow fromstotalways equals the weight of the minimums-t
+cut. Thus, flow algorithms can be used to solve general edge and
+vertex connectivity problems in graphs.
+</p>
+
+<p>
+<b>Implementation</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++">        <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> {
+          <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">neighboring vertex */</span>
+          <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">capacity</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">capacity of edge */</span>
+          <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flow</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">flow through edge */</span>
+          <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">residual</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">residual capacity of edge */</span>
+          <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">edgenode</span> *<span style="color: #eedd82;">next</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">next edge in list */</span>
+        } <span style="color: #98fb98;">edgenode</span>;
+
+      <span style="color: #87cefa;">netflow</span>(<span style="color: #98fb98;">flow_graph</span> *<span style="color: #eedd82;">g</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">source</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">sink</span>)
+      {
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">volume</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">weight of the augmenting path */</span>
+        add_residual_edges(g);
+        initialize_search(g);
+        bfs(g,source);
+        volume = path_volume(g, source, sink, parent);
+        <span style="color: #00ffff;">while</span> (volume &gt; 0) {
+          augment_path(g,source,sink,parent,volume);
+          initialize_search(g);
+          bfs(g,source);
+          volume = path_volume(g, source, sink, parent);
+        }
+      }
+
+    <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">valid_edge</span>(<span style="color: #98fb98;">edgenode</span> *<span style="color: #eedd82;">e</span>)
+    {
+      <span style="color: #00ffff;">if</span> (e-&gt;residual &gt; 0) <span style="color: #00ffff;">return</span> (TRUE);
+      <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">return</span>(FALSE);
+    }
+
+  <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">path_volume</span>(<span style="color: #98fb98;">flow_graph</span> *<span style="color: #eedd82;">g</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">start</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">end</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">parents</span>[])
+  {
+    <span style="color: #98fb98;">edgenode</span> *<span style="color: #eedd82;">e</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">edge in question */</span>
+    <span style="color: #98fb98;">edgenode</span> *<span style="color: #eedd82;">find_edge</span>();
+    <span style="color: #00ffff;">if</span> (parents[end] == -1) <span style="color: #00ffff;">return</span>(0);
+    e = find_edge(g,parents[end],end);
+    <span style="color: #00ffff;">if</span> (start == parents[end])
+      <span style="color: #00ffff;">return</span>(e-&gt;residual);
+    <span style="color: #00ffff;">else</span>
+      <span style="color: #00ffff;">return</span>( min(path_volume(g,start,parents[end],parents),
+                  e-&gt;residual) );
+  }
+  <span style="color: #98fb98;">edgenode</span> *<span style="color: #87cefa;">find_edge</span>(<span style="color: #98fb98;">flow_graph</span> *<span style="color: #eedd82;">g</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>)
+  {
+    <span style="color: #98fb98;">edgenode</span> *<span style="color: #eedd82;">p</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">temporary pointer */</span>
+    p = g-&gt;edges[x];
+    <span style="color: #00ffff;">while</span> (p != <span style="color: #7fffd4;">NULL</span>) {
+      <span style="color: #00ffff;">if</span> (p-&gt;v == y) <span style="color: #00ffff;">return</span>(p);
+      p = p-&gt;next;
+    }
+    <span style="color: #00ffff;">return</span>(<span style="color: #7fffd4;">NULL</span>);
+  }
+
+<span style="color: #87cefa;">augment_path</span>(<span style="color: #98fb98;">flow_graph</span>*<span style="color: #eedd82;">g</span>,intstart,intend,<span style="color: #98fb98;">intparents</span>[],intvolume)
+{
+  <span style="color: #98fb98;">edgenode</span> *<span style="color: #eedd82;">e</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">edge in question */</span>
+  <span style="color: #98fb98;">edgenode</span> *<span style="color: #eedd82;">find_edge</span>();
+  <span style="color: #00ffff;">if</span> (start == end) <span style="color: #00ffff;">return</span>;
+  e = find_edge(g,parents[end],end);
+  e-&gt;flow += volume;
+  e-&gt;residual -= volume;
+  e = find_edge(g,end,parents[end]);
+  e-&gt;residual += volume;
+  augment_path(g,start,parents[end],parents,volume);
+}
+</pre>
+</div>
+
+<p>
+Edmonds and Karp [EK72] proved that always selecting ashortest
+unweighted augmenting path guarantees that O(n<sup>3</sup>) augmentations
+suffice for optimization.
+</p>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-1-5" class="outline-3">
+<h3 id="sec-1-5">6.6 Design Graphs, Not Algorithms</h3>
+<div class="outline-text-3" id="text-1-5">
+<p>
+The secret is learning to design graphs, not algorithms. We have
+already seen a few instances of this idea:
+</p>
+
+<ul class="org-ul">
+<li>The maximum spanning tree can be found by negating the edge weights
+of the input graph G and using aminimumspanning tree algorithm on
+the result. The most negative weight spanning tree will define the
+maximum weight tree in G.
+</li>
+<li>To solve bipartite matching, we constructed a special network flow
+graph such that the maximum flow corresponds to a maximum
+cardinality matching.
+</li>
+</ul>
+</div>
+
+<ul class="org-ul"><li>Bucketing Rectangles<br  /><div class="outline-text-4" id="text-1-5-1">
+<p>
+Problem: “In my graphics work I need to solve the following problem.
+Given an arbitrary set of rectangles in the plane, how can I
+distribute them into a minimum number of buckets such that no subset
+of rectangles in any given bucket intersects another? In other words,
+there can not be any overlapping area between two rectangles in the same bucket.”
+</p>
+
+<p>
+Solution: We formulate a graph where each vertex is a rectangle, and
+there is an edge if two rectangles intersect. Each bucket corresponds
+to anindependent set of rectangles, so there is no overlap between any
+two. Avertex coloringof a graph is a partition of the vertices into
+independent sets, so minimizing the number of colors is exactly what
+you want.
+</p>
+</div>
+</li>
+
+<li>Names in Collision<br  /><div class="outline-text-4" id="text-1-5-2">
+<p>
+Problem:“In porting code from UNIX to DOS, I have to shorten several
+hundred file names down to at most 8 characters each. I can’t just
+use the first eight characters from each name, because “filename1”
+and “filename2” would be assigned the exact same name. How can I
+meaningfully shorten the names while ensuring that they do not
+collide?”
+</p>
+
+<p>
+Solution: Construct a bipartite graph with vertices corresponding to
+each original file namefi for 1≤i≤n, as well as a collection of
+acceptable shortenings for each name f<sub>i1</sub>,&#x2026;,f<sub>ik</sub>. Add an edge
+between each original and shortened name. We now seek a set of n edges
+that have no vertices in common, so each file name is mapped to a
+distinct acceptable substitute. Bipartite matching, discussed in
+Section 15.6 (page 498), is exactly this problem of finding an
+independent set of edges in a graph.
+</p>
+</div>
+</li>
+
+<li>Separate the Text<br  /><div class="outline-text-4" id="text-1-5-3">
+<p>
+Problem: “We need a way to separate the lines of text in the optical
+characterrecognition system that we are building. Although there is
+some white space between the lines, problems like noise and the tilt
+of the page makes it hard to find. How can we do line segmentation?
+</p>
+
+<p>
+Solution: Consider the following graph formulation. Treat each pixel
+in the image as a vertex in the graph, with an edge between two
+neighboring pixels. The weight of this edge should be proportional to
+how dark the pixels are. A segmentation between two lines is a path in
+this graph from the left to right side of the page. We seek a
+relatively straight path that avoids as much blackness as possible.
+This suggests that theshortest pathin the pixel graph will likely find
+a good line segmentation.
+</p>
+</div>
+</li></ul>
 </div>
 </div>
 
@@ -495,9 +700,209 @@ algorithm is basically solving a shortest path problem on a DAG.
 <h2 id="sec-2">Exercises</h2>
 <div class="outline-text-2" id="text-2">
 </div><div id="outline-container-sec-2-1" class="outline-3">
-<h3 id="sec-2-1">1</h3>
+<h3 id="sec-2-1">2-3</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+Is the path between two vertices in a minimum spanning tree necessarily a
+shortest path between the two vertices in the full graph? Give a proof
+or a counterexample.
+</p>
+
+<p>
+Assume that all edges in the graph have distinct edge weights (i.e. ,
+no pair of edges have the same weight). Is the path between a pair of
+vertices in a minimum spanning tree necessarily a shortest path
+between the two vertices in the full graph? Give a proof or a
+counterexample.
+</p>
+
+<p>
+不必要. 如下图,若a是6的话,minimum spanning tree不会选择a,但A和C间的最短路径会选择a.
+</p>
+
+
+<div class="figure">
+<p><img src="./images/6_4.jpg" alt="6_4.jpg" />
+</p>
 </div>
 </div>
+</div>
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">4</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+Can Prim’s and Kruskal’s algorithm yield different minimum spanning
+trees? Explain why or why not.
+</p>
+
+<p>
+能.当有相同weight的边.
+</p>
+
+<p>
+当所有边的weight不同时,图存在唯一的minimum spanning trees,两者生成同样的树.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">5</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+Does either Prim's and Kruskal's algorithm work if there are negative
+edge weights? Explain why or why not. 
+</p>
+
+<p>
+可以.Prim每次选相邻最近的不在树内的点,有负weight的边并不影响它. 而
+Kruskal每次选最短的边,同样不受影响.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">6</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+Suppose we are given the minimum spanning tree T of a given graph G
+(with n vertices and m edges) and a new edge e = (u,v) of weight w
+that we will add to G. Give an efficient algorithm to find the
+minimum spanning tree of the graph G + e. Your algorithm should run
+in O(n) time to receive full credit.
+</p>
+
+<p>
+新添加的e在顶点u和v中间,原本的MST中u和v通过u-&gt;a1-&gt;ai-&gt;v,把此路径的边与
+e比较,用Prim算法选最临近点.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5">7</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+(a) Let T be a minimum spanning tree of a weighted graph G. Construct
+a new graph G′ by adding a weight of k to every edge of G. Do the
+edges of T form a minimum spanning tree of G′? Prove the statement or
+give a counterexample.
+</p>
+
+<p>
+(b) Let P = {s, . . . , t} describe a shortest weighted path between
+vertices s and t of a weighted graph G. Construct a new graph G′ by
+adding a weight of k to every edge of G. Does P describe a shortest
+path from s to t in G′? Prove the statement or give a counterexample.
+</p>
+
+<p>
+(a)和(b)都对,并没有改变边之间的比较关系.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-6" class="outline-3">
+<h3 id="sec-2-6">8</h3>
+<div class="outline-text-3" id="text-2-6">
+<p>
+Devise and analyze an algorithm that takes a weighted graph G and
+finds the smallest change in the cost to a non-MST edge that would
+cause a change in the minimum spanning tree of G. Your algorithm must
+be correct and run in polynomial time. 
+</p>
+
+<ol class="org-ol">
+<li>遍历图的边,掠过MST中的边,当遇到non-MST的边E(i,j).
+</li>
+<li>利用MST中的parent遍历出顶点i到j的所有MST边,并得到其中最大weight的边
+mst<sub>e</sub><sub>max</sub>.
+</li>
+<li>计算E(i,j)与mst<sub>e</sub><sub>max的差值</sub>.
+</li>
+<li>遍历所有的non-MST的边,得到最小差值就是改变的最小值.
+</li>
+</ol>
+
+<p>
+总共边数m,算法复杂度O(m<sup>2</sup>).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-7" class="outline-3">
+<h3 id="sec-2-7">9</h3>
+<div class="outline-text-3" id="text-2-7">
+<p>
+Consider the problem of finding a minimum weight connected subset T of
+edges from a weighted connected graph G. The weight of T is the sum of
+all the edge weights in T.
+</p>
+
+<ol class="org-ol">
+<li>Why is this problem not just the minimum spanning tree problem?
+Hint: think negative weight edges.
+</li>
+<li>Give an efficient algorithm to compute the minimum weight connected
+subset T. 
+</li>
+</ol>
+
+<p>
+MST不能有环路,minimum weight connected subset T可以有环路,所以如果一条负数weight的边,不在MST中,但却包含在T中,因为它能使T的总权值减小.
+</p>
+
+<ol class="org-ol">
+<li>把所有负数weight的边加入T中,若剩下1个连通图,结束.
+</li>
+<li>若剩下C(&gt;1)个连通图,对C个连通图使用Kruskal,直到剩下一个连通图T.
+</li>
+</ol>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #87cefa;">sort</span>(edges);
+c := n;
+<span style="color: #00ffff;">for</span> edge<span style="color: #00ffff;"> in</span> edges:
+    <span style="color: #00ffff;">if</span> edge.weight &lt; 0:
+        <span style="color: #00ffff;">if</span> find(edge.firstEnd) != find(edge.secondEnd):
+            --c;
+        unite(edge.firstEnd, edge.secondEnd);
+    <span style="color: #00ffff;">else</span>:
+        <span style="color: #00ffff;">if</span> <span style="color: #eedd82;">c</span> == 1: break;
+        <span style="color: #00ffff;">if</span> find(edge.firstEnd) != find(edge.secondEnd):
+            unite(edge.firstEnd, edge.secondEnd);
+            --c;
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-8" class="outline-3">
+<h3 id="sec-2-8">10</h3>
+</div>
+
+
+
+<div id="outline-container-sec-2-9" class="outline-3">
+<h3 id="sec-2-9">23</h3>
+<div class="outline-text-3" id="text-2-9">
+<p>
+Arbitrage is the use of discrepancies in currency-exchange rates to
+make a profit. For example, there may be a small window of time during
+which 1 U.S. dollar buys 0.75 British pounds, 1 British pound buys 2
+Australian dollars, and 1 Australian dollar buys 0.70 U.S. dollars. At
+such a time, a smart trader can trade one U.S. dollar and end up with
+0.75 × 2 × 0.7 = 1.05 U.S. dollars—a profit of 5%. Suppose that
+there are n currencies c1 , …, cn and an n × n table R of exchange
+rates, such that one unit of currency ci buys R[i,j] units of currency
+cj. Devise and analyze an algorithm to determine the maximum value of
+R[c1, ci1] · R[ci1, ci2] · · · R[cik−1, cik] · R[cik, c1]
+</p>
+</div>
+</div>
+</div>
+
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">cc</h2>
 <div class="outline-text-2" id="text-3">
@@ -510,7 +915,7 @@ algorithm is basically solving a shortest path problem on a DAG.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-06-13 Fri 23:12</p>
+<p class="date">Created: 2014-06-14 Sat 22:34</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

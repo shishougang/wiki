@@ -252,11 +252,260 @@ particularly convenient dynamic programming solution for these
 problems (the Viterbi algorithm). Despite the fancy name, the Viterbi
 algorithm is basically solving a shortest path problem on a DAG.
 ** 6.5 Network Flows and Bipartite Matching
+The /network flow problem/ asks for the maximum amount of flow which can
+be sent from vertices s to t in a given weighted graph G while
+respecting the maximum capacities of each pipe.
+*** 6.5.1 Bipartite Matching
+The largest bipartite matching can be readily found using network
+flow. Create a source nodes that is connected to every vertex in L by
+an edge of weight 1. Create a sink node t and connect it to every
+vertex in R by an edge of weight 1. Finally, assign each edge in the
+bipartite graph G a weight of 1. Now, the maximum possible flow
+fromstotdefines the largest matching in G.
+*** 6.5.2 Computing Network Flows
+The key structure is the residual flow graph, denoted as R(G, f), where Gis
+the input graph andfis the current flow through G. 
 
+The maximum flow fromstotalways equals the weight of the minimums-t
+cut. Thus, flow algorithms can be used to solve general edge and
+vertex connectivity problems in graphs.
 
+*Implementation*
+#+begin_src c++
+          typedef struct {
+            int v; /* neighboring vertex */
+            int capacity; /* capacity of edge */
+            int flow; /* flow through edge */
+            int residual; /* residual capacity of edge */
+            struct edgenode *next; /* next edge in list */
+          } edgenode;
+        
+        netflow(flow_graph *g, int source, int sink)
+        {
+          int volume; /* weight of the augmenting path */
+          add_residual_edges(g);
+          initialize_search(g);
+          bfs(g,source);
+          volume = path_volume(g, source, sink, parent);
+          while (volume > 0) {
+            augment_path(g,source,sink,parent,volume);
+            initialize_search(g);
+            bfs(g,source);
+            volume = path_volume(g, source, sink, parent);
+          }
+        }
+      
+      bool valid_edge(edgenode *e)
+      {
+        if (e->residual > 0) return (TRUE);
+        else return(FALSE);
+      }
+    
+    int path_volume(flow_graph *g, int start, int end, int parents[])
+    {
+      edgenode *e; /* edge in question */
+      edgenode *find_edge();
+      if (parents[end] == -1) return(0);
+      e = find_edge(g,parents[end],end);
+      if (start == parents[end])
+        return(e->residual);
+      else
+        return( min(path_volume(g,start,parents[end],parents),
+                    e->residual) );
+    }
+    edgenode *find_edge(flow_graph *g, int x, int y)
+    {
+      edgenode *p; /* temporary pointer */
+      p = g->edges[x];
+      while (p != NULL) {
+        if (p->v == y) return(p);
+        p = p->next;
+      }
+      return(NULL);
+    }
+  
+  augment_path(flow_graph*g,intstart,intend,intparents[],intvolume)
+  {
+    edgenode *e; /* edge in question */
+    edgenode *find_edge();
+    if (start == end) return;
+    e = find_edge(g,parents[end],end);
+    e->flow += volume;
+    e->residual -= volume;
+    e = find_edge(g,end,parents[end]);
+    e->residual += volume;
+    augment_path(g,start,parents[end],parents,volume);
+  }
+#+end_src
+
+Edmonds and Karp [EK72] proved that always selecting ashortest
+unweighted augmenting path guarantees that O(n^3) augmentations
+suffice for optimization.
+** 6.6 Design Graphs, Not Algorithms
+The secret is learning to design graphs, not algorithms. We have
+already seen a few instances of this idea:
+
++ The maximum spanning tree can be found by negating the edge weights
+  of the input graph G and using aminimumspanning tree algorithm on
+  the result. The most negative weight spanning tree will define the
+  maximum weight tree in G.
++ To solve bipartite matching, we constructed a special network flow
+  graph such that the maximum flow corresponds to a maximum
+  cardinality matching.
+
+*** Bucketing Rectangles
+Problem: “In my graphics work I need to solve the following problem.
+Given an arbitrary set of rectangles in the plane, how can I
+distribute them into a minimum number of buckets such that no subset
+of rectangles in any given bucket intersects another? In other words,
+there can not be any overlapping area between two rectangles in the same bucket.”
+
+Solution: We formulate a graph where each vertex is a rectangle, and
+there is an edge if two rectangles intersect. Each bucket corresponds
+to anindependent set of rectangles, so there is no overlap between any
+two. Avertex coloringof a graph is a partition of the vertices into
+independent sets, so minimizing the number of colors is exactly what
+you want.
+*** Names in Collision
+Problem:“In porting code from UNIX to DOS, I have to shorten several
+hundred file names down to at most 8 characters each. I can’t just
+use the first eight characters from each name, because “filename1”
+and “filename2” would be assigned the exact same name. How can I
+meaningfully shorten the names while ensuring that they do not
+collide?”
+
+Solution: Construct a bipartite graph with vertices corresponding to
+each original file namefi for 1≤i≤n, as well as a collection of
+acceptable shortenings for each name f_{i1},...,f_{ik}. Add an edge
+between each original and shortened name. We now seek a set of n edges
+that have no vertices in common, so each file name is mapped to a
+distinct acceptable substitute. Bipartite matching, discussed in
+Section 15.6 (page 498), is exactly this problem of finding an
+independent set of edges in a graph.
+*** Separate the Text
+Problem: “We need a way to separate the lines of text in the optical
+characterrecognition system that we are building. Although there is
+some white space between the lines, problems like noise and the tilt
+of the page makes it hard to find. How can we do line segmentation?
+
+Solution: Consider the following graph formulation. Treat each pixel
+in the image as a vertex in the graph, with an edge between two
+neighboring pixels. The weight of this edge should be proportional to
+how dark the pixels are. A segmentation between two lines is a path in
+this graph from the left to right side of the page. We seek a
+relatively straight path that avoids as much blackness as possible.
+This suggests that theshortest pathin the pixel graph will likely find
+a good line segmentation.
 * Exercises
+** 2-3
+Is the path between two vertices in a minimum spanning tree necessarily a
+shortest path between the two vertices in the full graph? Give a proof
+or a counterexample.
 
-** 1
+Assume that all edges in the graph have distinct edge weights (i.e. ,
+no pair of edges have the same weight). Is the path between a pair of
+vertices in a minimum spanning tree necessarily a shortest path
+between the two vertices in the full graph? Give a proof or a
+counterexample.
+
+不必要. 如下图,若a是6的话,minimum spanning tree不会选择a,但A和C间的最
+短路径会选择a.
+
+[[./images/6_4.jpg]]
+** 4
+Can Prim’s and Kruskal’s algorithm yield different minimum spanning
+trees? Explain why or why not.
+
+能.当有相同weight的边.
+
+当所有边的weight不同时,图存在唯一的minimum spanning trees,两者生成同样
+的树.
+** 5 
+Does either Prim's and Kruskal's algorithm work if there are negative
+edge weights? Explain why or why not. 
+
+可以.Prim每次选相邻最近的不在树内的点,有负weight的边并不影响它. 而
+Kruskal每次选最短的边,同样不受影响.
+** 6
+ Suppose we are given the minimum spanning tree T of a given graph G
+ (with n vertices and m edges) and a new edge e = (u,v) of weight w
+ that we will add to G. Give an efficient algorithm to find the
+ minimum spanning tree of the graph G + e. Your algorithm should run
+ in O(n) time to receive full credit.
+
+新添加的e在顶点u和v中间,原本的MST中u和v通过u->a1->ai->v,把此路径的边与
+e比较,用Prim算法选最临近点.
+** 7
+(a) Let T be a minimum spanning tree of a weighted graph G. Construct
+a new graph G′ by adding a weight of k to every edge of G. Do the
+edges of T form a minimum spanning tree of G′? Prove the statement or
+give a counterexample.
+
+(b) Let P = {s, . . . , t} describe a shortest weighted path between
+vertices s and t of a weighted graph G. Construct a new graph G′ by
+adding a weight of k to every edge of G. Does P describe a shortest
+path from s to t in G′? Prove the statement or give a counterexample.
+
+(a)和(b)都对,并没有改变边之间的比较关系.
+** 8
+ Devise and analyze an algorithm that takes a weighted graph G and
+ finds the smallest change in the cost to a non-MST edge that would
+ cause a change in the minimum spanning tree of G. Your algorithm must
+ be correct and run in polynomial time. 
+
+1. 遍历图的边,掠过MST中的边,当遇到non-MST的边E(i,j).
+2. 利用MST中的parent遍历出顶点i到j的所有MST边,并得到其中最大weight的边
+   mst_e_max.
+3. 计算E(i,j)与mst_e_max的差值.
+4. 遍历所有的non-MST的边,得到最小差值就是改变的最小值.
+
+总共边数m,算法复杂度O(m^2).
+** 9
+Consider the problem of finding a minimum weight connected subset T of
+edges from a weighted connected graph G. The weight of T is the sum of
+all the edge weights in T.
+
+1. Why is this problem not just the minimum spanning tree problem?
+   Hint: think negative weight edges.
+2. Give an efficient algorithm to compute the minimum weight connected
+   subset T. 
+
+MST不能有环路,minimum weight connected subset T可以有环路,所以如果一条
+负数weight的边,不在MST中,但却包含在T中,因为它能使T的总权值减小.
+
+1. 把所有负数weight的边加入T中,若剩下1个连通图,结束.
+2. 若剩下C(>1)个连通图,对C个连通图使用Kruskal,直到剩下一个连通图T.
+
+#+begin_src sh
+sort(edges);
+c := n;
+for edge in edges:
+    if edge.weight < 0:
+        if find(edge.firstEnd) != find(edge.secondEnd):
+            --c;
+        unite(edge.firstEnd, edge.secondEnd);
+    else:
+        if c == 1: break;
+        if find(edge.firstEnd) != find(edge.secondEnd):
+            unite(edge.firstEnd, edge.secondEnd);
+            --c;
+#+end_src
+** 10
+
+
+
+** 23
+Arbitrage is the use of discrepancies in currency-exchange rates to
+make a profit. For example, there may be a small window of time during
+which 1 U.S. dollar buys 0.75 British pounds, 1 British pound buys 2
+Australian dollars, and 1 Australian dollar buys 0.70 U.S. dollars. At
+such a time, a smart trader can trade one U.S. dollar and end up with
+0.75 × 2 × 0.7 = 1.05 U.S. dollars—a profit of 5%. Suppose that
+there are n currencies c1 , …, cn and an n × n table R of exchange
+rates, such that one unit of currency ci buys R[i,j] units of currency
+cj. Devise and analyze an algorithm to determine the maximum value of
+R[c1, ci1] · R[ci1, ci2] · · · R[cik−1, cik] · R[cik, c1]
+
 
 * cc
 
