@@ -64,7 +64,7 @@ performs less work on behalf of a multithreaded program than it does
 for a multiprocess program. This translates into a performance gain
 for the multithreaded program.
 
-*** Creating a new thread: pthread_create
+*** Creating a new thread: =pthread_create=
 #+begin_src c
 pthread_t       thread1;
 
@@ -76,7 +76,7 @@ pthread_create(&thread1,
 
 + A pointer to a buffer to which pthread_create returns a value
   that identifies the newly created thread. This value, or
-  handle, is of type pthread_t.
+  handle, is of type =pthread_t=.
 + A pointer to a structure known as a thread attribute object.
 + A pointer to the routine at which the new thread will start
   executing.
@@ -145,7 +145,7 @@ between threads.
 
 ** Who Am I? Who Are You?
 You can save this handle and use it to determine a thread's identity
-using the pthread_self and pthread_equal function calls. 
+using the =pthread_self= and =pthread_equal= function calls. 
 #+begin_src c
     pthread_t io_thread;
     
@@ -162,8 +162,8 @@ using the pthread_self and pthread_equal function calls.
     }
 #+end_src
 ** Terminating Thread Execution
- A thread can also explicitly exit with a call to pthread_exit. You can
- terminate another thread by calling pthread_cancel. In any of these
+ A thread can also explicitly exit with a call to =pthread_exit=. You can
+ terminate another thread by calling =pthread_cancel=. In any of these
  cases, the Pthreads library runs any routines in its cleanup stack
  and any destructors in keys in which it has store values. 
 *** Exit Status and Return Values
@@ -178,9 +178,9 @@ will not have an exit status for a detached thread, you cannot use a
 
 What is the exit status of a thread? You can associate an exit status
 with a thread in either of two ways:	
-+ If the thread terminates explicitly with a call to pthread_exit, the
++ If the thread terminates explicitly with a call to =pthread_exit=, the
   argument to the call becomes its exit status.	
-+ If the thread does not call pthread_exit, the return value of the
++ If the thread does not call =pthread_exit=, the return value of the
   routine in which it started becomes its exit status.
 
 #+begin_src c
@@ -220,9 +220,9 @@ return 0;
 }
 #+end_src
 
-A final note on pthread_join is in order. Its purpose is to allow a
+A final note on =pthread_join= is in order. Its purpose is to allow a
 single thread to wait on another's termination. The result of having
-multiple threads concurrently call pthread_join is undefined in the
+multiple threads concurrently call =pthread_join= is undefined in the
 Pthreads standard.
 ** Why Use Threads Over Processes?
 Creating a new process can be expensive. It takes time. (A call into
@@ -287,8 +287,8 @@ In a race condition, two or more threads access the same resource at
 the same time.
 
 ** Selecting the Right Synchronization Tool
-*** pthread_join functions
-pthread_join allows one thread to suspend execution until another has
+*** =pthread_join= functions
+=pthread_join= allows one thread to suspend execution until another has
 terminated.
 
 *** Mutex variable functions
@@ -306,8 +306,8 @@ that allows them to proceed with some particular phase of their
 execution. The Pthreads library provides ways for threads both to
 express their interest in a condition and to signal that an awaited
 condition has been met. 
-*** pthread_once function
-pthread_once is a specialized synchronization tool that ensures that
+*** =pthread_once= function
+=pthread_once= is a specialized synchronization tool that ensures that
 initialization routines get executed once and only once when called by
 multiple threads.
 *** Some of the common synchronization mechanisms are:
@@ -333,13 +333,13 @@ piece of code that must be executed atomically a critical section.
 Using mutex variables in Pthreads is quite simple. Here's what you do:	
 1. Create and initialize a mutex for each resource you want to
    protect, like a record in a database.	
-2. When a thread must access the resource, use pthread_mutex_lock to
+2. When a thread must access the resource, use =pthread_mutex_lock= to
    lock the resource's mutex. The Pthreads library makes sure that
    only one thread at a time can lock the mutex; all other calls to
-   the pthread_mutex_lock function for the same mutex must wait until
+   the =pthread_mutex_lock= function for the same mutex must wait until
    the thread currently holding the mutex releases it.	
 3. When the thread is finished with the resource, unlock the mutex by
-   calling pthread_mutex_unlock.
+   calling =pthread_mutex_unlock=.
 
 *** Using Mutexes 
 + static 
@@ -352,13 +352,13 @@ Using mutex variables in Pthreads is quite simple. Here's what you do:
   pthread_mutex_init(mutexp, NULL);
 #+end_src
 
-*** Using pthread_mutex_trylock
+*** Using =pthread_mutex_trylock=
 Somewhat more acceptable is the specialized use of
-pthread_mutex_trylock by real-time programmers to poll for state
+=pthread_mutex_trylock= by real-time programmers to poll for state
 changes. This practice may be inefficient, but it does allow real-time
 programs to respond quickly to a condition that warrants speed.
 
-Another situation in which a pthread_mutex_trylock is often used is in
+Another situation in which a =pthread_mutex_trylock= is often used is in
 detecting and avoiding deadlock in locking hierarchies and priority
 inversion situations.
 *** Some Shortcomings of Mutexes
@@ -370,8 +370,8 @@ by its current holder. It would be nice if we could specify this
 ability in a mutex attribute object. We can imagine the Pthreads
 library associating an internal counter with a recursive mutex to
 count the number of times its current holder has called
-pthread_mutex_lock. Each time the current holder calls
-pthread_mutex_unlock, the library would decrement this counter. The
+=pthread_mutex_lock=. Each time the current holder calls
+=pthread_mutex_unlock=, the library would decrement this counter. The
 lock would not be released until the call that brings the count down
 to zero is issued.
 
@@ -399,11 +399,11 @@ thread is actually treated as if it had the inverse of its intended
 priority.
 *** Sharing a Mutex Among Processes
 If your platform allows you to set the process-shared attribute, the
-compile-time constant _POSIX_THREAD_PROCESS_SHARED will be TRUE.
+compile-time constant =_POSIX_THREAD_PROCESS_SHARED= will be TRUE.
 
-To set the process-shared attribute, supply the PTHREAD_PROCESS_SHARED
-constant in a pthread_mutexattr_setshared call. To revert to a
-process-private mutex, specify the PTHREAD_PROCESS_PRIVATE constant.
+To set the process-shared attribute, supply the =PTHREAD_PROCESS_SHARED=
+constant in a =pthread_mutexattr_setshared= call. To revert to a
+process-private mutex, specify the =PTHREAD_PROCESS_PRIVATE= constant.
 Processes that share a mutex must be able to access it in shared
 memory (created through System V shared memory mechanisms or through
 mmap calls). 
@@ -448,8 +448,6 @@ main(void)
            .	
 }
 #+end_src
-
-
 
 ** Condition Variables
 #+begin_src c
@@ -499,16 +497,16 @@ void inc_count(int *idp)
 }
 #+end_src
 
-A condition variable has a data type of pthread_cond_t. You can
+A condition variable has a data type of =pthread_cond_t=. You can
 initialize it statically as we do in Example 3-7, or you can
 initialize it dynamically by calling pthread_cond_init, as
 follows:	
 
 =pthread_cond_init(&count_threshold_cv, NULL);=
 
-If count is not the desired value, the thread calls pthread_cond_wait
-to put itself into a wait on the count_threshold_cv condition
-variable. The pthread_cond_wait function releases the count mutex
+If count is not the desired value, the thread calls =pthread_cond_wait=
+to put itself into a wait on the =count_threshold_cv= condition
+variable. The =pthread_cond_wait= function releases the count mutex
 while the thread is waiting so other threads have the opportunity to
 modify count.
 
@@ -523,11 +521,11 @@ calls pthread_cond_signal or pthread_cond_broadcast.
 It is important to use condition variables and mutexes together
 properly.
 
-A call to pthread_cond_wait requires that a locked mutex be passed in
+A call to =pthread_cond_wait= requires that a locked mutex be passed in
 along with the condition variable. The system releases the mutex on
 the caller's behalf when the wait for the condition begins. In concert
 with the actions of the waiting thread, the thread that issues the
-pthread_cond_signal or pthread_cond_broadcast call holds the mutex at
+=pthread_cond_signal= or =pthread_cond_broadcast= call holds the mutex at
 the time of the call but must release it after the call. Then, when
 the system wakes it up, a waiting thread can regain control of the
 mutex. It too must release the mutex when it's finished with
@@ -535,14 +533,14 @@ it.
 
 *** When Many Threads Are Waiting
 If all waiting threads are of the same priority, they are released in
-a first-in first-out order for each pthread_cond_signal call that's
+a first-in first-out order for each =pthread_cond_signal= call that's
 issued
 
-The pthread_cond_broadcast function releases all threads at once from
+The =pthread_cond_broadcast= function releases all threads at once from
 their waits on the condition variable, but there is a hitch.
 
  It does so by applying the same criterion it uses when selecting the
- thread it wakes when a phread_cond_signal call signals a
+ thread it wakes when a =phread_cond_signal= call signals a
  condition—scheduling order.The other threads are moved to the queue
  of threads that are waiting to acquire the mutex.
 *** Checking the Condition on Wake Up: Spurious Wake Ups
@@ -556,7 +554,6 @@ A Pthreads condition variable attribute object is of data type
 =pthread_condattr_t=.You initialize and deinitialize the condition
 variable attribute object by calling =pthread_condattr_init= and
 =pthread_condattr_destroy=, respectively.
-
 
 
 
@@ -666,11 +663,12 @@ but it can slow our server in a couple of different ways:
 * Chapter 4 - Managing Pthreads
 ** Setting Thread Attributes
 we'd perform the following steps:	
-1. Define an attribute object of type pthread_attr_t.	
-2. Call pthread_attr_init to declare and initialize the attribute object.	
-3. Make calls to specific Pthreads functions to set individual attributes in the object.	
+1. Define an attribute object of type =pthread_attr_t=.	
+2. Call =pthread_attr_init= to declare and initialize the attribute object.	
+3. Make calls to specific Pthreads functions to set individual
+   attributes in the object.
 4. Specify the fully initialized attribute object to the
-   pthread_create call that creates the thread.
+   =pthread_create= call that creates the thread.
    
 *** Setting a Thread's Stack Size
  a process stack normally starts in high memory and works its way down
@@ -679,8 +677,8 @@ we'd perform the following steps:
  start of the next thread's stack, even if the next thread isn't using
  all of its stack space.
 
-To set a thread's stack size, we call pthread_attr_init to declare and
-initialize a custom thread attribute object (pthread_attr_t)
+To set a thread's stack size, we call =pthread_attr_init= to declare and
+initialize a custom thread attribute object (=pthread_attr_t=)
 
 #+begin_src c
   #define MIN_REQ_SSIZE 81920     
@@ -713,8 +711,8 @@ pthread_attr_t detached_attr;
 pthread_attr_setdetachedstate(&detached_attr, PTHREAD_CREATE_DETACHED);
 pthread_create(&thread, &detached_attr, ...);
 #+end_src
-** The pthread_once Mechanism
-The pthread_once mechanism is the tool of choice for these situations.
+** The =pthread_once= Mechanism
+The =pthread_once= mechanism is the tool of choice for these situations.
 It, like mutexes and condition variables, is a synchronization tool,
 but its specialty is handling synchronization among threads at
 initialization time. 
@@ -724,23 +722,23 @@ another thread might be trying to initialize the same objects
 simultaneously?
 
 *** Example: The ATM Server's Communication Module
-Thread A checks the value of srv_comm_inited and finds FALSE. Thread B
+Thread A checks the value of =srv_comm_inited= and finds FALSE. Thread B
 checks the value and also finds it FALSE. Then they both go forward
-and call srv_comm_init.	
+and call =srv_comm_init=.	
 
 We'll consider two viable solutions:	
-+ Adding a mutex to protect the srv_comm_inited flag and
-  server_comm_init routine. Using PTHREAD_MUTEX_INITIALIZER, we'll
++ Adding a mutex to protect the =srv_comm_inited= flag and
+  =server_comm_init= routine. Using =PTHREAD_MUTEX_INITIALIZER=, we'll
   statically initialize this mutex.	
 + Designating that the entire routine needs special synchronization
-  handling by calling the pthread_once function.
+  handling by calling the =pthread_once= function.
 
-*** Using the pthread_once mechanism
-If we use the server_comm_init routine only through the pthread_once
+*** Using the =pthread_once= mechanism
+If we use the =server_comm_init= routine only through the =pthread_once=
 mechanism, we can make the following synchronization guarantees:
 + No matter how many times it is invoked by one or more threads, the
   routine will be executed only once by its first caller.
-+ No caller will exit from the <emphasis>pthread_once</emphasis>
++ No caller will exit from the =pthread_once=
   mechanism until the routine's first caller has returned
 #+begin_src c
 pthread_once_t      srv_comm_inited_once = PTHREAD_ONCE_INIT;	
@@ -749,15 +747,15 @@ pthread_once(&srv_comm_inited_once, server_comm_init);
 #+end_src
 
 no longer has to test a flag to determine whether to proceed with
-initialization. Instead, it calls pthread_once, specifying the once
+initialization. Instead, it calls =pthread_once=, specifying the once
 block and the routine
 
 You can declare multiple once blocks in a program, associating each
 with a different routine. Be careful, though. Once you associate a
-routine with the pthread_once mechanism, you must always call it
-through a pthread_once call, using the same once block. You cannot
+routine with the =pthread_once= mechanism, you must always call it
+through a =pthread_once= call, using the same once block. You cannot
 call the routine directly elsewhere in your program without subverting
-the synchronization the pthread_once mechanism is meant to provide
+the synchronization the =pthread_once= mechanism is meant to provide
 
 Notice that the pthread_once interface does not allow you to pass
 arguments to the routine that is protected by the once block. If
@@ -765,7 +763,6 @@ you're trying to fit a predefined routine with arguments into the
 pthread_once mechanism, you'll have to fiddle a bit with global
 variables, wrapper routines, or environment variables to get it to
 work properly.
-
 
 ** Keys: Using Thread-Specific Data
 *** Overview
@@ -819,8 +816,7 @@ exactly how many threads will be in your program at a given time. If
 this is the case, just allocate a global array with an element for
 each known thread and store each thread's data in a separate element.
 
-
-*** Initializing a Key: pthread_key_create
+*** Initializing a Key: =pthread_key_create=
 #+begin_src c
 	static pthread_key_t conn_key;
      pthread_key_create(&conn_key, (void *)free_conn);
@@ -830,10 +826,10 @@ void free_conn(int *connp)
 }
 #+end_src
 
-The pthread_key_create call takes two arguments: the key and a
+The =pthread_key_create= call takes two arguments: the key and a
 destructor routine. 
 
-	When you're done with a key, call pthread_key_delete to allow
+	When you're done with a key, call =pthread_key_delete= to allow
 	the library to recover resources associated with the key
 	itself.
 *** Associating Data with a Key
@@ -849,7 +845,7 @@ The pthread_setspecific routine takes, as an argument, a pointer to
 the data to be associated with the key—not the data itself. 
 
 *** Retrieving Data from a Key
- Each routine uses a pointer, saved_connp, to point to the connection
+ Each routine uses a pointer, =saved_connp=, to point to the connection
  identifier, 
 #+begin_src c
 int *saved_connp;
@@ -891,7 +887,7 @@ locations in its code path. These locations are known as cancellation
 points, and they come in two flavors:
 
 + Automatic cancellation points
-  (pthread_cond_wait,pthread_cond_timedwait, and pthread_join). The
+  (=pthread_cond_wait=, =pthread_cond_timedwait=, and =pthread_join=). The
   Pthreads library defines these function calls as cancellation points
   because they can block the calling thread. Rather than maintain the
   overhead of a blocked routine that's destined to be canceled, the
@@ -900,10 +896,10 @@ points, and they come in two flavors:
   pending does not call any of these functions, it may never actually
   be terminated. This is one of the reasons you may need to consider
   using a programmer-defined cancellation point.
-+ Programmer-defined cancellation points (pthread_testcancel).To force
++ Programmer-defined cancellation points (=pthread_testcancel=).To force
   a pending cancellation to be delivered at a particular point ina
   thread's code path, insert a call to pthread_testcancel. The
-  pthread_testcancel function causes any pending cancellation to be
+  =pthread_testcancel= function causes any pending cancellation to be
   delivered to the thread at the program location where it occurs. If
   no cancellation is pending on the thread, nothing happens. Thus, you
   can freely insert this call at those places in a thread's code path
@@ -912,7 +908,6 @@ points, and they come in two flavors:
   operation. If a cancellation is pending on the thread, it's better
   to terminate it as soon as possible, rather than have it continue
   and consume system resources needlessly.
-
 
 *** A Simple Cancellation Example
 #+begin_src c
@@ -941,8 +936,8 @@ Pthreads associates a cleanup stack with each thread.
 
 A cleanup stack contains pointers to routines to be executed just
 before the thread terminates.By default the stack is empty; you use
-pthread_cleanup_push to add routines to the stack, and
-pthread_cleanup_pop to remove them. When the library processes a
+=pthread_cleanup_push= to add routines to the stack, and
+=pthread_cleanup_pop= to remove them. When the library processes a
 thread's termination, the thread executes routines from the cleanup
 stack in last-in first-out order.
 
@@ -972,13 +967,13 @@ First, pthread_cleanup_pop takes a single argument—an integer that can have ei
   execute.
 
 Second, the Pthreads standard requires that there be one
-pthread_cleanup_pop for each pthread_cleanup_push within a given
+=pthread_cleanup_pop= for each =pthread_cleanup_push= within a given
 lexical scope of code.
 
 **** Cancellation in the ATM Server
 ** Scheduling Pthreads
 If your system supports the scheduling programming interface, the
-compile-time constant _POSIX_THREAD_PRIORITY_SCHEDULING will be TRUE.
+compile-time constant =_POSIX_THREAD_PRIORITY_SCHEDULING= will be TRUE.
 
 *** Scheduling Priority and Policy
 The eligibility of any given thread for special scheduling treatment
@@ -997,10 +992,10 @@ pthread_attr_setscope(&custom_sched_attr, PTHREAD_SCOPE_SYSTEM);
 pthread_create(&thread, &custom_sched_attr, ...);
 #+end_src
 
-The pthread_attr_setscope function sets the scheduling-scope attribute
+The =pthread_attr_setscope= function sets the scheduling-scope attribute
 in a thread attribute object to either system-scope scheduling
-(PTHREAD_SCOPE_SYSTEM), or process-scope scheduling
-(PTHREAD_SCOPE_PROCESS).
+(=PTHREAD_SCOPE_SYSTEM=), or process-scope scheduling
+(=PTHREAD_SCOPE_PROCESS=).
 
 
 + When we say pool of threads, we mean:	
@@ -1017,20 +1012,20 @@ in a thread attribute object to either system-scope scheduling
 
 *** Runnable and Blocked Threads
 *** Scheduling Policy
-The two main scheduling policies are SCHED_FIFO and SCHED-RR:
-+ SCHED_FIFO	This policy (first-in first-out) lets a thread run
+The two main scheduling policies are =SCHED_FIFO= and =SCHED-RR=:
++ =SCHED_FIFO=	This policy (first-in first-out) lets a thread run
   until it either exits or blocks. As soon as it becomes unblocked, a
   blocked thread that has given up its processing slot is placed at
   the end of its priority queue.
-+ SCHED_RR	This policy (round robin) allows a thread to run for
++ =SCHED_RR=	This policy (round robin) allows a thread to run for
   only a fixed amount of time before it must yield its processing slot
   to another thread of the same priority. This fixed amount of time is
   usually referred to as a quantum. When a thread is interrupted, it
   is placed at the end of its priority queue.
 *** Using Priorities and Policies
 *** Setting Scheduling Policy and Priority
-We specify it in calls to pthread_attr_setschedpolicy to set the
-scheduling policy and pthread_attr_setschedparam to set the scheduling
+We specify it in calls to =pthread_attr_setschedpolicy= to set the
+scheduling policy and =pthread_attr_setschedparam= to set the scheduling
 priority
 #+begin_src c
 pthread_attr_t custom_sched_attr;	
@@ -1059,7 +1054,7 @@ struct sched_param {;
 
 The absolute values and actual range of the priorities depend upon the
 implementation, but one thing's for certain—you can use
-sched_get_priority_max and sched_get_priority_min to get a handle on
+=sched_get_priority_max= and =sched_get_priority_min= to get a handle on
 them.
 
 Setting Policy and Priority Dynamically (sched.c)	
@@ -1069,9 +1064,8 @@ fifo_sched_param.sched_priority = fifo_min_prio;
 pthread_setschedparam(threads[i], SCHED_FIFO, &fifo_min_prio)
 #+end_src
 
-the pthread_setschedparam call sets both policy and priority at the
+the =pthread_setschedparam= call sets both policy and priority at the
 same time. 
-
 
 *** Inheritance
 Instead, you can specify that each thread should inherit its
@@ -1089,13 +1083,11 @@ pthread_attr_setinheritsched(&custom_sched_attr, PTHREAD_INHERIT_SCHED)
 pthread_create(&thread, &custom_sched_attr, ...);
 #+end_src
 
-The pthread_attr_setinheritsched function takes a thread attribute
+The =pthread_attr_setinheritsched= function takes a thread attribute
 object as its first argument and as its second argument either the
-PTHREAD_INHERIT_SCHED flag or the PTHREAD_EXPLICIT_SCHED flag. You can
+=PTHREAD_INHERIT_SCHED= flag or the =PTHREAD_EXPLICIT_SCHED= flag. You can
 obtain the current inheritance attribute from an attribute object by
-calling pthread_attr_getinheritsched
-
-
+calling =pthread_attr_getinheritsched=
 
 ** Mutex Scheduling Attributes
 The Pthreads standard allows (but does not require) implementations to
@@ -1111,7 +1103,7 @@ priority equal to its own, if the mutex holder has a lower priority to
 begin with.
 
 If your platform supports the priority ceiling protocol, the
-compile-time constant _POSIX_THREAD_PRIO_PROTECT will be defined.
+compile-time constant =_POSIX_THREAD_PRIO_PROTECT= will be defined.
 #+begin_src c
 pthread_mutex_t m1;	
 pthread_mutexattr_t mutexattr_prioceiling;	
@@ -1127,11 +1119,10 @@ pthread_mutex_init(&m1, &mutexattr_prioceiling);
 #+end_src
 
 The priority protocol attribute can have one of three values:	
-+ PTHREAD_PRIO_NONE	 The mutex uses no priority protocol.	
-+ PTHREAD_PRIO_PROTECT	 The mutex uses the priority ceiling protocol.	
-+ PTHREAD_PRIO_INHERIT   The mutex uses the priority inheritance
++ =PTHREAD_PRIO_NONE=	 The mutex uses no priority protocol.	
++ =PTHREAD_PRIO_PROTECT=  The mutex uses the priority ceiling protocol.	
++ =PTHREAD_PRIO_INHERIT=   The mutex uses the priority inheritance
   protocol.
-
 
 *** Priority Inheritance
 	The priority inheritance protocol lets a mutex elevate the
@@ -1143,7 +1134,7 @@ mutex holder only when it's absolutely needed, it can be more
 efficient than the priority ceiling protocol.
 
 	If your platform supports the priority inheritance feature,
-	the compile-time constant _POSIX_THREAD_PRIO_INHERIT will be
+	the compile-time constant =_POSIX_THREAD_PRIO_INHERIT= will be
 	TRUE
 
 #+begin_src c
@@ -1191,8 +1182,8 @@ challenges:
        interfere with its mainline execution?
 *** Traditional Signal Processing
 A process may choose to:
-+ Ignore the signal (SIG_IGN)	
-+ Use the default action (SIG_DFL)
++ Ignore the signal (=SIG_IGN=)	
++ Use the default action (=SIG_DFL=)
 + Catch the signal, and execute a user-specified handler routine
 
 The arrival of a signal interrupts a process at its current point of
@@ -1213,10 +1204,10 @@ way (SIGSEGV), use a broken pipe (SIGPIPE), or do something else that
 triggered an exception. 
 
 	The other type of synchronously generated signal results from
-	one thread in a process calling pthread_kill to send a signal
+	one thread in a process calling =pthread_kill= to send a signal
 	to another thread in the same process. 
 
-Note that you shouldn't use pthread_kill in place of cancellation or
+Note that you shouldn't use =pthread_kill= in place of cancellation or
 condition variables
 
 **** Asynchronously generated signals
@@ -1229,7 +1220,7 @@ call and can be handled by almost any of its threads.
 By default, the first thread in a child process inherits its signal
 mask from the thread in its parent that called fork. Additional
 threads inherit the signal mask of the thread that issued the
-pthread_create that created them. Use the pthread_sigmask call to
+=pthread_create= that created them. Use the =pthread_sigmask= call to
 block and unblock signals in the mask.
 
 When an asynchronously generated signal arrives at a process, it is
@@ -1237,8 +1228,6 @@ handled once by exactly one thread in the process. The system selects
 this thread by referring to the collection of per-thread signal masks
 of all the threads. If more than one thread has the signal unblocked,
 the system arbitrarily selects one of them.
-
-
 
 **** Per-process signal actions
 Although each thread has its own signal mask, all threads in a process
@@ -1265,11 +1254,15 @@ lists! In fact, the Pthreads standard specifies that the behavior of
 all Pthreads functions is undefined when the function is called from a
 signal handler.
 
+To make our program take an action when a signal arrives we can use
+sigwait as follows: 	
 
++ Mask the interesting signals in all threads so that their arrival is
+  made pending. The sigwait call will detect these signals. 
 
-To make our program take an action when a signal arrives we can use sigwait as follows: 	
-+ Mask the interesting signals in all threads so that their arrival is made pending. The sigwait call will detect these signals. 	
-+ Create a dedicated thread that waits specifically for interesting signals to arrive. 	
++ Create a dedicated thread that waits specifically for interesting
+  signals to arrive. 	
+
 + Insert a simple loop in the dedicated thread's code that calls
   sigwait, indicating the signals that it will handle. Add the action
   routine that executes when the sigwait call returns. 
@@ -1322,8 +1315,8 @@ known as its reentrancy.
 ** Cancellation-Safe Library Functions and System Calls
 *** Cancellation Points in System and Library Calls
 we know of four Pthreads function calls that act as cancellation
-points: they are pthread_testcancel, pthread_cond_wait,
-pthread_cond_timedwait, and pthread_join. 
+points: they are =pthread_testcancel=, =pthread_cond_wait=,
+=pthread_cond_timedwait=, and =pthread_join=. 
 ** Thread-Blocking Library Functions and System Calls
 ** Threads and Process Management
 *** Calling fork from a Thread
@@ -1343,15 +1336,17 @@ Consider the headaches:
   threads in the parent that don't exist in the child. Here we see
   memory leaks, data loss, and bug reports. 	
 
-The Pthreads standard defines the pthread_atfork call to help you
-manage these problems. The pthread_atfork function allows a parent
+The Pthreads standard defines the =pthread_atfork= call to help you
+manage these problems. The =pthread_atfork= function allows a parent
 process to specify preparation and cleanup routines that parent and
 child processes run as part of the fork operation. Using these
 routines a parent or child process can manage the release and
 reacquisition of locks and resources before and after the fork. 
 
 **** Fork-handling stacks
-To perform its magic, the pthread_atfork call pushes addresses of preparation and cleanup routines on any of three fork-handling stacks: 	
+To perform its magic, the pthread_atfork call pushes addresses of
+preparation and cleanup routines on any of three fork-handling stacks:
+
 + Routines placed on the prepare stack are run in the parent before the fork. 	
 + Routines placed on the parent stack are run in the parent after the fork. 	
 + Routines placed on the child stack are run in the child after the
@@ -1379,7 +1374,9 @@ from any thread must terminate all threads in the process and start a
 single new thread at main in the new image. 
 
 *** Process Exit and Threads
-Regardless of whether or not a process contains multiple threads, it can be terminated when: 	
+Regardless of whether or not a process contains multiple threads, it
+can be terminated when: 	
+
 + Any thread in it makes an exit system call. 	
 + The thread running the main routine completes its execution. 	
 + A fatal signal is delivered. 
@@ -1430,7 +1427,7 @@ threaded programs.
 ** Performance
 * Appendix C: Pthreads Quick Reference
 
-#+begin_src sh
+#+begin_src c++
 pthread_atfork ( )	
 
 int pthread_atfork (	

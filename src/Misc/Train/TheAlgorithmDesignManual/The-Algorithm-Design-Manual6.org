@@ -137,6 +137,8 @@ can be done even faster, as discussed in Section 12.5.
     return ( find(s,s1) == find(s,s2) );
   }
 #+end_src
+*** More MST
+http://www.seas.gwu.edu/~simhaweb/champalg/mst/mst.html
 ** 6.3 Shortest Paths
 *** 6.3.1 Dijkstra’s Algorithm
 Given a particular start vertexs, it finds the shortest path from s to
@@ -491,9 +493,109 @@ for edge in edges:
             --c;
 #+end_src
 ** 10
+Let G=(V,E) be an undirected graph. A set F⊆E of edges is called a
+feedback-edge set if every cycle of G has at least one edge in F.
 
+1. Suppose that Gis unweighted. Design an efficient algorithm to find
+   a minimum-size feedback-edge set.
 
+2. Suppose that Gis a weighted undirected graph with positive edge
+   weights. Design an efficient algorithm to find a minimum-weight
+   feedback-edge set.
 
+1. *Minimum size feedback edge set:* 使用DFS,从任意点开始,遇到回归边,
+   把它加入结果set中,当DFS完成,结果set就是答案.
+2. *minimum-weight feedback-edge set:* 对所有weight值取反,用Kruskal算
+   法,当遇到边E的顶点在同一个集合中,把E加入到结果set中,当Kruskal遍历完
+   所有边后,结果set就是答案.
+** 11
+Modify Prim's algorithm so that it runs in time O(nlogk) on a
+graph that has only k different edges costs. 
+
++ k个不同的边值,使用一个k个元素的min-heap,heap的节点是相同距离的顶点链表.
++ Prim每次选择和更新顶点的距离在min-heap完成,做到O(nlogk).
+
+** 12
+Devise an efficient data structure to handle the following operations
+on a weighted directed graph:
+
+1. Merge two given components.
+2. Locate which component contains a given vertex v.
+3. Retrieve a minimum edge from a given component. 
+
+使用Union-Find并添加minimum edge.
+#+begin_src c++
+  typedef struct {
+    int p[SET_SIZE+1]; /* parent element */
+    int size[SET_SIZE+1]; /* number of elements in subtree i */
+    int minedge[SET_SIZE+1];
+    int n; /* number of elements in set */
+  } set_union;
+#+end_src  
+** 14
+The single-destination shortest path problem for a directed graph
+seeks the shortest path from every vertex to a specified vertex v. Give
+an efficient algorithm to solve the single-destination shortest paths
+problem.
+
+用Floyd-Warshall对于顶点v反向更新距离值.得到最终shortest paths.
+** 19
+Let G be a weighted directed graph with n vertices and m edges, where
+all edges have positive weight. A directed cycle is a directed path
+that starts and ends at the same vertex and contains at least one
+edge. Give an O(n^3) algorithm to find a directed cycle in G of minimum
+total weight. Partial credit will be given for an O(n^{2}m) algorithm. 
+
+#+begin_src c++
+run Floyd Warshall on the graph
+min <- MAX_INT
+vertex <- None
+for each pair of vertices u,v
+    if (dist(u,v) + dist(v,u) < min):
+           min <- dist(u,v) + dist(v,u)
+           pair <- (u,v)
+return path(u,v) + path(v,u)
+#+end_src
+** 20
+Can we modify Dijkstra’s algorithm to solve the single-source longest
+path problem by changing minimum to maximum? If so, then prove your
+algorithm correct. If not, then provide a counterexample.
+
+没有负weight的边,可以.
+** 21
+LetG=(V,E) be a weighted acyclic directed graph with possibly negative
+edge weights. Design a linear-time algorithm to solve the
+single-source shortest-path problem from a given source v.
+
+#+begin_src sh
+for each vertex y in a topological ordering of G
+    choose edge (x,y) minimizing d(s,x)+length(x,y)
+    path(s,y) = path(s,x) + edge (x,y)
+    d(s,y) = d(s,x) + length(x,y)
+#+end_src
+** 22
+Let G=(V,E) be a directed weighted graph such that all the weights are
+positive. Let v and w be two vertices in G and k≤|V| be an integer. Design
+an algorithm to find the shortest path from v to w that contains
+exactly k edges. Note that the path need not be simple.
+
+#+begin_src sh
+  create the table D[V,k];
+  D[v,1] = 0;
+  for i in other vertex except v:
+           D[i,1] = MAX_INT;
+  for m=2 to k:
+      for every edge(i,j):
+          D[j,m] = D[i,m-1] + D[i,j]
+          P[i,m] = i
+  Path = emtpy list
+  i = w
+  for m=k down to 1:
+      Path.append(m);
+      i = P[m,k]
+   Path.append(V);
+   Path.reverse();
+#+end_src
 ** 23
 Arbitrage is the use of discrepancies in currency-exchange rates to
 make a profit. For example, there may be a small window of time during
@@ -506,13 +608,7 @@ rates, such that one unit of currency ci buys R[i,j] units of currency
 cj. Devise and analyze an algorithm to determine the maximum value of
 R[c1, ci1] · R[ci1, ci2] · · · R[cik−1, cik] · R[cik, c1]
 
+log(a*b*c) = loga + lgob + log.所以求最长路径.
 
-* cc
-
-
-#+begin_src c++
-
-#+end_src
-
-
-
+1. 用Floyd-Warshall算法算出i,j的最长路径;
+2. 计算所有C_(1i)*C_(i1)的值,得出最大值.
