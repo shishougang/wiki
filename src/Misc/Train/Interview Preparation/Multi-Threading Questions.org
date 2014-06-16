@@ -124,17 +124,30 @@ Thread Disadvantages
   happen with processes. If an attempt is made to walk on another
   process an exception error will occur.
 
-* What synchronization primitives do you know, tell difference between them.
-* What is a deadlock and what is a livelock.
-* What is a race condition.
-* What does the term 'lock-free' mean.
+* What synchronization primitives do you know, tell difference between them
+1. Mutex
+2. Join
+3. Condition variable
+4. Barriers
+5. Spinlock
+6. Semaphore
 * What is the best way to terminate a thread.
 * Why you shouldn't use TerminateThread-esque functions.
-* Write a thread-safe producer/consumer buffer that can be accessed by one or more producer/consumers
+* thread-safe producer/consumer
+Write a thread-safe producer/consumer buffer that can be accessed by
+one or more producer/consumers
+
 * When might you choose to use threads on a single CPU system?
+IO read/write, buffer and such time-consuming processes.
 * How would you measure the context switch overhead between threads?
-* How would you make a MT-safe hash table, while allowing for maximal concurrency?
-* What can go wrong when you write thread code and how can you guard against them?
+* MT-safe hash table
+How would you make a MT-safe hash table, while allowing for maximal
+concurrency?
+
+* write thread code
+What can go wrong when you write thread code and how can you guard
+against them?
+
 Basically, the big three of threading problems are deadlock, races and
 starvation. 
 
@@ -155,7 +168,11 @@ atomic operations, or transaction based operations.)
 Starvation happens when a thread needs a resource to proceed, but
 can't get it. The resource is constantly tied up by other threads and
 the one that needs it can't get in. The scheduling algorithm is the
-problem when this happens. Look at algorithms that assure access.
+problem when this happens. Look at algorithms that ass
+
+
+
+
 * What is the atomic operation and why do they matter?
 Atomic operations are operations that can't lose control of the
 resources they have while executing. Functionally, they are equivalent
@@ -179,7 +196,15 @@ they are created.
 If the boss thread becomes a worker thread once it's done starting
 other worker threads then this is a Peer Thread Design Pattern.
 * Define: critical section
-The code between lock and unlock calls to a mutex.
+
+critical section is a piece of code that accesses a shared resource
+(data structure or device) that must not be concurrently accessed by
+more than one thread of execution. A critical section will usually
+terminate in fixed time, and a thread, task or process will have to
+wait a fixed time to enter it (aka bounded waiting). Some
+synchronization mechanism is required at the entry and exit of the
+critical section to ensure exclusive use, for example a semaphore.
+
 * What are four mutex types?
 + Recursive: allows a thread holding the lock to acquire the same lock
   again which may be necessary for recursive algorithms.
@@ -194,11 +219,65 @@ The code between lock and unlock calls to a mutex.
 + Scoped: RAII-style semantics regarding lock acquisition and
   unlocking.
 
-* Define: deadlock
+* Define: deadlock and Banker's Algorithm
+
 Two (or more) threads have stopped execution or are spinning
 permanently. For example, a simple deadlock situation: thread 1 locks
 lock A, thread 2 locks lock B, thread 1 wants lock B and thread 2
 wants lock A.
+
+** Banker's Algorithm[fn:3]
+*** Resources
+For the Banker's algorithm to work, it needs to know three things:
++    How much of each resource each process could possibly request[CLAIMS]
++    How much of each resource each process is currently holding[ALLOCATED]
++    How much of each resource the system currently has available[AVAILABLE]
+
+Resources may be allocated to a process only if it satisfies the
+following conditions:
++    request ≤ max, else set error condition as process has crossed
+     maximum claim made by it.
++    request ≤ available, else process waits until resources are
+     available.
+
+Let n be the number of processes in the system and m be the number of resource types. Then we need the following data structures:
+
++    Available: A vector of length m indicates the number of available
+     resources of each type. If Available[j] = k, there are k
+     instances of resource type Rj available.
++    Max: An n×m matrix defines the maximum demand of each process.
+     If Max[i,j] = k, then Pi may request at most k instances of
+     resource type Rj.
+
++    Allocation: An n×m matrix defines the number of resources of
+     each type currently allocated to each process. If Allocation[i,j]
+     = k, then process Pi is currently allocated k instances of
+     resource type Rj.
+
++    Need: An n×m matrix indicates the remaining resource need of
+     each process. If Need[i,j] = k, then Pi may need k more instances
+     of resource type Rj to complete the task.
+Note: Need[i,j] = Max[i,j] - Allocation[i,j].
+*** Safe and Unsafe States
+Given that assumption, the algorithm determines if a state is *safe* by
+trying to find a hypothetical set of requests by the processes that
+would allow each to acquire its maximum resources and then terminate
+(returning its resources to the system). Any state where no such set
+exists is an *unsafe* state.
+*** Limitations
+1. Specifically, it needs to know how much of each resource a process
+   could possibly request. In most systems, this information is
+   unavailable, making it impossible to implement the Banker's
+   algorithm. 
+2. Also, it is unrealistic to assume that the number of processes is
+   static since in most systems the number of processes varies
+   dynamically.
+3. Moreover, the requirement that a process will eventually release
+   all its resources (when the process terminates) is sufficient for
+   the correctness of the algorithm, however it is not sufficient for
+   a practical system. Waiting for hours (or even days) for resources
+   to be released is usually not acceptable.
+
 * How can you prevent deadlocking from occurring?
 You can prevent deadlocks from happening by making sure threads
 acquire locks in an agreed order(i.e. preservation of lock ordering).
@@ -208,6 +287,11 @@ Deadlock can also happen if threads do not unlock mutexes properly.
 A race condition is when non-deterministic behavior results from
 threads accessing shared data or resources without following a defined
 synchronization protocol for serializing such access.
+
+when a piece of code is shared between 2 threads
+and when output of the code is different depending on the order in
+which that 2 threads execute that code...is race condition. 
+
 * How can you prevent race conditions from occurring?
 Take steps within your program to enforce serial access to shared file
 descriptors and other external resources.
@@ -263,9 +347,17 @@ lock up.
 * "Busy waiting" and how it can be avoided
 When one thread is waiting for another thread using an active looping
 structure that doesn't do anything. This can be avoided using mutexes.
+* IPC[fn:2]
++ File
++ Signal
++ Socket
++ Message queue
++ Pipe
++ Shared memory
 
 
-* How would you maintain concurrency on a shared page being edited by multiple users simultaneously. 
+* How would you maintain concurrency on a shared page
+How would you maintain concurrency on a shared page being edited by multiple users simultaneously. 
 What if the page is being shared using a client- server mechanism.
 Represent the classes and explain the thread safety mechnism to avoid
 editing conflicts.
@@ -289,24 +381,442 @@ committing transaction rolls back and can be restarted.
   and the changed versions.
 
 * Write a multi threaded C code with one thread printing all even numbers 
+Write a multi threaded C code with one thread printing all even numbers 
 and the other all odd numbers. The output should always be in sequence
 ie. 0,1,2,3,4....etc
 
+#+begin_src c
+    #include <stdio.h>
+    #include <pthread.h>
+    
+    pthread_t odd_thread, even_thread;
+    pthread_mutex_t lock;
+    pthread_cond_t cond;
+    
+    int is_even;
+    
+    void* even_print(void *data) {
+      int *max = data;
+      int i;
+      for (i = 0; i < *max; i += 2) {
+        pthread_mutex_lock(&lock);
+        while (is_even != 1) {
+          pthread_cond_wait(&cond, &lock);
+        }
+        is_even = 0;
+        printf("%d, ", i);
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&lock);
+      }
+      pthread_exit(0);
+    }
+    
+    void* odd_print(void *data) {
+      int *max = data;
+      int i;
+      for (i = 1; i < *max; i += 2) {
+        pthread_mutex_lock(&lock);
+        while (is_even != 0) {
+          pthread_cond_wait(&cond, &lock);
+        }
+        is_even = 1;
+        printf("%d, ", i);
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&lock);
+      }
+      pthread_exit(0);
+    }
+    
+    int main(int argc, char *argv[]) {
+      int max = 100;
+      is_even = 1;
+      pthread_cond_init(&cond, NULL);
+      pthread_mutex_init(&lock, NULL);
+      pthread_create(&even_thread, NULL, &even_print, &max);
+      pthread_create(&odd_thread, NULL, &odd_print, &max);
+      pthread_join(even_thread, NULL);
+      pthread_join(odd_thread, NULL);
+      pthread_mutex_destroy(&lock);
+      pthread_cond_destroy(&cond);
+      return 0;
+    }
+#+end_src
 
+* Difference between concurrency and parallelism 
++ Concurrency is the programming concept where multiple threads are
+  spawned by same process under same process space. The threads may or
+  may not contest for the same resource. If they do contest for same
+  resource then synchronization may be needs to avoid situations like
+  deadlocks.
 
-* c
++ Parallelism is the concept of dividing a particular computation into
+  independent parallel processes which do not share the same process
+  space. Parallelism requires multiple CPUs or a processor with
+  multiple core.
+* If two threads are incrementing a variable 100 times each 
+If two threads are incrementing a variable 100 times each without
+synchronization, what would be the possible min and maximum value.
 
-http://softpixel.com/~cwright/programming/threads/threads.c.php
+max value: var + 200 (it is simple. so explaining only the below)
+min value: var + 2
+1. P1 & P2 copy var
+2. P1 increments 99 times. so var becomes var + 99
+3. P2 increments once. so var becomes var + 1
+4. P1 copies var (value is var + 1)
+5. P2 increments 99 times. so var becomes var + 100
+6. P1 increments once. so var becomes var + 2
+* How would a mutex lock be implemented by the system?
+t is both complicated and differs from Unix to Unix variant.
 
-http://www.careercup.com/page?pid=threads-interview-questions
+In Linux, for example, a system called [[http://en.wikipedia.org/wiki/Futex][Futex]] (Short for Fast Userspace
+Mutex) is used.
 
-c++ multithreading interview questions
+In this system an atomic increment and test operation is performed on
+the mutex variable in user space.
+
+If the result of the operation indicates that there was no contention
+on the lock, the call to pthread_mutex_lock returns without ever
+context switching into the kernel, so the operation of taking a mutex
+can be very fast.
+
+Only if contention was detected does a system call (called futex) and
+context switch into the kernel occurs that puts the calling process to
+sleep until the mutex is released.
+
+There are many many more details, especially for reliable and/or
+priority inhertience mutexes, but this is the essence of it.
+* What is a Executer in threads?
+Executer is kind of Theread Pool which keeps the number of thread in a
+process finite. It is very efficient as it controls process creating
+too many threads.
+* what do threads share amongst themselves and what they dont share?
+Shared: 
++ code 
++ data 
++ heap memory and memory address 
++ memory management information (base/relocation & limit registers,
+  page tables 
++ process state (new, ready, running, waiting, halted, etc) 
++ I/O status information (opened file descriptors, etc) 
++ signals 
++ environment variables 
+
+Not shared: 
++ registers 
++ stack 
++ thread specific data
+
+* Drawbacks of using mutexes in threads.
+mutex have property that only owner can release it. So in a threading
+environment if some thread sets mutex on some shared address and it
+goes for long time I/O sleep or not scheduled for a long time (may be
+cause of lower priority) then other threads needy of that locked
+address will have to wait (may be infinitely causing deadlock).
+
+* A program has two functions 'reader_func' and 'writer_func'. 
+A program has two functions '=reader_func=' and '=writer_func='. The
+=reader_func= reads shared data and contains a critical section. The
+=writer_func= writes to shared data and contains a critical section.
+
+Reader threads call =reader_func=. Writer threads call =writer_func=.
+
+The condition is multiple reader threads can access the critical
+section at the same time as long as they don't access the critical
+section along with a writer. Only a single writer thread can access
+the critical section, i.e. no reader or other writer threads are
+allowed.
+
+Give the code segment, add code that uses mutexes that controls access
+to the critical sections so that the shared data is not corrupted and
+satisfies the give conditions. You can create as many mutexes and
+global variables as you want. Don't emphasize too much on syntax as to
+how to acquire and release locks on mutexes. Just use mutex.acquire()
+and mutex.release() .
+
+Code segment:
+#+begin_src c++
+void reader_func()
+{
+   //critical section
+}
+
+void writer_func()
+{
+   //critical section
+}
+#+end_src
 
 #+begin_src c++
+int reader_count = 0;  //Keeps track of reader count
+Mutex csMutex;         //Mutex for the critical section.
+Mutex readerMutex;     //Mutex for the reader_count access. If you don't have this the reader_count will get corrupted.
+void reader_func()
+{
+    readerMutex.acquire();
+    if(reader_count == 0)
+           csMutex.acquire();
+     reader_count++;
+  readerMutex.release();
 
+ //critical section
+
+    readerMutex.acquire();
+   reader_count--;
+   if(reader_count == 0)
+        csMutex.release();
+   readerMutex.release();
+}
+
+void writer_func()
+{
+   csMutex.acquire();
+   //critical section
+   csMutex.release();
+}
 #+end_src
++ Given a scenario where there will be lots of readers and few
+  writers, the writers might not acquire a lock on csMutex at all
+  give the way the code is written. There will always be bunch of
+  readers accessing the critical section and all writers will have to
+  most likely wait forever. So the above code favors the readers. 
++ How would you change the above code to favor the writers? Whenever a
+  writer is waiting, come up with a mechanism that won't allow any
+  more readers into the critical section or acquire the lock. The
+  existing readers will be allowed to finish and the last reader will
+  release the lock. Once this is done the waiting writer will acquire
+  the lock and do its task.
++ You can also put a limit on the number of readers that can access
+  the critical section. Once in a while or when a writer is waiting,
+  change the limit to 0 so that no new reader can acquire the lock
+  thereby allowing a writer to acquire the lock on the mutex. 
+
+
+#+begin_src c++
+int MAX_READERS = 10 /*max readers 10*/ , cSem = 0 /*counting semaphore*/;
+volatile bool requestCS = false;  //this flag is used by writer to request CS.
+WaitCondition waitForReadersExit; //condition variable which is invoked when readers==0.
+Mutex semMtx;	//mutex for atomically operating on cSem variable
+
+void reader_func()
+{
+   if(!requestCS){ //if writer thread not waiting then proceed
+	if(testAndIncrement(cSem,MAX_READERS)){ //if cSem less than MAX_READERS then increment it atomically proceed
+		//Critical Section processing
+		semMtx.acquire();
+			--cSem;
+			if(requestCS && cSem==0)		 //if writer requested CS and no readers are in CS then
+				waitForReadersExit.notify(semMtx);//unlock semMtx and notify writer
+			else
+				semMtx.release();
+        }else{
+		//max readers in CS.  Try later
+	}
+  }else{
+       //writer has placed request, wait till writer is done.
+  }
+}
+void writer_func()
+{
+   semMtx.acquire();
+	   if(cSem!=0){
+		requestCS = true; 
+		waitForReadersExit.wait(semMtx)	//unlocks 'semMtx' and waits on the condition variable
+	   }
+	   //critical section
+	   requestCS = false;
+   semMtx.release();
+}
+//atomically test and increment semaphore variable
+bool testAndIncrement(semVar,MAX_READERS){
+	semMtx.acquire();
+	if(MAX_READERS>semVar){
+		++semVar; semMtx.release(); return true;
+	}semMtx.release();
+	return false;
+}
+#+end_src
+
+#+begin_src c++
+/* pthread implementation of 1st reader/writer problem
+ *  based on mutex and conditional variable
+*/
+typedef struct read_write_lock_s {
+   pthread_mutex_t mutex;
+   pthread_cond_t cv;
+   int read_ctr;
+   it  write_ctr;
+}read_write_lock;
+
+void rw_lock_init(read_write_lock *rw_lock)
+{
+  rw_lock->read_ctr = 0;
+  rw_lock->write_ctr = 0;
+  pthread_cond_init(&rw_lock->cv);
+  pthread_mutex_init(&rw_lock->mutex);
+}
+
+void rw_lock_acquire_read(read_write_lock *rw_lock)
+{
+  pthread_mutex_lock(&rw_lock->mutex);
+  while(rw_lock->write_ctr != 0) {  /* wait for writer */
+    pthread_cond_wait(&rw_lock->cv, &rw_lock->mutex);
+  }
+  rw_lock->read_ctr++;
+  pthread_mutex_unlock(&rw_lock->mutex);
+}
+
+void rw_lock_acquire_write(read_write_lock *rw_lock)
+{
+  pthread_mutex_lock(&rw_lock->mutex);
+  while(rw_lock->write_ctr !=0 || rw_lock->read_ctr>;0) {
+    pthread_cond_wait(&rw_lock->cv, &rw_lock->mutex);
+    rw_lock->write_ctr=1;
+  }
+  pthread_mutex_unlock(&rw_lock->mutex);
+}
+
+void rw_lock_release_read(read_write_lock *rw_lock)
+{
+  pthread_mutex_lock(&rw_lock->mutex);
+  if(--rw_lock->read_ctr == 0) { /* no one is reading now; writer please hurry! */
+    pthread_cond_broadcast(&rw_lock->cv);
+  }
+  pthread_mutex_unlock(&rw_lock->mutex);
+}
+
+void rw_lock_release_write(read_write_lock *rw_lock)
+{
+  pthread_mutex_lock(&rw_lock->mutex);
+  rw_lock->write_ctr = 0;
+  pthread_cond_broadcast(&rw_lock->cv); /* writer is done; readers in... */
+  pthread_mutex_unlock(&rw_lock->mutex);
+}
+#+end_src
+* What is deadlock and what are the 4 conditions that creates a deadlock? 
+1. Mutual exclusion condition: a resource that cannot be used by more
+   than one process at a time
+
+2. Hold and wait condition: processes already holding resources may
+   request new resources
+
+3. No preemption condition: No resource can be forcibly removed from a
+   process holding it, resources can be released only by the explicit
+   action of the process
+
+4. Circular wait condition: two or more processes form a circular
+   chain where each process waits for a resource that the next process
+   in the chain holds
+* Memory is an array R[1..n]. And a Block is essentially
+Memory is an array R[1..n]. And a Block is essentially all memory
+between two indexes i, and j. Now, each application uses some blocks.
+And blocks can be contained within one another or can be disjoint, but
+they cannot be intersecting otherwise. So in this scenario, write an
+algorithm to lock or unlock a block. if a block is locked, none of its
+child blocks should be allowed to be locked and none of its parent
+blocks should be allowed to be locked.
+
+Store the blocks in the form of a n-ary tree structure. ( i.e. every sub block of a block stored as a child).
+
+1.Initially a block( say Block1) is locked.
+2.Next when another block( say Block2) needs to be locked, find the common ancestor(say Block3) of Block1 and Block2.
+3. If (Block3==Block1) or (Block3==Block2)
+   then dont grant lock to Block2.
+   else
+   grant lock to Block2.
+* What are the implications of doing a fork()
+What are the implications of doing a fork() from one of the threads of
+a multi-threaded process? Does child process get all threads of parent
+process?
+
+In linux, no, the "parent thread" that generated child process was
+obtained by child process, ignoring other threads in parent process.
+* Implement a semaphore using a mutex
+#+begin_src c++
+  class Semaphore()
+  {
+  private:
+    innerValue;
+    Mutex mutex;
+    
+  public:
+    Semaphore(int _v)
+    {
+      innerValue=_v;
+    };
+    
+    void post()
+    {
+      mutex.lock();
+      ++innerValue;
+      mutex.unlock();
+    };
+    
+    void wait()
+    {
+      mutex.lock();
+      while(innerValue<=0)
+      {
+        mutex.unlock;
+        sleep();
+        mutex.lock();
+      }
+      
+      mutex.unlock();
+    };
+  }
+#+end_src
+* different between exec and fork.
+Fork : The fork call basically makes a duplicate of the current
+process, identical in almost every way (not everything is copied over,
+for example, resource limits in some implementations but the idea is
+to create as close a copy as possible).
+
+The new process (child) gets a different process ID (PID) and has the
+the PID of the old process (parent) as its parent PID (PPID). Because
+the two processes are now running exactly the same code, they can tell
+which is which by the return code of fork - the child gets 0, the
+parent gets the PID of the child. This is all, of course, assuming the
+fork call works - if not, no child is created and the parent gets an
+error code.
+
+Exec : The exec call is a way to basically replace the entire current
+process with a new program. It loads the program into the current
+process space and runs it from the entry point. exec() replaces the
+current process with a the executable pointed by the function. Control
+never returns to the original program unless there is an exec() error.
+* context switching
+asked simple question about context switching, advantage/disadvantage
+of process vs thread etc
+
+A process contains two kinds of information: resources that are
+available to the entire process such as program instructions, global
+data and working directory, and schedulable entities, which include
+program counters and stacks. A thread is an entity within a process
+that consists of the schedulable part of the process.
+
+A thread (an example of a lightweight process) which has the following
+properties:
+
+1. Resources and data can be shared between threads
+2. Each thread has its own stack
+3. Context switching is fast
+
+* thread and fork
+http://www.linuxprogrammingblog.com/threads-and-fork-think-twice-before-using-them
+
+http://udrepper.livejournal.com/20407.html
+
+http://www.linuxprogrammingblog.com/all-about-linux-signals?page=3#Signalsafe_functions
+
+http://www.linuxprogrammingblog.com/multi-thread-specific-bugs
+
+http://unix.derkeiler.com/Newsgroups/comp.unix.programmer/2003-09/0672.html
 
 * Footnotes
 
 [fn:1] http://quizlet.com/24524062/c-multithreading-practice-interview-questions-flash-cards/
+
+[fn:2] http://en.wikipedia.org/wiki/Inter-process_communication
+
+[fn:3] http://en.wikipedia.org/wiki/Banker%27s_algorithm
 
