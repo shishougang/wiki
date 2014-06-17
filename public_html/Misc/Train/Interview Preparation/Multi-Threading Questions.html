@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Multi-Threading Questions</title>
-<!-- 2014-06-16 Mon 22:15 -->
+<!-- 2014-06-17 Tue 22:46 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -197,7 +197,16 @@ for the JavaScript code in this tag.
 <li><a href="#sec-42">Implement a semaphore using a mutex</a></li>
 <li><a href="#sec-43">different between exec and fork.</a></li>
 <li><a href="#sec-44">context switching</a></li>
-<li><a href="#sec-45">thread and fork</a></li>
+<li><a href="#sec-45">spinlock vs mutex</a>
+<ul>
+<li><a href="#sec-45-1">The Theory</a></li>
+<li><a href="#sec-45-2">The Problem</a></li>
+<li><a href="#sec-45-3">The Solution</a></li>
+<li><a href="#sec-45-4">The Practice</a></li>
+<li><a href="#sec-45-5">Summary</a></li>
+</ul>
+</li>
+<li><a href="#sec-46">thread and fork</a></li>
 </ul>
 </div>
 </div>
@@ -1496,8 +1505,141 @@ properties:
 </div>
 </div>
 <div id="outline-container-sec-45" class="outline-2">
-<h2 id="sec-45">thread and fork</h2>
+<h2 id="sec-45">spinlock vs mutex</h2>
 <div class="outline-text-2" id="text-45">
+</div><div id="outline-container-sec-45-1" class="outline-3">
+<h3 id="sec-45-1">The Theory</h3>
+<div class="outline-text-3" id="text-45-1">
+<p>
+In theory, when a thread tries to lock a mutex and it does not
+succeed, because the mutex is already locked, it will go to sleep,
+immediately allowing another thread to run. It will continue to sleep
+until being woken up, which will be the case once the mutex is being
+unlocked by whatever thread was holding the lock before. When a thread
+tries to lock a spinlock and it does not succeed, it will continuously
+re-try locking it, until it finally succeeds; thus it will not allow
+another thread to take its place (however, the operating system will
+forcefully switch to another thread, once the CPU runtime quantum of
+the current thread has been exceeded, of course).
+</p>
+</div>
+</div>
+<div id="outline-container-sec-45-2" class="outline-3">
+<h3 id="sec-45-2">The Problem</h3>
+<div class="outline-text-3" id="text-45-2">
+<p>
+The problem with mutexes is that putting threads to sleep and waking
+them up again are both rather expensive operations, they'll need quite
+a lot of CPU instructions and thus also take some time. If now the
+mutex was only locked for a very short amount of time, the time spent
+in putting a thread to sleep and waking it up again might exceed the
+time the thread has actually slept by far and it might even exceed the
+time the thread would have wasted by constantly polling on a spinlock.
+On the other hand, polling on a spinlock will constantly waste CPU
+time and if the lock is held for a longer amount of time, this will
+waste a lot more CPU time and it would have been much better if the
+thread was sleeping instead.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-45-3" class="outline-3">
+<h3 id="sec-45-3">The Solution</h3>
+<div class="outline-text-3" id="text-45-3">
+<p>
+Using spinlocks on a single-core/single-CPU system makes usually no
+sense, since as long as the spinlock polling is blocking the only
+available CPU core, no other thread can run and since no other thread
+can run, the lock won't be unlocked either. IOW, a spinlock wastes
+only CPU time on those systems for no real benefit. If the thread was
+put to sleep instead, another thread could have ran at once, possibly
+unlocking the lock and then allowing the first thread to continue
+processing, once it woke up again.
+</p>
+
+<p>
+On a multi-core/multi-CPU systems, with plenty of locks that are held
+for a very short amount of time only, the time wasted for constantly
+putting threads to sleep and waking them up again might decrease
+runtime performance noticeably. When using spinlocks instead, threads
+get the chance to take advantage of their full runtime quantum (always
+only blocking for a very short time period, but then immediately
+continue their work), leading to much higher processing throughput.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-45-4" class="outline-3">
+<h3 id="sec-45-4">The Practice</h3>
+<div class="outline-text-3" id="text-45-4">
+<p>
+Since very often programmers cannot know in advance if mutexes or
+spinlocks will be better (e.g. because the number of CPU cores of the
+target architecture is unknown), nor can operating systems know if a
+certain piece of code has been optimized for single-core or multi-core
+environments, most systems don't strictly distinguish between mutexes
+and spinlocks. In fact, most modern operating systems have hybrid
+mutexes and hybrid spinlocks. What does that actually mean?
+</p>
+
+<p>
+A hybrid mutex behaves like a spinlock at first on a multi-core
+system. If a thread cannot lock the mutex, it won't be put to sleep
+immediately, since the mutex might get unlocked pretty soon, so
+instead the mutex will first behave exactly like a spinlock. Only if
+the lock has still not been obtained after a certain amount of time
+(or retries or any other measuring factor), the thread is really put
+to sleep. If the same system runs on a system with only a single core,
+the mutex will not spinlock, though, as, see above, that would not be
+beneficial.
+</p>
+
+<p>
+A hybrid spinlock behaves like a normal spinlock at first, but to
+avoid wasting too much CPU time, it may have a back-off strategy. It
+will usually not put the thread to sleep (since you don't want that to
+happen when using a spinlock), but it may decide to stop the thread
+(either immediately or after a certain amount of time) and allow
+another thread to run, thus increasing chances that the spinlock is
+unlocked (a pure thread switch is usually less expensive than one that
+involves putting a thread to sleep and waking it up again later on,
+though not by far).
+</p>
+</div>
+</div>
+<div id="outline-container-sec-45-5" class="outline-3">
+<h3 id="sec-45-5">Summary</h3>
+<div class="outline-text-3" id="text-45-5">
+<p>
+If in doubt, use mutexes, they are usually the better choice and most
+modern systems will allow them to spinlock for a very short amount of
+time, if this seems beneficial. Using spinlocks can sometimes improve
+performance, but only under certain conditions and the fact that you
+are in doubt rather tells me, that you are not working on any project
+currently where a spinlock might be beneficial. You might consider
+using your own "lock object", that can either use a spinlock or a
+mutex internally (e.g. this behavior could be configurable when
+creating such an object), initially use mutexes everywhere and if you
+think that using a spinlock somewhere might really help, give it a try
+and compare the results (e.g. using a profiler), but be sure to test
+both cases, a single-core and a multi-core system before you jump to
+conclusions (and possibly different operating systems, if your code
+will be cross-platform).
+</p>
+
+<p>
+Spin-locks are best used when a piece of code cannot go to sleep
+state. Best example of such code would be interrupts request handlers.
+</p>
+
+<p>
+Mutexes are best used in user space program where sleeping of process
+does not affect the system in catastrophic way.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-46" class="outline-2">
+<h2 id="sec-46">thread and fork</h2>
+<div class="outline-text-2" id="text-46">
 <p>
 <a href="http://www.linuxprogrammingblog.com/threads-and-fork-think-twice-before-using-them">http://www.linuxprogrammingblog.com/threads-and-fork-think-twice-before-using-them</a>
 </p>
@@ -1540,7 +1682,7 @@ properties:
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-06-16 Mon 22:15</p>
+<p class="date">Created: 2014-06-17 Tue 22:46</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
