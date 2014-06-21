@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Hash table</title>
-<!-- 2014-01-01 Wed 13:36 -->
+<!-- 2014-06-21 Sat 23:02 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -524,7 +524,7 @@ uthash This is an easy-to-use hash table for C structures.
 </p>
 </div>
 </li>
-<li>hash<sub>map</sub>/set in SGI STL<br  /><div class="outline-text-3" id="text-6-8">
+<li><code>hash_map/set</code> in SGI STL<br  /><div class="outline-text-3" id="text-6-8">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;hash_map&gt;</span>
@@ -758,7 +758,7 @@ example:
 </div>
 </li>
 
-<li>rdestl::hash<sub>map</sub>: from RDESTL, another implementation of STL<br  /><div class="outline-text-3" id="text-6-16">
+<li><code>rdestl::hash_map</code>: from RDESTL, another implementation of STL<br  /><div class="outline-text-3" id="text-6-16">
 <p>
 <a href="https://code.google.com/p/rdestl/">https://code.google.com/p/rdestl/</a>
 <code>svn checkout http://rdestl.googlecode.com/svn/ rdestl-read-only</code>
@@ -773,7 +773,6 @@ example:
 </div>
 </li></ul>
 </div>
-
 <div id="outline-container-sec-7" class="outline-2">
 <h2 id="sec-7">comparison of Hash Table Libraries</h2>
 <div class="outline-text-2" id="text-7">
@@ -794,7 +793,6 @@ example:
 </ul>
 </div>
 </div>
-
 <div id="outline-container-sec-8" class="outline-2">
 <h2 id="sec-8">comparison of Hash Function</h2>
 <div class="outline-text-2" id="text-8">
@@ -808,6 +806,16 @@ example:
 <li>Hash functions: An empirical comparison<br  /><div class="outline-text-3" id="text-8-2">
 <p>
 <a href="http://www.strchr.com/hash_functions">http://www.strchr.com/hash_functions</a>
+</p>
+</div>
+</li>
+
+<li>SMHasher<br  /><div class="outline-text-3" id="text-8-3">
+<p>
+<a href="https://code.google.com/p/smhasher/wiki/SMHasher">SMHasher</a> is a test suite designed to test the distribution, collision,
+and performance properties of non-cryptographic hash functions - it
+aims to be the "<a href="http://www.phy.duke.edu/~rgb/General/dieharder.php">DieHarder</a>" of hash testing, and does a pretty good job
+of finding flaws with a number of popular hashes. 
 </p>
 </div>
 </li></ul>
@@ -888,7 +896,91 @@ containers.
 </ul>
 </div>
 </li>
-<li>Available Hash Functions<br  /><ul class="org-ul"><li>RS Hash Function<br  /><div class="outline-text-4" id="text-9-4-1">
+<li>Available Hash Functions<br  /><ul class="org-ul"><li>MurmurHash1<sup><a id="fnr.4" name="fnr.4" class="footref" href="#fn.4">4</a></sup><br  /><div class="outline-text-4" id="text-9-4-1">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">h</span> += k;
+<span style="color: #eedd82;">h</span> *= m;
+<span style="color: #eedd82;">h</span> ^= h &gt;&gt; r;
+</pre>
+</div>
+<p>
+where 'k' is a block of the key, 'm' and 'r' are constants, and 'h' is
+the 32-bit hash state.
+</p>
+</div>
+</li>
+
+<li>MurmurHash2<sup><a id="fnr.5" name="fnr.5" class="footref" href="#fn.5">5</a></sup><br  /><div class="outline-text-4" id="text-9-4-2">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">k</span> *= m;
+<span style="color: #eedd82;">k</span> ^= k &gt;&gt; r;
+<span style="color: #eedd82;">k</span> *= m;
+
+<span style="color: #eedd82;">h</span> *= m;
+<span style="color: #eedd82;">h</span> ^= k;
+</pre>
+</div>
+<p>
+where 'k' is a block of the key, 'm' and 'r' are constants, and 'h' is
+the 32-bit hash state.
+</p>
+</div>
+</li>
+
+<li>MurmurHash3<sup><a id="fnr.6" name="fnr.6" class="footref" href="#fn.6">6</a></sup><br  /><div class="outline-text-4" id="text-9-4-3">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">k</span> *= c1; 
+<span style="color: #eedd82;">k</span> = rotl(k,r1); 
+<span style="color: #eedd82;">k</span> *= c2;
+
+<span style="color: #eedd82;">h</span> ^= k;
+
+<span style="color: #eedd82;">h</span> = rotl(h,r1); 
+<span style="color: #eedd82;">h</span> = h*m1+n1;
+</pre>
+</div>
+<p>
+'k' is a block of the key, 'h' is a block of the hash state, and
+'rN'/'mN'/'cN' are constants.
+</p>
+
+<p>
+For each block of the key, we pre-mix it using two constants and a
+rotate, xor it into the hash block, and them mix the hash block using
+a rotate and a multiply-add.
+</p>
+
+<p>
+MurmurHash3's 32-bit finalizer is 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">h</span> ^= h &gt;&gt; 16;
+<span style="color: #eedd82;">h</span> *= 0x85ebca6b;
+<span style="color: #eedd82;">h</span> ^= h &gt;&gt; 13;
+<span style="color: #eedd82;">h</span> *= 0xc2b2ae35;
+<span style="color: #eedd82;">h</span> ^= h &gt;&gt; 16;
+</pre>
+</div>
+<p>
+and its 64-bit finalizer is 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">h</span> ^= h &gt;&gt; 16;
+<span style="color: #eedd82;">h</span> *= 0x85ebca6b;
+<span style="color: #eedd82;">h</span> ^= h &gt;&gt; 13;
+<span style="color: #eedd82;">h</span> *= 0xc2b2ae35;
+<span style="color: #eedd82;">h</span> ^= h &gt;&gt; 16;
+</pre>
+</div>
+</div>
+</li>
+
+<li>RS Hash Function<br  /><div class="outline-text-4" id="text-9-4-4">
 <p>
 A simple hash function from Robert Sedgwicks Algorithms in C book.
 I've added some simple optimizations to the algorithm in order to
@@ -916,7 +1008,7 @@ speed up its hashing process.
 </div>
 </li>
 
-<li>JS Hash Function<br  /><div class="outline-text-4" id="text-9-4-2">
+<li>JS Hash Function<br  /><div class="outline-text-4" id="text-9-4-5">
 <p>
 A bitwise hash function written by Justin Sobel
 </p>
@@ -939,7 +1031,7 @@ A bitwise hash function written by Justin Sobel
 </div>
 </div>
 </li>
-<li>PJW Hash Function<br  /><div class="outline-text-4" id="text-9-4-3">
+<li>PJW Hash Function<br  /><div class="outline-text-4" id="text-9-4-6">
 <p>
 This hash algorithm is based on work by Peter J. Weinberger of AT&amp;T
 Bell Labs. The book Compilers (Principles, Techniques and Tools) by
@@ -975,7 +1067,7 @@ the hashing methodology found in this particular algorithm.
 </div>
 </div>
 </li>
-<li>ELF Hash Function<br  /><div class="outline-text-4" id="text-9-4-4">
+<li>ELF Hash Function<br  /><div class="outline-text-4" id="text-9-4-7">
 <p>
 Similar to the PJW Hash function, but tweaked for 32-bit processors.
 Its the hash function widely used on most UNIX systems.
@@ -1005,7 +1097,7 @@ Its the hash function widely used on most UNIX systems.
 </div>
 </li>
 
-<li>BKDR Hash Function<br  /><div class="outline-text-4" id="text-9-4-5">
+<li>BKDR Hash Function<br  /><div class="outline-text-4" id="text-9-4-8">
 <p>
 This hash function comes from Brian Kernighan and Dennis Ritchie's
 book "The C Programming Language". It is a simple hash function using
@@ -1032,7 +1124,7 @@ function.
 </div>
 </div>
 </li>
-<li>SDBM Hash Function<br  /><div class="outline-text-4" id="text-9-4-6">
+<li>SDBM Hash Function<br  /><div class="outline-text-4" id="text-9-4-9">
 <p>
 This is the algorithm of choice which is used in the open source SDBM
 project. The hash function seems to have a good over-all distribution
@@ -1058,7 +1150,7 @@ set.
 </div>
 </div>
 </li>
-<li>DJB Hash Function<br  /><div class="outline-text-4" id="text-9-4-7">
+<li>DJB Hash Function<br  /><div class="outline-text-4" id="text-9-4-10">
 <p>
 An algorithm produced by Professor Daniel J. Bernstein and shown first
 to the world on the usenet newsgroup comp.lang.c. It is one of the
@@ -1082,7 +1174,7 @@ most efficient hash functions ever published.
 </div>
 </div>
 </li>
-<li>DEK Hash Function<br  /><div class="outline-text-4" id="text-9-4-8">
+<li>DEK Hash Function<br  /><div class="outline-text-4" id="text-9-4-11">
 <p>
 An algorithm proposed by Donald E. Knuth in The Art Of Computer
 Programming Volume 3, under the topic of sorting and search chapter
@@ -1106,7 +1198,7 @@ Programming Volume 3, under the topic of sorting and search chapter
 </div>
 </div>
 </li>
-<li>other<br  /><div class="outline-text-4" id="text-9-4-9">
+<li>other<br  /><div class="outline-text-4" id="text-9-4-12">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">BPHash</span>(<span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
@@ -1176,12 +1268,24 @@ Programming Volume 3, under the topic of sorting and search chapter
 <a href="http://www.partow.net/programming/hashfunctions/index.html#DJBHashFunction">http://www.partow.net/programming/hashfunctions/index.html#DJBHashFunction</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.4" name="fn.4" class="footnum" href="#fnr.4">4</a></sup> <p class="footpara">
+<a href="https://code.google.com/p/smhasher/wiki/MurmurHash1">https://code.google.com/p/smhasher/wiki/MurmurHash1</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.5" name="fn.5" class="footnum" href="#fnr.5">5</a></sup> <p class="footpara">
+<a href="https://code.google.com/p/smhasher/wiki/MurmurHash2">https://code.google.com/p/smhasher/wiki/MurmurHash2</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.6" name="fn.6" class="footnum" href="#fnr.6">6</a></sup> <p class="footpara">
+<a href="https://code.google.com/p/smhasher/wiki/MurmurHash3">https://code.google.com/p/smhasher/wiki/MurmurHash3</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-01-01 Wed 13:36</p>
+<p class="date">Created: 2014-06-21 Sat 23:02</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

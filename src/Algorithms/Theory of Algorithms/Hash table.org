@@ -127,7 +127,6 @@ algorithm terminates
 ** Hopscotch hashing
 
 * Features
-
 ** Advantages
 The main advantage of hash tables over other table data structures is
 speed. This advantage is more apparent when the number of entries is
@@ -250,7 +249,7 @@ http://libcfu.sourceforge.net/libcfu.html
 ** hash table
 http://burtleburtle.net/bob/hash/index.html
 
-** hash_map/set in SGI STL
+** =hash_map/set= in SGI STL
 #+begin_src c
 #include <hash_map>
 namespace std
@@ -432,12 +431,11 @@ http://attractivechaos.awardspace.com/khash.h.html
 
 ** hashlib library
 [[./files/hashfunction/hashlib.zip][hashlib.zip]]
-** rdestl::hash_map: from RDESTL, another implementation of STL
+** =rdestl::hash_map=: from RDESTL, another implementation of STL
 https://code.google.com/p/rdestl/
 =svn checkout http://rdestl.googlecode.com/svn/ rdestl-read-only=
 ** JudyL hash table
 http://judy.sourceforge.net/doc/JudyL_3x.htm
-
 
 * comparison of Hash Table Libraries
 + http://attractivechaos.wordpress.com/2008/08/28/comparison-of-hash-table-libraries/
@@ -449,12 +447,16 @@ http://judy.sourceforge.net/doc/JudyL_3x.htm
 + Hash Collision Probabilities
   http://preshing.com/page/5
 
-
 * comparison of Hash Function
 ** Useless hash test
 http://cbloomrants.blogspot.hk/2010/11/11-29-10-useless-hash-test.html
 ** Hash functions: An empirical comparison
 http://www.strchr.com/hash_functions
+** SMHasher
+[[https://code.google.com/p/smhasher/wiki/SMHasher][SMHasher]] is a test suite designed to test the distribution, collision,
+and performance properties of non-cryptographic hash functions - it
+aims to be the "[[http://www.phy.duke.edu/~rgb/General/dieharder.php][DieHarder]]" of hash testing, and does a pretty good job
+of finding flaws with a number of popular hashes. 
 
 * General Purpose Hash Function Algorithms[fn:2]
 ** choose the hash function
@@ -506,6 +508,59 @@ algorithm to implement, they are:
   containers.
 
 ** Available Hash Functions
+*** MurmurHash1[fn:4]
+#+begin_src sh
+h += k;
+h *= m;
+h ^= h >> r;
+#+end_src
+where 'k' is a block of the key, 'm' and 'r' are constants, and 'h' is
+the 32-bit hash state.
+*** MurmurHash2[fn:5]
+#+begin_src sh
+k *= m;
+k ^= k >> r;
+k *= m;
+
+h *= m;
+h ^= k;
+#+end_src
+where 'k' is a block of the key, 'm' and 'r' are constants, and 'h' is
+the 32-bit hash state.
+*** MurmurHash3[fn:6]
+#+begin_src sh
+k *= c1; 
+k = rotl(k,r1); 
+k *= c2;
+
+h ^= k;
+
+h = rotl(h,r1); 
+h = h*m1+n1;
+#+end_src
+'k' is a block of the key, 'h' is a block of the hash state, and
+'rN'/'mN'/'cN' are constants.
+
+For each block of the key, we pre-mix it using two constants and a
+rotate, xor it into the hash block, and them mix the hash block using
+a rotate and a multiply-add.
+
+MurmurHash3's 32-bit finalizer is 
+#+begin_src sh
+h ^= h >> 16;
+h *= 0x85ebca6b;
+h ^= h >> 13;
+h *= 0xc2b2ae35;
+h ^= h >> 16;
+#+end_src
+and its 64-bit finalizer is 
+#+begin_src sh
+h ^= h >> 16;
+h *= 0x85ebca6b;
+h ^= h >> 13;
+h *= 0xc2b2ae35;
+h ^= h >> 16;
+#+end_src
 *** RS Hash Function
 A simple hash function from Robert Sedgwicks Algorithms in C book.
 I've added some simple optimizations to the algorithm in order to
@@ -742,5 +797,11 @@ unsigned int APHash(char* str, unsigned int len)
 [fn:2] http://www.partow.net/programming/hashfunctions/index.html#DJBHashFunction
 
 [fn:3] http://en.wikipedia.org/wiki/Cuckoo_hashing
+
+[fn:4] https://code.google.com/p/smhasher/wiki/MurmurHash1
+
+[fn:5] https://code.google.com/p/smhasher/wiki/MurmurHash2
+
+[fn:6] https://code.google.com/p/smhasher/wiki/MurmurHash3
 
 
