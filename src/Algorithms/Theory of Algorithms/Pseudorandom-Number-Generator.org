@@ -1,0 +1,64 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Pseudorandom Number Generator
+#+OPTIONS: num:nil H:2
+
+* Pseudorandom Number Generator
+** Mersenne twister
+The [[http://en.wikipedia.org/wiki/Mersenne_twister][Mersenne Twister]] is the default PRNG for R, Python, Ruby, IDL,
+Free Pascal, PHP, Maple, MATLAB, GAUSS, CMU Common Lisp, the GNU
+Multiple Precision Arithmetic Library, and the GNU Scientific Library.
+
+#+begin_src c++
+// Mersenne Twister Parameters
+#define MT_N 624
+#define MT_M 397
+
+class MersenneTwister {
+ public:
+  explicit MersenneTwister(int seed);
+  unsigned int Integer();
+
+ private:
+  unsigned int buffer_[MT_N];
+  int index_;
+};
+
+MersenneTwister::MersenneTwister(int seed) {
+  buffer_[0] = seed;
+  for (index_ = 1; index_ < MT_N; ++index_) {
+    buffer_[index_] = (1812433253UL * (buffer_[index_-1]
+                                       ^ (buffer_[index_-1] >> 30)) + index_);
+  }
+}
+
+unsigned int MersenneTwister::Integer() {
+  if (index_ >= MT_N) {
+    unsigned int i;
+    unsigned int x;
+    for (i = 0; i < MT_N - MT_M; ++i) {
+      x = (buffer_[i] & 0x80000000UL) | (buffer_[i+1] & 0x7fffffffUL);
+      buffer_[i] = buffer_[i+MT_M] ^ (x >> 1) ^ ((x & 1) * 0x9908b0dfUL);
+    }
+    for (; i < MT_N - 1; ++i) {
+      x = (buffer_[i] & 0x80000000UL) | (buffer_[i+1] & 0x7fffffffUL);
+      buffer_[i] = buffer_[i+MT_M-MT_N] ^ (x >> 1) ^ ((x & 1) * 0x9908b0dfUL);
+    }
+    x = (buffer_[MT_N-1] & 0x80000000UL) | (buffer_[0] & 0x7fffffffUL);
+    buffer_[MT_N-1] = buffer_[MT_M-1] ^ (x >> 1) ^ ((x & 1) * 0x9908b0dfUL);
+    index_ = 0;
+  }
+  unsigned int y = buffer_[index_++];
+  y ^= (y >> 11);
+  y ^= (y << 7) & 0x9d2c5680UL;
+  y ^= (y << 15) & 0xefc60000UL;
+  y ^= (y >> 18);
+  return y;
+}
+#+end_src
+* Testing of uniform random number generators
+** TestU01
+[[http://en.wikipedia.org/wiki/TestU01][TestU01]] is a software library, implemented in the ANSI C language,
+that offers a collection of utilities for the empirical statistical
+testing of uniform random number generators. And the [[http://simul.iro.umontreal.ca/testu01/tu01.html][homepage]].
+
+

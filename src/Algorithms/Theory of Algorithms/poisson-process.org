@@ -1,0 +1,55 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Poisson Process
+#+OPTIONS: num:nil H:2
+
+* Exponential Distribution
+the [[http://en.wikipedia.org/wiki/Cumulative_distribution_function][cumulative distribution function]] for the [[http://en.wikipedia.org/wiki/Exponential_distribution][exponential distribution]]
+is:
+
+\begin{equation}
+\begin{align}
+f(x) = 1 - e^{-\lambda x}
+\end{align}
+\end{equation}
+\lambda is rate parameter, the average rate of events
+
+基本方法，一个循环，每隔X分，采样一个[0,1]的随机小数，如果小于f(X)，就
+产生这个事件。但这种方法对随机数产生器的精度要求比较高。
+
+所以反过来，随即产生一个事件发生的概率y，计算发生这个事件的时间x：
+\begin{equation}
+\begin{align}
+x = \dfrac{-\ln y}{\lambda}
+\end{align}
+\end{equation}
+
+* Implementation
+
+** python
+直接使用python提供的[[https://docs.python.org/2/library/random.html#random.expovariate][random.expovariate]]
+#+begin_src python
+import random
+random.expovariate
+#+end_src
+
+测试：
+#+begin_src sh
+>>> sum([random.expovariate(1/40.0) for i in xrange(1000000)]) / 1000000
+39.96582878280089
+>>> sum([random.expovariate(1/40.0) for i in xrange(1000000)]) / 1000000
+40.00629399783253
+>>> sum([random.expovariate(1/40.0) for i in xrange(1000000)]) / 1000000
+39.92697050573954
+#+end_src
+* c
+#+begin_src c
+    #include <math.h>
+    #include <stdlib.h>
+    
+    float happenTime(float rate_parameter) {
+      return -logf(1.0 - (float)(random() / (RAND_MAX + 1))) / rate_parameter;
+    }
+#+end_src
+
+
+
