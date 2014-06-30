@@ -1,0 +1,71 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Misc
+#+OPTIONS: num:nil H:2
+
+
+* GUID generation
+Generate globally unique identifiers(GUIDs) and can be decrypted.[fn:1]
+
+#+begin_src c++
+void GUID::GenerateUnique()
+{
+    Time Time;
+    GetTime(Time);
+ 
+    static tU16 StaticMask = 0;
+    StaticMask = InterlockedIncrement(StaticMask);
+ 
+    A = GUUID;
+    B = GMACAddress >> 16;
+    C = (StaticMask << 16) | (GMACAddress & 0xffff);
+    D = (Time.Second + Time.Minute * 60 + Time.Hour * 60 * 60) | (Time.Month << 17) | (Time.Day << 22) | ((Time.Year - 2011) << 27);
+ 
+    // Simple encryption
+    tU32 Mask = (StaticMask << 16) | ((StaticMask * 0x0bb38435) + 0x3619636b);
+    A = ~A ^ Mask;
+    B = ~B ^ Mask;
+    C = ~C ^ StaticMask; // don't encrypt the mask itself
+    D = ~D ^ Mask;
+}
+
+String GUID::GetDescStr() const
+{
+    tU16 StaticMask = ~(C >> 16);
+    tU32 Mask = (StaticMask << 16) | (StaticMask * 0x0bb38435) + 0x3619636b;
+    tU32 Mac0 = ~(B ^ Mask);
+    tU32 Mac1 = ~(C ^ StaticMask);
+ 
+    String Result = String::Printf(
+        "UUID:%08x MAC:%02x-%02x-%02x-%02x-%02x-%02x ",
+        ~(A ^ Mask),
+        (tU32)((Mac0 & 0xff000000) >> 24),
+        (tU32)((Mac0 & 0xff0000) >> 16),
+        (tU32)((Mac0 & 0xff00) >> 8),
+        (tU32)((Mac0 & 0xff)),
+        (tU32)((Mac1 & 0xff00) >> 8),
+        (tU32)((Mac1 & 0xff))
+    );
+ 
+    tU32 Timestamp = ~(D ^ Mask);
+    tU32 Seconds = (Timestamp & 0x1ffff);
+    tU32 Month = ((Timestamp >> 17) & 0x1f);
+    tU32 Day = ((Timestamp >> 22) & 0x1f);
+    tU32 Year = (Timestamp >> 27) + 2011;
+    tU32 Hour = (Seconds / (60 * 60));
+    Seconds -= Hour * 60 * 60;
+    tU32 Minute = (Seconds / 60);
+    Seconds -= Minute * 60;
+ 
+    Result += String::Printf("Date:%d-%02d-%02d %d:%02d:%02d ", Year, Month, Day, Hour, Minute, Seconds);
+    Result += String::Printf("Mask:0x%08x", Mask);
+ 
+    return Result;
+}
+#+end_src
+
+
+
+* Footnotes
+
+[fn:1] http://jfdube.wordpress.com/2011/09/21/guid-generation/
+
