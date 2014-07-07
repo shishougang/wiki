@@ -1,0 +1,55 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: Python call external program
+#+OPTIONS: num:nil H:2
+
+** =os.system=
+=os.system("some_command with args")= passes the command and arguments
+to your system's shell. This is nice because you can actually run
+multiple commands at once in this manner and set up pipes and
+input/output redirection. For example,
+=os.system("some_command < input_file | another_command >
+output_file")=
+
+However, while this is convenient, you have to *manually handle the
+escaping of shell characters* such as spaces, etc. On the other hand,
+this also lets you run commands which are simply *shell commands* and
+not actually external programs. [[https://docs.python.org/2/library/os.html#os.system][see documentation]].
+
+** =os.popen=
+=stream = os.popen("some_command with args")= will do the same thing as
+=os.system= except that it gives you a file-like object that you can use
+to access standard input/output for that process. There are 3 other
+variants of popen that all handle the i/o slightly differently. If you
+pass everything as a string, then your command is passed to the shell;
+if you pass them as a list then you don't need to worry about escaping
+anything. [[https://docs.python.org/2/library/os.html#os.popen][see documentation]].
+
+** =subprocess.Popen=
+The =Popen= class of the =subprocess= module. This is intended as a
+replacement for =os.popen= but has the downside of being slightly more
+complicated by virtue of being so comprehensive. For example, you'd
+say
+
+=print subprocess.Popen("echo Hello World", stdout=PIPE).stdout.read()=
+
+instead of
+
+=print os.popen("echo Hello World").read()=
+
+but it is nice to have all of the options there in one unified class instead of 4 different popen functions.
+[[https://docs.python.org/2/library/subprocess.html#popen-constructor][see documentation]].
+
+** =subprocess.call=
+The =call= function from the =subprocess= module. This is basically just
+like the Popen class and takes all of the same arguments, but it
+simply wait until the command completes and gives you the return code.
+For example:
+
+=return_code = subprocess.call("echo Hello World", shell=True)=
+
+[[https://docs.python.org/2/library/subprocess.html#subprocess.call][see documentation]] and [[http://pymotw.com/2/subprocess/][PyHowto:subprocess – Work with additional processes]].
+
+** others
+The os module also has all of the fork/exec/spawn functions.
+
+
