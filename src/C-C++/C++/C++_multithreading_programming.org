@@ -2,11 +2,12 @@
 #+TITLE: 浅谈C++ multithreading programming
 #+OPTIONS: num:nil H:2
 
-
 * Overview
 随着多核CPU随处可见,多线程(multithreading)可以被用来实现并行,提高CPU的
 利用率和性能显著的提高.掌握多线程编程也成为现代实现软件的基本要求技能
-之一.
+之一.[[https://computing.llnl.gov/tutorials/parallel_comp/][Introduction to Parallel Computing]]详细的介绍了 Parallel Computing;
+为什么使用它;Parallel Computing的分类;Parallel Computing的limits和
+costs; Parallel Computing的程序模型;如何设计Parallel程序等.
 
 这里先介绍多线程的概念,多线程中涉及的基本概念,然后用实例介绍Pthread库
 的使用,并介绍Google Code中如何把它封装成C++类,最后介绍可移植并大量使用的
@@ -18,8 +19,119 @@
 + [[http://omniorb.sourceforge.net/omni42/omnithread.html][OMNI Thread]]为C++提供Thread操作的.
 + [[http://en.wikipedia.org/wiki/List_of_C%2B%2B_multi-threading_libraries][其他multithreading libraries]].
 
+* Thread
+** 定义
+A *thread* is defined as an independent stream of instructions that can
+be scheduled to run as such by the operating system.所以它是在程序中独
+立于其他代码可由操作系统调度的一段指令.
 
-* Pthread basis and example
+那么是操作系统是如何具体实现这一独立性呢?
+
+要理解thread,必须先明白process.进程由操作系统创建来运行相应的程序,进程
+包含程序资源和程序执行状态的信息.以Linux的进程为例包含:
++ Process ID, process group ID, user ID, and group ID
++ Environment
++ Working directory
++ Program instructions
++ Registers
++ Stack
++ Heap
++ File descriptors
++ Signal actions
++ Shared libraries
++ Inter-process communication tools (such as message queues, pipes,
+  semaphores, or shared memory).
+
+Thread使用Process的资源,并且能成为独立的元件被操作系统调度,是因为它仅
+重复那些使得它们能成为独立运行代码的必要资源.Thread维护它自己如下的信
+息:
++ Stack pointer
++ Registers
++ Scheduling properties (such as policy or priority)
++ Set of pending and blocked signals
++ Thread specific data.
+
+与Process比较,Thread可以总结如下:
++ Thread相当于一个lightweight的Process,拥有如ID,properties等相似信息,
+  但仅仅包含能使得它独立运行的信息即可.
++ 信息包含的不同,与需要复制大量信息来创建Process比,Thread的创建比较快
+  捷.
++ 独立的Processes不共享任何信息.每个Process运行在独立的地址空间.Threads共
+  享所在Process的资源,全局变量和文件描述符.
++ Threads可以直接与所在同一Process的Threads通信.而Processes必须使用
+  inter-process communication(IPC)来通信.
++ 因为Threads的资源共享性,增加并行操作资源的难度,需要引入Thread同步机
+  制来达到资源并行性.
+
+** 一些术语
+Posix Thread基本模型如下图,一些有关其中Thread的术语:
+
+[[./Files/threads_model.png]]
+
++ *Lightweight Process(LWP)* 可以被认为虚拟的CPU,在系统中通常LWP的个
+  数大于实际CPU个数.Thread库通过与LWP沟通来调度thread.LWP也通常被称为
+  kernel threads.
++ *[[http://en.wikipedia.org/wiki/System_Contention_Scope][Contention Scope]]* 是如何决定哪个线程得到调度.
++ *Bound threads* 拥有系统级别的Contention Scope,也就是,它们与其他进程
+  一同竞争.
++ *Unbound threads* 拥有进程级别的Contention Scope.
++ *Thread-safe* 意味共享数据被得到保护,可以同时被多个thread调用而安全.
++ *Reentrant code* 意味程序可以被多个thread并行运行.
++ *[[https://www.securecoding.cert.org/confluence/display/seccode/BB.+Definitions][asynchronous-safe function]]* 在signal handler下被安全调用并没有任何
+  副作用.
++ *Concurrency vs. Parallelism* 并不一样.Parallelism意味同时运行代码.而
+  Concurrency意味许多任务可以以任何顺序执行或可以是并行运行.
+
+** Amdahl法则和Pareto原则
+Threads能提供益处 /对于相适/ 的应用.所以thread的并行性对于应用来说也有
+它的限制.
+
+*** Amdahl法则
+[[http://en.wikipedia.org/wiki/Amdahl%27s_law][Amdahl法则]] 陈述到潜在的程序加速由能被并行的代码率P定义为:
+
+\begin{equation}
+\begin{align}
+speedup = \dfrac{1}{1-P}
+\end{align}
+\end{equation}
+
++ 如果代码中没有能并行的部分,P=0,那么speedup=1.
++ 如果所有代码都能并行,P=1,那么speedup能达到无限(理论上).
++ 如果50%的代码能并行,那么最大的speedup=2,也就是最多2倍的加速.
+
+引入能并行的处理器个数,那么进一步可以定义为:
+
+\begin{equation}
+\begin{align}
+speedup = \dfrac{1}{\dfrac{P}{N} + (1-P)}
+其中P并行率,N处理器个数
+\end{align}
+\end{equation}
+
+[[./Files/amdahl1.gif]]
+[[./Files/amdahl2.gif]]
+
+*** Pareto原则
+[[http://en.wikipedia.org/wiki/Pareto_principle][Pareto原则]] 陈述到80%的处理器时间花在20%的代码中.
+
+* Thread设计模式
+
+* 保护共享资源
+
+* 线程同步原语
+
+
+* Pthread
+
+** Overview
+
+** Thread Management
+
+** Mutex Variables
+
+** Condition Variables
+
+** Miscellaneous
 
 
 POSIX Threads
