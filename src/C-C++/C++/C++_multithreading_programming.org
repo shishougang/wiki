@@ -112,13 +112,79 @@ speedup = \dfrac{1}{\dfrac{P}{N} + (1-P)}
 [[./Files/amdahl2.gif]]
 
 *** Pareto原则
-[[http://en.wikipedia.org/wiki/Pareto_principle][Pareto原则]] 陈述到80%的处理器时间花在20%的代码中.
+[[http://en.wikipedia.org/wiki/Pareto_principle][Pareto原则]] 陈述到80%的处理器时间花在20%的代码中.所以仔细分析代码,不要
+把时间花在并行/优化那部分不重要的代码.
 
-* Thread设计模式
+* Thread设计模式[fn:1]
+在程序中有不同的方法使用线程,这里讨论3种线程设计模式,没有哪一种模式最
+好,每种模式都有相应适合的应用场合.
 
-* 保护共享资源
+** Boss/worker(Thread pool)
+[[./Files/boss_workers_pattern.gif]]
+
+如上图,一个Boss线程创建其他Worker线程,并给它们分配任务,必要的话,并等待其他线
+程运行结束.通常Boss线程会在初始建立Thread Pool来为之后分配.尽管线程是
+轻量级的,但是创建它们仍是有开销的.
+
+** Peer(Workcrew)
+[[./Files/peer_pattern.gif]]
+
+Peer模式又叫做workcrew模式,一个thread创建其他peer threads当程序开始,但
+是如上图,与Boss/worker模式不同,这个thread之后也变成peer thread去处理自
+己的任务.
+
+** Pipeline
+[[./Files/pipeline_pattern.gif]]
+
+Pipeline模式假定:
++ 一串连续长输入.
++ 每个输入经过一连串的子操作(熟知为stages或fliers).
++ 每个处理stage能一次处理个不同的输入.
+
+如上图, Pipeline就像流水线一般,每个thread是一个长链中的一部分.每个
+thread处理由之前thread过的数据.
 
 * 线程同步原语
+如上线程中的定义,线程们共享进程中的全局变量或资源,它们可以并行同时对这些数据
+和资源操作,如果没有一定的机制协调它们,那么数据或资源将处于一个不安全状
+态,引起诸如如下的一些问题:
+
++ [[http://en.wikipedia.org/wiki/Race_condition#Software][Race condition]]发生于不能决定行为的结果因为线程们操作共享数据或资源没
+  有遵循一定的同步规则.
++ [[http://en.wikipedia.org/wiki/ABA_problem][ABA problem]]发生于一个地方被读取两次,都读到相同的值,'值是相同的'被用
+  来说明'没有东西被改变'.但是,另外一个线程能在这两次读取中间执行操作并
+  修改这个位置的值,然后做一些其他操作,最后把这个值改回去,以致愚弄第一
+  个线程让它认为'没有东西被改变',即使第二个线程的操作已经破坏了这个假
+  设.
+
+所以我们需要如下的一些线程同步原语满足不同的线程间同步需求.
+
+** Mutex
+[[http://en.wikipedia.org/wiki/Lock_%28computer_science%29][Mutex]] 又被称为Lock,所以它就像一把Lock,一个线程Lock住一段资源,那么其他线
+程就不能去访问那段资源,只有等到第一个线程Unlock那么资源,它才能访问.
+
+在Lock和Unlock之间的代码,一般被称为 *critical section*.
+
+Mutex也包含一些复杂的类型,如下:
++ Recursive: 允许占有锁的那一个线程再次获取同样的锁,对递归算法是必要的.
++ Queuing: 使得 *公平* 的获取锁,通过FIFO排序锁的请求.
++ Reader/Writer(rwlock): 允许多个reader同时获取锁,如果有reader占用
+  锁,writer只有等到reader释放锁.
++ Scoped: [[http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization][RAII]] 类型定义的锁获取和解锁.
+
+在Blog中之前[[http://dreamrunner.org/blog/2014/06/29/qian-tan-mutex-lock/][浅谈Mutex (Lock)]]中可以看到更多有关Mutex的性能和开销分析,并如何实现一
+个轻量级的Mutex.
+
+** Join
+
+** Condition Variable
+
+** Barrier
+
+** Spinlock
+
+** Semaphore
+
 
 
 * Pthread
@@ -311,3 +377,8 @@ http://blog.csdn.net/vagrxie/article/details/4246470
 <br><a href="man/pthread_testcancel.txt">pthread_testcancel</a>
 </p>
 #+end_html
+
+* Footnotes
+
+[fn:1] http://maxim.int.ru/bookshelf/PthreadsProgram/htm/r_19.html
+
