@@ -172,71 +172,101 @@ Mutex也包含一些复杂的类型,如下:
   锁,writer只有等到reader释放锁.
 + Scoped: [[http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization][RAII]] 类型定义的锁获取和解锁.
 
+但Mutex也会引入其他一些问题,如[[http://en.wikipedia.org/wiki/Deadlock][deadlock]] 和 [[http://en.wikipedia.org/wiki/Priority_inversion][priority inversion]].
+
 在Blog中之前[[http://dreamrunner.org/blog/2014/06/29/qian-tan-mutex-lock/][浅谈Mutex (Lock)]]中可以看到更多有关Mutex的性能和开销分析,并如何实现一
 个轻量级的Mutex.
 
 ** Join
+线程join机制能让一个线程join到另外一个线程中.比如一个子线程join回主线
+程,那么主线程就会等待子线程运行结束.从而达到线程间等待的同步机制.
 
 ** Condition Variable
+Condition variable 允许线程同步到某个共享资源的某个值.
+
+比如,程序有一个计数器,当计数器达到某一个值时去激活某个线程运行.把计数
+器当成一个Condition variable.这个线程可以等待这个Condition variable,其
+他active线程操作完这个Condition variable,可以通过signal/broadcast去唤
+醒那些等待这个Condition variable睡眠的线程.
 
 ** Barrier
-
+Barrier是一种能让一系列线程在某个点得到同步的方法,通过让参与barrier的
+线程等待直到所有参与线程都调用了这个barrier函数.本质上就是,阻塞所有参
+与barrier的线程直到最慢的那个参与线程调用barrier.
 ** Spinlock
+Spinlock与mutex类似,是种锁,但当获取锁失败时,spinlock不会让线程进入睡眠,而
+是不断poll去获取这个锁直到获取成功.更多[[http://dreamrunner.org/blog/2014/06/29/qian-tan-mutex-lock/#mutex-vs-spinlock][Mutex与Spinlock的区别]].
 
 ** Semaphore
-
-
+当某些资源具有多个时,简单的Mutex不能满足,引入Semphore,Semphore可以根据
+资源个数初始化为任意值.当线程们占有所有资源,使得Semphore为0,那么其他线
+程再获取资源只有等待.当Semphore值只能是1或0时,它相当于简单的Mutex.
 
 * Pthread
-
 ** Overview
+原始的Pthread API由ANSI/IEEE POSIX 1003.1 - 1995 standard定义.POSIX标
+准也随着时间不断改进.
+
+接下来主要把Pthread API分成如下主要5部分:
+1. Thread Management
+2. Mutex Variables
+3. Condition Variables
+4. Synchronization
+5. Miscellaneous
+
+如果想把Pthread封装成类对象或Scoped Lock,可以参考之后
+[[google-wrap][Google wrap the Pthread]],或直接使用之后介绍的[[boost-thread][Boost thread library]].
+
+如果更全面的API参考文章最后的[[pthread-library][Pthread Library Routines Reference]].更多有关资
+料参考文章后的[[<<other-materials>>][其他资料]].
+*** 编译Pthread程序
+**** include
+对于POSIX系统,包含头文件 =pthread.h=. 如果使用 =semaphore=, 包含
+=semaphore.h=.
+
+#+begin_src c
+#include <pthread.h>
+#include <semaphore.h>
+#+end_src
+**** compile
+对于Gcc编译器,使用选项 =-l=,如下:
+#+begin_src sh
+gcc Program.o -o Program -lpthread
+#+end_src
 
 ** Thread Management
+*** Creating and Terminating Threads
+**** APIs
+#+begin_src c
+int pthread_create(pthread_t *restrict thread,
+              const pthread_attr_t *restrict attr,
+              void *(*start_routine)(void*), void *restrict arg);
+void pthread_exit(void *value_ptr);
+int pthread_cancel(pthread_t thread);
+int pthread_attr_init(pthread_attr_t *attr);
+int pthread_attr_destroy(pthread_attr_t *attr);
+#+end_src
+**** Creating Threads
+=pthread_create= 创建一个新的线程并运行它.它能在代码的任何处被多次调用.
+
+
 
 ** Mutex Variables
 
 ** Condition Variables
 
+** Synchronization
+
 ** Miscellaneous
 
-
-POSIX Threads
-Library based; requires parallel coding
-Specified by the IEEE POSIX 1003.1c standard (1995).
-C Language only
-Commonly referred to as Pthreads.
-Most hardware vendors now offer Pthreads in addition to their proprietary threads implementations.
-
-Very explicit parallelism; requires significant programmer attention
-to detail.
-
-
-http://fanqiang.chinaunix.net/a4/b8/20010811/0905001105_b.html
-
-http://www.tutorialspoint.com/cplusplus/cpp_multithreading.htm
-
-http://softpixel.com/~cwright/programming/threads/threads.c.php
-
-http://randu.org/tutorials/threads/
-
-https://computing.llnl.gov/tutorials/pthreads/
-* google wrap the pthread 
+<<google-wrap>>
+* Google wrap the Pthread 
 
 * Thread Debugging:
 http://www.yolinux.com/TUTORIALS/LinuxTutorialPosixThreads.html
 
-
-
-
-* mutex
-Handling mutexes in C++
-http://home.roadrunner.com/~hinnant/mutexes/locking.html
-
-Mutex, Lock, Condition Variable Rationale adds rationale for the
-design decisions made for mutexes, locks and condition variables. 
-
-http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2406.html
-* boost thread libray
+<<boost-thread>>
+* Boost thread library
 
 http://www.drdobbs.com/cpp/the-boostthreads-library/184401518
 
@@ -248,6 +278,7 @@ http://blog.csdn.net/vagrxie/article/details/4246470
 
 
 
+<<other-materials>>
 * 其他资料
 ** Books:
 + [[http://shop.oreilly.com/product/9781565921153.do][PThreads Programming]] and [[http://wiki.dreamrunner.org/public_html/Books%20Review/Pthreads%20Programming/Pthreads%20Programming.html][Its notes]]
@@ -265,12 +296,16 @@ http://blog.csdn.net/vagrxie/article/details/4246470
 + Herb Sutter’s [[http://www.gotw.ca/publications/][Effective Concurrency series]]
 + POSIX Standard: http://www.unix.org/version3/ieee_std.html
 
+** 有关Mutex
++ [[http://home.roadrunner.com/~hinnant/mutexes/locking.html][Handling mutexes in C++]]
++ [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2406.html][Mutex, Lock, Condition Variable Rationale]]
 * cc
 
 #+begin_src c++
 
 #+end_src
 
+<<pthread-library>>
 * Pthread Library Routines Reference
 #+begin_html
 <p>

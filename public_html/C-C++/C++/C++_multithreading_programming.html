@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>浅谈C++ multithreading programming</title>
-<!-- 2014-07-18 Fri 00:19 -->
+<!-- 2014-07-24 Thu 22:54 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -214,21 +214,22 @@ for the JavaScript code in this tag.
 <li><a href="#sec-5-2">Thread Management</a></li>
 <li><a href="#sec-5-3">Mutex Variables</a></li>
 <li><a href="#sec-5-4">Condition Variables</a></li>
-<li><a href="#sec-5-5">Miscellaneous</a></li>
+<li><a href="#sec-5-5">Synchronization</a></li>
+<li><a href="#sec-5-6">Miscellaneous</a></li>
 </ul>
 </li>
-<li><a href="#sec-6">google wrap the pthread</a></li>
+<li><a href="#sec-6">Google wrap the Pthread</a></li>
 <li><a href="#sec-7">Thread Debugging:</a></li>
-<li><a href="#sec-8">mutex</a></li>
-<li><a href="#sec-9">boost thread libray</a></li>
-<li><a href="#sec-10">其他资料</a>
+<li><a href="#sec-8">Boost thread library</a></li>
+<li><a href="#sec-9">其他资料</a>
 <ul>
-<li><a href="#sec-10-1">Books:</a></li>
-<li><a href="#sec-10-2">Online resources:</a></li>
+<li><a href="#sec-9-1">Books:</a></li>
+<li><a href="#sec-9-2">Online resources:</a></li>
+<li><a href="#sec-9-3">有关Mutex</a></li>
 </ul>
 </li>
-<li><a href="#sec-11">cc</a></li>
-<li><a href="#sec-12">Pthread Library Routines Reference</a></li>
+<li><a href="#sec-10">cc</a></li>
+<li><a href="#sec-11">Pthread Library Routines Reference</a></li>
 </ul>
 </div>
 </div>
@@ -537,42 +538,150 @@ Mutex也包含一些复杂的类型,如下:
 </ul>
 
 <p>
+但Mutex也会引入其他一些问题,如<a href="http://en.wikipedia.org/wiki/Deadlock">deadlock</a> 和 <a href="http://en.wikipedia.org/wiki/Priority_inversion">priority inversion</a>.
+</p>
+
+<p>
 在Blog中之前<a href="http://dreamrunner.org/blog/2014/06/29/qian-tan-mutex-lock/">浅谈Mutex (Lock)</a>中可以看到更多有关Mutex的性能和开销分析,并如何实现一个轻量级的Mutex.
 </p>
 </div>
 </div>
 <div id="outline-container-sec-4-2" class="outline-3">
 <h3 id="sec-4-2">Join</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+线程join机制能让一个线程join到另外一个线程中.比如一个子线程join回主线程,那么主线程就会等待子线程运行结束.从而达到线程间等待的同步机制.
+</p>
 </div>
-
+</div>
 <div id="outline-container-sec-4-3" class="outline-3">
 <h3 id="sec-4-3">Condition Variable</h3>
-</div>
+<div class="outline-text-3" id="text-4-3">
+<p>
+Condition variable 允许线程同步到某个共享资源的某个值.
+</p>
 
+<p>
+比如,程序有一个计数器,当计数器达到某一个值时去激活某个线程运行.把计数器当成一个Condition variable.这个线程可以等待这个Condition variable,其他active线程操作完这个Condition variable,可以通过signal/broadcast去唤醒那些等待这个Condition variable睡眠的线程.
+</p>
+</div>
+</div>
 <div id="outline-container-sec-4-4" class="outline-3">
 <h3 id="sec-4-4">Barrier</h3>
+<div class="outline-text-3" id="text-4-4">
+<p>
+Barrier是一种能让一系列线程在某个点得到同步的方法,通过让参与barrier的线程等待直到所有参与线程都调用了这个barrier函数.本质上就是,阻塞所有参与barrier的线程直到最慢的那个参与线程调用barrier.
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-4-5" class="outline-3">
 <h3 id="sec-4-5">Spinlock</h3>
+<div class="outline-text-3" id="text-4-5">
+<p>
+Spinlock与mutex类似,是种锁,但当获取锁失败时,spinlock不会让线程进入睡眠,而是不断poll去获取这个锁直到获取成功.更多<a href="http://dreamrunner.org/blog/2014/06/29/qian-tan-mutex-lock/#mutex-vs-spinlock">Mutex与Spinlock的区别</a>.
+</p>
 </div>
-
+</div>
 <div id="outline-container-sec-4-6" class="outline-3">
 <h3 id="sec-4-6">Semaphore</h3>
+<div class="outline-text-3" id="text-4-6">
+<p>
+当某些资源具有多个时,简单的Mutex不能满足,引入Semphore,Semphore可以根据资源个数初始化为任意值.当线程们占有所有资源,使得Semphore为0,那么其他线程再获取资源只有等待.当Semphore值只能是1或0时,它相当于简单的Mutex.
+</p>
 </div>
 </div>
-
-
+</div>
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">Pthread</h2>
 <div class="outline-text-2" id="text-5">
 </div><div id="outline-container-sec-5-1" class="outline-3">
 <h3 id="sec-5-1">Overview</h3>
-</div>
+<div class="outline-text-3" id="text-5-1">
+<p>
+原始的Pthread API由ANSI/IEEE POSIX 1003.1 - 1995 standard定义.POSIX标准也随着时间不断改进.
+</p>
 
+<p>
+接下来主要把Pthread API分成如下主要5部分:
+</p>
+<ol class="org-ol">
+<li>Thread Management
+</li>
+<li>Mutex Variables
+</li>
+<li>Condition Variables
+</li>
+<li>Synchronization
+</li>
+<li>Miscellaneous
+</li>
+</ol>
+
+<p>
+如果想把Pthread封装成类对象或Scoped Lock,可以参考之后
+<a href="#google-wrap">Google wrap the Pthread</a>,或直接使用之后介绍的<a href="#boost-thread">Boost thread library</a>.
+</p>
+
+<p>
+如果更全面的API参考文章最后的<a href="#pthread-library">Pthread Library Routines Reference</a>.更多有关资料参考文章后的<i>其他资料</i>.
+</p>
+</div>
+<ul class="org-ul"><li>编译Pthread程序<br  /><ul class="org-ul"><li>include<br  /><div class="outline-text-5" id="text-5-1-1-1">
+<p>
+对于POSIX系统,包含头文件 <code>pthread.h</code>. 如果使用 <code>semaphore</code>, 包含
+<code>semaphore.h</code>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;pthread.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;semaphore.h&gt;</span>
+</pre>
+</div>
+</div>
+</li>
+
+<li>compile<br  /><div class="outline-text-5" id="text-5-1-1-2">
+<p>
+对于Gcc编译器,使用选项 <code>-l</code>,如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">gcc Program.o -o Program -lpthread
+</pre>
+</div>
+</div>
+</li></ul>
+</li></ul>
+</div>
 <div id="outline-container-sec-5-2" class="outline-3">
 <h3 id="sec-5-2">Thread Management</h3>
+<div class="outline-text-3" id="text-5-2">
+</div><ul class="org-ul"><li>Creating and Terminating Threads<br  /><ul class="org-ul"><li>APIs<br  /><div class="outline-text-5" id="text-5-2-1-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_create</span>(<span style="color: #98fb98;">pthread_t</span> *<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">thread</span>,
+              <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">pthread_attr_t</span> *<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">attr</span>,
+              <span style="color: #98fb98;">void</span> *(*<span style="color: #eedd82;">start_routine</span>)(<span style="color: #98fb98;">void</span>*), <span style="color: #98fb98;">void</span> *<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">arg</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">pthread_exit</span>(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">value_ptr</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_cancel</span>(<span style="color: #98fb98;">pthread_t</span> <span style="color: #eedd82;">thread</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_attr_init</span>(<span style="color: #98fb98;">pthread_attr_t</span> *<span style="color: #eedd82;">attr</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_attr_destroy</span>(<span style="color: #98fb98;">pthread_attr_t</span> *<span style="color: #eedd82;">attr</span>);
+</pre>
 </div>
+</div>
+</li>
+
+<li>Creating Threads<br  /><div class="outline-text-5" id="text-5-2-1-2">
+<p>
+<code>pthread_create</code> 创建一个新的线程并运行它.它能在代码的任何处被多次调用.
+</p>
+</div>
+</li></ul>
+</li></ul>
+</div>
+
 
 <div id="outline-container-sec-5-3" class="outline-3">
 <h3 id="sec-5-3">Mutex Variables</h3>
@@ -583,48 +692,21 @@ Mutex也包含一些复杂的类型,如下:
 </div>
 
 <div id="outline-container-sec-5-5" class="outline-3">
-<h3 id="sec-5-5">Miscellaneous</h3>
-<div class="outline-text-3" id="text-5-5">
-<p>
-POSIX Threads
-Library based; requires parallel coding
-Specified by the IEEE POSIX 1003.1c standard (1995).
-C Language only
-Commonly referred to as Pthreads.
-Most hardware vendors now offer Pthreads in addition to their proprietary threads implementations.
-</p>
+<h3 id="sec-5-5">Synchronization</h3>
+</div>
 
+<div id="outline-container-sec-5-6" class="outline-3">
+<h3 id="sec-5-6">Miscellaneous</h3>
+<div class="outline-text-3" id="text-5-6">
 <p>
-Very explicit parallelism; requires significant programmer attention
-to detail.
-</p>
-
-
-<p>
-<a href="http://fanqiang.chinaunix.net/a4/b8/20010811/0905001105_b.html">http://fanqiang.chinaunix.net/a4/b8/20010811/0905001105_b.html</a>
-</p>
-
-<p>
-<a href="http://www.tutorialspoint.com/cplusplus/cpp_multithreading.htm">http://www.tutorialspoint.com/cplusplus/cpp_multithreading.htm</a>
-</p>
-
-<p>
-<a href="http://softpixel.com/~cwright/programming/threads/threads.c.php">http://softpixel.com/~cwright/programming/threads/threads.c.php</a>
-</p>
-
-<p>
-<a href="http://randu.org/tutorials/threads/">http://randu.org/tutorials/threads/</a>
-</p>
-
-<p>
-<a href="https://computing.llnl.gov/tutorials/pthreads/">https://computing.llnl.gov/tutorials/pthreads/</a>
+<a id="google-wrap" name="google-wrap"></a>
 </p>
 </div>
 </div>
 </div>
 
 <div id="outline-container-sec-6" class="outline-2">
-<h2 id="sec-6">google wrap the pthread</h2>
+<h2 id="sec-6">Google wrap the Pthread</h2>
 </div>
 
 <div id="outline-container-sec-7" class="outline-2">
@@ -633,33 +715,16 @@ to detail.
 <p>
 <a href="http://www.yolinux.com/TUTORIALS/LinuxTutorialPosixThreads.html">http://www.yolinux.com/TUTORIALS/LinuxTutorialPosixThreads.html</a>
 </p>
+
+<p>
+<a id="boost-thread" name="boost-thread"></a>
+</p>
 </div>
 </div>
-
-
 
 <div id="outline-container-sec-8" class="outline-2">
-<h2 id="sec-8">mutex</h2>
+<h2 id="sec-8">Boost thread library</h2>
 <div class="outline-text-2" id="text-8">
-<p>
-Handling mutexes in C++
-<a href="http://home.roadrunner.com/~hinnant/mutexes/locking.html">http://home.roadrunner.com/~hinnant/mutexes/locking.html</a>
-</p>
-
-<p>
-Mutex, Lock, Condition Variable Rationale adds rationale for the
-design decisions made for mutexes, locks and condition variables. 
-</p>
-
-<p>
-<a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2406.html">http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2406.html</a>
-</p>
-</div>
-</div>
-
-<div id="outline-container-sec-9" class="outline-2">
-<h2 id="sec-9">boost thread libray</h2>
-<div class="outline-text-2" id="text-9">
 <p>
 <a href="http://www.drdobbs.com/cpp/the-boostthreads-library/184401518">http://www.drdobbs.com/cpp/the-boostthreads-library/184401518</a>
 </p>
@@ -675,16 +740,21 @@ design decisions made for mutexes, locks and condition variables.
 <p>
 <a href="http://blog.csdn.net/vagrxie/article/details/4246470">http://blog.csdn.net/vagrxie/article/details/4246470</a>
 </p>
+
+
+
+<p>
+<a id="other-materials" name="other-materials"></a>
+</p>
 </div>
 </div>
 
-
-<div id="outline-container-sec-10" class="outline-2">
-<h2 id="sec-10">其他资料</h2>
-<div class="outline-text-2" id="text-10">
-</div><div id="outline-container-sec-10-1" class="outline-3">
-<h3 id="sec-10-1">Books:</h3>
-<div class="outline-text-3" id="text-10-1">
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">其他资料</h2>
+<div class="outline-text-2" id="text-9">
+</div><div id="outline-container-sec-9-1" class="outline-3">
+<h3 id="sec-9-1">Books:</h3>
+<div class="outline-text-3" id="text-9-1">
 <ul class="org-ul">
 <li><a href="http://shop.oreilly.com/product/9781565921153.do">PThreads Programming</a> and <a href="http://wiki.dreamrunner.org/public_html/Books%20Review/Pthreads%20Programming/Pthreads%20Programming.html">Its notes</a>
 </li>
@@ -695,9 +765,9 @@ design decisions made for mutexes, locks and condition variables.
 </ul>
 </div>
 </div>
-<div id="outline-container-sec-10-2" class="outline-3">
-<h3 id="sec-10-2">Online resources:</h3>
-<div class="outline-text-3" id="text-10-2">
+<div id="outline-container-sec-9-2" class="outline-3">
+<h3 id="sec-9-2">Online resources:</h3>
+<div class="outline-text-3" id="text-9-2">
 <ul class="org-ul">
 <li><i>Dmitriy V’jukov’s website</i> and various <a href="https://groups.google.com/forum/?fromgroups#!forum/lock-free">forum discussions</a>
 </li>
@@ -720,19 +790,36 @@ design decisions made for mutexes, locks and condition variables.
 </ul>
 </div>
 </div>
+<div id="outline-container-sec-9-3" class="outline-3">
+<h3 id="sec-9-3">有关Mutex</h3>
+<div class="outline-text-3" id="text-9-3">
+<ul class="org-ul">
+<li><a href="http://home.roadrunner.com/~hinnant/mutexes/locking.html">Handling mutexes in C++</a>
+</li>
+<li><a href="http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2406.html">Mutex, Lock, Condition Variable Rationale</a>
+</li>
+</ul>
 </div>
-<div id="outline-container-sec-11" class="outline-2">
-<h2 id="sec-11">cc</h2>
-<div class="outline-text-2" id="text-11">
+</div>
+</div>
+
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10">cc</h2>
+<div class="outline-text-2" id="text-10">
 <div class="org-src-container">
 
 <pre class="src src-c++"></pre>
 </div>
+
+<p>
+<a id="pthread-library" name="pthread-library"></a>
+</p>
 </div>
 </div>
-<div id="outline-container-sec-12" class="outline-2">
-<h2 id="sec-12">Pthread Library Routines Reference</h2>
-<div class="outline-text-2" id="text-12">
+
+<div id="outline-container-sec-11" class="outline-2">
+<h2 id="sec-11">Pthread Library Routines Reference</h2>
+<div class="outline-text-2" id="text-11">
 <p>
 <a href="man/pthread_atfork.txt">pthread_atfork</a>
 <br><a href="man/pthread_attr_destroy.txt">pthread_attr_destroy</a>
@@ -851,7 +938,7 @@ design decisions made for mutexes, locks and condition variables.
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-07-18 Fri 00:19</p>
+<p class="date">Created: 2014-07-24 Thu 22:54</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
