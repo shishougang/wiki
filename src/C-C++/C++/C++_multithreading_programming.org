@@ -238,9 +238,9 @@ gcc Program.o -o Program -lpthread
 *** Creating and Terminating Threads
 **** APIs
 #+begin_src c
-int pthread_create(pthread_t *restrict thread,
-              const pthread_attr_t *restrict attr,
-              void *(*start_routine)(void*), void *restrict arg);
+int pthread_create(pthread_t *thread,
+              const pthread_attr_t *attr,
+              void *(*start_routine)(void*), void *arg);
 void pthread_exit(void *value_ptr);
 int pthread_cancel(pthread_t thread);
 int pthread_attr_init(pthread_attr_t *attr);
@@ -249,11 +249,112 @@ int pthread_attr_destroy(pthread_attr_t *attr);
 **** Creating Threads
 =pthread_create= 创建一个新的线程并运行它.它能在代码的任何处被多次调用.
 
+=pthread_create= 的参数:
++ =thread=:返回新thread程的唯一标识.
++ =attr=:设置thread的性质.NULL为默认性质.
++ =start_routine=: 新thread运行的函数指针.
++ =arg=:传给 =start_routine= 的参数,必须强制转换成 =void *=.NULL为没有
+  参数传入.
 
+Process能创建的最大thread个数由系统配置决定.如下Ubuntu打印出的结果:
+#+begin_src sh
+$ limit
+cputime         unlimited
+filesize        unlimited
+datasize        unlimited
+stacksize       8MB
+coredumpsize    0kB
+memoryuse       unlimited
+maxproc         62694
+descriptors     1024
+memorylocked    64kB
+addressspace    unlimited
+maxfilelocks    unlimited
+sigpending      62694
+msgqueue        819200
+nice            0
+rt_priority     0
+rt_time         unlimited
+#+end_src
+**** Thread Attributes
+=pthread_attr_init= 和 =pthread_attr_destroy= 被用来初始化/销毁thread
+性质对象.
+
+性质包括:
++ Detached or joinable state
++ Scheduling inheritance
++ Scheduling policy
++ Scheduling parameters
++ Scheduling contention scope
++ Stack size
++ Stack address
++ Stack guard (overflow) size
+**** Thread Binding
+Pthread APIs并没有提供binding threads到特定cpus/cores的接口.但不同系统
+可能包含这功能,比如提供非标准的[[https://computing.llnl.gov/tutorials/pthreads/man/pthread_setaffinity_np.txt][=pthread_setaffinity_np= ]] 接口.
+
+比如设置两个线程都在core0上运行,如下设置:
+#+begin_src c++
+  cpu_set_t cpus;
+  CPU_ZERO(&cpus);
+  CPU_SET(0, &cpus);
+  pthread_setaffinity_np(thread[0], sizeof(cpu_set_t), &cpus);
+  pthread_setaffinity_np(thread[1], sizeof(cpu_set_t), &cpus);
+#+end_src
+**** Terminating Threads
+**** Example: Pthread Creation and Termination
+*** Joining and Detaching Threads
+**** APIs
+#+begin_src c
+int pthread_join(pthread_t thread, void **value_ptr);
+int pthread_detach(pthread_t thread);
+int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate);
+int pthread_attr_getdetachstate(const pthread_attr_t *attr,
+              int *detachstate);
+#+end_src
+**** Example: Pthread Joining
+*** Stack Management
+**** APIs
+#+begin_src c
+int pthread_attr_getstacksize(const pthread_attr_t *restrict attr,
+              size_t *restrict stacksize);
+int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize);
+int pthread_attr_getstackaddr(const pthread_attr_t *restrict attr,
+              void **restrict stackaddr);
+int pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr);
+#+end_src
+*** Miscellaneous
+#+begin_src c
+pthread_t pthread_self(void);
+int pthread_equal(pthread_t t1, pthread_t t2);
+int pthread_once(pthread_once_t *once_control,
+              void (*init_routine)(void));
+pthread_once_t once_control = PTHREAD_ONCE_INIT;
+#+end_src
 
 ** Mutex Variables
+*** Overview
+*** Creating and Destroying Mutexes
+**** APIs
+#+begin_src c
+int pthread_mutex_destroy(pthread_mutex_t *mutex);
+int pthread_mutex_init(pthread_mutex_t *restrict mutex,
+          const pthread_mutexattr_t *restrict attr);
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+int pthread_mutexattr_destroy(pthread_mutexattr_t *attr);
+int pthread_mutexattr_init(pthread_mutexattr_t *attr);
+#+end_src
+*** Locking and Unlocking Mutexes
+**** APIs
+#+begin_src c
+int pthread_mutex_lock(pthread_mutex_t *mutex);
+int pthread_mutex_trylock(pthread_mutex_t *mutex);
+int pthread_mutex_unlock(pthread_mutex_t *mutex);
+#+end_src
+*** Example: Using Mutexes
 
 ** Condition Variables
+*** Overview
 
 ** Synchronization
 
