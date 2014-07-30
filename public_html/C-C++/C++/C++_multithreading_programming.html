@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>浅谈C++ multithreading programming</title>
-<!-- 2014-07-25 Fri 23:08 -->
+<!-- 2014-07-30 Wed 22:58 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -86,7 +86,7 @@
     { background-color: #ffff00; color: #000000; font-weight: bold; }
   /*]]>*/-->
 </style>
-<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<link rel="stylesheet" href="./assets/stylesheet.css" type="text/css"/>
 <script type="text/javascript">
 /*
 @licstart  The following is the entire license notice for the
@@ -233,6 +233,9 @@ for the JavaScript code in this tag.
 </ul>
 </div>
 </div>
+<p>
+admin#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+</p>
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">Overview</h2>
@@ -769,10 +772,83 @@ pthread_setaffinity_np(thread[1], <span style="color: #00ffff;">sizeof</span>(cp
 </div>
 </li>
 
-<li>Terminating Threads<br  /></li>
-<li>Example: Pthread Creation and Termination<br  /></li></ul>
+<li>Terminating Threads<br  /><div class="outline-text-5" id="text-5-2-1-5">
+<p>
+一个线程有很多种方法终止:
+</p>
+<ul class="org-ul">
+<li>线程从它的运行中正常放回.它的工作完成.
 </li>
+<li>线程调用 <code>pthread_exit</code> 无论它的工作完成否.
+</li>
+<li>线程被另外一个线程调用 <code>pthread_cancel</code> 来取消.
+</li>
+<li>整个线程终止因为调用 <code>exec()</code> 或 <code>exit()</code>.
+</li>
+<li><code>main()</code> 函数先完成,没有调用 <code>pthread_exit</code>.
+</li>
+</ul>
 
+<p>
+<code>pthread_exit()</code> 允许指定一个可选的终止 <code>status parameter</code>.这个可选参数一般返回给线程"joining"到这个终止线程.
+</p>
+
+<p>
+<code>pthread_exit()</code> 不关闭文件,在线程打开的任何文件将继续打开在线程终止后.
+</p>
+
+<p>
+在 <code>main()</code> 调用 <code>pthread_exit()</code> :
+</p>
+<ul class="org-ul">
+<li>如果 <code>main()</code> 在它创建的threads之前终止,并没有显示的调用
+<code>pthread_exit()</code>,这将是个问题.所有创建的线程将终止因为main()结束,不再存在支持这些线程.
+</li>
+<li>通过main()在最后调用 <code>pthread_exit()</code>, main()将阻塞并保持存活来支持它创建的线程运行直到它们完成.
+</li>
+</ul>
+</div>
+</li>
+<li>Example: Pthread Creation and Termination<br  /><div class="outline-text-5" id="text-5-2-1-6">
+<p>
+如果注释掉main()中最后的 <code>pthread_exit(NULL);</code> ,那么它创建的线程将会完成不了所有的打印而被强制退出.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;pthread.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdlib&gt;</span>
+
+<span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">ThreadProc</span>(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">param</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id</span>;
+  id = *(<span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">int</span> *&gt;(param));
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; 10; ++i) {
+    printf(<span style="color: #ffa07a;">"thread %d: run %d \n"</span>, id, i);
+  }
+  pthread_exit(<span style="color: #7fffd4;">NULL</span>);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kNumThreads</span> = 4;
+  <span style="color: #98fb98;">pthread_t</span> <span style="color: #eedd82;">threads</span>[kNumThreads];
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">thread_ids</span>[kNumThreads];
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kNumThreads; ++i) {
+    thread_ids[i] = i;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span> = pthread_create(&amp;threads[i], <span style="color: #7fffd4;">NULL</span>, ThreadProc,
+                            <span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">void</span> *&gt;(&amp;thread_ids[i]));
+    <span style="color: #00ffff;">if</span> (rt) {
+      printf(<span style="color: #ffa07a;">"ERROR: pthread_create failed, rt=%d\n"</span>, rt);
+      exit(1);
+    }
+  }
+  pthread_exit(<span style="color: #7fffd4;">NULL</span>);
+}
+</pre>
+</div>
+</div>
+</li></ul>
+</li>
 <li>Joining and Detaching Threads<br  /><ul class="org-ul"><li>APIs<br  /><div class="outline-text-5" id="text-5-2-2-1">
 <div class="org-src-container">
 
@@ -786,9 +862,97 @@ pthread_setaffinity_np(thread[1], <span style="color: #00ffff;">sizeof</span>(cp
 </div>
 </li>
 
-<li>Example: Pthread Joining<br  /></li></ul>
+<li>Joining<br  /><div class="outline-text-5" id="text-5-2-2-2">
+<p>
+Joining是同步不同线程的方法之一,原理如下图:
+</p>
+
+<ul class="org-ul">
+<li><code>pthread_join()</code> 阻塞调用它的线程直到指定的 <code>threadid</code> 的线程终止.
+</li>
+<li>调用的线程能获取目标线程终止返回的 <code>status</code> 只要目标线程调用
+  <code>pthread_exit()</code>.
+</li>
+<li>当一个线程被创建,它的属性之一是它是否可以join.只有创建的能被join的线程才能被join.如果线程线程以detached创建,它永远都不能被join.
+</li>
+<li>显示的创建一个线程可join或detached,使用在 <code>pthread_create()</code> 中的 <code>attr</code>
+参数.典型的步骤是:
+<ol class="org-ol">
+<li>定义 <code>pthread_attr_t</code> 类型的pthread属性;
+</li>
+<li>用 <code>pthread_attr_init()</code> 初始化属性变量;
+</li>
+<li>用 <code>pthread_attr_setdetachstate()</code> 设置detached属性;
+</li>
+<li>用 <code>pthread_attr_destroy()</code> 释放属性使用的资源.
+</li>
+</ol>
+</li>
+</ul>
+</div>
 </li>
 
+<li>Detaching<br  /><div class="outline-text-5" id="text-5-2-2-3">
+<ul class="org-ul">
+<li><code>pthread_detach()</code> 能显示的detach一个线程即使它是以可join创建.
+</li>
+<li>没有相反的操作.
+</li>
+</ul>
+</div>
+</li>
+
+<li>Example: Pthread Joining<br  /><div class="outline-text-5" id="text-5-2-2-4">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;pthread.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdlib&gt;</span>
+
+<span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">ThreadProc</span>(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">param</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id</span>;
+  id = *(<span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">int</span> *&gt;(param));
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; 10; ++i) {
+    printf(<span style="color: #ffa07a;">"thread %d: run %d \n"</span>, id, i);
+  }
+  pthread_exit(param);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kNumThreads</span> = 4;
+  <span style="color: #98fb98;">pthread_t</span> <span style="color: #eedd82;">threads</span>[kNumThreads];
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">thread_ids</span>[kNumThreads];
+  <span style="color: #98fb98;">pthread_attr_t</span> <span style="color: #eedd82;">attr</span>;
+
+  pthread_attr_init(&amp;attr);
+  pthread_attr_setdetachstate(&amp;attr, PTHREAD_CREATE_JOINABLE);
+
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kNumThreads; ++i) {
+    thread_ids[i] = i;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span> = pthread_create(&amp;threads[i], &amp;attr, ThreadProc,
+                            <span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">void</span> *&gt;(&amp;thread_ids[i]));
+    <span style="color: #00ffff;">if</span> (rt) {
+      printf(<span style="color: #ffa07a;">"ERROR: pthread_create failed, rt=%d\n"</span>, rt);
+      exit(1);
+    }
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kNumThreads; ++i) {
+    <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">status</span>;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span> = pthread_join(threads[i], &amp;status);
+    <span style="color: #00ffff;">if</span> (rt) {
+      printf(<span style="color: #ffa07a;">"ERROR: pthread_join failed, rt=%d\n"</span>, rt);
+      exit(1);
+    }
+    printf(<span style="color: #ffa07a;">"completed join with thread %d having a status of %d\n"</span>
+           , i, *<span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">int</span> *&gt;(status));
+  }
+  pthread_exit(<span style="color: #7fffd4;">NULL</span>);
+}
+</pre>
+</div>
+</div>
+</li></ul>
+</li>
 <li>Stack Management<br  /><ul class="org-ul"><li>APIs<br  /><div class="outline-text-5" id="text-5-2-3-1">
 <div class="org-src-container">
 
@@ -798,6 +962,63 @@ pthread_setaffinity_np(thread[1], <span style="color: #00ffff;">sizeof</span>(cp
 <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_attr_getstackaddr</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">pthread_attr_t</span> *<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">attr</span>,
               <span style="color: #98fb98;">void</span> **<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">stackaddr</span>);
 <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_attr_setstackaddr</span>(<span style="color: #98fb98;">pthread_attr_t</span> *<span style="color: #eedd82;">attr</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">stackaddr</span>);
+</pre>
+</div>
+
+<p>
+每个线程都有各自独立的stack, <code>pthread_attr_getstackaddr</code> 和
+<code>pthread_attr_setstackaddr</code> 分别获取和设置线程的stack属性.
+</p>
+</div>
+</li>
+
+<li>Example: Stack Management<br  /><div class="outline-text-5" id="text-5-2-3-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;pthread.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdlib&gt;</span>
+
+<span style="color: #98fb98;">pthread_attr_t</span> <span style="color: #eedd82;">attr</span>;
+
+<span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">ThreadProc</span>(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">param</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id</span>;
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">thread_stack_size</span>;
+  id = *(<span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">int</span> *&gt;(param));
+  pthread_attr_getstacksize(&amp;attr, &amp;thread_stack_size);
+  printf(<span style="color: #ffa07a;">"thread %d: stack size = %d\n"</span>, id, thread_stack_size);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; 10; ++i) {
+    printf(<span style="color: #ffa07a;">"thread %d: run %d \n"</span>, id, i);
+  }
+  pthread_exit(<span style="color: #7fffd4;">NULL</span>);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kNumThreads</span> = 4;
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kThround</span> = 1000;
+  <span style="color: #98fb98;">pthread_t</span> <span style="color: #eedd82;">threads</span>[kNumThreads];
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">thread_ids</span>[kNumThreads];
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">stack_size</span>;
+
+  pthread_attr_init(&amp;attr);
+  pthread_attr_getstacksize(&amp;attr, &amp;stack_size);
+  printf(<span style="color: #ffa07a;">"Default stack size = %d\n"</span>, stack_size);
+  stack_size = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">double</span>) * kThround * kThround;
+  printf(<span style="color: #ffa07a;">"Setting stack size = %d\n"</span>, stack_size);
+  pthread_attr_setstacksize(&amp;attr, stack_size);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kNumThreads; ++i) {
+    thread_ids[i] = i;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span> = pthread_create(&amp;threads[i], &amp;attr, ThreadProc,
+                            <span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">void</span> *&gt;(&amp;thread_ids[i]));
+    <span style="color: #00ffff;">if</span> (rt) {
+      printf(<span style="color: #ffa07a;">"ERROR: pthread_create failed, rt=%d\n"</span>, rt);
+      exit(1);
+    }
+  }
+  pthread_exit(<span style="color: #7fffd4;">NULL</span>);
+  pthread_attr_destroy(&amp;attr);
+  <span style="color: #00ffff;">return</span> 0;
+}
 </pre>
 </div>
 </div>
@@ -814,14 +1035,53 @@ pthread_setaffinity_np(thread[1], <span style="color: #00ffff;">sizeof</span>(cp
 <span style="color: #98fb98;">pthread_once_t</span> <span style="color: #eedd82;">once_control</span> = PTHREAD_ONCE_INIT;
 </pre>
 </div>
+
+<ul class="org-ul">
+<li><code>pthread_self</code> 返回调用线程的唯一thread ID.
+</li>
+<li><code>pthread_equal</code> 比较两个线程ID是否相等.
+</li>
+<li><code>pthread_once</code> 只执行 <code>init_routine</code> 仅仅一次在进程中.
+</li>
+</ul>
 </div>
 </li></ul>
 </div>
 <div id="outline-container-sec-5-3" class="outline-3">
 <h3 id="sec-5-3">Mutex Variables</h3>
 <div class="outline-text-3" id="text-5-3">
-</div><ul class="org-ul"><li>Overview<br  /></li>
-<li>Creating and Destroying Mutexes<br  /><ul class="org-ul"><li>APIs<br  /><div class="outline-text-5" id="text-5-3-2-1">
+</div><ul class="org-ul"><li>Overview<br  /><div class="outline-text-4" id="text-5-3-1">
+<p>
+Mutex以"mutual exclusion"(互斥)简称.
+</p>
+
+<p>
+Mutex variable就像一把"锁"一样保护共享数据资源.mutex的基本概念就是,只有一个线程能lock一个mutex变量在任何时候.所以,即使很多线程尝试去锁一个
+mute,也仅仅只有一个线程能成功.
+</p>
+
+<p>
+典型使用mutex的顺序如下:
+</p>
+<ol class="org-ol">
+<li>创建和初始化mutex变量;
+</li>
+<li>许多线程尝试锁住mutex;
+</li>
+<li>只有一个线程成功锁住mutex,其他线程等待;
+</li>
+<li>拥有mutex的线程进行自己的操作;
+</li>
+<li>拥有线程解锁mutex;
+</li>
+<li>其他线程继续获取mutex并持续如上步骤;
+</li>
+<li>最后mutex销毁.
+</li>
+</ol>
+</div>
+</li>
+<li>Creating and Destroying Mutexes<br  /><div class="outline-text-4" id="text-5-3-2">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_mutex_destroy</span>(<span style="color: #98fb98;">pthread_mutex_t</span> *<span style="color: #eedd82;">mutex</span>);
@@ -832,11 +1092,41 @@ pthread_setaffinity_np(thread[1], <span style="color: #00ffff;">sizeof</span>(cp
 <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_mutexattr_init</span>(<span style="color: #98fb98;">pthread_mutexattr_t</span> *<span style="color: #eedd82;">attr</span>);
 </pre>
 </div>
-</div>
-</li></ul>
-</li>
 
-<li>Locking and Unlocking Mutexes<br  /><ul class="org-ul"><li>APIs<br  /><div class="outline-text-5" id="text-5-3-3-1">
+<p>
+Mutex变量由 <code>pthread_mutex_t</code> 声明定义,而且必须初始化在使用前.两种方法初始:
+</p>
+<ol class="org-ol">
+<li>静态的,当声明时.如:
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">pthread_mutex_t</span> <span style="color: #eedd82;">mutex</span> = PTHREAD_MUTEX_INITIALIZER;
+</pre>
+</div>
+<ol class="org-ol">
+<li>动态的,使用 <code>pthread_mutex_init()</code> 函数,并能设置mutex的属性 <code>attr</code>.
+</li>
+</ol>
+
+<p>
+<code>attr</code> 用来设置mutex变量的属性,必须是 <code>pthread_mutexattr_t</code> 类型.Pthread标准中定义的3种可选mutex属性:
+</p>
+
+<ul class="org-ul">
+<li>Protocol: Specifies the protocol used to prevent priority inversions
+for a mutex.
+</li>
+<li>Prioceiling: Specifies the priority ceiling of a mutex.
+</li>
+<li>Process-shared: Specifies the process sharing of a mutex.(Pthread
+mutex能被process间使用).
+</li>
+</ul>
+</div>
+</li>
+<li>Locking and Unlocking Mutexes<br  /><div class="outline-text-4" id="text-5-3-3">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_mutex_lock</span>(<span style="color: #98fb98;">pthread_mutex_t</span> *<span style="color: #eedd82;">mutex</span>);
@@ -844,17 +1134,256 @@ pthread_setaffinity_np(thread[1], <span style="color: #00ffff;">sizeof</span>(cp
 <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_mutex_unlock</span>(<span style="color: #98fb98;">pthread_mutex_t</span> *<span style="color: #eedd82;">mutex</span>);
 </pre>
 </div>
+
+<p>
+<code>pthread_mutex_lock()</code> 函数被用来获取传入的mutex变量,如果mutex已经被其他线程占用,那么这个调用就阻塞调用线程,使它进入睡眠等待这个mutex直到它被释放.
+</p>
+
+<p>
+<code>pthread_mutex_trylock()</code> 仅尝试获取锁,若不成功也立即返回'busy'信号.
+</p>
+</div>
+</li>
+<li>Example: Using Mutexes<br  /><div class="outline-text-4" id="text-5-3-4">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;pthread.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdlib&gt;</span>
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">ThreadData</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">tid</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">data</span>;
+};
+
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shared_x</span>;
+<span style="color: #98fb98;">pthread_mutex_t</span> <span style="color: #eedd82;">lock</span>;
+
+<span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">ThreadProc</span>(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">param</span>) {
+  <span style="color: #98fb98;">ThreadData</span> *<span style="color: #eedd82;">data</span> = <span style="color: #00ffff;">static_cast</span>&lt;ThreadData *&gt;(param);
+  printf(<span style="color: #ffa07a;">"begin from thread id: %d\n"</span>, data-&gt;tid);
+  pthread_mutex_lock(&amp;lock);
+  shared_x += data-&gt;data;
+  printf(<span style="color: #ffa07a;">"thread %d: x = %d\n"</span>, data-&gt;tid, shared_x);
+  pthread_mutex_unlock(&amp;lock);
+  pthread_exit(<span style="color: #7fffd4;">NULL</span>);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kNumThreads</span> = 4;
+  <span style="color: #98fb98;">pthread_t</span> <span style="color: #eedd82;">threads</span>[kNumThreads];
+  <span style="color: #98fb98;">ThreadData</span> <span style="color: #eedd82;">threads_data</span>[kNumThreads];
+  <span style="color: #98fb98;">pthread_attr_t</span> <span style="color: #eedd82;">attr</span>;
+
+  shared_x = 0;
+  pthread_mutex_init(&amp;lock, <span style="color: #7fffd4;">NULL</span>);
+  pthread_attr_init(&amp;attr);
+  pthread_attr_setdetachstate(&amp;attr, PTHREAD_CREATE_JOINABLE);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kNumThreads; ++i) {
+    threads_data[i].tid = i;
+    threads_data[i].data = i * i;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span> = pthread_create(&amp;threads[i], &amp;attr, ThreadProc,
+                            <span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">void</span> *&gt;(&amp;threads_data[i]));
+    <span style="color: #00ffff;">if</span> (rt) {
+      printf(<span style="color: #ffa07a;">"ERROR: pthread_create failed, rt=%d\n"</span>, rt);
+      exit(1);
+    }
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kNumThreads; ++i) {
+    <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">status</span>;
+    pthread_join(threads[i], &amp;status);
+  }
+  pthread_attr_destroy(&amp;attr);
+  pthread_exit(<span style="color: #7fffd4;">NULL</span>);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
 </div>
 </li></ul>
-</li>
-
-<li>Example: Using Mutexes<br  /></li></ul>
 </div>
+
 <div id="outline-container-sec-5-4" class="outline-3">
 <h3 id="sec-5-4">Condition Variables</h3>
 <div class="outline-text-3" id="text-5-4">
-</div><ul class="org-ul"><li>Overview<br  /></li></ul>
+</div><ul class="org-ul"><li>Overview<br  /><div class="outline-text-4" id="text-5-4-1">
+<p>
+Mutex 变量如锁一般防止多个线程访问共享数据资源,如果某个线程等待某个共享数据达到某个数值才进行相应的操作,那么这个线程需要不断的去poll,查看是否满足需要的值,这样开销很大,因为线程需要一直处于忙状态.
+</p>
+
+<p>
+引入Condition Variables来完成这样的同步到某个实际数据值而不要不断poll.
+</p>
+
+<p>
+Condition变量一般与mutex一起使用.锁住查看的共享数据资源.
+</p>
+
+<p>
+使用Condition的一般步骤如下:
+</p>
+<ul class="org-ul">
+<li>声明和定义需要同步的共享数据;
+</li>
+<li>声明和定义condition变量;
+</li>
+<li>声明和定义相对应的mutex;
+</li>
+<li>创建线程使用condition变量同步.
+</li>
+</ul>
 </div>
+</li>
+<li>Creating and Destroying Condition Variables<br  /><div class="outline-text-4" id="text-5-4-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_cond_destroy</span>(<span style="color: #98fb98;">pthread_cond_t</span> *<span style="color: #eedd82;">cond</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_cond_init</span>(<span style="color: #98fb98;">pthread_cond_t</span> *<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">cond</span>,
+                      <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">pthread_condattr_t</span> *<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">attr</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_condattr_destroy</span>(<span style="color: #98fb98;">pthread_condattr_t</span> *<span style="color: #eedd82;">attr</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_condattr_init</span>(<span style="color: #98fb98;">pthread_condattr_t</span> *<span style="color: #eedd82;">attr</span>);
+</pre>
+</div>
+
+<p>
+Condition变量由 <code>pthread_cond_t</code> 声明定义,而且必须初始化在使用前.两种方法初始:
+</p>
+<ol class="org-ol">
+<li>静态的,当声明时.如:
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">pthread_cond_t</span> <span style="color: #eedd82;">convar</span> = PTHREAD_COND_INITIALIZER;
+</pre>
+</div>
+<ol class="org-ol">
+<li>动态的,使用 <code>pthread_cond_init()</code> 函数,并能设置condition的属性 <code>attr</code>.
+</li>
+</ol>
+
+<p>
+<code>attr</code> 用来设置condition变量的属性,必须是 <code>pthread_condattr_t</code> 类型.只有一种属性可选:是否进程共享,也就是允许其他进程中的线程也能看到它.
+</p>
+</div>
+</li>
+<li>Waiting and Signaling on Condition Variables<br  /><div class="outline-text-4" id="text-5-4-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_cond_wait</span>(<span style="color: #98fb98;">pthread_cond_t</span> *<span style="color: #eedd82;">cond</span>,
+                      <span style="color: #98fb98;">pthread_mutex_t</span> *<span style="color: #eedd82;">mutex</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_cond_signal</span>(<span style="color: #98fb98;">pthread_cond_t</span> *<span style="color: #eedd82;">cond</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">pthread_cond_broadcast</span>(<span style="color: #98fb98;">pthread_cond_t</span> *<span style="color: #eedd82;">cond</span>);
+</pre>
+</div>
+
+<p>
+<code>pthread_cond_wait()</code> 阻塞调用它的线程直到其中 <code>cond</code> 被signal.这个函数需要在占有 <i>mutex</i> 时被调用,而它将 <b>自动释放</b> mutex当它等待时.等到
+signal收到,线程被唤醒, <i>mutex</i> 将 <b>自动被占有</b> .最后当线程完成
+condition的操作,要负责对mutex解锁.
+</p>
+
+<p>
+<code>pthread_cond_signal()</code> 用来signal其他等待这个 <code>cond</code> 的线程.它需要在占有 <i>mutex</i> 时被调用.然后必须对mutex解锁来完成 <code>pthread_cond_wait</code>
+的等待.
+</p>
+
+<p>
+如果有多余一个线程处于等待 <code>cond</code> 而阻塞, 应该用
+<code>pthread_cond_broadcast()</code> 替换 <code>pthread_cond_signal()</code>.
+</p>
+</div>
+</li>
+<li>Example: Using Condition Variables<br  /><div class="outline-text-4" id="text-5-4-4">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;pthread.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdlib&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;unistd.h&gt;</span>
+
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kNumThreads</span> = 3;
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kLoops</span> = 10;
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kCountLimit</span> = 15;
+
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">g_count</span>;
+<span style="color: #98fb98;">pthread_mutex_t</span> <span style="color: #eedd82;">count_mutex</span>;
+<span style="color: #98fb98;">pthread_cond_t</span> <span style="color: #eedd82;">count_cv</span>;
+
+<span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">IncreaseCount</span>(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">param</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id</span>;
+  id = *(<span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">int</span> *&gt;(param));
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kLoops; ++i) {
+    pthread_mutex_lock(&amp;count_mutex);
+    g_count++;
+    <span style="color: #00ffff;">if</span> (g_count == kCountLimit) {
+      pthread_cond_signal(&amp;count_cv);
+      printf(<span style="color: #ffa07a;">"increse thread %d: count = %d, signal cond\n"</span>, id, g_count);
+    }
+    printf(<span style="color: #ffa07a;">"increse thread %d: count = %d, unlock mutex\n"</span>, id, g_count);
+    pthread_mutex_unlock(&amp;count_mutex);
+    sleep(1);
+  }
+  pthread_exit(<span style="color: #7fffd4;">NULL</span>);
+}
+
+<span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">WatchCount</span>(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">param</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id</span>;
+  id = *(<span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">int</span> *&gt;(param));
+  pthread_mutex_lock(&amp;count_mutex);
+  <span style="color: #00ffff;">while</span> (g_count &lt; kCountLimit) {
+    pthread_cond_wait(&amp;count_cv, &amp;count_mutex);
+    printf(<span style="color: #ffa07a;">"watch thread %d: count = %d, receive signal\n"</span>, id, g_count);
+  }
+  pthread_mutex_unlock(&amp;count_mutex);
+  pthread_exit(<span style="color: #7fffd4;">NULL</span>);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #98fb98;">pthread_t</span> <span style="color: #eedd82;">threads</span>[kNumThreads];
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">thread_ids</span>[kNumThreads];
+  <span style="color: #98fb98;">pthread_attr_t</span> <span style="color: #eedd82;">attr</span>;
+
+  pthread_mutex_init(&amp;count_mutex, <span style="color: #7fffd4;">NULL</span>);
+  pthread_cond_init(&amp;count_cv, <span style="color: #7fffd4;">NULL</span>);
+  pthread_attr_init(&amp;attr);
+  pthread_attr_setdetachstate(&amp;attr, PTHREAD_CREATE_JOINABLE);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kNumThreads; ++i) {
+    thread_ids[i] = i;
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span>;
+  rt = pthread_create(&amp;threads[0], &amp;attr, WatchCount,
+                            <span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">void</span> *&gt;(&amp;thread_ids[0]));
+  <span style="color: #00ffff;">if</span> (rt) {
+    printf(<span style="color: #ffa07a;">"ERROR: pthread_create failed, rt=%d\n"</span>, rt);
+    exit(1);
+  }
+  rt = pthread_create(&amp;threads[1], &amp;attr, IncreaseCount,
+                            <span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">void</span> *&gt;(&amp;thread_ids[1]));
+  <span style="color: #00ffff;">if</span> (rt) {
+    printf(<span style="color: #ffa07a;">"ERROR: pthread_create failed, rt=%d\n"</span>, rt);
+    exit(1);
+  }
+  rt = pthread_create(&amp;threads[2], &amp;attr, IncreaseCount,
+                            <span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">void</span> *&gt;(&amp;thread_ids[2]));
+  <span style="color: #00ffff;">if</span> (rt) {
+    printf(<span style="color: #ffa07a;">"ERROR: pthread_create failed, rt=%d\n"</span>, rt);
+    exit(1);
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kNumThreads; ++i) {
+    pthread_join(threads[i], <span style="color: #7fffd4;">NULL</span>);
+  }
+  pthread_attr_destroy(&amp;attr);
+  pthread_cond_destroy(&amp;count_cv);
+  pthread_mutex_destroy(&amp;count_mutex);
+  pthread_exit(<span style="color: #7fffd4;">NULL</span>);
+}
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+
 <div id="outline-container-sec-5-5" class="outline-3">
 <h3 id="sec-5-5">Synchronization</h3>
 </div>
@@ -1102,7 +1631,7 @@ pthread_setaffinity_np(thread[1], <span style="color: #00ffff;">sizeof</span>(cp
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-07-25 Fri 23:08</p>
+<p class="date">Created: 2014-07-30 Wed 22:58</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

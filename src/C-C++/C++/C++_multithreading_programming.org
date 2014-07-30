@@ -1,4 +1,4 @@
-#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+admin#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
 #+TITLE: 浅谈C++ multithreading programming
 #+OPTIONS: num:nil H:2
 
@@ -302,7 +302,60 @@ Pthread APIs并没有提供binding threads到特定cpus/cores的接口.但不同
   pthread_setaffinity_np(thread[1], sizeof(cpu_set_t), &cpus);
 #+end_src
 **** Terminating Threads
+一个线程有很多种方法终止:
++ 线程从它的运行中正常放回.它的工作完成.
++ 线程调用 =pthread_exit= 无论它的工作完成否.
++ 线程被另外一个线程调用 =pthread_cancel= 来取消.
++ 整个线程终止因为调用 =exec()= 或 =exit()=.
++ =main()= 函数先完成,没有调用 =pthread_exit=.
+
+=pthread_exit()= 允许指定一个可选的终止 =status parameter=.这个可选参数
+一般返回给线程"joining"到这个终止线程.
+
+=pthread_exit()= 不关闭文件,在线程打开的任何文件将继续打开在线程终止后.
+
+在 =main()= 调用 =pthread_exit()= :
++ 如果 =main()= 在它创建的threads之前终止,并没有显示的调用
+  =pthread_exit()=,这将是个问题.所有创建的线程将终止因为main()结束,不
+  再存在支持这些线程.
++ 通过main()在最后调用 =pthread_exit()=, main()将阻塞并保持存活来支持
+  它创建的线程运行直到它们完成.
+
 **** Example: Pthread Creation and Termination
+如果注释掉main()中最后的 =pthread_exit(NULL);= ,那么它创建的线程将会完
+成不了所有的打印而被强制退出.
+
+#+begin_src c++
+#include <pthread.h>
+#include <cstdio>
+#include <cstdlib>
+
+void *ThreadProc(void *param) {
+  int id;
+  id = *(static_cast<int *>(param));
+  for (int i = 0; i < 10; ++i) {
+    printf("thread %d: run %d \n", id, i);
+  }
+  pthread_exit(NULL);
+}
+
+int main(int argc, char *argv[]) {
+  const int kNumThreads = 4;
+  pthread_t threads[kNumThreads];
+  int thread_ids[kNumThreads];
+  for (int i = 0; i < kNumThreads; ++i) {
+    thread_ids[i] = i;
+    int rt = pthread_create(&threads[i], NULL, ThreadProc,
+                            static_cast<void *>(&thread_ids[i]));
+    if (rt) {
+      printf("ERROR: pthread_create failed, rt=%d\n", rt);
+      exit(1);
+    }
+  }
+  pthread_exit(NULL);
+}
+#+end_src
+
 *** Joining and Detaching Threads
 **** APIs
 #+begin_src c
@@ -312,7 +365,70 @@ int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate);
 int pthread_attr_getdetachstate(const pthread_attr_t *attr,
               int *detachstate);
 #+end_src
+**** Joining
+Joining是同步不同线程的方法之一,原理如下图:
+
++ =pthread_join()= 阻塞调用它的线程直到指定的 =threadid= 的线程终止.
++ 调用的线程能获取目标线程终止返回的 =status= 只要目标线程调用
+  =pthread_exit()=.
++ 当一个线程被创建,它的属性之一是它是否可以join.只有创建的能被join的线
+  程才能被join.如果线程线程以detached创建,它永远都不能被join.
++ 显示的创建一个线程可join或detached,使用在 =pthread_create()= 中的 =attr=
+  参数.典型的步骤是:
+  1. 定义 =pthread_attr_t= 类型的pthread属性;
+  2. 用 =pthread_attr_init()= 初始化属性变量;
+  3. 用 =pthread_attr_setdetachstate()= 设置detached属性;
+  4. 用 =pthread_attr_destroy()= 释放属性使用的资源.
+**** Detaching
++ =pthread_detach()= 能显示的detach一个线程即使它是以可join创建.
++ 没有相反的操作.
 **** Example: Pthread Joining
+#+begin_src c++
+#include <pthread.h>
+#include <cstdio>
+#include <cstdlib>
+
+void *ThreadProc(void *param) {
+  int id;
+  id = *(static_cast<int *>(param));
+  for (int i = 0; i < 10; ++i) {
+    printf("thread %d: run %d \n", id, i);
+  }
+  pthread_exit(param);
+}
+
+int main(int argc, char *argv[]) {
+  const int kNumThreads = 4;
+  pthread_t threads[kNumThreads];
+  int thread_ids[kNumThreads];
+  pthread_attr_t attr;
+
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+  
+  for (int i = 0; i < kNumThreads; ++i) {
+    thread_ids[i] = i;
+    int rt = pthread_create(&threads[i], &attr, ThreadProc,
+                            static_cast<void *>(&thread_ids[i]));
+    if (rt) {
+      printf("ERROR: pthread_create failed, rt=%d\n", rt);
+      exit(1);
+    }
+  }
+  for (int i = 0; i < kNumThreads; ++i) {
+    void *status;
+    int rt = pthread_join(threads[i], &status);
+    if (rt) {
+      printf("ERROR: pthread_join failed, rt=%d\n", rt);
+      exit(1);
+    }
+    printf("completed join with thread %d having a status of %d\n"
+           , i, *static_cast<int *>(status));
+  }
+  pthread_exit(NULL);
+}
+#+end_src 
+
 *** Stack Management
 **** APIs
 #+begin_src c
@@ -323,6 +439,56 @@ int pthread_attr_getstackaddr(const pthread_attr_t *restrict attr,
               void **restrict stackaddr);
 int pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr);
 #+end_src
+
+每个线程都有各自独立的stack, =pthread_attr_getstackaddr= 和
+=pthread_attr_setstackaddr= 分别获取和设置线程的stack属性.
+**** Example: Stack Management
+#+begin_src c++
+#include <pthread.h>
+#include <cstdio>
+#include <cstdlib>
+
+pthread_attr_t attr;
+
+void *ThreadProc(void *param) {
+  int id;
+  size_t thread_stack_size;
+  id = *(static_cast<int *>(param));
+  pthread_attr_getstacksize(&attr, &thread_stack_size);
+  printf("thread %d: stack size = %d\n", id, thread_stack_size);
+  for (int i = 0; i < 10; ++i) {
+    printf("thread %d: run %d \n", id, i);
+  }
+  pthread_exit(NULL);
+}
+
+int main(int argc, char *argv[]) {
+  const int kNumThreads = 4;
+  const int kThround = 1000;
+  pthread_t threads[kNumThreads];
+  int thread_ids[kNumThreads];
+  size_t stack_size;
+
+  pthread_attr_init(&attr);
+  pthread_attr_getstacksize(&attr, &stack_size);
+  printf("Default stack size = %d\n", stack_size);
+  stack_size = sizeof(double) * kThround * kThround;
+  printf("Setting stack size = %d\n", stack_size);
+  pthread_attr_setstacksize(&attr, stack_size);
+  for (int i = 0; i < kNumThreads; ++i) {
+    thread_ids[i] = i;
+    int rt = pthread_create(&threads[i], &attr, ThreadProc,
+                            static_cast<void *>(&thread_ids[i]));
+    if (rt) {
+      printf("ERROR: pthread_create failed, rt=%d\n", rt);
+      exit(1);
+    }
+  }
+  pthread_exit(NULL);
+  pthread_attr_destroy(&attr);
+  return 0;
+}
+#+end_src
 *** Miscellaneous
 #+begin_src c
 pthread_t pthread_self(void);
@@ -332,10 +498,28 @@ int pthread_once(pthread_once_t *once_control,
 pthread_once_t once_control = PTHREAD_ONCE_INIT;
 #+end_src
 
++ =pthread_self= 返回调用线程的唯一thread ID.
++ =pthread_equal= 比较两个线程ID是否相等.
++ =pthread_once= 只执行 =init_routine= 仅仅一次在进程中.
+
 ** Mutex Variables
 *** Overview
+Mutex以"mutual exclusion"(互斥)简称.
+
+Mutex variable就像一把"锁"一样保护共享数据资源.mutex的基本概念就是,只
+有一个线程能lock一个mutex变量在任何时候.所以,即使很多线程尝试去锁一个
+mute,也仅仅只有一个线程能成功.
+
+典型使用mutex的顺序如下:
+1. 创建和初始化mutex变量;
+2. 许多线程尝试锁住mutex;
+3. 只有一个线程成功锁住mutex,其他线程等待;
+4. 拥有mutex的线程进行自己的操作;
+5. 拥有线程解锁mutex;
+6. 其他线程继续获取mutex并持续如上步骤;
+7. 最后mutex销毁.
+
 *** Creating and Destroying Mutexes
-**** APIs
 #+begin_src c
 int pthread_mutex_destroy(pthread_mutex_t *mutex);
 int pthread_mutex_init(pthread_mutex_t *restrict mutex,
@@ -344,18 +528,230 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int pthread_mutexattr_destroy(pthread_mutexattr_t *attr);
 int pthread_mutexattr_init(pthread_mutexattr_t *attr);
 #+end_src
+
+Mutex变量由 =pthread_mutex_t= 声明定义,而且必须初始化在使用前.两种方法
+初始:
+1. 静态的,当声明时.如:
+#+begin_src c
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+#+end_src
+2. 动态的,使用 =pthread_mutex_init()= 函数,并能设置mutex的属性 =attr=.
+
+=attr= 用来设置mutex变量的属性,必须是 =pthread_mutexattr_t= 类
+型.Pthread标准中定义的3种可选mutex属性:
+
++ Protocol: Specifies the protocol used to prevent priority inversions
+  for a mutex.
++ Prioceiling: Specifies the priority ceiling of a mutex.
++ Process-shared: Specifies the process sharing of a mutex.(Pthread
+  mutex能被process间使用).
+
 *** Locking and Unlocking Mutexes
-**** APIs
 #+begin_src c
 int pthread_mutex_lock(pthread_mutex_t *mutex);
 int pthread_mutex_trylock(pthread_mutex_t *mutex);
 int pthread_mutex_unlock(pthread_mutex_t *mutex);
 #+end_src
-*** Example: Using Mutexes
 
+=pthread_mutex_lock()= 函数被用来获取传入的mutex变量,如果mutex已经被其
+他线程占用,那么这个调用就阻塞调用线程,使它进入睡眠等待这个mutex直到它
+被释放.
+
+=pthread_mutex_trylock()= 仅尝试获取锁,若不成功也立即返回'busy'信号.
+
+*** Example: Using Mutexes
+#+begin_src c++
+#include <pthread.h>
+#include <cstdio>
+#include <cstdlib>
+
+struct ThreadData {
+  int tid;
+  int data;
+};
+
+int shared_x;
+pthread_mutex_t lock;
+
+void *ThreadProc(void *param) {
+  ThreadData *data = static_cast<ThreadData *>(param);
+  printf("begin from thread id: %d\n", data->tid);
+  pthread_mutex_lock(&lock);
+  shared_x += data->data;
+  printf("thread %d: x = %d\n", data->tid, shared_x);
+  pthread_mutex_unlock(&lock);
+  pthread_exit(NULL);
+}
+
+int main(int argc, char *argv[]) {
+  const int kNumThreads = 4;
+  pthread_t threads[kNumThreads];
+  ThreadData threads_data[kNumThreads];
+  pthread_attr_t attr;
+
+  shared_x = 0;
+  pthread_mutex_init(&lock, NULL);
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+  for (int i = 0; i < kNumThreads; ++i) {
+    threads_data[i].tid = i;
+    threads_data[i].data = i * i;
+    int rt = pthread_create(&threads[i], &attr, ThreadProc,
+                            static_cast<void *>(&threads_data[i]));
+    if (rt) {
+      printf("ERROR: pthread_create failed, rt=%d\n", rt);
+      exit(1);
+    }
+  }
+  for (int i = 0; i < kNumThreads; ++i) {
+    void *status;
+    pthread_join(threads[i], &status);
+  }
+  pthread_attr_destroy(&attr);
+  pthread_exit(NULL);
+  return 0;
+}
+#+end_src
 ** Condition Variables
 *** Overview
+Mutex 变量如锁一般防止多个线程访问共享数据资源,如果某个线程等待某个共
+享数据达到某个数值才进行相应的操作,那么这个线程需要不断的去poll,查看是
+否满足需要的值,这样开销很大,因为线程需要一直处于忙状态.
 
+引入Condition Variables来完成这样的同步到某个实际数据值而不要不断poll.
+
+Condition变量一般与mutex一起使用.锁住查看的共享数据资源.
+
+使用Condition的一般步骤如下:
++ 声明和定义需要同步的共享数据;
++ 声明和定义condition变量;
++ 声明和定义相对应的mutex;
++ 创建线程使用condition变量同步.
+
+*** Creating and Destroying Condition Variables
+#+begin_src c
+  int pthread_cond_destroy(pthread_cond_t *cond);
+  int pthread_cond_init(pthread_cond_t *restrict cond,
+                        const pthread_condattr_t *restrict attr);
+  int pthread_condattr_destroy(pthread_condattr_t *attr);
+  int pthread_condattr_init(pthread_condattr_t *attr);
+#+end_src
+
+Condition变量由 =pthread_cond_t= 声明定义,而且必须初始化在使用前.两种方法
+初始:
+1. 静态的,当声明时.如:
+#+begin_src c
+pthread_cond_t convar = PTHREAD_COND_INITIALIZER;
+#+end_src
+2. 动态的,使用 =pthread_cond_init()= 函数,并能设置condition的属性 =attr=.
+
+=attr= 用来设置condition变量的属性,必须是 =pthread_condattr_t= 类
+型.只有一种属性可选:是否进程共享,也就是允许其他进程中的线程也能看到它.
+
+*** Waiting and Signaling on Condition Variables
+#+begin_src c
+  int pthread_cond_wait(pthread_cond_t *cond,
+                        pthread_mutex_t *mutex);
+  int pthread_cond_signal(pthread_cond_t *cond);
+  int pthread_cond_broadcast(pthread_cond_t *cond);
+#+end_src
+
+=pthread_cond_wait()= 阻塞调用它的线程直到其中 =cond= 被signal.这个函
+数需要在占有 /mutex/ 时被调用,而它将 *自动释放* mutex当它等待时.等到
+signal收到,线程被唤醒, /mutex/ 将 *自动被占有* .最后当线程完成
+condition的操作,要负责对mutex解锁.
+
+=pthread_cond_signal()= 用来signal其他等待这个 =cond= 的线程.它需要在
+占有 /mutex/ 时被调用.然后必须对mutex解锁来完成 =pthread_cond_wait=
+的等待.
+
+如果有多余一个线程处于等待 =cond= 而阻塞, 应该用
+=pthread_cond_broadcast()= 替换 =pthread_cond_signal()=.
+
+*** Example: Using Condition Variables
+#+begin_src c++
+#include <pthread.h>
+#include <cstdio>
+#include <cstdlib>
+#include <unistd.h>
+
+const int kNumThreads = 3;
+const int kLoops = 10;
+const int kCountLimit = 15;
+
+int g_count;
+pthread_mutex_t count_mutex;
+pthread_cond_t count_cv;
+
+void *IncreaseCount(void *param) {
+  int id;
+  id = *(static_cast<int *>(param));
+  for (int i = 0; i < kLoops; ++i) {
+    pthread_mutex_lock(&count_mutex);
+    g_count++;
+    if (g_count == kCountLimit) {
+      pthread_cond_signal(&count_cv);
+      printf("increse thread %d: count = %d, signal cond\n", id, g_count);
+    }
+    printf("increse thread %d: count = %d, unlock mutex\n", id, g_count);
+    pthread_mutex_unlock(&count_mutex);
+    sleep(1);
+  }
+  pthread_exit(NULL);
+}
+
+void *WatchCount(void *param) {
+  int id;
+  id = *(static_cast<int *>(param));
+  pthread_mutex_lock(&count_mutex);
+  while (g_count < kCountLimit) {
+    pthread_cond_wait(&count_cv, &count_mutex);
+    printf("watch thread %d: count = %d, receive signal\n", id, g_count);
+  }
+  pthread_mutex_unlock(&count_mutex);
+  pthread_exit(NULL);
+}
+    
+int main(int argc, char *argv[]) {
+  pthread_t threads[kNumThreads];
+  int thread_ids[kNumThreads];
+  pthread_attr_t attr;
+
+  pthread_mutex_init(&count_mutex, NULL);
+  pthread_cond_init(&count_cv, NULL);
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+  for (int i = 0; i < kNumThreads; ++i) {
+    thread_ids[i] = i;
+  }
+  int rt;
+  rt = pthread_create(&threads[0], &attr, WatchCount,
+                            static_cast<void *>(&thread_ids[0]));
+  if (rt) {
+    printf("ERROR: pthread_create failed, rt=%d\n", rt);
+    exit(1);
+  }
+  rt = pthread_create(&threads[1], &attr, IncreaseCount,
+                            static_cast<void *>(&thread_ids[1]));
+  if (rt) {
+    printf("ERROR: pthread_create failed, rt=%d\n", rt);
+    exit(1);
+  }
+  rt = pthread_create(&threads[2], &attr, IncreaseCount,
+                            static_cast<void *>(&thread_ids[2]));
+  if (rt) {
+    printf("ERROR: pthread_create failed, rt=%d\n", rt);
+    exit(1);
+  }
+  for (int i = 0; i < kNumThreads; ++i) {
+    pthread_join(threads[i], NULL);
+  }
+  pthread_attr_destroy(&attr);
+  pthread_cond_destroy(&count_cv);
+  pthread_mutex_destroy(&count_mutex);
+  pthread_exit(NULL);
+}
+#+end_src
 ** Synchronization
 
 ** Miscellaneous
