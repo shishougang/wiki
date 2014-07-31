@@ -752,23 +752,72 @@ int main(int argc, char *argv[]) {
   pthread_exit(NULL);
 }
 #+end_src
-** Synchronization
+** Barrier
+*** Overview
+Barrier就是栅栏一样,调用等待barrier的线程需要等待直到满足调用barrier的
+线程个数达到要求的 =count=.
+*** Creating, Destroying and Wait Barrier
+#+begin_src c
+  int pthread_barrier_init(pthread_barrier_t *barrier,
+                  const pthread_barrierattr_t *attr, unsigned count);
+  pthread_barrier_t barrier = PTHREAD_BARRIER_INITIALIZER(count);
+  int pthread_barrier_destroy(pthread_barrier_t *barrier);
+  int pthread_barrierattr_init(pthread_barrierattr_t *attr);
+  int pthread_barrierattr_destroy(pthread_barrierattr_t *attr);
+  int pthread_barrier_wait(pthread_barrier_t *barrier);
+#+end_src
 
-** Miscellaneous
+Barrier变量由 =pthread_barrier_t= 声明定义,而且必须初始化在使用前.需要
+传入满足barrier等待的个数 =count=, 两种方法
+初始:
+1. 静态的,当声明时.如:
+#+begin_src c
+pthread_barrier_t barrier = PTHREAD_BARRIER_INITIALIZER(count);
+#+end_src
+2. 动态的,使用 =pthread_barrier_init()= 函数,并能设置barrier的属性 =attr=.
+
+线程调用barrier,只需要调用 =pthread_barrier_wait= 来等待barrier达到满
+足条件.
 
 <<google-wrap>>
 * Google wrap the Pthread 
 
 * Monitoring, Debugging and Performance Analysis Tools for Pthreads
-
 ** Monitoring
-
 *** Linux *ps* command
+使用Linux自带的 =ps= 命令查看运行的thread情况,[[http://unixhelp.ed.ac.uk/CGI/man-cgi?ps][ps的man手册]].
+#+begin_src sh
+➜$ ps -Lf
+UID        PID  PPID   LWP  C NLWP STIME TTY          TIME CMD
+shougang 13103  8814 13103  0    1 23:30 pts/17   00:00:00 /bin/zsh
+shougang 13237 13103 13237  0    6 23:30 pts/17   00:00:00 [thread]
+shougang 13237 13103 13240  0    6 23:30 pts/17   00:00:00 [thread]
+shougang 13237 13103 13241  0    6 23:30 pts/17   00:00:00 [thread]
+shougang 13237 13103 13242  0    6 23:30 pts/17   00:00:00 [thread]
+shougang 13237 13103 13243  0    6 23:30 pts/17   00:00:00 [thread]
+shougang 13237 13103 13244  0    6 23:30 pts/17   00:00:00 [thread]
+#+end_src
+*** Linux *top* command
+Linux的 =top= 命令加上 =-H= 参数, process中的threads也能看到.
+如下是 =top -H= 的一个例子:
 
-http://www.yolinux.com/TUTORIALS/LinuxTutorialPosixThreads.html
+[[./Files/top.png]]
+** Debugging
+*** GDB
++ [[http://sources.redhat.com/gdb/current/onlinedocs/gdb/Threads.html#Threads][Debugging Programs with Multiple Threads]]
++ [[http://sources.redhat.com/gdb/current/onlinedocs/gdb/Thread-Stops.html#Thread-Stops][GDB: Stopping and starting multi-thread programs]]
++ [[http://sources.redhat.com/gdb/current/onlinedocs/gdb/GDB_002fMI-Thread-Commands.html#GDB_002fMI-Thread-Commands][GDB/MI: Threads commands]]
+
+*** DDD
++ [[http://www.gnu.org/software/ddd/manual/html_mono/ddd.html#Threads][Examining Threads]]
+** Performance Analysis Tools[fn:2]
++ [[http://www.openspeedshop.org/wp/][Open|SpeedShop]]
++ [[http://www.cs.uoregon.edu/research/tau/home.php][TAU]]
++ [[https://software.intel.com/en-us/intel-advisor-xe][Intel Advisor]]
 
 <<boost-thread>>
 * Boost thread library
+-lboost_thread
 
 http://www.drdobbs.com/cpp/the-boostthreads-library/184401518
 
@@ -778,7 +827,9 @@ http://remonstrate.wordpress.com/2009/12/05/boost-%E7%9A%84-thread/
 
 http://blog.csdn.net/vagrxie/article/details/4246470
 
+#+begin_src c++
 
+#+end_src
 
 <<other-materials>>
 * 其他资料
@@ -801,121 +852,118 @@ http://blog.csdn.net/vagrxie/article/details/4246470
 ** 有关Mutex
 + [[http://home.roadrunner.com/~hinnant/mutexes/locking.html][Handling mutexes in C++]]
 + [[http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2007/n2406.html][Mutex, Lock, Condition Variable Rationale]]
-* cc
-
-#+begin_src c++
-
-#+end_src
 
 <<pthread-library>>
 * Pthread Library Routines Reference
 #+begin_html
 <p>
-<a href="man/pthread_atfork.txt">pthread_atfork</a>
-<br><a href="man/pthread_attr_destroy.txt">pthread_attr_destroy</a>
-<br><a href="man/pthread_attr_getdetachstate.txt">pthread_attr_getdetachstate</a>
-<br><a href="man/pthread_attr_getguardsize.txt">pthread_attr_getguardsize</a>
-<br><a href="man/pthread_attr_getinheritsched.txt">pthread_attr_getinheritsched</a>
-<br><a href="man/pthread_attr_getschedparam.txt">pthread_attr_getschedparam</a>
-<br><a href="man/pthread_attr_getschedpolicy.txt">pthread_attr_getschedpolicy</a>
-<br><a href="man/pthread_attr_getscope.txt">pthread_attr_getscope</a>
-<br><a href="man/pthread_attr_getstack.txt">pthread_attr_getstack</a>
-<br><a href="man/pthread_attr_getstackaddr.txt">pthread_attr_getstackaddr</a>
-<br><a href="man/pthread_attr_getstacksize.txt">pthread_attr_getstacksize</a>
-<br><a href="man/pthread_attr_init.txt">pthread_attr_init</a>
-<br><a href="man/pthread_attr_setdetachstate.txt">pthread_attr_setdetachstate</a>
-<br><a href="man/pthread_attr_setguardsize.txt">pthread_attr_setguardsize</a>
-<br><a href="man/pthread_attr_setinheritsched.txt">pthread_attr_setinheritsched</a>
-<br><a href="man/pthread_attr_setschedparam.txt">pthread_attr_setschedparam</a>
-<br><a href="man/pthread_attr_setschedpolicy.txt">pthread_attr_setschedpolicy</a>
-<br><a href="man/pthread_attr_setscope.txt">pthread_attr_setscope</a>
-<br><a href="man/pthread_attr_setstack.txt">pthread_attr_setstack</a>
-<br><a href="man/pthread_attr_setstackaddr.txt">pthread_attr_setstackaddr</a>
-<br><a href="man/pthread_attr_setstacksize.txt">pthread_attr_setstacksize</a>
-<br><a href="man/pthread_barrier_destroy.txt">pthread_barrier_destroy</a>
-<br><a href="man/pthread_barrier_init.txt">pthread_barrier_init</a>
-<br><a href="man/pthread_barrier_wait.txt">pthread_barrier_wait</a>
-<br><a href="man/pthread_barrierattr_destroy.txt">pthread_barrierattr_destroy</a>
-<br><a href="man/pthread_barrierattr_getpshared.txt">pthread_barrierattr_getpshared</a>
-<br><a href="man/pthread_barrierattr_init.txt">pthread_barrierattr_init</a>
-<br><a href="man/pthread_barrierattr_setpshared.txt">pthread_barrierattr_setpshared</a>
-<br><a href="man/pthread_cancel.txt">pthread_cancel</a>
-<br><a href="man/pthread_cleanup_pop.txt">pthread_cleanup_pop</a>
-<br><a href="man/pthread_cleanup_push.txt">pthread_cleanup_push</a>
-<br><a href="man/pthread_cond_broadcast.txt">pthread_cond_broadcast</a>
-<br><a href="man/pthread_cond_destroy.txt">pthread_cond_destroy</a>
-<br><a href="man/pthread_cond_init.txt">pthread_cond_init</a>
-<br><a href="man/pthread_cond_signal.txt">pthread_cond_signal</a>
-<br><a href="man/pthread_cond_timedwait.txt">pthread_cond_timedwait</a>
-<br><a href="man/pthread_cond_wait.txt">pthread_cond_wait</a>
-<br><a href="man/pthread_condattr_destroy.txt">pthread_condattr_destroy</a>
-<br><a href="man/pthread_condattr_getclock.txt">pthread_condattr_getclock</a>
-<br><a href="man/pthread_condattr_getpshared.txt">pthread_condattr_getpshared</a>
-<br><a href="man/pthread_condattr_init.txt">pthread_condattr_init</a>
-<br><a href="man/pthread_condattr_setclock.txt">pthread_condattr_setclock</a>
-<br><a href="man/pthread_condattr_setpshared.txt">pthread_condattr_setpshared</a>
-<br><a href="man/pthread_create.txt">pthread_create</a>
-<br><a href="man/pthread_detach.txt">pthread_detach</a>
-<br><a href="man/pthread_equal.txt">pthread_equal</a>
-<br><a href="man/pthread_exit.txt">pthread_exit</a>
-<br><a href="man/pthread_getconcurrency.txt">pthread_getconcurrency</a>
-<br><a href="man/pthread_getcpuclockid.txt">pthread_getcpuclockid</a>
-<br><a href="man/pthread_getschedparam.txt">pthread_getschedparam</a>
-<br><a href="man/pthread_getspecific.txt">pthread_getspecific</a>
-<br><a href="man/pthread_join.txt">pthread_join</a>
-<br><a href="man/pthread_key_create.txt">pthread_key_create</a>
-<br><a href="man/pthread_key_delete.txt">pthread_key_delete</a>
-<br><a href="man/pthread_kill.txt">pthread_kill</a>
-<br><a href="man/pthread_mutex_destroy.txt">pthread_mutex_destroy</a>
-<br><a href="man/pthread_mutex_getprioceiling.txt">pthread_mutex_getprioceiling</a>
-<br><a href="man/pthread_mutex_init.txt">pthread_mutex_init</a>
-<br><a href="man/pthread_mutex_lock.txt">pthread_mutex_lock</a>
-<br><a href="man/pthread_mutex_setprioceiling.txt">pthread_mutex_setprioceiling</a>
-<br><a href="man/pthread_mutex_timedlock.txt">pthread_mutex_timedlock</a>
-<br><a href="man/pthread_mutex_trylock.txt">pthread_mutex_trylock</a>
-<br><a href="man/pthread_mutex_unlock.txt">pthread_mutex_unlock</a>
-<br><a href="man/pthread_mutexattr_destroy.txt">pthread_mutexattr_destroy</a>
-<br><a href="man/pthread_mutexattr_getprioceiling.txt">pthread_mutexattr_getprioceiling</a>
-<br><a href="man/pthread_mutexattr_getprotocol.txt">pthread_mutexattr_getprotocol</a>
-<br><a href="man/pthread_mutexattr_getpshared.txt">pthread_mutexattr_getpshared</a>
-<br><a href="man/pthread_mutexattr_gettype.txt">pthread_mutexattr_gettype</a>
-<br><a href="man/pthread_mutexattr_init.txt">pthread_mutexattr_init</a>
-<br><a href="man/pthread_mutexattr_setprioceiling.txt">pthread_mutexattr_setprioceiling</a>
-<br><a href="man/pthread_mutexattr_setprotocol.txt">pthread_mutexattr_setprotocol</a>
-<br><a href="man/pthread_mutexattr_setpshared.txt">pthread_mutexattr_setpshared</a>
-<br><a href="man/pthread_mutexattr_settype.txt">pthread_mutexattr_settype</a>
-<br><a href="man/pthread_once.txt">pthread_once</a>
-<br><a href="man/pthread_rwlock_destroy.txt">pthread_rwlock_destroy</a>
-<br><a href="man/pthread_rwlock_init.txt">pthread_rwlock_init</a>
-<br><a href="man/pthread_rwlock_rdlock.txt">pthread_rwlock_rdlock</a>
-<br><a href="man/pthread_rwlock_timedrdlock.txt">pthread_rwlock_timedrdlock</a>
-<br><a href="man/pthread_rwlock_timedwrlock.txt">pthread_rwlock_timedwrlock</a>
-<br><a href="man/pthread_rwlock_tryrdlock.txt">pthread_rwlock_tryrdlock</a>
-<br><a href="man/pthread_rwlock_trywrlock.txt">pthread_rwlock_trywrlock</a>
-<br><a href="man/pthread_rwlock_unlock.txt">pthread_rwlock_unlock</a>
-<br><a href="man/pthread_rwlock_wrlock.txt">pthread_rwlock_wrlock</a>
-<br><a href="man/pthread_rwlockattr_destroy.txt">pthread_rwlockattr_destroy</a>
-<br><a href="man/pthread_rwlockattr_getpshared.txt">pthread_rwlockattr_getpshared</a>
-<br><a href="man/pthread_rwlockattr_init.txt">pthread_rwlockattr_init</a>
-<br><a href="man/pthread_rwlockattr_setpshared.txt">pthread_rwlockattr_setpshared</a>
-<br><a href="man/pthread_self.txt">pthread_self</a>
-<br><a href="man/pthread_setcancelstate.txt">pthread_setcancelstate</a>
-<br><a href="man/pthread_setcanceltype.txt">pthread_setcanceltype</a>
-<br><a href="man/pthread_setconcurrency.txt">pthread_setconcurrency</a>
-<br><a href="man/pthread_setschedparam.txt">pthread_setschedparam</a>
-<br><a href="man/pthread_setschedprio.txt">pthread_setschedprio</a>
-<br><a href="man/pthread_setspecific.txt">pthread_setspecific</a>
-<br><a href="man/pthread_sigmask.txt">pthread_sigmask</a>
-<br><a href="man/pthread_spin_destroy.txt">pthread_spin_destroy</a>
-<br><a href="man/pthread_spin_init.txt">pthread_spin_init</a>
-<br><a href="man/pthread_spin_lock.txt">pthread_spin_lock</a>
-<br><a href="man/pthread_spin_trylock.txt">pthread_spin_trylock</a>
-<br><a href="man/pthread_spin_unlock.txt">pthread_spin_unlock</a>
-<br><a href="man/pthread_testcancel.txt">pthread_testcancel</a>
+<a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_atfork.txt">pthread_atfork</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_destroy.txt">pthread_attr_destroy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_getdetachstate.txt">pthread_attr_getdetachstate</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_getguardsize.txt">pthread_attr_getguardsize</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_getinheritsched.txt">pthread_attr_getinheritsched</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_getschedparam.txt">pthread_attr_getschedparam</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_getschedpolicy.txt">pthread_attr_getschedpolicy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_getscope.txt">pthread_attr_getscope</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_getstack.txt">pthread_attr_getstack</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_getstackaddr.txt">pthread_attr_getstackaddr</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_getstacksize.txt">pthread_attr_getstacksize</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_init.txt">pthread_attr_init</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_setdetachstate.txt">pthread_attr_setdetachstate</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_setguardsize.txt">pthread_attr_setguardsize</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_setinheritsched.txt">pthread_attr_setinheritsched</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_setschedparam.txt">pthread_attr_setschedparam</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_setschedpolicy.txt">pthread_attr_setschedpolicy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_setscope.txt">pthread_attr_setscope</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_setstack.txt">pthread_attr_setstack</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_setstackaddr.txt">pthread_attr_setstackaddr</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_attr_setstacksize.txt">pthread_attr_setstacksize</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_barrier_destroy.txt">pthread_barrier_destroy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_barrier_init.txt">pthread_barrier_init</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_barrier_wait.txt">pthread_barrier_wait</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_barrierattr_destroy.txt">pthread_barrierattr_destroy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_barrierattr_getpshared.txt">pthread_barrierattr_getpshared</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_barrierattr_init.txt">pthread_barrierattr_init</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_barrierattr_setpshared.txt">pthread_barrierattr_setpshared</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_cancel.txt">pthread_cancel</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_cleanup_pop.txt">pthread_cleanup_pop</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_cleanup_push.txt">pthread_cleanup_push</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_cond_broadcast.txt">pthread_cond_broadcast</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_cond_destroy.txt">pthread_cond_destroy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_cond_init.txt">pthread_cond_init</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_cond_signal.txt">pthread_cond_signal</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_cond_timedwait.txt">pthread_cond_timedwait</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_cond_wait.txt">pthread_cond_wait</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_condattr_destroy.txt">pthread_condattr_destroy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_condattr_getclock.txt">pthread_condattr_getclock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_condattr_getpshared.txt">pthread_condattr_getpshared</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_condattr_init.txt">pthread_condattr_init</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_condattr_setclock.txt">pthread_condattr_setclock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_condattr_setpshared.txt">pthread_condattr_setpshared</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_create.txt">pthread_create</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_detach.txt">pthread_detach</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_equal.txt">pthread_equal</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_exit.txt">pthread_exit</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_getconcurrency.txt">pthread_getconcurrency</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_getcpuclockid.txt">pthread_getcpuclockid</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_getschedparam.txt">pthread_getschedparam</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_getspecific.txt">pthread_getspecific</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_join.txt">pthread_join</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_key_create.txt">pthread_key_create</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_key_delete.txt">pthread_key_delete</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_kill.txt">pthread_kill</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutex_destroy.txt">pthread_mutex_destroy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutex_getprioceiling.txt">pthread_mutex_getprioceiling</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutex_init.txt">pthread_mutex_init</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutex_lock.txt">pthread_mutex_lock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutex_setprioceiling.txt">pthread_mutex_setprioceiling</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutex_timedlock.txt">pthread_mutex_timedlock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutex_trylock.txt">pthread_mutex_trylock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutex_unlock.txt">pthread_mutex_unlock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutexattr_destroy.txt">pthread_mutexattr_destroy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutexattr_getprioceiling.txt">pthread_mutexattr_getprioceiling</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutexattr_getprotocol.txt">pthread_mutexattr_getprotocol</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutexattr_getpshared.txt">pthread_mutexattr_getpshared</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutexattr_gettype.txt">pthread_mutexattr_gettype</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutexattr_init.txt">pthread_mutexattr_init</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutexattr_setprioceiling.txt">pthread_mutexattr_setprioceiling</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutexattr_setprotocol.txt">pthread_mutexattr_setprotocol</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutexattr_setpshared.txt">pthread_mutexattr_setpshared</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_mutexattr_settype.txt">pthread_mutexattr_settype</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_once.txt">pthread_once</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlock_destroy.txt">pthread_rwlock_destroy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlock_init.txt">pthread_rwlock_init</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlock_rdlock.txt">pthread_rwlock_rdlock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlock_timedrdlock.txt">pthread_rwlock_timedrdlock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlock_timedwrlock.txt">pthread_rwlock_timedwrlock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlock_tryrdlock.txt">pthread_rwlock_tryrdlock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlock_trywrlock.txt">pthread_rwlock_trywrlock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlock_unlock.txt">pthread_rwlock_unlock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlock_wrlock.txt">pthread_rwlock_wrlock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlockattr_destroy.txt">pthread_rwlockattr_destroy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlockattr_getpshared.txt">pthread_rwlockattr_getpshared</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlockattr_init.txt">pthread_rwlockattr_init</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_rwlockattr_setpshared.txt">pthread_rwlockattr_setpshared</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_self.txt">pthread_self</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_setcancelstate.txt">pthread_setcancelstate</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_setcanceltype.txt">pthread_setcanceltype</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_setconcurrency.txt">pthread_setconcurrency</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_setschedparam.txt">pthread_setschedparam</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_setschedprio.txt">pthread_setschedprio</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_setspecific.txt">pthread_setspecific</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_sigmask.txt">pthread_sigmask</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_spin_destroy.txt">pthread_spin_destroy</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_spin_init.txt">pthread_spin_init</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_spin_lock.txt">pthread_spin_lock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_spin_trylock.txt">pthread_spin_trylock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_spin_unlock.txt">pthread_spin_unlock</a>
+<br><a href="https://computing.llnl.gov/tutorials/pthreads/man/pthread_testcancel.txt">pthread_testcancel</a>
 </p>
 #+end_html
 
 * Footnotes
 
 [fn:1] http://maxim.int.ru/bookshelf/PthreadsProgram/htm/r_19.html
+
+[fn:2] https://computing.llnl.gov/?set=code&page=software_tools#perftools
 
