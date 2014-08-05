@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>浅谈C++ multithreading programming</title>
-<!-- 2014-08-04 Mon 23:21 -->
+<!-- 2014-08-05 Tue 23:30 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -231,6 +231,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-8-2">Thread Management</a></li>
 <li><a href="#sec-8-3">Mutex Variables</a></li>
 <li><a href="#sec-8-4">Condition Variables</a></li>
+<li><a href="#sec-8-5">Miscellaneous</a></li>
 </ul>
 </li>
 <li><a href="#sec-9">其他资料</a>
@@ -1538,9 +1539,16 @@ Linux的 <code>top</code> 命令加上 <code>-H</code> 参数, process中的thre
 <h3 id="sec-8-1">Overview</h3>
 <div class="outline-text-3" id="text-8-1">
 <p>
-直到现在C++11库才支持thread
+直到C++11库才比较好的支持thread,之前C++程序使用操作系统支持的thread库(如
+Pthread).但这样做至少有个主要的问题:(1) 这些库基本是C的库,需要很小心的
+C++中使用,和(2) 每个操作系统提供自己的一套对thread支持的库.以致,编写的代码既不标准又不可移植.
+</p>
+
+<p>
+<a href="http://www.boost.org/doc/libs/1_55_0/doc/html/thread.html">Boost Thread</a>可以解决这两个主要问题. Boost Thread不是通过继承来使用线程,而是Boost的thread类使用一个Callable的对象创建.
 </p>
 </div>
+
 <ul class="org-ul"><li>编译Boost Thread程序<br  /><ul class="org-ul"><li>include<br  /><div class="outline-text-5" id="text-8-1-1-1">
 <p>
 根据使用到的Boost Thread中的类型包含不同头文件:
@@ -1550,6 +1558,8 @@ Linux的 <code>top</code> 命令加上 <code>-H</code> 参数, process中的thre
 <pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/thread.hpp&gt;</span>
 <span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/mutex.hpp&gt;</span>
 <span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/condition.hpp&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/locks.hpp&gt;</span> 
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/once.hpp&gt;</span>
 </pre>
 </div>
 </div>
@@ -1572,53 +1582,521 @@ Linux的 <code>top</code> 命令加上 <code>-H</code> 参数, process中的thre
 <div id="outline-container-sec-8-2" class="outline-3">
 <h3 id="sec-8-2">Thread Management</h3>
 <div class="outline-text-3" id="text-8-2">
-</div><ul class="org-ul"><li>Creating and Terminating Threads<br  /></li>
-<li>Joining and Detaching Threads<br  /></li>
-<li>Thread group<br  /></li>
-<li>Miscellaneous<br  /></li>
-<li>Example: thread Creation<br  /></li></ul>
+</div><ul class="org-ul"><li>Thread类<br  /><div class="outline-text-4" id="text-8-2-1">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">  #include</span> <span style="color: #ffa07a;">&lt;boost/thread/thread.hpp&gt;</span>
+  <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">thread</span>
+  {
+  <span style="color: #00ffff;">public</span>:
+      <span style="color: #87cefa;">thread</span>() noexcept;
+      <span style="color: #87cefa;">thread</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">thread</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+      <span style="color: #98fb98;">thread</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">thread</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+
+      <span style="color: #87cefa;">thread</span>(<span style="color: #98fb98;">thread</span>&amp;&amp;) noexcept;
+      <span style="color: #98fb98;">thread</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">thread</span>&amp;&amp;) noexcept;
+      ~<span style="color: #87cefa;">thread</span>();
+
+      <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>&gt;
+      <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">thread</span>(<span style="color: #98fb98;">F</span> <span style="color: #eedd82;">f</span>);
+      <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>&gt;
+      <span style="color: #87cefa;">thread</span>(<span style="color: #98fb98;">F</span> &amp;&amp;<span style="color: #eedd82;">f</span>);
+
+      <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>,<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">A1</span>,<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">A2</span>,...&gt;
+      <span style="color: #87cefa;">thread</span>(<span style="color: #98fb98;">F</span> <span style="color: #eedd82;">f</span>,<span style="color: #98fb98;">A1</span> <span style="color: #eedd82;">a1</span>,<span style="color: #98fb98;">A2</span> <span style="color: #eedd82;">a2</span>,...);
+      <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span> ...Args&gt;
+      <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">thread</span>(<span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
+
+      <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>&gt;
+      <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">thread</span>(<span style="color: #98fb98;">attributes</span>&amp; <span style="color: #eedd82;">attrs</span>, <span style="color: #98fb98;">F</span> <span style="color: #eedd82;">f</span>); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">EXTENSION</span>
+      <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>&gt;
+      <span style="color: #87cefa;">thread</span>(<span style="color: #98fb98;">attributes</span>&amp; <span style="color: #eedd82;">attrs</span>, <span style="color: #98fb98;">F</span> &amp;&amp;<span style="color: #eedd82;">f</span>); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">EXTENSION</span>
+      <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span> ...Args&gt;
+      <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">thread</span>(<span style="color: #98fb98;">attributes</span>&amp; <span style="color: #eedd82;">attrs</span>, <span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
+      <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">id</span>;
+      <span style="color: #98fb98;">id</span> <span style="color: #87cefa;">get_id</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+
+      <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">joinable</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+      <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">join</span>();
+...
+};
+</pre>
+</div>
+
+<p>
+整个thread类包含thread的所有特性,如thread id, join, detach等.
+</p>
+</div>
+<ul class="org-ul"><li>Create Thread<br  /><div class="outline-text-5" id="text-8-2-1-1">
+<p>
+Callable对象既可以是一个函数又可以是类中的 <code>operator()</code> 实现,如下:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hello</span>() {
+  cout &lt;&lt; <span style="color: #ffa07a;">"hello world"</span> &lt;&lt; endl;
+}
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Hello</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #98fb98;">void</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">()</span> () {
+    cout &lt;&lt; <span style="color: #ffa07a;">"hello world"</span> &lt;&lt; endl;
+  }
+};
+
+<span style="color: #98fb98;">Hello</span> <span style="color: #eedd82;">h</span>;
+<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">thread</span> <span style="color: #87cefa;">thread_hello</span>(h);
+<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">thread</span> <span style="color: #87cefa;">thread_hello</span>(hello);
+</pre>
+</div>
+</div>
+</li>
+
+<li>Passing data<br  /><div class="outline-text-5" id="text-8-2-1-2">
+<p>
+传递参数给线程
+</p>
+<ol class="org-ol">
+<li>thread创建时附加后面
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hello</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">str</span>) {
+  cout &lt;&lt; str &lt;&lt; endl;
+}
+<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">str</span> = <span style="color: #ffa07a;">"hello"</span>;
+<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">thread</span> <span style="color: #87cefa;">thrd</span>(hello, str);
+</pre>
+</div>
+<ol class="org-ol">
+<li>利用 <code>Boost.bind</code> 库接口
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hello</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">str</span>) {
+  cout &lt;&lt; str &lt;&lt; endl;
+}
+<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">str</span> = <span style="color: #ffa07a;">"hello"</span>;
+<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">str</span> = <span style="color: #ffa07a;">"hello"</span>;
+<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">thread</span> <span style="color: #87cefa;">thrd</span>(bind(hello, str));
+</pre>
+</div>
+</div>
+</li></ul>
+</li>
+<li>Thread group类<br  /><div class="outline-text-4" id="text-8-2-2">
+<p>
+可以使用thread group类管理thread,通过 <code>add_thread</code> 和 <code>create_thread</code>
+添加线程到管理类中, 可以直接 <code>join_all</code> 将所有管理类中的线程join.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/thread.hpp&gt;</span>
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">thread_group</span>
+{
+<span style="color: #00ffff;">public</span>:
+    <span style="color: #87cefa;">thread_group</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">thread_group</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+    <span style="color: #98fb98;">thread_group</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">thread_group</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+
+    <span style="color: #87cefa;">thread_group</span>();
+    ~<span style="color: #87cefa;">thread_group</span>();
+
+    <span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">F</span>&gt;
+    <span style="color: #98fb98;">thread</span>* <span style="color: #87cefa;">create_thread</span>(<span style="color: #98fb98;">F</span> <span style="color: #eedd82;">threadfunc</span>);
+    <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">add_thread</span>(<span style="color: #98fb98;">thread</span>* <span style="color: #eedd82;">thrd</span>);
+    <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">remove_thread</span>(<span style="color: #98fb98;">thread</span>* <span style="color: #eedd82;">thrd</span>);
+    <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">is_this_thread_in</span>();
+    <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">is_thread_in</span>(<span style="color: #98fb98;">thread</span>* <span style="color: #eedd82;">thrd</span>);
+    <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">join_all</span>();
+    <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">interrupt_all</span>();
+    <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">size</span>() <span style="color: #00ffff;">const</span>;
+};
+</pre>
+</div>
+</div>
+</li>
+
+<li>Miscellaneous<br  /><div class="outline-text-4" id="text-8-2-3">
+<p>
+Boost Thread中还有 <code>strict_scoped_thread</code> 类和 <code>scoped_thread</code> 类,提供线程结束不是调用 <code>terminate</code> ,而是调用传入的参数来执行特定行为.
+</p>
+</div>
+</li>
+<li>Example: Thread Creation<br  /><div class="outline-text-4" id="text-8-2-4">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/thread.hpp&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/bind.hpp&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">boost</span>;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hello</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">str</span>) {
+  cout &lt;&lt; str &lt;&lt; endl;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(){
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">str</span> = <span style="color: #ffa07a;">"hello"</span>;
+  <span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">thrd</span>(bind(hello, str));
+  thrd.join();
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</li></ul>
 </div>
 
 <div id="outline-container-sec-8-3" class="outline-3">
 <h3 id="sec-8-3">Mutex Variables</h3>
 <div class="outline-text-3" id="text-8-3">
-</div><ul class="org-ul"><li>Creating and Destroying Mutexes<br  /></li>
+<div class="org-src-container">
 
-<li>Locking and Unlocking Mutexes<br  /></li>
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/mutex.hpp&gt;</span>
 
-<li>Example: Using Mutexes<br  /></li></ul>
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">mutex</span>:
+    <span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">noncopyable</span>
+{
+<span style="color: #00ffff;">public</span>:
+    <span style="color: #87cefa;">mutex</span>();
+    ~<span style="color: #87cefa;">mutex</span>();
+
+    <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">lock</span>();
+    <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock</span>();
+    <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">unlock</span>();
+
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">platform</span>-specific-type native_handle_type;
+    <span style="color: #98fb98;">native_handle_type</span> <span style="color: #87cefa;">native_handle</span>();
+
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #98fb98;">scoped_lock</span>;
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">unspecified</span>-type scoped_try_lock;
+};
+</pre>
 </div>
+
+<ul class="org-ul">
+<li><code>lock()</code> 来获取锁.
+</li>
+<li><code>unlock()</code> 释放锁.
+</li>
+<li><code>typedef unique_lock&lt;mutex&gt; scoped_lock;</code> 定义了 <code>scoped_lock</code> 的类型,通过 <code>boost::mutex::scoped_lock</code> 来定义一个RAII-style锁,离开定义区域自动释放锁.
+</li>
+</ul>
+</div>
+
+<ul class="org-ul"><li><code>lock_guard</code><br  /><div class="outline-text-4" id="text-8-3-1">
+<p>
+<a href="http://www.boost.org/doc/libs/1_55_0/doc/html/thread/synchronization.html#thread.synchronization.lock_guard.lock_guard">boost::lock<sub>guard</sub></a> 非常简单:
+</p>
+<ul class="org-ul">
+<li>构造时,它获取锁.
+</li>
+<li>析构时,它释放锁.
+</li>
+</ul>
+
+<p>
+它提供了一个简单的RAII-style锁对象,使得exception-safe锁和解锁更容易.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">boost</span>
+{
+
+  <span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Lockable</span>&gt;
+  <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">lock_guard</span>
+<span style="color: #b0c4de;">#if</span> ! <span style="color: #b0c4de;">defined</span> BOOST_THREAD_NO_MAKE_LOCK_GUARD
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Lockable</span>&gt;
+  <span style="color: #98fb98;">lock_guard</span>&lt;<span style="color: #98fb98;">Lockable</span>&gt; <span style="color: #87cefa;">make_lock_guard</span>(<span style="color: #98fb98;">Lockable</span>&amp; <span style="color: #eedd82;">mtx</span>); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">EXTENSION</span>
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Lockable</span>&gt;
+  <span style="color: #98fb98;">lock_guard</span>&lt;<span style="color: #98fb98;">Lockable</span>&gt; <span style="color: #87cefa;">make_lock_guard</span>(<span style="color: #98fb98;">Lockable</span>&amp; <span style="color: #eedd82;">mtx</span>, <span style="color: #98fb98;">adopt_lock_t</span>); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">EXTENSION</span>
+<span style="color: #b0c4de;">#endif</span>
+}
+</pre>
+</div>
+
+<p>
+基本使用,传入可 <code>Lockable</code> 的mutex类型:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">mutex</span> <span style="color: #eedd82;">count_mutex</span>;
+<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">lock_guard</span>&lt;<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #87cefa;">lock</span>(count_mutex) ;
+</pre>
+</div>
+</div>
+</li>
+
+<li>Example: Using Mutexes<br  /><div class="outline-text-4" id="text-8-3-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/thread.hpp&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/mutex.hpp&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">cout</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">endl</span>;
+<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">mutex</span> <span style="color: #eedd82;">count_mutex</span>;
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">count</span> {
+  <span style="color: #87cefa;">count</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id</span>) : id_(id) {
+  }
+  <span style="color: #98fb98;">void</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">()</span> () {
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; 10; ++i) {
+      <span style="color: #7fffd4;">boost</span>::<span style="color: #7fffd4;">mutex</span>::<span style="color: #98fb98;">scoped_lock</span> <span style="color: #eedd82;">lock</span>(count_mutex);
+      cout &lt;&lt; id_ &lt;&lt; <span style="color: #ffa07a;">": "</span> &lt;&lt; i &lt;&lt; endl;
+    }
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id_</span>;
+};
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">thread1</span>(count(1));
+  <span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">thread2</span>(count(2));
+  thread1.join();
+  thread2.join();
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+
 <div id="outline-container-sec-8-4" class="outline-3">
 <h3 id="sec-8-4">Condition Variables</h3>
 <div class="outline-text-3" id="text-8-4">
-</div><ul class="org-ul"><li>Creating and Destroying Condition Variables<br  /></li>
-<li>Waiting and Signaling on Condition Variables<br  /></li>
-<li>Example: Using Condition Variables<br  /><div class="outline-text-4" id="text-8-4-3">
 <p>
-<a href="http://www.drdobbs.com/cpp/the-boostthreads-library/184401518">http://www.drdobbs.com/cpp/the-boostthreads-library/184401518</a>
+与Pthread, Boost Condition Variable功能更全面,如不同条件的
+<code>wait_until</code> , <code>wait_for</code> 等功能.
 </p>
+<div class="org-src-container">
 
-<p>
-<a href="http://www.boost.org/doc/libs/1_55_0/doc/html/thread.html">http://www.boost.org/doc/libs/1_55_0/doc/html/thread.html</a>
-</p>
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">boost</span>
+{
+    <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">condition_variable</span>
+    {
+    <span style="color: #00ffff;">public</span>:
+        <span style="color: #87cefa;">condition_variable</span>();
+        ~<span style="color: #87cefa;">condition_variable</span>();
 
-<p>
-<a href="http://remonstrate.wordpress.com/2009/12/05/boost-%E7%9A%84-thread/">http://remonstrate.wordpress.com/2009/12/05/boost-%E7%9A%84-thread/</a>
-</p>
+        <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">notify_one</span>() noexcept;
+        <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">notify_all</span>() noexcept;
 
+        <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>(<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #7fffd4;">boost</span>::mutex&gt;&amp; <span style="color: #eedd82;">lock</span>);
+
+        <span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">predicate_type</span>&gt;
+        <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>(<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #7fffd4;">boost</span>::mutex&gt;&amp; <span style="color: #eedd82;">lock</span>,<span style="color: #eedd82;">predicate_type</span> predicate);
+
+        <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+        <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">cv_status</span>::<span style="color: #98fb98;">type</span>
+        <span style="color: #87cefa;">wait_until</span>(
+            <span style="color: #98fb98;">unique_lock</span>&lt;mutex&gt;&amp; <span style="color: #eedd82;">lock</span>,
+            <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">t</span>);
+...
+};
+</pre>
+</div>
+</div>
+
+<ul class="org-ul"><li>Example: Using Condition Variables<br  /><div class="outline-text-4" id="text-8-4-1">
 <p>
-<a href="http://blog.csdn.net/vagrxie/article/details/4246470">http://blog.csdn.net/vagrxie/article/details/4246470</a>
+利用Condition Variables实现一个简单的read/writer Buffer.
 </p>
 
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/thread.hpp&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/mutex.hpp&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/condition.hpp&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">cout</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">endl</span>;
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kBufSize</span> = 10;
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kIters</span> = 100;
+
+<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">mutex</span> <span style="color: #eedd82;">io_mutex</span>;
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Buffer</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">typedef</span> <span style="color: #7fffd4;">boost</span>::<span style="color: #7fffd4;">mutex</span>::<span style="color: #98fb98;">scoped_lock</span> <span style="color: #98fb98;">scoped_lock</span>;
+  <span style="color: #87cefa;">Buffer</span>() : p(0), c(0), full(0) {
+  }
+
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Put</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>) {
+    <span style="color: #98fb98;">scoped_lock</span> <span style="color: #eedd82;">lock</span>(<span style="color: #98fb98;">mutex</span>);
+    <span style="color: #00ffff;">if</span> (full == kBufSize) {
+      {
+        <span style="color: #98fb98;">scoped_lock</span> <span style="color: #eedd82;">lock</span>(io_mutex);
+        cout &lt;&lt; <span style="color: #ffa07a;">"Buffer is full."</span> &lt;&lt; endl;
+      }
+      <span style="color: #00ffff;">while</span> (full == kBufSize) {
+        cond.wait(lock);
+      }
+    }
+    buf[p] = m;
+    p = (p + 1) % kBufSize;
+    ++full;
+    cond.notify_one();
+  }
+
+  <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">Get</span>() {
+    <span style="color: #98fb98;">scoped_lock</span> <span style="color: #eedd82;">lock</span>(<span style="color: #98fb98;">mutex</span>);
+    <span style="color: #00ffff;">if</span> (full == 0) {
+      {
+        <span style="color: #98fb98;">scoped_lock</span> <span style="color: #eedd82;">lock</span>(io_mutex);
+        cout &lt;&lt; <span style="color: #ffa07a;">"Buffer is empty."</span> &lt;&lt; endl;
+      }
+      <span style="color: #00ffff;">while</span> (full == 0) {
+        cond.wait(lock);
+      }
+    }
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = buf[c];
+    c = (c + 1) % kBufSize;
+    --full;
+    cond.notify_one();
+    <span style="color: #00ffff;">return</span> i;
+  }
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">mutex</span> <span style="color: #eedd82;">mutex</span>;
+  <span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">condition</span> <span style="color: #eedd82;">cond</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">p</span>, <span style="color: #eedd82;">c</span>, <span style="color: #eedd82;">full</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">buf</span>[kBufSize];
+};
+
+<span style="color: #98fb98;">Buffer</span> <span style="color: #eedd82;">buf</span>;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">writer</span>() {
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kIters; ++i) {
+    {
+      <span style="color: #7fffd4;">boost</span>::<span style="color: #7fffd4;">mutex</span>::<span style="color: #98fb98;">scoped_lock</span> <span style="color: #eedd82;">lock</span>(io_mutex);
+      cout &lt;&lt; <span style="color: #ffa07a;">"sending: "</span> &lt;&lt; i &lt;&lt; endl;
+    }
+    buf.Put(i);
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">reader</span>() {
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kIters; ++i) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = buf.Get();
+    {
+      <span style="color: #7fffd4;">boost</span>::<span style="color: #7fffd4;">mutex</span>::<span style="color: #98fb98;">scoped_lock</span> <span style="color: #eedd82;">lock</span>(io_mutex);
+      cout &lt;&lt; <span style="color: #ffa07a;">"received: "</span> &lt;&lt; n &lt;&lt; endl;
+    }
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #7fffd4;">boost</span>::thread <span style="color: #98fb98;">thread_reader</span>(&amp;<span style="color: #eedd82;">reader</span>);
+  <span style="color: #7fffd4;">boost</span>::thread <span style="color: #98fb98;">thread_writer</span>(&amp;<span style="color: #eedd82;">writer</span>);
+  thread_reader.join();
+  thread_writer.join();
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-8-5" class="outline-3">
+<h3 id="sec-8-5">Miscellaneous</h3>
+<div class="outline-text-3" id="text-8-5">
+</div><ul class="org-ul"><li>Barrier<br  /><div class="outline-text-4" id="text-8-5-1">
+<p>
+基本使用:
+</p>
+<ol class="org-ol">
+<li>定义barrier,传入参与thread个数: <code>barrier b(num_threads)</code>.
+</li>
+<li>thread中等待barrier: <code>b.wait()</code>.
+</li>
+</ol>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">barrier</span>
+{
+<span style="color: #00ffff;">public</span>:
+    <span style="color: #87cefa;">barrier</span>(<span style="color: #98fb98;">barrier</span> <span style="color: #00ffff;">const</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+    <span style="color: #98fb98;">barrier</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">barrier</span> <span style="color: #00ffff;">const</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+
+    <span style="color: #87cefa;">barrier</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span>);
+    <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">F</span>&gt;
+    <span style="color: #87cefa;">barrier</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span>, <span style="color: #98fb98;">F</span>&amp;&amp;);
+
+    ~<span style="color: #87cefa;">barrier</span>();
+
+    <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">wait</span>();
+    <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">count_down_and_wait</span>();
+};
+</pre>
+</div>
+
 
 <p>
 <a id="other-materials" name="other-materials"></a>
 </p>
 </div>
+</li>
+
+<li>Once Routines<br  /><div class="outline-text-4" id="text-8-5-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/once.hpp&gt;</span>
+
+<span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">boost</span>
+{
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">once_flag</span>;
+  <span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Function</span>, <span style="color: #00ffff;">class</span> ...ArgTypes&gt;
+  <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">call_once</span>(<span style="color: #98fb98;">once_flag</span>&amp; <span style="color: #eedd82;">flag</span>, <span style="color: #98fb98;">Function</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">ArgTypes</span>&amp;&amp;... args);
+
+<span style="color: #b0c4de;">#if</span> <span style="color: #b0c4de;">defined</span> BOOST_THREAD_PROVIDES_DEPRECATED_FEATURES_SINCE_V3_0_0
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">call_once</span>(<span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">func</span>)(),<span style="color: #98fb98;">once_flag</span>&amp; <span style="color: #eedd82;">flag</span>);
+<span style="color: #b0c4de;">#endif</span>
+
+}
+</pre>
+</div>
+</div>
+<ul class="org-ul"><li>Example: Call once<br  /><div class="outline-text-5" id="text-8-5-2-1">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/thread.hpp&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;boost/thread/once.hpp&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0;
+<span style="color: #7fffd4;">boost</span>::<span style="color: #98fb98;">once_flag</span> <span style="color: #eedd82;">flag</span> = BOOST_ONCE_INIT;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">init</span>()
+{
+  ++i;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">thread</span>()
+{
+  <span style="color: #7fffd4;">boost</span>::call_once(&amp;init, flag);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">argv</span>[])
+{
+  <span style="color: #7fffd4;">boost</span>::thread <span style="color: #98fb98;">thrd1</span>(&amp;<span style="color: #eedd82;">thread</span>);
+  <span style="color: #7fffd4;">boost</span>::thread <span style="color: #98fb98;">thrd2</span>(&amp;<span style="color: #eedd82;">thread</span>);
+  thrd1.join();
+  thrd2.join();
+  <span style="color: #7fffd4;">std</span>::cout &lt;&lt; i &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</li></ul>
 </li></ul>
 </div>
 </div>
@@ -1806,7 +2284,7 @@ Linux的 <code>top</code> 命令加上 <code>-H</code> 参数, process中的thre
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-08-04 Mon 23:21</p>
+<p class="date">Created: 2014-08-05 Tue 23:30</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

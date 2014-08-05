@@ -818,7 +818,14 @@ Linux的 =top= 命令加上 =-H= 参数, process中的threads也能看到.
 <<boost-thread>>
 * Boost thread library
 ** Overview
-直到现在C++11库才支持thread
+直到C++11库才比较好的支持thread,之前C++程序使用操作系统支持的thread库(如
+Pthread).但这样做至少有个主要的问题:(1) 这些库基本是C的库,需要很小心的
+C++中使用,和(2) 每个操作系统提供自己的一套对thread支持的库.以致,编写的
+代码既不标准又不可移植.
+
+[[http://www.boost.org/doc/libs/1_55_0/doc/html/thread.html][Boost Thread]]可以解决这两个主要问题. Boost Thread不是通过继承来使用线程,而
+是Boost的thread类使用一个Callable的对象创建.
+
 *** 编译Boost Thread程序
 **** include
 根据使用到的Boost Thread中的类型包含不同头文件:
@@ -826,6 +833,8 @@ Linux的 =top= 命令加上 =-H= 参数, process中的threads也能看到.
 #include <boost/thread/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition.hpp>
+#include <boost/thread/locks.hpp> 
+#include <boost/thread/once.hpp>
 #+end_src
 **** compile
 对于Gcc编译器,使用选项 =-l=,如下:
@@ -833,37 +842,414 @@ Linux的 =top= 命令加上 =-H= 参数, process中的threads也能看到.
 g++ Program.o -o Program -lboost_thread -lboost_system
 #+end_src
 ** Thread Management
-*** Creating and Terminating Threads
-*** Joining and Detaching Threads
-*** Thread group
-*** Miscellaneous
-*** Example: thread Creation
-** Mutex Variables
-*** Creating and Destroying Mutexes
-
-*** Locking and Unlocking Mutexes
-
-*** Example: Using Mutexes
-
-** Condition Variables
-*** Creating and Destroying Condition Variables
-*** Waiting and Signaling on Condition Variables
-*** Example: Using Condition Variables
-
-
-http://www.drdobbs.com/cpp/the-boostthreads-library/184401518
-
-http://www.boost.org/doc/libs/1_55_0/doc/html/thread.html
-
-http://remonstrate.wordpress.com/2009/12/05/boost-%E7%9A%84-thread/
-
-http://blog.csdn.net/vagrxie/article/details/4246470
-
+*** Thread类
 #+begin_src c++
-
+  #include <boost/thread/thread.hpp>
+  class thread
+  {
+  public:
+      thread() noexcept;
+      thread(const thread&) = delete;
+      thread& operator=(const thread&) = delete;
+  
+      thread(thread&&) noexcept;
+      thread& operator=(thread&&) noexcept;
+      ~thread();
+  
+      template <class F>
+      explicit thread(F f);
+      template <class F>
+      thread(F &&f);
+  
+      template <class F,class A1,class A2,...>
+      thread(F f,A1 a1,A2 a2,...);
+      template <class F, class ...Args>
+      explicit thread(F&& f, Args&&... args);
+  
+      template <class F>
+      explicit thread(attributes& attrs, F f); // EXTENSION
+      template <class F>
+      thread(attributes& attrs, F &&f); // EXTENSION
+      template <class F, class ...Args>
+      explicit thread(attributes& attrs, F&& f, Args&&... args);
+      class id;
+      id get_id() const noexcept;
+  
+      bool joinable() const noexcept;
+      void join();
+...
+};
 #+end_src
 
+整个thread类包含thread的所有特性,如thread id, join, detach等.
+**** Create Thread
+Callable对象既可以是一个函数又可以是类中的 =operator()= 实现,如下:
+
+#+begin_src c++
+  void hello() {
+    cout << "hello world" << endl;
+  }
+  
+  struct Hello {
+   public:
+    void operator() () {
+      cout << "hello world" << endl;
+    }
+  };
+  
+  Hello h;
+  boost::thread thread_hello(h);
+  boost::thread thread_hello(hello);
+#+end_src
+**** Passing data
+传递参数给线程
+1. thread创建时附加后面
+#+begin_src c++
+  void hello(const string &str) {
+    cout << str << endl;
+  }
+  string str = "hello";
+  boost::thread thrd(hello, str);
+#+end_src
+2. 利用 =Boost.bind= 库接口
+#+begin_src c++
+  void hello(const string &str) {
+    cout << str << endl;
+  }
+  string str = "hello";
+  string str = "hello";
+  boost::thread thrd(bind(hello, str));
+#+end_src
+
+*** Thread group类
+可以使用thread group类管理thread,通过 =add_thread= 和 =create_thread=
+添加线程到管理类中, 可以直接 =join_all= 将所有管理类中的线程join.
+#+begin_src c++
+#include <boost/thread/thread.hpp>
+
+class thread_group
+{
+public:
+    thread_group(const thread_group&) = delete;
+    thread_group& operator=(const thread_group&) = delete;
+
+    thread_group();
+    ~thread_group();
+
+    template<typename F>
+    thread* create_thread(F threadfunc);
+    void add_thread(thread* thrd);
+    void remove_thread(thread* thrd);
+    bool is_this_thread_in();
+    bool is_thread_in(thread* thrd);
+    void join_all();
+    void interrupt_all();
+    int size() const;
+};
+#+end_src
+*** Miscellaneous
+Boost Thread中还有 =strict_scoped_thread= 类和 =scoped_thread= 类,提供
+线程结束不是调用 =terminate= ,而是调用传入的参数来执行特定行为.
+
+*** Example: Thread Creation
+#+begin_src c++
+#include <iostream>
+#include <string>
+#include <boost/thread/thread.hpp>
+#include <boost/bind.hpp>
+
+using namespace std;
+using namespace boost;
+
+void hello(const string &str) {
+  cout << str << endl;
+}
+
+int main(){
+  string str = "hello";
+  boost::thread thrd(bind(hello, str));
+  thrd.join();
+  return 0;
+}
+#+end_src
+** Mutex Variables
+#+begin_src c++
+#include <boost/thread/mutex.hpp>
+
+class mutex:
+    boost::noncopyable
+{
+public:
+    mutex();
+    ~mutex();
+
+    void lock();
+    bool try_lock();
+    void unlock();
+
+    typedef platform-specific-type native_handle_type;
+    native_handle_type native_handle();
+
+    typedef unique_lock<mutex> scoped_lock;
+    typedef unspecified-type scoped_try_lock;
+};
+#+end_src
+
++ =lock()= 来获取锁.
++ =unlock()= 释放锁.
++ =typedef unique_lock<mutex> scoped_lock;= 定义了 =scoped_lock= 的类
+  型,通过 =boost::mutex::scoped_lock= 来定义一个RAII-style锁,离开定义
+  区域自动释放锁.
+
+*** =lock_guard=
+[[http://www.boost.org/doc/libs/1_55_0/doc/html/thread/synchronization.html#thread.synchronization.lock_guard.lock_guard][boost::lock_guard]] 非常简单:
++ 构造时,它获取锁.
++ 析构时,它释放锁.
+
+它提供了一个简单的RAII-style锁对象,使得exception-safe锁和解锁更容易.
+#+begin_src c++
+namespace boost
+{
+
+  template<typename Lockable>
+  class lock_guard
+#if ! defined BOOST_THREAD_NO_MAKE_LOCK_GUARD
+  template <typename Lockable>
+  lock_guard<Lockable> make_lock_guard(Lockable& mtx); // EXTENSION
+  template <typename Lockable>
+  lock_guard<Lockable> make_lock_guard(Lockable& mtx, adopt_lock_t); // EXTENSION
+#endif
+}
+#+end_src
+
+基本使用,传入可 =Lockable= 的mutex类型:
+#+begin_src c++
+boost::mutex count_mutex;
+boost::lock_guard<mutex> lock(count_mutex) ;
+#+end_src
+*** Example: Using Mutexes
+#+begin_src c++
+#include <iostream>
+#include <boost/thread/thread.hpp>
+#include <boost/thread/mutex.hpp>
+
+using std::cout;
+using std::endl;
+boost::mutex count_mutex;
+
+struct count {
+  count(int id) : id_(id) {
+  }
+  void operator() () {
+    for (int i = 0; i < 10; ++i) {
+      boost::mutex::scoped_lock lock(count_mutex);
+      cout << id_ << ": " << i << endl;
+    }
+  }
+  int id_;
+};
+
+int main(int argc, char *argv[]) {
+  boost::thread thread1(count(1));
+  boost::thread thread2(count(2));
+  thread1.join();
+  thread2.join();
+  return 0;
+}
+#+end_src
+** Condition Variables
+与Pthread, Boost Condition Variable功能更全面,如不同条件的
+=wait_until= , =wait_for= 等功能.
+#+begin_src c++
+namespace boost
+{
+    class condition_variable
+    {
+    public:
+        condition_variable();
+        ~condition_variable();
+
+        void notify_one() noexcept;
+        void notify_all() noexcept;
+
+        void wait(boost::unique_lock<boost::mutex>& lock);
+
+        template<typename predicate_type>
+        void wait(boost::unique_lock<boost::mutex>& lock,predicate_type predicate);
+
+        template <class Clock, class Duration>
+        typename cv_status::type
+        wait_until(
+            unique_lock<mutex>& lock,
+            const chrono::time_point<Clock, Duration>& t);
+...
+};
+#+end_src
+
+*** Example: Using Condition Variables
+利用Condition Variables实现一个简单的read/writer Buffer.
+
+#+begin_src c++
+#include <boost/thread/thread.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition.hpp>
+#include <iostream>
+using std::cout;
+using std::endl;
+const int kBufSize = 10;
+const int kIters = 100;
+
+boost::mutex io_mutex;
+
+class Buffer {
+ public:
+  typedef boost::mutex::scoped_lock scoped_lock;
+  Buffer() : p(0), c(0), full(0) {
+  }
+
+  void Put(int m) {
+    scoped_lock lock(mutex);
+    if (full == kBufSize) {
+      {
+        scoped_lock lock(io_mutex);
+        cout << "Buffer is full." << endl;
+      }
+      while (full == kBufSize) {
+        cond.wait(lock);
+      }
+    }
+    buf[p] = m;
+    p = (p + 1) % kBufSize;
+    ++full;
+    cond.notify_one();
+  }
+
+  int Get() {
+    scoped_lock lock(mutex);
+    if (full == 0) {
+      {
+        scoped_lock lock(io_mutex);
+        cout << "Buffer is empty." << endl;
+      }
+      while (full == 0) {
+        cond.wait(lock);
+      }
+    }
+    int i = buf[c];
+    c = (c + 1) % kBufSize;
+    --full;
+    cond.notify_one();
+    return i;
+  }
+ private:
+  boost::mutex mutex;
+  boost::condition cond;
+  unsigned int p, c, full;
+  int buf[kBufSize];
+};
+
+Buffer buf;
+
+void writer() {
+  for (int i = 0; i < kIters; ++i) {
+    {
+      boost::mutex::scoped_lock lock(io_mutex);
+      cout << "sending: " << i << endl;
+    }
+    buf.Put(i);
+  }
+}
+
+void reader() {
+  for (int i = 0; i < kIters; ++i) {
+    int n = buf.Get();
+    {
+      boost::mutex::scoped_lock lock(io_mutex);
+      cout << "received: " << n << endl;
+    }
+  }
+}
+
+int main(int argc, char *argv[]) {
+  boost::thread thread_reader(&reader);
+  boost::thread thread_writer(&writer);
+  thread_reader.join();
+  thread_writer.join();
+  return 0;
+}
+#+end_src
+
+** Miscellaneous
+*** Barrier
+基本使用:
+1. 定义barrier,传入参与thread个数: =barrier b(num_threads)=.
+2. thread中等待barrier: =b.wait()=.
+
+#+begin_src c++
+class barrier
+{
+public:
+    barrier(barrier const&) = delete;
+    barrier& operator=(barrier const&) = delete;
+
+    barrier(unsigned int count);
+    template <typename F>
+    barrier(unsigned int count, F&&);
+
+    ~barrier();
+
+    bool wait();
+    void count_down_and_wait();
+};
+#+end_src
+
+
 <<other-materials>>
+*** Once Routines
+#+begin_src c++
+#include <boost/thread/once.hpp>
+
+namespace boost
+{
+  struct once_flag;
+  template<typename Function, class ...ArgTypes>
+  inline void call_once(once_flag& flag, Function&& f, ArgTypes&&... args);
+
+#if defined BOOST_THREAD_PROVIDES_DEPRECATED_FEATURES_SINCE_V3_0_0
+  void call_once(void (*func)(),once_flag& flag);
+#endif
+
+}
+#+end_src
+**** Example: Call once
+#+begin_src c++
+#include <boost/thread/thread.hpp>
+#include <boost/thread/once.hpp>
+#include <iostream>
+ 
+int i = 0;
+boost::once_flag flag = BOOST_ONCE_INIT;
+ 
+void init()
+{
+  ++i;
+}
+ 
+void thread()
+{
+  boost::call_once(&init, flag);
+}
+ 
+int main(int argc, char* argv[])
+{
+  boost::thread thrd1(&thread);
+  boost::thread thrd2(&thread);
+  thrd1.join();
+  thrd2.join();
+  std::cout << i << std::endl;
+  return 0;
+}
+#+end_src
 * 其他资料
 ** Books:
 + [[http://shop.oreilly.com/product/9781565921153.do][PThreads Programming]] and [[http://wiki.dreamrunner.org/public_html/Books%20Review/Pthreads%20Programming/Pthreads%20Programming.html][Its notes]]
