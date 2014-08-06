@@ -42,6 +42,8 @@ be scheduled to run as such by the operating system.所以它是在程序中独
 + Inter-process communication tools (such as message queues, pipes,
   semaphores, or shared memory).
 
+[[./Files/process_thread.png]]
+
 Thread使用Process的资源,并且能成为独立的元件被操作系统调度,是因为它仅
 重复那些使得它们能成为独立运行代码的必要资源.Thread维护它自己如下的信
 息:
@@ -367,6 +369,8 @@ int pthread_attr_getdetachstate(const pthread_attr_t *attr,
 #+end_src
 **** Joining
 Joining是同步不同线程的方法之一,原理如下图:
+
+[[./Files/join.png]]
 
 + =pthread_join()= 阻塞调用它的线程直到指定的 =threadid= 的线程终止.
 + 调用的线程能获取目标线程终止返回的 =status= 只要目标线程调用
@@ -781,7 +785,71 @@ pthread_barrier_t barrier = PTHREAD_BARRIER_INITIALIZER(count);
 
 <<google-wrap>>
 * Google wrap the Pthread 
+** Mutex类和CondVar类
+Google api的base包里封装了Mutex类和CondVar类.
+#+begin_src c++
+namespace base {
+enum LinkerInitialized { LINKER_INITIALIZED };
+}
 
+class LOCKABLE PThreadMutex {
+ public:
+  explicit PThreadMutex(base::LinkerInitialized) {
+    pthread_mutex_init(&mutex_, NULL);
+  }
+  PThreadMutex()   { pthread_mutex_init(&mutex_, NULL); }
+  ~PThreadMutex()  { pthread_mutex_destroy(&mutex_); }
+
+  void Lock()     { CHECK_EQ(0, pthread_mutex_lock(&mutex_)); }
+  void Unlock()   { CHECK_EQ(0, pthread_mutex_unlock(&mutex_)); }
+
+ private:
+  friend class PThreadCondVar;
+  pthread_mutex_t mutex_;
+
+  DISALLOW_COPY_AND_ASSIGN(PThreadMutex);
+};
+
+class PThreadCondVar {
+ public:
+  PThreadCondVar()  { pthread_cond_init(&cv_, NULL); }
+  ~PThreadCondVar() { CHECK_EQ(0, pthread_cond_destroy(&cv_)); }
+
+  void Signal()        { CHECK_EQ(0, pthread_cond_signal(&cv_)); }
+  void SignalAll()     { CHECK_EQ(0, pthread_cond_broadcast(&cv_)); }
+  void Wait(PThreadMutex* mu) {
+    CHECK_EQ(0, pthread_cond_wait(&cv_, &mu->mutex_));
+  }
+  bool WaitWithTimeout(PThreadMutex* mu, int64 millis) {
+    struct timeval tv;
+    struct timespec ts;
+    gettimeofday(&tv, NULL);
+    ts.tv_sec = tv.tv_sec + millis / 1000;
+    ts.tv_nsec = millis % 1000;
+    int result = pthread_cond_timedwait(&cv_, &mu->mutex_, &ts);
+    if (!result) return true;
+
+    CHECK_EQ(ETIMEDOUT, result);
+    return false;
+  }
+
+ private:
+  pthread_cond_t cv_;
+  DISALLOW_COPY_AND_ASSIGN(PThreadCondVar);
+};
+
+typedef PThreadCondVar CondVar;
+typedef PThreadMutex Mutex;
+#+end_src
+** GoogleOnceInit类
+#+begin_src c++
+typedef pthread_once_t GoogleOnceType;
+#define GOOGLE_ONCE_INIT PTHREAD_ONCE_INIT
+
+inline void GoogleOnceInit(GoogleOnceType* once, void (*initializer)()) {
+  CHECK_EQ(0, pthread_once(once, initializer));
+}
+#+end_src
 * Monitoring, Debugging and Performance Analysis Tools for Pthreads
 ** Monitoring
 *** Linux *ps* command
@@ -1002,7 +1070,7 @@ public:
   区域自动释放锁.
 
 *** =lock_guard=
-[[http://www.boost.org/doc/libs/1_55_0/doc/html/thread/synchronization.html#thread.synchronization.lock_guard.lock_guard][boost::lock_guard]] 非常简单:
+=boost::lock_guard= 非常简单:
 + 构造时,它获取锁.
 + 析构时,它释放锁.
 
@@ -1010,7 +1078,6 @@ public:
 #+begin_src c++
 namespace boost
 {
-
   template<typename Lockable>
   class lock_guard
 #if ! defined BOOST_THREAD_NO_MAKE_LOCK_GUARD

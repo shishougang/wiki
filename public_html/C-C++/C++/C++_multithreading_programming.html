@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>浅谈C++ multithreading programming</title>
-<!-- 2014-08-05 Tue 23:30 -->
+<!-- 2014-08-06 Wed 23:28 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -217,7 +217,12 @@ for the JavaScript code in this tag.
 <li><a href="#sec-5-5">Barrier</a></li>
 </ul>
 </li>
-<li><a href="#sec-6">Google wrap the Pthread</a></li>
+<li><a href="#sec-6">Google wrap the Pthread</a>
+<ul>
+<li><a href="#sec-6-1">Mutex类和CondVar类</a></li>
+<li><a href="#sec-6-2">GoogleOnceInit类</a></li>
+</ul>
+</li>
 <li><a href="#sec-7">Monitoring, Debugging and Performance Analysis Tools for Pthreads</a>
 <ul>
 <li><a href="#sec-7-1">Monitoring</a></li>
@@ -317,6 +322,12 @@ be scheduled to run as such by the operating system.所以它是在程序中独�
 semaphores, or shared memory).
 </li>
 </ul>
+
+
+<div class="figure">
+<p><img src="./Files/process_thread.png" alt="process_thread.png" />
+</p>
+</div>
 
 <p>
 Thread使用Process的资源,并且能成为独立的元件被操作系统调度,是因为它仅重复那些使得它们能成为独立运行代码的必要资源.Thread维护它自己如下的信息:
@@ -875,6 +886,12 @@ pthread_setaffinity_np(thread[1], <span style="color: #00ffff;">sizeof</span>(cp
 <p>
 Joining是同步不同线程的方法之一,原理如下图:
 </p>
+
+
+<div class="figure">
+<p><img src="./Files/join.png" alt="join.png" />
+</p>
+</div>
 
 <ul class="org-ul">
 <li><code>pthread_join()</code> 阻塞调用它的线程直到指定的 <code>threadid</code> 的线程终止.
@@ -1447,6 +1464,87 @@ Barrier变量由 <code>pthread_barrier_t</code> 声明定义,而且必须初始�
 
 <div id="outline-container-sec-6" class="outline-2">
 <h2 id="sec-6">Google wrap the Pthread</h2>
+<div class="outline-text-2" id="text-6">
+</div><div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1">Mutex类和CondVar类</h3>
+<div class="outline-text-3" id="text-6-1">
+<p>
+Google api的base包里封装了Mutex类和CondVar类.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">base</span> {
+<span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">LinkerInitialized</span> { <span style="color: #eedd82;">LINKER_INITIALIZED</span> };
+}
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">LOCKABLE</span> <span style="color: #eedd82;">PThreadMutex</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">explicit</span> <span style="color: #eedd82;">PThreadMutex</span>(<span style="color: #7fffd4;">base</span>::LinkerInitialized) {
+    pthread_mutex_init(&amp;mutex_, <span style="color: #7fffd4;">NULL</span>);
+  }
+  <span style="color: #eedd82;">PThreadMutex</span>()   { pthread_mutex_init(&amp;mutex_, <span style="color: #7fffd4;">NULL</span>); }
+  ~<span style="color: #eedd82;">PThreadMutex</span>()  { pthread_mutex_destroy(&amp;mutex_); }
+
+  <span style="color: #98fb98;">void</span> <span style="color: #eedd82;">Lock</span>()     { CHECK_EQ(0, pthread_mutex_lock(&amp;mutex_)); }
+  <span style="color: #98fb98;">void</span> <span style="color: #eedd82;">Unlock</span>()   { CHECK_EQ(0, pthread_mutex_unlock(&amp;mutex_)); }
+
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #00ffff;">friend</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">PThreadCondVar</span>;
+  <span style="color: #98fb98;">pthread_mutex_t</span> <span style="color: #eedd82;">mutex_</span>;
+
+  DISALLOW_COPY_AND_ASSIGN(PThreadMutex);
+};
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">PThreadCondVar</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">PThreadCondVar</span>()  { pthread_cond_init(&amp;cv_, <span style="color: #7fffd4;">NULL</span>); }
+  ~<span style="color: #87cefa;">PThreadCondVar</span>() { CHECK_EQ(0, <span style="color: #98fb98;">pthread_cond_destroy</span>(&amp;<span style="color: #eedd82;">cv_</span>)); }
+
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Signal</span>()        { CHECK_EQ(0, <span style="color: #98fb98;">pthread_cond_signal</span>(&amp;<span style="color: #eedd82;">cv_</span>)); }
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">SignalAll</span>()     { CHECK_EQ(0, <span style="color: #98fb98;">pthread_cond_broadcast</span>(&amp;<span style="color: #eedd82;">cv_</span>)); }
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Wait</span>(<span style="color: #98fb98;">PThreadMutex</span>* <span style="color: #eedd82;">mu</span>) {
+    CHECK_EQ(0, pthread_cond_wait(&amp;cv_, &amp;mu-&gt;mutex_));
+  }
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">WaitWithTimeout</span>(<span style="color: #98fb98;">PThreadMutex</span>* <span style="color: #eedd82;">mu</span>, <span style="color: #98fb98;">int64</span> <span style="color: #eedd82;">millis</span>) {
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> <span style="color: #eedd82;">tv</span>;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> <span style="color: #eedd82;">ts</span>;
+    gettimeofday(&amp;tv, <span style="color: #7fffd4;">NULL</span>);
+    ts.tv_sec = tv.tv_sec + millis / 1000;
+    ts.tv_nsec = millis % 1000;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">result</span> = pthread_cond_timedwait(&amp;cv_, &amp;mu-&gt;mutex_, &amp;ts);
+    <span style="color: #00ffff;">if</span> (!result) <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+
+    CHECK_EQ(ETIMEDOUT, result);
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+  }
+
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">pthread_cond_t</span> <span style="color: #eedd82;">cv_</span>;
+  DISALLOW_COPY_AND_ASSIGN(<span style="color: #98fb98;">PThreadCondVar</span>);
+};
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">PThreadCondVar</span> <span style="color: #98fb98;">CondVar</span>;
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">PThreadMutex</span> <span style="color: #98fb98;">Mutex</span>;
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2">GoogleOnceInit类</h3>
+<div class="outline-text-3" id="text-6-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">pthread_once_t</span> <span style="color: #98fb98;">GoogleOnceType</span>;
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">GOOGLE_ONCE_INIT</span> PTHREAD_ONCE_INIT
+
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">GoogleOnceInit</span>(<span style="color: #98fb98;">GoogleOnceType</span>* <span style="color: #eedd82;">once</span>, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">initializer</span>)()) {
+  CHECK_EQ(0, pthread_once(once, initializer));
+}
+</pre>
+</div>
+</div>
+</div>
 </div>
 
 <div id="outline-container-sec-7" class="outline-2">
@@ -1792,7 +1890,7 @@ Boost Thread中还有 <code>strict_scoped_thread</code> 类和 <code>scoped_thre
 
 <ul class="org-ul"><li><code>lock_guard</code><br  /><div class="outline-text-4" id="text-8-3-1">
 <p>
-<a href="http://www.boost.org/doc/libs/1_55_0/doc/html/thread/synchronization.html#thread.synchronization.lock_guard.lock_guard">boost::lock<sub>guard</sub></a> 非常简单:
+<code>boost::lock_guard</code> 非常简单:
 </p>
 <ul class="org-ul">
 <li>构造时,它获取锁.
@@ -1808,7 +1906,6 @@ Boost Thread中还有 <code>strict_scoped_thread</code> 类和 <code>scoped_thre
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">boost</span>
 {
-
   <span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Lockable</span>&gt;
   <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">lock_guard</span>
 <span style="color: #b0c4de;">#if</span> ! <span style="color: #b0c4de;">defined</span> BOOST_THREAD_NO_MAKE_LOCK_GUARD
@@ -2284,7 +2381,7 @@ Boost Thread中还有 <code>strict_scoped_thread</code> 类和 <code>scoped_thre
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-08-05 Tue 23:30</p>
+<p class="date">Created: 2014-08-06 Wed 23:28</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
