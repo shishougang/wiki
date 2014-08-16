@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>C++11 multithreading programming</title>
-<!-- 2014-08-10 Sun 23:23 -->
+<!-- 2014-08-16 Sat 23:29 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -141,17 +141,38 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">compile</a></li>
-<li><a href="#sec-2">reference</a></li>
-<li><a href="#sec-3">cc</a></li>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">compile</a></li>
+<li><a href="#sec-3">unique<sub>lock</sub></a></li>
+<li><a href="#sec-4"><code>condition_variable</code> vs <code>condition_variable_any</code></a></li>
+<li><a href="#sec-5">其他资料</a>
+<ul>
+<li><a href="#sec-5-1">Books</a></li>
+<li><a href="#sec-5-2">Online resources</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">reference</a></li>
+<li><a href="#sec-7">cc</a></li>
 </ul>
 </div>
 </div>
 
-
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">compile</h2>
+<h2 id="sec-1">Overview</h2>
 <div class="outline-text-2" id="text-1">
+<p>
+上一篇<a href="http://dreamrunner.org/blog/2014/08/07/C-multithreading-programming/">浅谈C++ Multithreading Programming</a>主要介绍时下规范好的C++使用
+Pthread库和Boost Thread库实现C++多线程编程.这里主要谈谈正在规范的C++11
+引入的Thread库和Atomic库,终于自带的C++库能支持高效并可移植的
+Multithreading编程.分为2篇,这里先谈谈C++11的<a href="http://en.cppreference.com/w/cpp/thread">支持Thread的库</a>, 后一篇谈谈
+C++11的<a href="http://en.cppreference.com/w/cpp/atomic">Atomic操作的库</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">compile</h2>
+<div class="outline-text-2" id="text-2">
 <div class="org-src-container">
 
 <pre class="src src-sh">g++ program.o -o program -std=c++11 -pthread
@@ -169,30 +190,118 @@ miss the <code>-phtread</code>
 </div>
 </div>
 </div>
-<div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">reference</h2>
-<div class="outline-text-2" id="text-2">
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">unique<sub>lock</sub></h2>
+<div class="outline-text-2" id="text-3">
+<p>
+more 
+</p>
+
+<ul class="org-ul">
+<li>lock multiple:
+  <a href="http://stackoverflow.com/questions/17113619/whats-the-best-way-to-lock-multiple-stdmutexes/17113678#17113678">http://stackoverflow.com/questions/17113619/whats-the-best-way-to-lock-multiple-stdmutexes/17113678#17113678</a>
+
+<p>
+I think it's less a question of efficiency than of functionality. If
+ std::lock<sub>guard</sub> is enough for your case A, then you should use it.
+ Not only it avoids unnecessary overhead but also shows intent to the
+ reader that you will never unlock this guard
+</p>
+</li>
+</ul>
+
+<p>
+lock<sub>guard</sub> and unique<sub>lock</sub> are pretty much the same thing; lock<sub>guard</sub>
+is a restricted version with a limited interface.
+</p>
+
+
+<p>
+A lock<sub>guard</sub> always holds a lock from its construction to its
+destruction. A unique<sub>lock</sub> can be created without immediately locking,
+can unlock at any point in its existence, and can transfer ownership
+of the lock from one instance to another.
+</p>
+
+
+<p>
+So you always use lock<sub>guard</sub>, unless you need the capabilities of
+unique<sub>lock</sub>. A condition<sub>variable</sub> needs a unique<sub>lock</sub>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4"><code>condition_variable</code> vs <code>condition_variable_any</code></h2>
+<div class="outline-text-2" id="text-4">
+<p>
+std::condition<sub>variable</sub> is more specialized, and therefore can be more
+efficient when you don't need the flexibility of
+std::condition<sub>variable</sub><sub>any</sub>.
+</p>
+
+
+<p>
+From N3290 §30.5[thread.condition]/1
+</p>
+
+<p>
+Class condition<sub>variable</sub> provides a condition variable that can only
+wait on an object of type unique<sub>lock</sub>&lt;mutex&gt;, allowing maximum
+efficiency on some platforms. Class condition<sub>variable</sub><sub>any</sub> provides a
+general condition variable that can wait on objects of user-supplied
+lock types.
+</p>
+
+
+<p>
+When using std::condition<sub>variable</sub><sub>any</sub>, there is potential for
+additional costs in terms of size, performance or operating system
+resources, because it is more general than std::condition<sub>variable</sub>.
+std::condition<sub>variable</sub> works with std::unique<sub>lock</sub>&lt;std::mutex&gt;, while
+std::condition<sub>variable</sub><sub>any</sub> can operate on any objects that have lock
+and unlock member functions.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">其他资料</h2>
+<div class="outline-text-2" id="text-5">
+</div><div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Books</h3>
+<div class="outline-text-3" id="text-5-1">
+<ul class="org-ul">
+<li>Scott Meyers的<a href="http://www.artima.com/shop/overview_of_the_new_cpp"> Overview of the New C++ (C++11/14)</a>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">Online resources</h3>
+<div class="outline-text-3" id="text-5-2">
+<ul class="org-ul">
+<li>Scott Meyers的<a href="http://www.aristeia.com/C++11/C++11FeatureAvailability.htm">Summary of C++11 Feature Availability in gcc and MSVC</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">reference</h2>
+<div class="outline-text-2" id="text-6">
 <ul class="org-ul">
 <li>c++11 wiki: <a href="https://en.wikipedia.org/wiki/C%2B%2B11">https://en.wikipedia.org/wiki/C%2B%2B11</a>
 </li>
 <li><a href="http://www.stroustrup.com/C++11FAQ.html">http://www.stroustrup.com/C++11FAQ.html</a>
 </li>
-
-<li>old <a href="http://www.aristeia.com/C++11/C++11FeatureAvailability.htm">http://www.aristeia.com/C++11/C++11FeatureAvailability.htm</a>
-</li>
-<li>book <a href="http://www.aristeia.com/Licensing/personalUse.html">http://www.aristeia.com/Licensing/personalUse.html</a>
-</li>
 </ul>
-<p>
-<a href="http://www.cnblogs.com/haippy/p/3284540.html">http://www.cnblogs.com/haippy/p/3284540.html</a>
-</p>
 </div>
 </div>
 
 
-<div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">cc</h2>
-<div class="outline-text-2" id="text-3">
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">cc</h2>
+<div class="outline-text-2" id="text-7">
 <div class="org-src-container">
 
 <pre class="src src-c++"></pre>
@@ -208,7 +317,7 @@ miss the <code>-phtread</code>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-08-10 Sun 23:23</p>
+<p class="date">Created: 2014-08-16 Sat 23:29</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

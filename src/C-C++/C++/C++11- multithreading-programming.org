@@ -2,6 +2,13 @@
 #+TITLE: C++11 multithreading programming
 #+OPTIONS: num:nil H:2
 
+* Overview
+上一篇[[http://dreamrunner.org/blog/2014/08/07/C-multithreading-programming/][浅谈C++ Multithreading Programming]]主要介绍时下规范好的C++使用
+Pthread库和Boost Thread库实现C++多线程编程.这里主要谈谈正在规范的C++11
+引入的Thread库和Atomic库,终于自带的C++库能支持高效并可移植的
+Multithreading编程.分为2篇,这里先谈谈C++11的[[http://en.cppreference.com/w/cpp/thread][支持Thread的库]], 后一篇谈谈
+C++11的[[http://en.cppreference.com/w/cpp/atomic][Atomic操作的库]].
+
 
 * compile
 #+begin_src sh
@@ -14,14 +21,65 @@ terminate called after throwing an instance of 'std::system_error'
   what():  Enable multithreading to use std::thread: Operation not permitted
 #+end_src
 
+* unique_lock
+more 
+
++ lock multiple:
+  http://stackoverflow.com/questions/17113619/whats-the-best-way-to-lock-multiple-stdmutexes/17113678#17113678
+
+ I think it's less a question of efficiency than of functionality. If
+  std::lock_guard is enough for your case A, then you should use it.
+  Not only it avoids unnecessary overhead but also shows intent to the
+  reader that you will never unlock this guard
+
+lock_guard and unique_lock are pretty much the same thing; lock_guard
+is a restricted version with a limited interface.
+
+
+A lock_guard always holds a lock from its construction to its
+destruction. A unique_lock can be created without immediately locking,
+can unlock at any point in its existence, and can transfer ownership
+of the lock from one instance to another.
+
+
+So you always use lock_guard, unless you need the capabilities of
+unique_lock. A condition_variable needs a unique_lock.
+
+
+* =condition_variable= vs =condition_variable_any=
+
+std::condition_variable is more specialized, and therefore can be more
+efficient when you don't need the flexibility of
+std::condition_variable_any.
+
+
+From N3290 §30.5[thread.condition]/1
+
+Class condition_variable provides a condition variable that can only
+wait on an object of type unique_lock<mutex>, allowing maximum
+efficiency on some platforms. Class condition_variable_any provides a
+general condition variable that can wait on objects of user-supplied
+lock types.
+
+
+When using std::condition_variable_any, there is potential for
+additional costs in terms of size, performance or operating system
+resources, because it is more general than std::condition_variable.
+std::condition_variable works with std::unique_lock<std::mutex>, while
+std::condition_variable_any can operate on any objects that have lock
+and unlock member functions.
+
+* 其他资料
+** Books
++ Scott Meyers的[[http://www.artima.com/shop/overview_of_the_new_cpp][ Overview of the New C++ (C++11/14)]]
+
+** Online resources
++ Scott Meyers的[[http://www.aristeia.com/C++11/C++11FeatureAvailability.htm][Summary of C++11 Feature Availability in gcc and MSVC]]
+
 * reference 
 
 + c++11 wiki: https://en.wikipedia.org/wiki/C%2B%2B11
 + http://www.stroustrup.com/C++11FAQ.html
-
-+ old http://www.aristeia.com/C++11/C++11FeatureAvailability.htm
-+ book http://www.aristeia.com/Licensing/personalUse.html
-http://www.cnblogs.com/haippy/p/3284540.html
 
 
 
