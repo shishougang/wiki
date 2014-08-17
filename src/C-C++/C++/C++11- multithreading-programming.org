@@ -6,23 +6,277 @@
 上一篇[[http://dreamrunner.org/blog/2014/08/07/C-multithreading-programming/][浅谈C++ Multithreading Programming]]主要介绍时下规范好的C++使用
 Pthread库和Boost Thread库实现C++多线程编程.这里主要谈谈正在规范的C++11
 引入的Thread库和Atomic库,终于自带的C++库能支持高效并可移植的
-Multithreading编程.分为2篇,这里先谈谈C++11的[[http://en.cppreference.com/w/cpp/thread][支持Thread的库]], 后一篇谈谈
+Multithreading编程.分为2篇,这里先谈谈C++11的[[http://en.cppreference.com/w/cpp/thread][Thread的库]], 后一篇谈谈
 C++11的[[http://en.cppreference.com/w/cpp/atomic][Atomic操作的库]].
 
+[[https://en.wikipedia.org/wiki/C++11][C++11]](之前被成为C++0x)是编程语言C++最新版本的标准.它由 [[https://en.wikipedia.org/wiki/International_Organization_for_Standardization][ISO ]]在2011年8月
+12日被批准替代[[https://en.wikipedia.org/wiki/C%2B%2B03][C++03]]. C++11标准正在规范中,从[[https://isocpp.org/std/the-standard][ISO页面]] 可以知道如何获得进
+行中的草稿:
++ [[https://isocpp.org/files/papers/N3690.pdf][下载最新进行的pdf版草稿(N3690)]]
++ [[https://github.com/cplusplus/draft][从Github获取草稿的源文件]]
 
-* compile
+所以本文:
++ 标准内容主要参考如上的N3690版本的C++11标准.
++ 使用的编译器是GCC4.8,[[https://gcc.gnu.org/gcc-4.8/cxx0x_status.html][关于GCC4.8支持C+11的情况]].
++ 源代码之类主要参考[[http://www.cplusplus.com/reference/multithreading/][cplusplus]] 和 [[http://en.cppreference.com/w/][cppreference]].
+
+更多有关C++参考最后的[[reference][其他资料]].
+
+* Compile
+GCC编译支持C++11,使用编译选项 =-std=c++11= 或 =-std=gnu++11=, 前者关闭
+GNU扩张支持.并加上 =-pthread= 选项.
+
 #+begin_src sh
 g++ program.o -o program -std=c++11 -pthread
 #+end_src
 
-miss the =-phtread=
+如果漏掉 =-phtread= 选项,编译能通过,当运行出现如下错误:
 #+begin_src sh
 terminate called after throwing an instance of 'std::system_error'
   what():  Enable multithreading to use std::thread: Operation not permitted
 #+end_src
 
-* unique_lock
-more 
+* Threads
+** =<thread>= 概要
+头文件是 =<thread>=, 分为两部分: 1) =thread= 类和在namespace
+=this_thread= 用来管理当前thread的函数.
+
+基本概要如下(§30.3 [thread.threads] of N3690):
+#+begin_src c++
+// Header <thread> synopsis
+namespace std {
+class thread;
+void swap(thread& x, thread& y) noexcept;
+namespace this_thread {
+thread::id get_id() noexcept;
+void yield() noexcept;
+template <class Clock, class Duration>
+void sleep_until(const chrono::time_point<Clock, Duration>& abs_time);
+template <class Rep, class Period>
+void sleep_for(const chrono::duration<Rep, Period>& rel_time);
+}
+}
+#+end_src
+** =thread= 类
+#+begin_src c++
+  namespace std {
+  class thread {
+   public:
+    // types:
+    class id;
+    typedef implementation-defined native_handle_type; // See 30.2.3
+    // construct/copy/destroy:
+    thread() noexcept;
+    template <class F, class ...Args> explicit thread(F&& f, Args&&... args);
+    ~thread();
+    thread(const thread&) = delete;
+    thread(thread&&) noexcept;
+    thread& operator=(const thread&) = delete;
+    thread& operator=(thread&&) noexcept;
+    // members:
+    void swap(thread&) noexcept;
+    bool joinable() const noexcept;
+    void join();
+    void detach();
+    id get_id() const noexcept;
+    native_handle_type native_handle(); // See 30.2.3
+    // static members:
+    static unsigned hardware_concurrency() noexcept;
+  };
+  }
+#+end_src
+
+** =thread::id= 类
+#+begin_src c++
+  namespace std {
+  class thread::id {
+   public:
+    id() noexcept;
+  };
+  bool operator==(thread::id x, thread::id y) noexcept;
+  bool operator!=(thread::id x, thread::id y) noexcept;
+  bool operator<(thread::id x, thread::id y) noexcept;
+  bool operator<=(thread::id x, thread::id y) noexcept;
+  bool operator>(thread::id x, thread::id y) noexcept;
+  bool operator>=(thread::id x, thread::id y) noexcept;
+  template<class charT, class traits>
+  basic_ostream<charT, traits>&
+  operator<< (basic_ostream<charT, traits>& out, thread::id id);
+  // Hash support
+  template <class T> struct hash;
+  template <typename T> <> struct hash<thread::id>;
+  }
+#+end_src
+* Mutual exclusion
+** =<mutex>= 概要
+头文件 =<mutex>= 分为: mutexes,locks和call once.
+#+begin_src c++
+  Header <mutex> synopsis
+  namespace std {
+  class mutex;
+  class recursive_mutex;
+  class timed_mutex;
+  class recursive_timed_mutex;
+  struct defer_lock_t { };
+  struct try_to_lock_t { };
+  struct adopt_lock_t { };
+  constexpr defer_lock_t defer_lock { };
+  constexpr try_to_lock_t try_to_lock { };
+  constexpr adopt_lock_t adopt_lock { };
+  template <class Mutex> class lock_guard;
+  template <class Mutex> class unique_lock;
+  template <class Mutex>
+  void swap(unique_lock<Mutex>& x, unique_lock<Mutex>& y) noexcept;
+  template <class L1, class L2, class... L3> int try_lock(L1&, L2&, L3&...);
+  template <class L1, class L2, class... L3> void lock(L1&, L2&, L3&...);
+  struct once_flag {
+    constexpr once_flag() noexcept;
+    once_flag(const once_flag&) = delete;
+    once_flag& operator=(const once_flag&) = delete;
+  };
+  template<class Callable, class ...Args>
+  void call_once(once_flag& flag, Callable func, Args&&... args);
+  }
+#+end_src
+** =mutex= 类
+#+begin_src c++
+  namespace std {
+  class mutex {
+   public:
+    constexpr mutex() noexcept;
+    ~mutex();
+    mutex(const mutex&) = delete;
+    mutex& operator=(const mutex&) = delete;
+    void lock();
+    bool try_lock();
+    void unlock();
+    typedef implementation-defined native_handle_type; // See 30.2.3
+    native_handle_type native_handle(); // See 30.2.3
+  };
+  }
+#+end_src
+** =recursive_mutex= 类
+#+begin_src c++
+  namespace std {
+  class recursive_mutex {
+   public:
+    recursive_mutex();
+    ~recursive_mutex();
+    recursive_mutex(const recursive_mutex&) = delete;
+    recursive_mutex& operator=(const recursive_mutex&) = delete;
+    void lock();
+    bool try_lock() noexcept;
+    void unlock();
+    typedef implementation-defined native_handle_type; // See 30.2.3
+    native_handle_type native_handle(); // See 30.2.3
+  };
+  }
+#+end_src
+** =timed_mutex= 类
+#+begin_src c++
+  namespace std {
+  class timed_mutex {
+   public:
+    timed_mutex();
+    ~timed_mutex();
+    timed_mutex(const timed_mutex&) = delete;
+    timed_mutex& operator=(const timed_mutex&) = delete;
+    void lock();
+    bool try_lock();
+    template <class Rep, class Period>
+    bool try_lock_for(const chrono::duration<Rep, Period>& rel_time);
+    template <class Clock, class Duration>
+    bool try_lock_until(const chrono::time_point<Clock, Duration>& abs_time);
+    void unlock();
+    typedef implementation-defined native_handle_type; // See 30.2.3
+    native_handle_type native_handle(); // See 30.2.3
+  };
+  }
+#+end_src
+** =recursive_timed_mutex= 类
+#+begin_src c++
+  namespace std {
+  class recursive_timed_mutex {
+   public:
+    recursive_timed_mutex();
+    ~recursive_timed_mutex();
+    recursive_timed_mutex(const recursive_timed_mutex&) = delete;
+    recursive_timed_mutex& operator=(const recursive_timed_mutex&) = delete;
+    void lock();
+    bool try_lock() noexcept;
+    template <class Rep, class Period>
+    bool try_lock_for(const chrono::duration<Rep, Period>& rel_time);
+    template <class Clock, class Duration>
+    bool try_lock_until(const chrono::time_point<Clock, Duration>& abs_time);
+    void unlock();
+    typedef implementation-defined native_handle_type; // See 30.2.3
+    native_handle_type native_handle(); // See 30.2.3
+  };
+  }
+#+end_src
+** =lock_guard= 类
+#+begin_src c++
+  namespace std {
+  template <class Mutex>
+  class lock_guard {
+   public:
+    typedef Mutex mutex_type;
+    explicit lock_guard(mutex_type& m);
+    lock_guard(mutex_type& m, adopt_lock_t);
+    ~lock_guard();
+    lock_guard(lock_guard const&) = delete;
+    lock_guard& operator=(lock_guard const&) = delete;
+   private:
+    mutex_type& pm; // exposition only
+  };
+  }
+#+end_src
+** =unique_lock= 类
+#+begin_src c++
+  namespace std {
+  template <class Mutex>
+  class unique_lock {
+   public:
+    typedef Mutex mutex_type;
+    // 30.4.2.2.1, construct/copy/destroy:
+    unique_lock() noexcept;
+    explicit unique_lock(mutex_type& m);
+    unique_lock(mutex_type& m, defer_lock_t) noexcept;
+    unique_lock(mutex_type& m, try_to_lock_t);
+    unique_lock(mutex_type& m, adopt_lock_t);
+    template <class Clock, class Duration>
+    unique_lock(mutex_type& m, const chrono::time_point<Clock, Duration>& abs_time);
+    template <class Rep, class Period>
+    unique_lock(mutex_type& m, const chrono::duration<Rep, Period>& rel_time);
+    ~unique_lock();
+    unique_lock(unique_lock const&) = delete;
+    unique_lock& operator=(unique_lock const&) = delete;
+    unique_lock(unique_lock&& u) noexcept;
+    unique_lock& operator=(unique_lock&& u) noexcept;
+    // 30.4.2.2.2, locking:
+    void lock();
+    bool try_lock();
+    template <class Rep, class Period>
+    bool try_lock_for(const chrono::duration<Rep, Period>& rel_time);
+    template <class Clock, class Duration>
+    bool try_lock_until(const chrono::time_point<Clock, Duration>& abs_time);
+    void unlock();
+    // 30.4.2.2.3, modifiers:
+    void swap(unique_lock& u) noexcept;
+    mutex_type *release() noexcept;
+    // 30.4.2.2.4, observers:
+    bool owns_lock() const noexcept;
+    explicit operator bool () const noexcept;
+    mutex_type* mutex() const noexcept;
+   private:
+    mutex_type *pm; // exposition only
+    bool owns; // exposition only
+  };
+  template <class Mutex>
+  void swap(unique_lock<Mutex>& x, unique_lock<Mutex>& y) noexcept;
+  }
+#+end_src
+*** more 
 
 + lock multiple:
   http://stackoverflow.com/questions/17113619/whats-the-best-way-to-lock-multiple-stdmutexes/17113678#17113678
@@ -44,9 +298,78 @@ of the lock from one instance to another.
 
 So you always use lock_guard, unless you need the capabilities of
 unique_lock. A condition_variable needs a unique_lock.
-
-
-* =condition_variable= vs =condition_variable_any=
+* Condition variables
+** =<condition_variable>= 概要
+#+begin_src c++
+  namespace std {
+  class condition_variable;
+  class condition_variable_any;
+  void notify_all_at_thread_exit(condition_variable& cond, unique_lock<mutex> lk);
+  enum class cv_status { no_timeout, timeout };
+  }
+#+end_src
+** =condition_variable= 类
+#+begin_src c++
+  namespace std {
+  class condition_variable {
+   public:
+    condition_variable();
+    ~condition_variable();
+    condition_variable(const condition_variable&) = delete;
+    condition_variable& operator=(const condition_variable&) = delete;
+    void notify_one() noexcept;
+    void notify_all() noexcept;
+    void wait(unique_lock<mutex>& lock);
+    template <class Predicate>
+    void wait(unique_lock<mutex>& lock, Predicate pred);
+    template <class Clock, class Duration>
+    cv_status wait_until(unique_lock<mutex>& lock,
+                         const chrono::time_point<Clock, Duration>& abs_time);
+    template <class Clock, class Duration, class Predicate>
+    bool wait_until(unique_lock<mutex>& lock,
+                    const chrono::time_point<Clock, Duration>& abs_time,
+                    Predicate pred);
+    template <class Rep, class Period>
+    cv_status wait_for(unique_lock<mutex>& lock,
+                       const chrono::duration<Rep, Period>& rel_time);
+    template <class Rep, class Period, class Predicate>
+    bool wait_for(unique_lock<mutex>& lock,
+                  const chrono::duration<Rep, Period>& rel_time,
+                  Predicate pred);
+    typedef implementation-defined native_handle_type; // See 30.2.3
+    native_handle_type native_handle(); // See 30.2.3
+  };
+  }
+#+end_src
+** =condition_variable_any= 类
+#+begin_src c++
+  namespace std {
+  class condition_variable_any {
+   public:
+    condition_variable_any();
+    ~condition_variable_any();
+    condition_variable_any(const condition_variable_any&) = delete;
+    condition_variable_any& operator=(const condition_variable_any&) = delete;
+    void notify_one() noexcept;
+    void notify_all() noexcept;
+    template <class Lock>
+    void wait(Lock& lock);
+    template <class Lock, class Predicate>
+    void wait(Lock& lock, Predicate pred);
+    template <class Lock, class Clock, class Duration>
+    cv_status wait_until(Lock& lock, const chrono::time_point<Clock, Duration>& abs_time);
+    template <class Lock, class Clock, class Duration, class Predicate>
+    bool wait_until(Lock& lock, const chrono::time_point<Clock, Duration>& abs_time,
+                    Predicate pred);
+    template <class Lock, class Rep, class Period>
+    cv_status wait_for(Lock& lock, const chrono::duration<Rep, Period>& rel_time);
+    template <class Lock, class Rep, class Period, class Predicate>
+    bool wait_for(Lock& lock, const chrono::duration<Rep, Period>& rel_time,
+                  Predicate pred);
+  };
+  }
+#+end_src
+** =condition_variable= vs =condition_variable_any=
 
 std::condition_variable is more specialized, and therefore can be more
 efficient when you don't need the flexibility of
@@ -68,28 +391,91 @@ resources, because it is more general than std::condition_variable.
 std::condition_variable works with std::unique_lock<std::mutex>, while
 std::condition_variable_any can operate on any objects that have lock
 and unlock member functions.
-
-* 其他资料
-** Books
-+ Scott Meyers的[[http://www.artima.com/shop/overview_of_the_new_cpp][ Overview of the New C++ (C++11/14)]]
-
-** Online resources
-+ Scott Meyers的[[http://www.aristeia.com/C++11/C++11FeatureAvailability.htm][Summary of C++11 Feature Availability in gcc and MSVC]]
-
-* reference 
-
-+ c++11 wiki: https://en.wikipedia.org/wiki/C%2B%2B11
-+ http://www.stroustrup.com/C++11FAQ.html
-
-
-
-* cc
-
-
+* Futures
+** =<future>= 概要
+#+begin_src c++
+  namespace std {
+  enum class future_errc {
+    broken_promise = implementation-defined ,
+      future_already_retrieved = implementation-defined ,
+      promise_already_satisfied = implementation-defined ,
+      no_state = implementation-defined
+        };
+  enum class launch : unspecified {
+    async = unspecified ,
+      deferred = unspecified ,
+      implementation-defined
+        };
+  enum class future_status {
+    ready,
+      timeout,
+      deferred
+        };
+  template <> struct is_error_code_enum<future_errc> : public true_type { };
+  error_code make_error_code(future_errc e) noexcept;
+  error_condition make_error_condition(future_errc e) noexcept;
+  const error_category& future_category() noexcept;
+  class future_error;
+  template <class R> class promise;
+  template <class R> class promise<R&>;
+  template <> class promise<void>;
+  template <class R>
+  void swap(promise<R>& x, promise<R>& y) noexcept;
+  template <class R, class Alloc>
+  struct uses_allocator<promise<R>, Alloc>;
+  template <class R> class future;
+  template <class R> class future<R&>;
+  template <> class future<void>;
+  template <class R> class shared_future;
+  template <class R> class shared_future<R&>;
+  template <> class shared_future<void>;
+  template <class> class packaged_task; // undefined
+  template <class R, class... ArgTypes>
+  class packaged_task<R(ArgTypes...)>;
+  template <class R>
+  void swap(packaged_task<R(ArgTypes...)>&, packaged_task<R(ArgTypes...)>&) noexcept;
+  template <class R, class Alloc>
+  struct uses_allocator<packaged_task<R>, Alloc>;
+  template <class F, class... Args>
+  future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
+  async(F&& f, Args&&... args);
+  template <class F, class... Args>
+  future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
+  async(launch policy, F&& f, Args&&... args);
+  }
+#+end_src
+** =future_error= 类
+#+begin_src c++
+  namespace std {
+  class future_error : public logic_error {
+   public:
+    future_error(error_code ec); // exposition only
+    const error_code& code() const noexcept;
+    const char* what() const noexcept;
+  };
+  }
+  const error_code& code() const noexcept;
+#+end_src
+** =promise=
 #+begin_src c++
 
 #+end_src
 
+<<reference>>
+* 其他资料
+** Books
++ Scott Meyers的[[http://www.artima.com/shop/overview_of_the_new_cpp][ Overview of the New C++ (C++11/14)]]
+** Online resources
++ Scott Meyers的[[http://www.aristeia.com/C++11/C++11FeatureAvailability.htm][Summary of C++11 Feature Availability in gcc and MSVC]]
++ [[http://en.cppreference.com/w/cpp][C++11 on cppreference]]
++ [[http://www.cplusplus.com/reference/multithreading/][C++11 on cplusplus]]
++ Bjarne Stroustrup的[[http://www.stroustrup.com/C++11FAQ.html][C++11 FAQ]]
++ [[https://en.wikipedia.org/wiki/C++11][C++11 Wiki]]
++ [[https://github.com/cplusplus/draft][C++ standards drafts on GitHub]]
+* cc
+#+begin_src c++
+
+#+end_src
 
 #+begin_src sh
 
