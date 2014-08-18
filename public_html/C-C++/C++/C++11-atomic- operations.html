@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>C++11 atomic operations</title>
+<!-- 2014-08-18 Mon 23:31 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  pre.src-sh:before    { content: 'sh'; }
+  pre.src-bash:before  { content: 'sh'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-R:before     { content: 'R'; }
+  pre.src-perl:before  { content: 'Perl'; }
+  pre.src-java:before  { content: 'Java'; }
+  pre.src-sql:before   { content: 'SQL'; }
+
+  table { border-collapse:collapse; }
+  td, th { vertical-align:top;  }
+  th.right  { text-align: center;  }
+  th.left   { text-align: center;   }
+  th.center { text-align: center; }
+  td.right  { text-align: right;  }
+  td.left   { text-align: left;   }
+  td.center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara:nth-child(2) { display: inline; }
+  .footpara { display: block; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  /*]]>*/-->
+</style>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">C++11 atomic operations</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">&lt;atomic&gt; 概要</a></li>
+<li><a href="#sec-3">Lock-free property</a></li>
+<li><a href="#sec-4">Atomic types</a></li>
+<li><a href="#sec-5">Flag type and operations</a></li>
+<li><a href="#sec-6">Memory synchronization ordering</a></li>
+<li><a href="#sec-7">cc</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Overview</h2>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">&lt;atomic&gt; 概要</h2>
+<div class="outline-text-2" id="text-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">29.3, order and consistency</span>
+<span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">memory_order</span>;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">kill_dependency</span>(<span style="color: #98fb98;">T</span> <span style="color: #eedd82;">y</span>) noexcept;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">29.4, lock-free property</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_BOOL_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_CHAR_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_CHAR16_T_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_CHAR32_T_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_WCHAR_T_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_SHORT_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_INT_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_LONG_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_LLONG_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_POINTER_LOCK_FREE</span> unspecified
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">29.5, generic types</span>
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt; <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic</span>;
+<span style="color: #00ffff;">template</span>&lt;&gt; <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic</span>&lt;integral &gt;;
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt; <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt;;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">29.6.1, general operations on atomic types</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">In the following declarations, atomic-type is either</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">atomic&lt;T&gt; or a named base class for T from</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Table 145 or inferred from Table 146 or from bool.</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If it is atomic&lt;T&gt;, then the declaration is a template</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">declaration prefixed with template &lt;class T&gt;.</span>
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_is_lock_free</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_is_lock_free</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>-type *) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_init</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_init</span>(atomic-type *, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_store</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_store</span>(atomic-type *, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_store_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_store_explicit</span>(atomic-type *, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_load</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *) noexcept;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_load</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>-type *) noexcept;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_load_explicit</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_load_explicit</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_exchange</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_exchange</span>(atomic-type *, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_exchange_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_exchange_explicit</span>(atomic-type *, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_compare_exchange_weak</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">T</span>*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_compare_exchange_weak</span>(atomic-type *, <span style="color: #98fb98;">T</span>*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_compare_exchange_strong</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">T</span>*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_compare_exchange_strong</span>(atomic-type *, <span style="color: #98fb98;">T</span>*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_compare_exchange_weak_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">T</span>*, <span style="color: #98fb98;">T</span>,
+<span style="color: #98fb98;">memory_order</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_compare_exchange_weak_explicit</span>(atomic-type *, <span style="color: #98fb98;">T</span>*, T.
+memory_order, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">atomic_compare</span>)exchange_strong_explicit(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-type *, <span style="color: #98fb98;">T</span>*, T,
+memory_order, memory_order) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_compare_exchange_strong_explicit</span>(atomic-type *, <span style="color: #98fb98;">T</span>*, <span style="color: #98fb98;">T</span>,
+<span style="color: #98fb98;">memory_order</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">29.6.2, templated operations on atomic types</span>
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_add</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_add</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_add_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_add_explicit</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_sub</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_sub</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_sub_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_sub_explicit</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_and</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_and</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_and_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_and_explicit</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_or</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_or</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_or_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_or_explicit</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_xor</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_xor</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_xor_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">atomic_fetch_xor_explicit</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>&gt;*, <span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">29.6.3, arithmetic operations on atomic types</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">In the following declarations, atomic-integral is either</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">atomic&lt;T&gt; or a named base class for T from</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Table 145 or inferred from Table 146.</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If it is atomic&lt;T&gt;, then the declaration is a template</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">specialization declaration prefixed with template &lt;&gt;.</span>
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_add</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-integral *, <span style="color: #98fb98;">integral</span> ) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_add</span>(atomic-integral *, <span style="color: #98fb98;">integral</span> ) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_add_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-integral *, <span style="color: #98fb98;">integral</span> , <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_add_explicit</span>(atomic-integral *, <span style="color: #98fb98;">integral</span> , <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_sub</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-integral *, <span style="color: #98fb98;">integral</span> ) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_sub</span>(atomic-integral *, <span style="color: #98fb98;">integral</span> ) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_sub_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-integral *, <span style="color: #98fb98;">integral</span> , <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_sub_explicit</span>(atomic-integral *, <span style="color: #98fb98;">integral</span> , <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_and</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-integral *, <span style="color: #98fb98;">integral</span> ) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_and</span>(atomic-integral *, <span style="color: #98fb98;">integral</span> ) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_and_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-integral *, <span style="color: #98fb98;">integral</span> , <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_and_explicit</span>(atomic-integral *, <span style="color: #98fb98;">integral</span> , <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_or</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-integral *, <span style="color: #98fb98;">integral</span> ) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_or</span>(atomic-integral *, <span style="color: #98fb98;">integral</span> ) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_or_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-integral *, <span style="color: #98fb98;">integral</span> , <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_or_explicit</span>(atomic-integral *, <span style="color: #98fb98;">integral</span> , <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_xor</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-integral *, <span style="color: #98fb98;">integral</span> ) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_xor</span>(atomic-integral *, <span style="color: #98fb98;">integral</span> ) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_xor_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>-integral *, <span style="color: #98fb98;">integral</span> , <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">atomic_fetch_xor_explicit</span>(atomic-integral *, <span style="color: #98fb98;">integral</span> , <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">29.6.4, partial specializations for pointers</span>
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">atomic_fetch_add</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt;*, <span style="color: #98fb98;">ptrdiff_t</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">atomic_fetch_add</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt;*, <span style="color: #98fb98;">ptrdiff_t</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">atomic_fetch_add_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt;*, <span style="color: #98fb98;">ptrdiff_t</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">atomic_fetch_add_explicit</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt;*, <span style="color: #98fb98;">ptrdiff_t</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">atomic_fetch_sub</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt;*, <span style="color: #98fb98;">ptrdiff_t</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">atomic_fetch_sub</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt;*, <span style="color: #98fb98;">ptrdiff_t</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">atomic_fetch_sub_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt;*, <span style="color: #98fb98;">ptrdiff_t</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">atomic_fetch_sub_explicit</span>(<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt;*, <span style="color: #98fb98;">ptrdiff_t</span>, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">29.6.5, initialization</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">ATOMIC_VAR_INIT</span>(<span style="color: #eedd82;">value</span>) <span style="color: #98fb98;">see</span> <span style="color: #eedd82;">below</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">29.7, flag type and operations</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic_flag</span>;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_flag_test_and_set</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic_flag</span>*) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_flag_test_and_set</span>(<span style="color: #98fb98;">atomic_flag</span>*) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_flag_test_and_set_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic_flag</span>*, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_flag_test_and_set_explicit</span>(<span style="color: #98fb98;">atomic_flag</span>*, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_flag_clear</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic_flag</span>*) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_flag_clear</span>(<span style="color: #98fb98;">atomic_flag</span>*) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_flag_clear_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic_flag</span>*, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_flag_clear_explicit</span>(<span style="color: #98fb98;">atomic_flag</span>*, <span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_FLAG_INIT</span> see below
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">29.8, fences</span>
+<span style="color: #00ffff;">extern</span> <span style="color: #ffa07a;">"C"</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_thread_fence</span>(<span style="color: #98fb98;">memory_order</span>) noexcept;
+<span style="color: #00ffff;">extern</span> <span style="color: #ffa07a;">"C"</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_signal_fence</span>(<span style="color: #98fb98;">memory_order</span>) noexcept;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Lock-free property</h2>
+<div class="outline-text-2" id="text-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_BOOL_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_CHAR_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_CHAR16_T_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_CHAR32_T_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_WCHAR_T_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_SHORT_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_INT_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_LONG_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_LLONG_LOCK_FREE</span> unspecified
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_POINTER_LOCK_FREE</span> unspecified
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Atomic types</h2>
+<div class="outline-text-2" id="text-4">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt; <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic</span> {
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">is_lock_free</span>() <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">is_lock_free</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">store</span>(<span style="color: #98fb98;">T</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">store</span>(<span style="color: #98fb98;">T</span>, memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">T</span> <span style="color: #87cefa;">load</span>(memory_order = memory_order_seq_cst) <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span> <span style="color: #87cefa;">load</span>(memory_order = memory_order_seq_cst) <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #00ffff;">operator</span> <span style="color: #98fb98;">T</span>() <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #00ffff;">operator</span> <span style="color: #98fb98;">T</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span> <span style="color: #87cefa;">exchange</span>(<span style="color: #98fb98;">T</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span> <span style="color: #87cefa;">exchange</span>(<span style="color: #98fb98;">T</span>, memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">T</span>&amp;, <span style="color: #98fb98;">T</span>, memory_order, memory_order) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">T</span>&amp;, <span style="color: #98fb98;">T</span>, memory_order, memory_order) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">T</span>&amp;, <span style="color: #98fb98;">T</span>, memory_order, memory_order) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">T</span>&amp;, <span style="color: #98fb98;">T</span>, memory_order, memory_order) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">T</span>&amp;, <span style="color: #98fb98;">T</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">T</span>&amp;, <span style="color: #98fb98;">T</span>, memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">T</span>&amp;, <span style="color: #98fb98;">T</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">T</span>&amp;, <span style="color: #98fb98;">T</span>, memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #87cefa;">atomic</span>() noexcept = <span style="color: #00ffff;">default</span>;
+  <span style="color: #98fb98;">constexpr</span> <span style="color: #87cefa;">atomic</span>(<span style="color: #98fb98;">T</span>) noexcept;
+  <span style="color: #87cefa;">atomic</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">atomic</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">atomic</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>&amp;) <span style="color: #00ffff;">volatile</span> = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">T</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">T</span>) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">T</span>) noexcept;
+};
+
+<span style="color: #00ffff;">template</span> &lt;&gt; <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic</span>&lt;integral &gt; {
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">is_lock_free</span>() <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">is_lock_free</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">store</span>(integral , memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">store</span>(integral , memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">load</span>(memory_order = memory_order_seq_cst) <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">load</span>(memory_order = memory_order_seq_cst) <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #00ffff;">operator</span> <span style="color: #98fb98;">integral</span>() <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #00ffff;">operator</span> <span style="color: #98fb98;">integral</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">exchange</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">exchange</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">integral</span> &amp;, <span style="color: #98fb98;">integral</span> , memory_order, memory_order) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">integral</span> &amp;, <span style="color: #98fb98;">integral</span> , memory_order, memory_order) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">integral</span> &amp;, <span style="color: #98fb98;">integral</span> , memory_order, memory_order) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">integral</span> &amp;, <span style="color: #98fb98;">integral</span> , memory_order, memory_order) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">integral</span> &amp;, <span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">integral</span> &amp;, <span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">integral</span> &amp;, <span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">integral</span> &amp;, <span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_add</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_add</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_sub</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_sub</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_and</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_and</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_or</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_or</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_xor</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_xor</span>(<span style="color: #98fb98;">integral</span> , memory_order = memory_order_seq_cst) noexcept;
+
+  atomic() noexcept = <span style="color: #00ffff;">default</span>;
+  <span style="color: #98fb98;">constexpr</span> <span style="color: #87cefa;">atomic</span>(<span style="color: #98fb98;">integral</span> ) noexcept;
+  atomic(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">atomic</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">atomic</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>&amp;) <span style="color: #00ffff;">volatile</span> = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">integral</span> ) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">integral</span> ) noexcept;
+
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>(<span style="color: #98fb98;">int</span>) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>(<span style="color: #98fb98;">int</span>) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>(<span style="color: #98fb98;">int</span>) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>(<span style="color: #98fb98;">int</span>) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>() <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>() noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>() <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>() noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">+=</span>(<span style="color: #98fb98;">integral</span> ) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">+=</span>(<span style="color: #98fb98;">integral</span> ) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">-=</span>(<span style="color: #98fb98;">integral</span> ) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">-=</span>(<span style="color: #98fb98;">integral</span> ) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">&amp;=</span>(<span style="color: #98fb98;">integral</span> ) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">&amp;=</span>(<span style="color: #98fb98;">integral</span> ) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">|=</span>(<span style="color: #98fb98;">integral</span> ) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">|=</span>(<span style="color: #98fb98;">integral</span> ) noexcept;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">^=</span>(<span style="color: #98fb98;">integral</span> ) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">^=</span>(<span style="color: #98fb98;">integral</span> ) noexcept;
+};
+
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt; <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt; {
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">is_lock_free</span>() <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">is_lock_free</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">store</span>(<span style="color: #98fb98;">T</span>*, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">store</span>(<span style="color: #98fb98;">T</span>*, memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">load</span>(memory_order = memory_order_seq_cst) <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">load</span>(memory_order = memory_order_seq_cst) <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #00ffff;">operator</span> <span style="color: #98fb98;">T</span>*() <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #00ffff;">operator</span> <span style="color: #98fb98;">T</span>*() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">exchange</span>(<span style="color: #98fb98;">T</span>*, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">exchange</span>(<span style="color: #98fb98;">T</span>*, memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">T</span>*&amp;, <span style="color: #98fb98;">T</span>*, memory_order, memory_order) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">T</span>*&amp;, <span style="color: #98fb98;">T</span>*, memory_order, memory_order) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">T</span>*&amp;, <span style="color: #98fb98;">T</span>*, memory_order, memory_order) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">T</span>*&amp;, <span style="color: #98fb98;">T</span>*, memory_order, memory_order) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">T</span>*&amp;, <span style="color: #98fb98;">T</span>*, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_weak</span>(<span style="color: #98fb98;">T</span>*&amp;, <span style="color: #98fb98;">T</span>*, memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">T</span>*&amp;, <span style="color: #98fb98;">T</span>*, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">compare_exchange_strong</span>(<span style="color: #98fb98;">T</span>*&amp;, <span style="color: #98fb98;">T</span>*, memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">fetch_add</span>(<span style="color: #98fb98;">ptrdiff_t</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">fetch_add</span>(<span style="color: #98fb98;">ptrdiff_t</span>, memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">fetch_sub</span>(<span style="color: #98fb98;">ptrdiff_t</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">fetch_sub</span>(<span style="color: #98fb98;">ptrdiff_t</span>, memory_order = memory_order_seq_cst) noexcept;
+
+  <span style="color: #87cefa;">atomic</span>() noexcept = <span style="color: #00ffff;">default</span>;
+  <span style="color: #98fb98;">constexpr</span> <span style="color: #87cefa;">atomic</span>(<span style="color: #98fb98;">T</span>*) noexcept;
+  <span style="color: #87cefa;">atomic</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">atomic</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">atomic</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic</span>&amp;) <span style="color: #00ffff;">volatile</span> = <span style="color: #00ffff;">delete</span>;
+
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">T</span>*) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">T</span>*) noexcept;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>(<span style="color: #98fb98;">int</span>) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>(<span style="color: #98fb98;">int</span>) noexcept;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>(<span style="color: #98fb98;">int</span>) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>(<span style="color: #98fb98;">int</span>) noexcept;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>() <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>() noexcept;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>() <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>() noexcept;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">+=</span>(<span style="color: #98fb98;">ptrdiff_t</span>) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">+=</span>(<span style="color: #98fb98;">ptrdiff_t</span>) noexcept;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">-=</span>(<span style="color: #98fb98;">ptrdiff_t</span>) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">-=</span>(<span style="color: #98fb98;">ptrdiff_t</span>) noexcept;
+};
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Flag type and operations</h2>
+<div class="outline-text-2" id="text-5">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic_flag</span> {
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">test_and_set</span>(memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">test_and_set</span>(memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">clear</span>(memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">clear</span>(memory_order = memory_order_seq_cst) noexcept;
+  <span style="color: #87cefa;">atomic_flag</span>() noexcept = <span style="color: #00ffff;">default</span>;
+  <span style="color: #87cefa;">atomic_flag</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic_flag</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">atomic_flag</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic_flag</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">atomic_flag</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic_flag</span>&amp;) <span style="color: #00ffff;">volatile</span> = <span style="color: #00ffff;">delete</span>;
+} <span style="color: #98fb98;">atomic_flag</span>;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_flag_test_and_set</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic_flag</span>*) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_flag_test_and_set</span>(<span style="color: #98fb98;">atomic_flag</span>*) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_flag_test_and_set_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic_flag</span>*, memory_order) noexcept;
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">atomic_flag_test_and_set_explicit</span>(<span style="color: #98fb98;">atomic_flag</span>*, memory_order) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_flag_clear</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic_flag</span>*) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_flag_clear</span>(<span style="color: #98fb98;">atomic_flag</span>*) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_flag_clear_explicit</span>(<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">atomic_flag</span>*, memory_order) noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_flag_clear_explicit</span>(<span style="color: #98fb98;">atomic_flag</span>*, memory_order) noexcept;
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ATOMIC_FLAG_INIT</span> see below
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Memory synchronization ordering</h2>
+<div class="outline-text-2" id="text-6">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">memory_order</span> {
+<span style="color: #eedd82;">memory_order_relaxed</span>, <span style="color: #eedd82;">memory_order_consume</span>, <span style="color: #eedd82;">memory_order_acquire</span>,
+<span style="color: #eedd82;">memory_order_release</span>, <span style="color: #eedd82;">memory_order_acq_rel</span>, <span style="color: #eedd82;">memory_order_seq_cst</span>
+} <span style="color: #98fb98;">memory_order</span>;
+}
+
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #98fb98;">T</span> <span style="color: #87cefa;">kill_dependency</span>(<span style="color: #98fb98;">T</span> <span style="color: #eedd82;">y</span>) noexcept;
+
+<span style="color: #00ffff;">extern</span> <span style="color: #ffa07a;">"C"</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_thread_fence</span>(<span style="color: #98fb98;">memory_order</span> <span style="color: #eedd82;">order</span>) noexcept;
+
+<span style="color: #00ffff;">extern</span> <span style="color: #ffa07a;">"C"</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">atomic_signal_fence</span>(<span style="color: #98fb98;">memory_order</span> <span style="color: #eedd82;">order</span>) noexcept;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">cc</h2>
+<div class="outline-text-2" id="text-7">
+<div class="org-src-container">
+
+<pre class="src src-c++"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2014-08-18 Mon 23:31</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

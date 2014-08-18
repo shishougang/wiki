@@ -38,24 +38,34 @@ terminate called after throwing an instance of 'std::system_error'
 
 * Threads
 ** =<thread>= 概要
-头文件是 =<thread>=, 分为两部分: 1) =thread= 类和在namespace
-=this_thread= 用来管理当前thread的函数.
+头文件是 =<thread>=, 分为两部分: =thread= 类和在namespace
+=this_thread= 用来管理当前thread的函数.具体见之后的[[thread_header][Header <thread>
+synopsis]].
 
-基本概要如下(§30.3 [thread.threads] of N3690):
+** =thread::id= 类
+=thread::id= 类型的对象为每个执行的线程提供唯一的标识,并为所有并不表示
+线程执行(默认构造的线程对象)的所有线程对象提供一个唯一的值.
+
+=thread::id= 类没有特别的东西,主要提供方便比较或打印等运算符重载.
 #+begin_src c++
-// Header <thread> synopsis
-namespace std {
-class thread;
-void swap(thread& x, thread& y) noexcept;
-namespace this_thread {
-thread::id get_id() noexcept;
-void yield() noexcept;
-template <class Clock, class Duration>
-void sleep_until(const chrono::time_point<Clock, Duration>& abs_time);
-template <class Rep, class Period>
-void sleep_for(const chrono::duration<Rep, Period>& rel_time);
-}
-}
+  namespace std {
+  class thread::id {
+   public:
+    id() noexcept;
+  };
+  bool operator==(thread::id x, thread::id y) noexcept;
+  bool operator!=(thread::id x, thread::id y) noexcept;
+  bool operator<(thread::id x, thread::id y) noexcept;
+  bool operator<=(thread::id x, thread::id y) noexcept;
+  bool operator>(thread::id x, thread::id y) noexcept;
+  bool operator>=(thread::id x, thread::id y) noexcept;
+  template<class charT, class traits>
+  basic_ostream<charT, traits>&
+  operator<< (basic_ostream<charT, traits>& out, thread::id id);
+  // Hash support
+  template <class T> struct hash;
+  template <typename T> <> struct hash<thread::id>;
+  }
 #+end_src
 ** =thread= 类
 #+begin_src c++
@@ -86,27 +96,102 @@ void sleep_for(const chrono::duration<Rep, Period>& rel_time);
   }
 #+end_src
 
-** =thread::id= 类
+** Constructs a thread object
+从如上的 =thread= 类知道, 构造thread对象:
+1. 默认构造
+   构造一个线程对象,但并不代表任何执行线程.
+2. 移动构造
+   从其他线程构造一个thread对象,并设置其他线程为默认构造状态.
+3. 初始化构造
+   创建一个新的thread对象并把它与执行线程相关联.复制/移动所有参数
+   =args..= 到thread可访问的内存通过如下函数:
 #+begin_src c++
-  namespace std {
-  class thread::id {
-   public:
-    id() noexcept;
-  };
-  bool operator==(thread::id x, thread::id y) noexcept;
-  bool operator!=(thread::id x, thread::id y) noexcept;
-  bool operator<(thread::id x, thread::id y) noexcept;
-  bool operator<=(thread::id x, thread::id y) noexcept;
-  bool operator>(thread::id x, thread::id y) noexcept;
-  bool operator>=(thread::id x, thread::id y) noexcept;
-  template<class charT, class traits>
-  basic_ostream<charT, traits>&
-  operator<< (basic_ostream<charT, traits>& out, thread::id id);
-  // Hash support
-  template <class T> struct hash;
-  template <typename T> <> struct hash<thread::id>;
-  }
+template <class T>
+typename decay<T>::type decay_copy(T&& v) {
+    return std::forward<T>(v);
+}
 #+end_src
+   求值和复制/移动参数过程丢出的任何exceptions仅在当前线程丢出,不在新
+   线程中.
+4. 复制构造
+   复制构造被删除.线程不可被复制.
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <utility>
+#include <thread>
+#include <functional>
+
+using std::cout;
+using std::endl;
+
+void Thread1Fun(int n) {
+  for (int i = 0; i < n; ++i) {
+    cout << "Thread 1 executing" << endl;
+  }
+}
+
+void Thread2Fun(const int& n) {
+  for (int i = 0; i < n; ++i) {
+    std::cout << "Thread 2 executing\n";
+  }
+}
+
+int main() {
+  const int kLoops = 5;
+  std::thread t1;  // t1 is not a thread
+  std::thread t2(Thread1Fun, kLoops + 1);  // pass by value
+  std::thread t3(Thread2Fun, std::ref(kLoops));  // pass by reference
+  std::thread t4(std::move(t3));
+  // t4 is now running f2(). t3 is no longer a thread
+  t2.join();
+  t4.join();
+  return 0;
+}
+#+end_src
+** joinable
+用来检查一个线程对象是否是正在执行的线程.若是,返回 =true=. 所以默认构
+造thread对象是不可joinable.
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <thread>
+#include <chrono>
+using std::cout;
+using std::endl;
+
+void ThreadFun() {
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+}
+
+int main() {
+  std::thread t;
+  cout << "default construct, joinable: " << t.joinable() << endl;
+
+  t = std::thread(ThreadFun);
+  cout << "initial construct, joinable: " << t.joinable() << endl;
+  t.join();
+  return 0;
+}
+#+end_src
+
+结果:
+#+begin_src sh
+default construct, joinable: 0
+initial construct, joinable: 1
+#+end_src
+** =get_id=
+返回thread对象的 =std::thread::id= 值.
+
+** =native_handle=
+** =hardware_concurrency= (static)
+
+** swap
+
+** 管理当前thread的函数
+
 * Mutual exclusion
 ** =<mutex>= 概要
 头文件 =<mutex>= 分为: mutexes,locks和call once.
@@ -394,55 +479,55 @@ and unlock member functions.
 * Futures
 ** =<future>= 概要
 #+begin_src c++
-  namespace std {
-  enum class future_errc {
-    broken_promise = implementation-defined ,
-      future_already_retrieved = implementation-defined ,
-      promise_already_satisfied = implementation-defined ,
-      no_state = implementation-defined
-        };
-  enum class launch : unspecified {
-    async = unspecified ,
-      deferred = unspecified ,
-      implementation-defined
-        };
-  enum class future_status {
-    ready,
-      timeout,
-      deferred
-        };
-  template <> struct is_error_code_enum<future_errc> : public true_type { };
-  error_code make_error_code(future_errc e) noexcept;
-  error_condition make_error_condition(future_errc e) noexcept;
-  const error_category& future_category() noexcept;
-  class future_error;
-  template <class R> class promise;
-  template <class R> class promise<R&>;
-  template <> class promise<void>;
-  template <class R>
-  void swap(promise<R>& x, promise<R>& y) noexcept;
-  template <class R, class Alloc>
-  struct uses_allocator<promise<R>, Alloc>;
-  template <class R> class future;
-  template <class R> class future<R&>;
-  template <> class future<void>;
-  template <class R> class shared_future;
-  template <class R> class shared_future<R&>;
-  template <> class shared_future<void>;
-  template <class> class packaged_task; // undefined
-  template <class R, class... ArgTypes>
-  class packaged_task<R(ArgTypes...)>;
-  template <class R>
-  void swap(packaged_task<R(ArgTypes...)>&, packaged_task<R(ArgTypes...)>&) noexcept;
-  template <class R, class Alloc>
-  struct uses_allocator<packaged_task<R>, Alloc>;
-  template <class F, class... Args>
-  future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
-  async(F&& f, Args&&... args);
-  template <class F, class... Args>
-  future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
-  async(launch policy, F&& f, Args&&... args);
-  }
+namespace std {
+enum class future_errc {
+broken_promise = implementation-defined ,
+future_already_retrieved = implementation-defined ,
+promise_already_satisfied = implementation-defined ,
+no_state = implementation-defined
+};
+enum class launch : unspecified {
+async = unspecified ,
+deferred = unspecified ,
+implementation-defined
+};
+enum class future_status {
+ready,
+timeout,
+deferred
+};
+template <> struct is_error_code_enum<future_errc> : public true_type { };
+error_code make_error_code(future_errc e) noexcept;
+error_condition make_error_condition(future_errc e) noexcept;
+const error_category& future_category() noexcept;
+class future_error;
+template <class R> class promise;
+template <class R> class promise<R&>;
+template <> class promise<void>;
+template <class R>
+void swap(promise<R>& x, promise<R>& y) noexcept;
+template <class R, class Alloc>
+struct uses_allocator<promise<R>, Alloc>;
+template <class R> class future;
+template <class R> class future<R&>;
+template <> class future<void>;
+template <class R> class shared_future;
+template <class R> class shared_future<R&>;
+template <> class shared_future<void>;
+template <class> class packaged_task; // undefined
+template <class R, class... ArgTypes>
+class packaged_task<R(ArgTypes...)>;
+template <class R>
+void swap(packaged_task<R(ArgTypes...)>&, packaged_task<R(ArgTypes...)>&) noexcept;
+template <class R, class Alloc>
+struct uses_allocator<packaged_task<R>, Alloc>;
+template <class F, class... Args>
+future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
+async(F&& f, Args&&... args);
+template <class F, class... Args>
+future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
+async(launch policy, F&& f, Args&&... args);
+}
 #+end_src
 ** =future_error= 类
 #+begin_src c++
@@ -456,13 +541,155 @@ and unlock member functions.
   }
   const error_code& code() const noexcept;
 #+end_src
-** =promise=
+** =template promise= 类
 #+begin_src c++
-
+  namespace std {
+  template <class R>
+  class promise {
+   public:
+    promise();
+    template <class Allocator>
+    promise(allocator_arg_t, const Allocator& a);
+    promise(promise&& rhs) noexcept;
+    promise(const promise& rhs) = delete;
+    ~promise();
+    // assignment
+    promise& operator=(promise&& rhs) noexcept;
+    promise& operator=(const promise& rhs) = delete;
+    void swap(promise& other) noexcept;
+    // retrieving the result
+    future<R> get_future();
+    // setting the result
+    void set_value(see below );
+    void set_exception(exception_ptr p);
+    // setting the result with deferred notification
+    void set_value_at_thread_exit(const R& r);
+    void set_value_at_thread_exit(see below );
+    void set_exception_at_thread_exit(exception_ptr p);
+  };
+  template <class R>
+  void swap(promise<R>& x, promise<R>& y) noexcept;
+  template <class R, class Alloc>
+  struct uses_allocator<promise<R>, Alloc>;
+  }
 #+end_src
 
-<<reference>>
+** =template future= 类
+#+begin_src c++
+  namespace std {
+  template <class R>
+  class future {
+   public:
+    future() noexcept;
+    future(future &&) noexcept;
+    future(const future& rhs) = delete;
+    ~future();
+    future& operator=(const future& rhs) = delete;
+    future& operator=(future&&) noexcept;
+    shared_future<R> share();
+    // retrieving the value
+    see below get();
+    // functions to check state
+    bool valid() const noexcept;
+    void wait() const;
+    template <class Rep, class Period>
+    future_status wait_for(const chrono::duration<Rep, Period>& rel_time) const;
+    template <class Clock, class Duration>
+    future_status wait_until(const chrono::time_point<Clock, Duration>& abs_time) const;
+  };
+  }
+#+end_src
+** =template shared_future= 类
+#+begin_src c++
+  namespace std {
+  template <class R>
+  class shared_future {
+   public:
+    shared_future() noexcept;
+    shared_future(const shared_future& rhs);
+    shared_future(future<R>&&) noexcept;
+    shared_future(shared_future&& rhs) noexcept;
+    ~shared_future();
+    shared_future& operator=(const shared_future& rhs);
+    shared_future& operator=(shared_future&& rhs) noexcept;
+    // retrieving the value
+    see below get() const;
+    // functions to check state
+    bool valid() const noexcept;
+    void wait() const;
+    template <class Rep, class Period>
+    future_status wait_for(const chrono::duration<Rep, Period>& rel_time) const;
+    template <class Clock, class Duration>
+    future_status wait_until(const chrono::time_point<Clock, Duration>& abs_time) const;
+  };
+  }
+#+end_src
+** =template async= 函数
+#+begin_src c++
+template <class F, class... Args>
+future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
+async(F&& f, Args&&... args);
+template <class F, class... Args>
+future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
+async(launch policy, F&& f, Args&&... args);
+#+end_src
+** =template packaged_task= 函数
+#+begin_src c++
+  namespace std {
+  template<class> class packaged_task; // undefined
+  template<class R, class... ArgTypes>
+  class packaged_task<R(ArgTypes...)> {
+   public:
+    // construction and destruction
+    packaged_task() noexcept;
+    template <class F>
+    explicit packaged_task(F&& f);
+    template <class F, class Allocator>
+    explicit packaged_task(allocator_arg_t, const Allocator& a, F&& f);
+    ~packaged_task();
+    // no copy
+    packaged_task(const packaged_task&) = delete;
+    packaged_task& operator=(const packaged_task&) = delete;
+    // move support
+    packaged_task(packaged_task&& rhs) noexcept;
+    packaged_task& operator=(packaged_task&& rhs) noexcept;
+    void swap(packaged_task& other) noexcept;
+    bool valid() const noexcept;
+    // result retrieval
+    future<R> get_future();
+    // execution
+    void operator()(ArgTypes... );
+    void make_ready_at_thread_exit(ArgTypes...);
+    void reset();
+  };
+  template <class R, class... ArgTypes>
+  void swap(packaged_task<R(ArgTypes...)>& x, packaged_task<R(ArgTypes...)>& y) noexcept;
+  template <class R, class Alloc>
+  struct uses_allocator<packaged_task<R>, Alloc>;
+  }
+#+end_src
+* Header synopsis
+** =<thread>=
+<<thread_header>>
+基本概要如下(§30.3 [thread.threads] of N3690):
+#+begin_src c++
+// Header <thread> synopsis
+namespace std {
+class thread;
+void swap(thread& x, thread& y) noexcept;
+namespace this_thread {
+thread::id get_id() noexcept;
+void yield() noexcept;
+template <class Clock, class Duration>
+void sleep_until(const chrono::time_point<Clock, Duration>& abs_time);
+template <class Rep, class Period>
+void sleep_for(const chrono::duration<Rep, Period>& rel_time);
+}
+}
+#+end_src
+
 * 其他资料
+<<reference>>
 ** Books
 + Scott Meyers的[[http://www.artima.com/shop/overview_of_the_new_cpp][ Overview of the New C++ (C++11/14)]]
 ** Online resources
@@ -473,10 +700,8 @@ and unlock member functions.
 + [[https://en.wikipedia.org/wiki/C++11][C++11 Wiki]]
 + [[https://github.com/cplusplus/draft][C++ standards drafts on GitHub]]
 * cc
+实例:
 #+begin_src c++
 
 #+end_src
 
-#+begin_src sh
-
-#+end_src

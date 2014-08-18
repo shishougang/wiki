@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>C++11 multithreading programming</title>
-<!-- 2014-08-17 Sun 22:10 -->
+<!-- 2014-08-18 Mon 22:53 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -147,27 +147,52 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-3-1"><code>&lt;thread&gt;</code> 概要</a></li>
 <li><a href="#sec-3-2"><code>thread</code> 类</a></li>
-<li><a href="#sec-3-3"><code>thread::id</code> 类</a></li>
+<li><a href="#sec-3-3">Constructs a thread object</a></li>
+<li><a href="#sec-3-4"><code>thread::id</code> 类</a></li>
 </ul>
 </li>
 <li><a href="#sec-4">Mutual exclusion</a>
 <ul>
-<li><a href="#sec-4-1">unique<sub>lock</sub></a></li>
+<li><a href="#sec-4-1"><code>&lt;mutex&gt;</code> 概要</a></li>
+<li><a href="#sec-4-2"><code>mutex</code> 类</a></li>
+<li><a href="#sec-4-3"><code>recursive_mutex</code> 类</a></li>
+<li><a href="#sec-4-4"><code>timed_mutex</code> 类</a></li>
+<li><a href="#sec-4-5"><code>recursive_timed_mutex</code> 类</a></li>
+<li><a href="#sec-4-6"><code>lock_guard</code> 类</a></li>
+<li><a href="#sec-4-7"><code>unique_lock</code> 类</a></li>
 </ul>
 </li>
 <li><a href="#sec-5">Condition variables</a>
 <ul>
-<li><a href="#sec-5-1"><code>condition_variable</code> vs <code>condition_variable_any</code></a></li>
+<li><a href="#sec-5-1"><code>&lt;condition_variable&gt;</code> 概要</a></li>
+<li><a href="#sec-5-2"><code>condition_variable</code> 类</a></li>
+<li><a href="#sec-5-3"><code>condition_variable_any</code> 类</a></li>
+<li><a href="#sec-5-4"><code>condition_variable</code> vs <code>condition_variable_any</code></a></li>
 </ul>
 </li>
-<li><a href="#sec-6">Futures</a></li>
-<li><a href="#sec-7">其他资料</a>
+<li><a href="#sec-6">Futures</a>
 <ul>
-<li><a href="#sec-7-1">Books</a></li>
-<li><a href="#sec-7-2">Online resources</a></li>
+<li><a href="#sec-6-1"><code>&lt;future&gt;</code> 概要</a></li>
+<li><a href="#sec-6-2"><code>future_error</code> 类</a></li>
+<li><a href="#sec-6-3"><code>template promise</code> 类</a></li>
+<li><a href="#sec-6-4"><code>template future</code> 类</a></li>
+<li><a href="#sec-6-5"><code>template shared_future</code> 类</a></li>
+<li><a href="#sec-6-6"><code>template async</code> 函数</a></li>
+<li><a href="#sec-6-7"><code>template packaged_task</code> 函数</a></li>
 </ul>
 </li>
-<li><a href="#sec-8">cc</a></li>
+<li><a href="#sec-7">Header synopsis</a>
+<ul>
+<li><a href="#sec-7-1"><code>&lt;thread&gt;</code></a></li>
+</ul>
+</li>
+<li><a href="#sec-8">其他资料</a>
+<ul>
+<li><a href="#sec-8-1">Books</a></li>
+<li><a href="#sec-8-2">Online resources</a></li>
+</ul>
+</li>
+<li><a href="#sec-9">cc</a></li>
 </ul>
 </div>
 </div>
@@ -243,33 +268,12 @@ GNU扩张支持.并加上 <code>-pthread</code> 选项.
 <h3 id="sec-3-1"><code>&lt;thread&gt;</code> 概要</h3>
 <div class="outline-text-3" id="text-3-1">
 <p>
-头文件是 <code>#include &lt;thread&gt;</code>, 分为两部分: 1) <code>thread</code> 类和在namespace
-<code>this_thread</code> 用来管理当前thread的函数.
+头文件是 <code>&lt;thread&gt;</code>, 分为两部分: <code>thread</code> 类和在namespace
+<code>this_thread</code> 用来管理当前thread的函数.具体见之后的<a href="#thread_header">Header &lt;thread&gt;
+synopsis</a>.
 </p>
-
-<p>
-基本概要如下(§30.3 [thread.threads] of N3690):
-</p>
-<div class="org-src-container">
-
-<pre class="src src-c++"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Header &lt;thread&gt; synopsis</span>
-<span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
-<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">thread</span>;
-<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">thread</span>&amp; <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">thread</span>&amp; <span style="color: #eedd82;">y</span>) noexcept;
-<span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">this_thread</span> {
-<span style="color: #7fffd4;">thread</span>::<span style="color: #98fb98;">id</span> <span style="color: #87cefa;">get_id</span>() noexcept;
-<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">yield</span>() noexcept;
-<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
-<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">sleep_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>);
-<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
-<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">sleep_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>);
-}
-}
-</pre>
 </div>
 </div>
-</div>
-
 <div id="outline-container-sec-3-2" class="outline-3">
 <h3 id="sec-3-2"><code>thread</code> 类</h3>
 <div class="outline-text-3" id="text-3-2">
@@ -304,10 +308,35 @@ GNU扩张支持.并加上 <code>-pthread</code> 选项.
 </div>
 </div>
 </div>
-
 <div id="outline-container-sec-3-3" class="outline-3">
-<h3 id="sec-3-3"><code>thread::id</code> 类</h3>
+<h3 id="sec-3-3">Constructs a thread object</h3>
 <div class="outline-text-3" id="text-3-3">
+<p>
+从如上的 <code>thread</code> 类知道, 可以通过如下4种方法构造thread对象:
+</p>
+<ol class="org-ol">
+<li>默认构造构造一个线程对象,但并不代表任何执行线程.
+</li>
+<li>移动构造从其他线程构造一个thread对象,并设置其他线程为默认构造状态.
+</li>
+<li>创建一个新的thread对象并把它与执行线程相关联.复制/移动所有参数
+   <code>args..</code> 到thread可访问的内存通过如下函数:
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">T</span>&gt;::<span style="color: #98fb98;">type</span> <span style="color: #87cefa;">decay_copy</span>(<span style="color: #98fb98;">T</span>&amp;&amp; <span style="color: #eedd82;">v</span>) {
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">forward</span>&lt;<span style="color: #98fb98;">T</span>&gt;(<span style="color: #eedd82;">v</span>);
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4"><code>thread::id</code> 类</h3>
+<div class="outline-text-3" id="text-3-4">
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -334,17 +363,227 @@ GNU扩张支持.并加上 <code>-pthread</code> 选项.
 </div>
 </div>
 
-
 <div id="outline-container-sec-4" class="outline-2">
 <h2 id="sec-4">Mutual exclusion</h2>
 <div class="outline-text-2" id="text-4">
 </div><div id="outline-container-sec-4-1" class="outline-3">
-<h3 id="sec-4-1">unique<sub>lock</sub></h3>
+<h3 id="sec-4-1"><code>&lt;mutex&gt;</code> 概要</h3>
 <div class="outline-text-3" id="text-4-1">
 <p>
-more 
+头文件 <code>&lt;mutex&gt;</code> 分为: mutexes,locks和call once.
 </p>
+<div class="org-src-container">
 
+<pre class="src src-c++"><span style="color: #98fb98;">Header</span> &lt;mutex&gt; <span style="color: #eedd82;">synopsis</span>
+<span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">mutex</span>;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">recursive_mutex</span>;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">timed_mutex</span>;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">recursive_timed_mutex</span>;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">defer_lock_t</span> { };
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">try_to_lock_t</span> { };
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">adopt_lock_t</span> { };
+constexpr <span style="color: #98fb98;">defer_lock_t</span> <span style="color: #eedd82;">defer_lock</span> { };
+constexpr <span style="color: #98fb98;">try_to_lock_t</span> <span style="color: #eedd82;">try_to_lock</span> { };
+constexpr <span style="color: #98fb98;">adopt_lock_t</span> <span style="color: #eedd82;">adopt_lock</span> { };
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Mutex</span>&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">lock_guard</span>;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Mutex</span>&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">unique_lock</span>;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Mutex</span>&gt;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #98fb98;">Mutex</span>&gt;&amp; <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #98fb98;">Mutex</span>&gt;&amp; <span style="color: #eedd82;">y</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">L1</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">L2</span>, <span style="color: #00ffff;">class</span>... L3&gt; <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">try_lock</span>(<span style="color: #98fb98;">L1</span>&amp;, <span style="color: #98fb98;">L2</span>&amp;, <span style="color: #98fb98;">L3</span>&amp;...);
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">L1</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">L2</span>, <span style="color: #00ffff;">class</span>... L3&gt; <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">lock</span>(<span style="color: #98fb98;">L1</span>&amp;, <span style="color: #98fb98;">L2</span>&amp;, <span style="color: #98fb98;">L3</span>&amp;...);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">once_flag</span> {
+  <span style="color: #98fb98;">constexpr</span> <span style="color: #87cefa;">once_flag</span>() noexcept;
+  <span style="color: #87cefa;">once_flag</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">once_flag</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">once_flag</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">once_flag</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+};
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Callable</span>, <span style="color: #00ffff;">class</span> ...Args&gt;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">call_once</span>(<span style="color: #98fb98;">once_flag</span>&amp; <span style="color: #eedd82;">flag</span>, <span style="color: #98fb98;">Callable</span> <span style="color: #eedd82;">func</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2"><code>mutex</code> 类</h3>
+<div class="outline-text-3" id="text-4-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">mutex</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #98fb98;">constexpr</span> <span style="color: #87cefa;">mutex</span>() noexcept;
+  ~<span style="color: #87cefa;">mutex</span>();
+  <span style="color: #87cefa;">mutex</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">mutex</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">mutex</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">mutex</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">lock</span>();
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">unlock</span>();
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">implementation</span>-defined native_handle_type; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
+  <span style="color: #98fb98;">native_handle_type</span> <span style="color: #87cefa;">native_handle</span>(); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3"><code>recursive_mutex</code> 类</h3>
+<div class="outline-text-3" id="text-4-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">recursive_mutex</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">recursive_mutex</span>();
+  ~<span style="color: #87cefa;">recursive_mutex</span>();
+  <span style="color: #87cefa;">recursive_mutex</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">recursive_mutex</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">recursive_mutex</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">recursive_mutex</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">lock</span>();
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock</span>() noexcept;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">unlock</span>();
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">implementation</span>-defined native_handle_type; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
+  <span style="color: #98fb98;">native_handle_type</span> <span style="color: #87cefa;">native_handle</span>(); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4"><code>timed_mutex</code> 类</h3>
+<div class="outline-text-3" id="text-4-4">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">timed_mutex</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">timed_mutex</span>();
+  ~<span style="color: #87cefa;">timed_mutex</span>();
+  <span style="color: #87cefa;">timed_mutex</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">timed_mutex</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">timed_mutex</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">timed_mutex</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">lock</span>();
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock</span>();
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">unlock</span>();
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">implementation</span>-defined native_handle_type; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
+  <span style="color: #98fb98;">native_handle_type</span> <span style="color: #87cefa;">native_handle</span>(); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4-5" class="outline-3">
+<h3 id="sec-4-5"><code>recursive_timed_mutex</code> 类</h3>
+<div class="outline-text-3" id="text-4-5">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">recursive_timed_mutex</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">recursive_timed_mutex</span>();
+  ~<span style="color: #87cefa;">recursive_timed_mutex</span>();
+  <span style="color: #87cefa;">recursive_timed_mutex</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">recursive_timed_mutex</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">recursive_timed_mutex</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">recursive_timed_mutex</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">lock</span>();
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock</span>() noexcept;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">unlock</span>();
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">implementation</span>-defined native_handle_type; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
+  <span style="color: #98fb98;">native_handle_type</span> <span style="color: #87cefa;">native_handle</span>(); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4-6" class="outline-3">
+<h3 id="sec-4-6"><code>lock_guard</code> 类</h3>
+<div class="outline-text-3" id="text-4-6">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Mutex</span>&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">lock_guard</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">Mutex</span> <span style="color: #98fb98;">mutex_type</span>;
+  <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">lock_guard</span>(<span style="color: #98fb98;">mutex_type</span>&amp; <span style="color: #eedd82;">m</span>);
+  <span style="color: #87cefa;">lock_guard</span>(<span style="color: #98fb98;">mutex_type</span>&amp; <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">adopt_lock_t</span>);
+  ~<span style="color: #87cefa;">lock_guard</span>();
+  <span style="color: #87cefa;">lock_guard</span>(<span style="color: #98fb98;">lock_guard</span> <span style="color: #00ffff;">const</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">lock_guard</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">lock_guard</span> <span style="color: #00ffff;">const</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">mutex_type</span>&amp; <span style="color: #eedd82;">pm</span>; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">exposition only</span>
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4-7" class="outline-3">
+<h3 id="sec-4-7"><code>unique_lock</code> 类</h3>
+<div class="outline-text-3" id="text-4-7">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Mutex</span>&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">unique_lock</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">Mutex</span> <span style="color: #98fb98;">mutex_type</span>;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">30.4.2.2.1, construct/copy/destroy:</span>
+  <span style="color: #87cefa;">unique_lock</span>() noexcept;
+  <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">unique_lock</span>(<span style="color: #98fb98;">mutex_type</span>&amp; <span style="color: #eedd82;">m</span>);
+  <span style="color: #87cefa;">unique_lock</span>(<span style="color: #98fb98;">mutex_type</span>&amp; <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">defer_lock_t</span>) noexcept;
+  <span style="color: #87cefa;">unique_lock</span>(<span style="color: #98fb98;">mutex_type</span>&amp; <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">try_to_lock_t</span>);
+  <span style="color: #87cefa;">unique_lock</span>(<span style="color: #98fb98;">mutex_type</span>&amp; <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">adopt_lock_t</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+  <span style="color: #87cefa;">unique_lock</span>(<span style="color: #98fb98;">mutex_type</span>&amp; <span style="color: #eedd82;">m</span>, <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+  <span style="color: #87cefa;">unique_lock</span>(<span style="color: #98fb98;">mutex_type</span>&amp; <span style="color: #eedd82;">m</span>, <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>);
+  ~<span style="color: #87cefa;">unique_lock</span>();
+  <span style="color: #87cefa;">unique_lock</span>(<span style="color: #98fb98;">unique_lock</span> <span style="color: #00ffff;">const</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">unique_lock</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">unique_lock</span> <span style="color: #00ffff;">const</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #87cefa;">unique_lock</span>(<span style="color: #98fb98;">unique_lock</span>&amp;&amp; <span style="color: #eedd82;">u</span>) noexcept;
+  <span style="color: #98fb98;">unique_lock</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">unique_lock</span>&amp;&amp; u) noexcept;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">30.4.2.2.2, locking:</span>
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">lock</span>();
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock</span>();
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">try_lock_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">unlock</span>();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">30.4.2.2.3, modifiers:</span>
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">unique_lock</span>&amp; <span style="color: #eedd82;">u</span>) noexcept;
+  <span style="color: #98fb98;">mutex_type</span> *<span style="color: #87cefa;">release</span>() noexcept;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">30.4.2.2.4, observers:</span>
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">owns_lock</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #00ffff;">explicit</span> <span style="color: #00ffff;">operator</span> <span style="color: #98fb98;">bool</span> () <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">mutex_type</span>* <span style="color: #87cefa;">mutex</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">mutex_type</span> *<span style="color: #eedd82;">pm</span>; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">exposition only</span>
+  <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">owns</span>; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">exposition only</span>
+};
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Mutex</span>&gt;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #98fb98;">Mutex</span>&gt;&amp; <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #98fb98;">Mutex</span>&gt;&amp; <span style="color: #eedd82;">y</span>) noexcept;
+}
+</pre>
+</div>
+</div>
+<ul class="org-ul"><li>more<br  /><div class="outline-text-4" id="text-4-7-1">
 <ul class="org-ul">
 <li>lock multiple:
   <a href="http://stackoverflow.com/questions/17113619/whats-the-best-way-to-lock-multiple-stdmutexes/17113678#17113678">http://stackoverflow.com/questions/17113619/whats-the-best-way-to-lock-multiple-stdmutexes/17113678#17113678</a>
@@ -377,6 +616,7 @@ So you always use lock<sub>guard</sub>, unless you need the capabilities of
 unique<sub>lock</sub>. A condition<sub>variable</sub> needs a unique<sub>lock</sub>.
 </p>
 </div>
+</li></ul>
 </div>
 </div>
 
@@ -384,8 +624,99 @@ unique<sub>lock</sub>. A condition<sub>variable</sub> needs a unique<sub>lock</s
 <h2 id="sec-5">Condition variables</h2>
 <div class="outline-text-2" id="text-5">
 </div><div id="outline-container-sec-5-1" class="outline-3">
-<h3 id="sec-5-1"><code>condition_variable</code> vs <code>condition_variable_any</code></h3>
+<h3 id="sec-5-1"><code>&lt;condition_variable&gt;</code> 概要</h3>
 <div class="outline-text-3" id="text-5-1">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">condition_variable</span>;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">condition_variable_any</span>;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">notify_all_at_thread_exit</span>(<span style="color: #98fb98;">condition_variable</span>&amp; <span style="color: #eedd82;">cond</span>, <span style="color: #98fb98;">unique_lock</span>&lt;mutex&gt; <span style="color: #eedd82;">lk</span>);
+<span style="color: #00ffff;">enum</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">cv_status</span> { <span style="color: #eedd82;">no_timeout</span>, <span style="color: #eedd82;">timeout</span> };
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2"><code>condition_variable</code> 类</h3>
+<div class="outline-text-3" id="text-5-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">condition_variable</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">condition_variable</span>();
+  ~<span style="color: #87cefa;">condition_variable</span>();
+  <span style="color: #87cefa;">condition_variable</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">condition_variable</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">condition_variable</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">condition_variable</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">notify_one</span>() noexcept;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">notify_all</span>() noexcept;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>(<span style="color: #98fb98;">unique_lock</span>&lt;mutex&gt;&amp; <span style="color: #eedd82;">lock</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Predicate</span>&gt;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>(<span style="color: #98fb98;">unique_lock</span>&lt;mutex&gt;&amp; <span style="color: #eedd82;">lock</span>, <span style="color: #98fb98;">Predicate</span> <span style="color: #eedd82;">pred</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+  <span style="color: #98fb98;">cv_status</span> <span style="color: #87cefa;">wait_until</span>(<span style="color: #98fb98;">unique_lock</span>&lt;mutex&gt;&amp; <span style="color: #eedd82;">lock</span>,
+                       <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Predicate</span>&gt;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">wait_until</span>(<span style="color: #98fb98;">unique_lock</span>&lt;mutex&gt;&amp; <span style="color: #eedd82;">lock</span>,
+                  <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>,
+                  <span style="color: #eedd82;">Predicate</span> pred);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+  <span style="color: #98fb98;">cv_status</span> <span style="color: #87cefa;">wait_for</span>(<span style="color: #98fb98;">unique_lock</span>&lt;mutex&gt;&amp; <span style="color: #eedd82;">lock</span>,
+                     <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Predicate</span>&gt;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">wait_for</span>(<span style="color: #98fb98;">unique_lock</span>&lt;mutex&gt;&amp; <span style="color: #eedd82;">lock</span>,
+                <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>,
+                <span style="color: #eedd82;">Predicate</span> pred);
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">implementation</span>-defined native_handle_type; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
+  <span style="color: #98fb98;">native_handle_type</span> <span style="color: #87cefa;">native_handle</span>(); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3"><code>condition_variable_any</code> 类</h3>
+<div class="outline-text-3" id="text-5-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">condition_variable_any</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">condition_variable_any</span>();
+  ~<span style="color: #87cefa;">condition_variable_any</span>();
+  <span style="color: #87cefa;">condition_variable_any</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">condition_variable_any</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">condition_variable_any</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">condition_variable_any</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">notify_one</span>() noexcept;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">notify_all</span>() noexcept;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Lock</span>&gt;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>(<span style="color: #98fb98;">Lock</span>&amp; <span style="color: #eedd82;">lock</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Lock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Predicate</span>&gt;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>(<span style="color: #98fb98;">Lock</span>&amp; <span style="color: #eedd82;">lock</span>, <span style="color: #98fb98;">Predicate</span> <span style="color: #eedd82;">pred</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Lock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+  <span style="color: #98fb98;">cv_status</span> <span style="color: #87cefa;">wait_until</span>(<span style="color: #98fb98;">Lock</span>&amp; <span style="color: #eedd82;">lock</span>, <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Lock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Predicate</span>&gt;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">wait_until</span>(<span style="color: #98fb98;">Lock</span>&amp; <span style="color: #eedd82;">lock</span>, <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>,
+                  <span style="color: #eedd82;">Predicate</span> pred);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Lock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+  <span style="color: #98fb98;">cv_status</span> <span style="color: #87cefa;">wait_for</span>(<span style="color: #98fb98;">Lock</span>&amp; <span style="color: #eedd82;">lock</span>, <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Lock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Predicate</span>&gt;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">wait_for</span>(<span style="color: #98fb98;">Lock</span>&amp; <span style="color: #eedd82;">lock</span>, <span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>,
+                <span style="color: #eedd82;">Predicate</span> pred);
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5-4" class="outline-3">
+<h3 id="sec-5-4"><code>condition_variable</code> vs <code>condition_variable_any</code></h3>
+<div class="outline-text-3" id="text-5-4">
 <p>
 std::condition<sub>variable</sub> is more specialized, and therefore can be more
 efficient when you don't need the flexibility of
@@ -421,18 +752,285 @@ and unlock member functions.
 <div id="outline-container-sec-6" class="outline-2">
 <h2 id="sec-6">Futures</h2>
 <div class="outline-text-2" id="text-6">
-<p>
-<a id="reference" name="reference"></a>
-</p>
+</div><div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1"><code>&lt;future&gt;</code> 概要</h3>
+<div class="outline-text-3" id="text-6-1">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">enum</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future_errc</span> {
+<span style="color: #eedd82;">broken_promise</span> = implementation-defined ,
+<span style="color: #eedd82;">future_already_retrieved</span> = implementation-defined ,
+<span style="color: #eedd82;">promise_already_satisfied</span> = implementation-defined ,
+<span style="color: #eedd82;">no_state</span> = implementation-defined
+};
+<span style="color: #00ffff;">enum</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">launch</span> : <span style="color: #98fb98;">unspecified</span> {
+<span style="color: #eedd82;">async</span> = unspecified ,
+<span style="color: #eedd82;">deferred</span> = unspecified ,
+<span style="color: #eedd82;">implementation</span>-defined
+};
+<span style="color: #00ffff;">enum</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future_status</span> {
+<span style="color: #eedd82;">ready</span>,
+<span style="color: #eedd82;">timeout</span>,
+<span style="color: #eedd82;">deferred</span>
+};
+<span style="color: #00ffff;">template</span> &lt;&gt; <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">is_error_code_enum</span>&lt;<span style="color: #98fb98;">future_errc</span>&gt; : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">true_type</span> { };
+<span style="color: #98fb98;">error_code</span> <span style="color: #87cefa;">make_error_code</span>(<span style="color: #98fb98;">future_errc</span> <span style="color: #eedd82;">e</span>) noexcept;
+<span style="color: #98fb98;">error_condition</span> <span style="color: #87cefa;">make_error_condition</span>(<span style="color: #98fb98;">future_errc</span> <span style="color: #eedd82;">e</span>) noexcept;
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">error_category</span>&amp; <span style="color: #87cefa;">future_category</span>() noexcept;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future_error</span>;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">promise</span>;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">R</span>&amp;&gt;;
+<span style="color: #00ffff;">template</span> &lt;&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">void</span>&gt;;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">R</span>&gt;&amp; <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">R</span>&gt;&amp; <span style="color: #eedd82;">y</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Alloc</span>&gt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">uses_allocator</span>&lt;<span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">R</span>&gt;, <span style="color: #98fb98;">Alloc</span>&gt;;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future</span>;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">R</span>&amp;&gt;;
+<span style="color: #00ffff;">template</span> &lt;&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">void</span>&gt;;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">shared_future</span>;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">shared_future</span>&lt;<span style="color: #98fb98;">R</span>&amp;&gt;;
+<span style="color: #00ffff;">template</span> &lt;&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">shared_future</span>&lt;<span style="color: #98fb98;">void</span>&gt;;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span>&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">packaged_task</span>; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">undefined</span>
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>, <span style="color: #00ffff;">class</span>... ArgTypes&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">packaged_task</span>&lt;R(<span style="color: #eedd82;">ArgTypes</span>...)&gt;;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">packaged_task</span>&lt;R(ArgTypes...)&gt;&amp;, <span style="color: #98fb98;">packaged_task</span>&lt;R(ArgTypes...)&gt;&amp;) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Alloc</span>&gt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">uses_allocator</span>&lt;<span style="color: #98fb98;">packaged_task</span>&lt;<span style="color: #98fb98;">R</span>&gt;, <span style="color: #98fb98;">Alloc</span>&gt;;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span>... Args&gt;
+<span style="color: #98fb98;">future</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">result_of</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">F</span>&gt;::<span style="color: #98fb98;">type</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;Args&gt;::<span style="color: #98fb98;">type</span>...)&gt;::<span style="color: #98fb98;">type</span>&gt;
+<span style="color: #87cefa;">async</span>(<span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span>... Args&gt;
+<span style="color: #98fb98;">future</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">result_of</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">F</span>&gt;::<span style="color: #98fb98;">type</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">Args</span>&gt;::<span style="color: #98fb98;">type</span>...)&gt;::<span style="color: #98fb98;">type</span>&gt;
+<span style="color: #87cefa;">async</span>(<span style="color: #98fb98;">launch</span> <span style="color: #eedd82;">policy</span>, <span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2"><code>future_error</code> 类</h3>
+<div class="outline-text-3" id="text-6-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future_error</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">logic_error</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">future_error</span>(<span style="color: #98fb98;">error_code</span> <span style="color: #eedd82;">ec</span>); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">exposition only</span>
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">error_code</span>&amp; <span style="color: #87cefa;">code</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span>* <span style="color: #87cefa;">what</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+};
+}
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">error_code</span>&amp; <span style="color: #87cefa;">code</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-3" class="outline-3">
+<h3 id="sec-6-3"><code>template promise</code> 类</h3>
+<div class="outline-text-3" id="text-6-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">promise</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">promise</span>();
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Allocator</span>&gt;
+  <span style="color: #87cefa;">promise</span>(<span style="color: #98fb98;">allocator_arg_t</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">Allocator</span>&amp; <span style="color: #eedd82;">a</span>);
+  <span style="color: #87cefa;">promise</span>(<span style="color: #98fb98;">promise</span>&amp;&amp; <span style="color: #eedd82;">rhs</span>) noexcept;
+  <span style="color: #87cefa;">promise</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">promise</span>&amp; <span style="color: #eedd82;">rhs</span>) = <span style="color: #00ffff;">delete</span>;
+  ~<span style="color: #87cefa;">promise</span>();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">assignment</span>
+  <span style="color: #98fb98;">promise</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">promise</span>&amp;&amp; rhs) noexcept;
+  <span style="color: #98fb98;">promise</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">promise</span>&amp; <span style="color: #eedd82;">rhs</span>) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">promise</span>&amp; <span style="color: #eedd82;">other</span>) noexcept;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">retrieving the result</span>
+  <span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">R</span>&gt; <span style="color: #87cefa;">get_future</span>();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">setting the result</span>
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_value</span>(<span style="color: #98fb98;">see</span> <span style="color: #eedd82;">below</span> );
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_exception</span>(<span style="color: #98fb98;">exception_ptr</span> <span style="color: #eedd82;">p</span>);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">setting the result with deferred notification</span>
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_value_at_thread_exit</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">R</span>&amp; <span style="color: #eedd82;">r</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_value_at_thread_exit</span>(<span style="color: #98fb98;">see</span> <span style="color: #eedd82;">below</span> );
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_exception_at_thread_exit</span>(<span style="color: #98fb98;">exception_ptr</span> <span style="color: #eedd82;">p</span>);
+};
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">R</span>&gt;&amp; <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">R</span>&gt;&amp; <span style="color: #eedd82;">y</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Alloc</span>&gt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">uses_allocator</span>&lt;<span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">R</span>&gt;, <span style="color: #98fb98;">Alloc</span>&gt;;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-4" class="outline-3">
+<h3 id="sec-6-4"><code>template future</code> 类</h3>
+<div class="outline-text-3" id="text-6-4">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">future</span>() noexcept;
+  <span style="color: #87cefa;">future</span>(<span style="color: #98fb98;">future</span> &amp;&amp;) noexcept;
+  <span style="color: #87cefa;">future</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">future</span>&amp; <span style="color: #eedd82;">rhs</span>) = <span style="color: #00ffff;">delete</span>;
+  ~<span style="color: #87cefa;">future</span>();
+  <span style="color: #98fb98;">future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">future</span>&amp; <span style="color: #eedd82;">rhs</span>) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">future</span>&amp;&amp;) noexcept;
+  <span style="color: #98fb98;">shared_future</span>&lt;<span style="color: #98fb98;">R</span>&gt; <span style="color: #87cefa;">share</span>();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">retrieving the value</span>
+  see <span style="color: #98fb98;">below</span> <span style="color: #87cefa;">get</span>();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">functions to check state</span>
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">valid</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>() <span style="color: #00ffff;">const</span>;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>) <span style="color: #00ffff;">const</span>;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>) <span style="color: #00ffff;">const</span>;
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-5" class="outline-3">
+<h3 id="sec-6-5"><code>template shared_future</code> 类</h3>
+<div class="outline-text-3" id="text-6-5">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">shared_future</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">shared_future</span>() noexcept;
+  <span style="color: #87cefa;">shared_future</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #eedd82;">rhs</span>);
+  <span style="color: #87cefa;">shared_future</span>(<span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">R</span>&gt;&amp;&amp;) noexcept;
+  <span style="color: #87cefa;">shared_future</span>(<span style="color: #98fb98;">shared_future</span>&amp;&amp; <span style="color: #eedd82;">rhs</span>) noexcept;
+  ~<span style="color: #87cefa;">shared_future</span>();
+  <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #eedd82;">rhs</span>);
+  <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">shared_future</span>&amp;&amp; rhs) noexcept;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">retrieving the value</span>
+  see <span style="color: #98fb98;">below</span> <span style="color: #87cefa;">get</span>() <span style="color: #00ffff;">const</span>;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">functions to check state</span>
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">valid</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>() <span style="color: #00ffff;">const</span>;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>) <span style="color: #00ffff;">const</span>;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>) <span style="color: #00ffff;">const</span>;
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-6" class="outline-3">
+<h3 id="sec-6-6"><code>template async</code> 函数</h3>
+<div class="outline-text-3" id="text-6-6">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span>... Args&gt;
+<span style="color: #98fb98;">future</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">result_of</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">F</span>&gt;::<span style="color: #98fb98;">type</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;Args&gt;::<span style="color: #98fb98;">type</span>...)&gt;::<span style="color: #98fb98;">type</span>&gt;
+<span style="color: #87cefa;">async</span>(<span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span>... Args&gt;
+<span style="color: #98fb98;">future</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">result_of</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">F</span>&gt;::<span style="color: #98fb98;">type</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">Args</span>&gt;::<span style="color: #98fb98;">type</span>...)&gt;::<span style="color: #98fb98;">type</span>&gt;
+<span style="color: #87cefa;">async</span>(<span style="color: #98fb98;">launch</span> <span style="color: #eedd82;">policy</span>, <span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-7" class="outline-3">
+<h3 id="sec-6-7"><code>template packaged_task</code> 函数</h3>
+<div class="outline-text-3" id="text-6-7">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">class</span>&gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">packaged_task</span>; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">undefined</span>
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>, <span style="color: #00ffff;">class</span>... ArgTypes&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">packaged_task</span>&lt;R(<span style="color: #eedd82;">ArgTypes</span>...)&gt; {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">construction and destruction</span>
+  packaged_task() noexcept;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>&gt;
+  <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">packaged_task</span>(<span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>);
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Allocator</span>&gt;
+  <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">packaged_task</span>(<span style="color: #98fb98;">allocator_arg_t</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">Allocator</span>&amp; <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>);
+  ~packaged_task();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">no copy</span>
+  packaged_task(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">packaged_task</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">packaged_task</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">packaged_task</span>&amp;) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">move support</span>
+  <span style="color: #87cefa;">packaged_task</span>(<span style="color: #98fb98;">packaged_task</span>&amp;&amp; <span style="color: #eedd82;">rhs</span>) noexcept;
+  <span style="color: #98fb98;">packaged_task</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">packaged_task</span>&amp;&amp; rhs) noexcept;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">packaged_task</span>&amp; <span style="color: #eedd82;">other</span>) noexcept;
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">valid</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">result retrieval</span>
+  <span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">R</span>&gt; <span style="color: #87cefa;">get_future</span>();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">execution</span>
+  <span style="color: #98fb98;">void</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">()</span>(ArgTypes... );
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">make_ready_at_thread_exit</span>(ArgTypes...);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">reset</span>();
+};
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>, <span style="color: #00ffff;">class</span>... ArgTypes&gt;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">packaged_task</span>&lt;R(ArgTypes...)&gt;&amp; <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">packaged_task</span>&lt;R(ArgTypes...)&gt;&amp; <span style="color: #eedd82;">y</span>) noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Alloc</span>&gt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">uses_allocator</span>&lt;<span style="color: #98fb98;">packaged_task</span>&lt;<span style="color: #98fb98;">R</span>&gt;, <span style="color: #98fb98;">Alloc</span>&gt;;
+}
+</pre>
+</div>
+</div>
 </div>
 </div>
 
 <div id="outline-container-sec-7" class="outline-2">
-<h2 id="sec-7">其他资料</h2>
+<h2 id="sec-7">Header synopsis</h2>
 <div class="outline-text-2" id="text-7">
 </div><div id="outline-container-sec-7-1" class="outline-3">
-<h3 id="sec-7-1">Books</h3>
+<h3 id="sec-7-1"><code>&lt;thread&gt;</code></h3>
 <div class="outline-text-3" id="text-7-1">
+<p>
+<a id="thread_header" name="thread_header"></a>
+基本概要如下(§30.3 [thread.threads] of N3690):
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Header &lt;thread&gt; synopsis</span>
+<span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">thread</span>;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">swap</span>(<span style="color: #98fb98;">thread</span>&amp; <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">thread</span>&amp; <span style="color: #eedd82;">y</span>) noexcept;
+<span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">this_thread</span> {
+<span style="color: #7fffd4;">thread</span>::<span style="color: #98fb98;">id</span> <span style="color: #87cefa;">get_id</span>() noexcept;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">yield</span>() noexcept;
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">sleep_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>);
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">sleep_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>);
+}
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">其他资料</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+<a id="reference" name="reference"></a>
+</p>
+</div>
+<div id="outline-container-sec-8-1" class="outline-3">
+<h3 id="sec-8-1">Books</h3>
+<div class="outline-text-3" id="text-8-1">
 <ul class="org-ul">
 <li>Scott Meyers的<a href="http://www.artima.com/shop/overview_of_the_new_cpp"> Overview of the New C++ (C++11/14)</a>
 </li>
@@ -440,9 +1038,9 @@ and unlock member functions.
 </div>
 </div>
 
-<div id="outline-container-sec-7-2" class="outline-3">
-<h3 id="sec-7-2">Online resources</h3>
-<div class="outline-text-3" id="text-7-2">
+<div id="outline-container-sec-8-2" class="outline-3">
+<h3 id="sec-8-2">Online resources</h3>
+<div class="outline-text-3" id="text-8-2">
 <ul class="org-ul">
 <li>Scott Meyers的<a href="http://www.aristeia.com/C++11/C++11FeatureAvailability.htm">Summary of C++11 Feature Availability in gcc and MSVC</a>
 </li>
@@ -461,24 +1059,19 @@ and unlock member functions.
 </div>
 </div>
 
-<div id="outline-container-sec-8" class="outline-2">
-<h2 id="sec-8">cc</h2>
-<div class="outline-text-2" id="text-8">
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">cc</h2>
+<div class="outline-text-2" id="text-9">
 <div class="org-src-container">
 
 <pre class="src src-c++"></pre>
-</div>
-
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
 </div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-08-17 Sun 22:10</p>
+<p class="date">Created: 2014-08-18 Mon 22:53</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
