@@ -39,8 +39,7 @@ terminate called after throwing an instance of 'std::system_error'
 * Threads
 ** =<thread>= 概要
 头文件是 =<thread>=, 分为两部分: =thread= 类和在namespace
-=this_thread= 用来管理当前thread的函数.具体见之后的[[thread_header][Header <thread>
-synopsis]].
+=this_thread= 用来管理当前thread的函数.具体见之后的[[thread_header][Header <thread> synopsis]].
 
 ** =thread::id= 类
 =thread::id= 类型的对象为每个执行的线程提供唯一的标识,并为所有并不表示
@@ -184,46 +183,214 @@ initial construct, joinable: 1
 #+end_src
 ** =get_id=
 返回thread对象的 =std::thread::id= 值.
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <thread>
+#include <chrono>
+
+using std::cout;
+using std::endl;
+
+void ThreadFun() {
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+}
+
+int main() {
+  std::thread t1(ThreadFun);
+  std::thread::id id_t1 = t1.get_id();
+  cout << "thread1's id: " << id_t1 << endl;
+  t1.join();
+  return 0;
+}
+#+end_src
 
 ** =native_handle=
+这个函数是implementation-defined. 它允许提供底层实现细节的访问.但实际
+使用它是non-portable. 
+
+实例: 使用 =native_handle= 打开在POSIX系统上C++线程的实时调度.
+#+begin_src c++
+#include <pthread.h>
+#include <thread>
+#include <mutex>
+#include <iostream>  // NOLINT
+#include <chrono>
+#include <cstring>
+using std::cout;
+using std::endl;
+
+std::mutex iomutex;
+void ThreadFun(int thread_id) {
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+  sched_param sch;
+  int policy;
+  pthread_getschedparam(pthread_self(), &policy, &sch);
+  std::lock_guard<std::mutex> lk(iomutex);
+  cout << "Thread " << thread_id << " is executing at priority "
+       << sch.sched_priority << endl;
+}
+
+int main() {
+  std::thread t1(ThreadFun, 1), t2(ThreadFun, 2);
+  sched_param sch;
+  int policy;
+  pthread_getschedparam(t1.native_handle(), &policy, &sch);
+  sch.sched_priority = 20;
+  if (pthread_setschedparam(t1.native_handle(), SCHED_FIFO, &sch)) {
+    cout << "Failed to setschedparam: " << std::strerror(errno) << endl;
+  }
+  t1.join();
+  t2.join();
+  return 0;
+}
+#+end_src
+
+暂时GCC4.8不支持,结果:
+#+begin_src sh
+Failed to setschedparam: Operation not permitted
+Thread 1 is executing at priority 0
+Thread 2 is executing at priority 0
+#+end_src
 ** =hardware_concurrency= (static)
+返回硬件支持的thread数.这个值仅作为参考.如果这个值不可计算或没有很多的
+定义,那么实现返回0.
 
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <thread>
+
+int main() {
+    unsigned int num = std::thread::hardware_concurrency();
+    std::cout << num << " concurrent threads are supported." << std::endl;
+}
+#+end_src
 ** swap
+=swap= 操作用来交换2个线程对象的底层句柄.有2种可选,thread类的成员函数
+和在std下的全局函数.
 
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <thread>
+#include <chrono>
+
+void Thread1Fun() {
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+}
+
+void Thread2Fun() {
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+}
+
+int main() {
+    std::thread t1(Thread1Fun);
+    std::thread t2(Thread2Fun);
+    std::cout << "thread 1 id: " << t1.get_id() << std::endl;
+    std::cout << "thread 2 id: " << t2.get_id() << std::endl;
+
+    std::swap(t1, t2);
+    std::cout << "after std::swap(t1, t2):" << std::endl;
+    std::cout << "thread 1 id: " << t1.get_id() << std::endl;
+    std::cout << "thread 2 id: " << t2.get_id() << std::endl;
+
+    t1.swap(t2);
+    std::cout << "after t1.swap(t2):" << std::endl;
+    std::cout << "thread 1 id: " << t1.get_id() << std::endl;
+    std::cout << "thread 2 id: " << t2.get_id() << std::endl;
+    t1.join();
+    t2.join();
+    return 0;
+}
+#+end_src
 ** 管理当前thread的函数
+在thread的头文件中,加了一个新的namespace =this_thread= 用来包含一些管
+理操作当前thread的一些函数.
 
+#+begin_src c++
+void yield();
+#+end_src
+重新调度线程的执行,让其他线程运行.具体行为依赖于实现,与OS的调度机制有
+关.
+
+#+begin_src c++
+std::thread::id get_id();
+#+end_src
+返回当前线程的 =thread::id= 类型的对象.
+
+#+begin_src c++
+template< class Rep, class Period >
+void sleep_for( const std::chrono::duration<Rep, Period>& sleep_duration );
+#+end_src
+阻塞当前线程的执行至少相对时间 =sleep_duration=.
+
+#+begin_src c++
+template< class Clock, class Duration >
+void sleep_until( const std::chrono::time_point<Clock,Duration>& sleep_time );
+#+end_src
+阻塞当前线程的执行直到绝对时间 =sleep_time= 到达.
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <thread>
+#include <chrono>
+#include <mutex>
+#include <atomic>
+#include <ctime>
+using std::cout;
+using std::endl;
+using std::chrono::system_clock;
+
+std::atomic<bool> ready(false);
+
+void Thread1Fun() {
+  while (!ready) {
+    std::this_thread::yield();
+  }
+  std::thread::id id = std::this_thread::get_id();
+  cout << "thread " << id << "go to sleep" << endl;
+  std::this_thread::sleep_for(std::chrono::seconds(1));
+}
+
+void Thread2Fun() {
+  std::thread::id id = std::this_thread::get_id();
+  cout << "thread " << id << "is running" << endl;
+  ready = true;
+
+  std::time_t tt = system_clock::to_time_t(system_clock::now());
+  struct std::tm *ptm = std::localtime(&tt);
+  ptm->tm_sec += 2;
+  std::this_thread::sleep_until(system_clock::from_time_t(mktime(ptm)));
+}
+
+int main() {
+  std::thread t1(Thread1Fun);
+  std::thread t2(Thread2Fun);
+  t1.join();
+  t2.join();
+  return 0;
+}
+#+end_src
 * Mutual exclusion
 ** =<mutex>= 概要
-头文件 =<mutex>= 分为: mutexes,locks和call once.
-#+begin_src c++
-  Header <mutex> synopsis
-  namespace std {
-  class mutex;
-  class recursive_mutex;
-  class timed_mutex;
-  class recursive_timed_mutex;
-  struct defer_lock_t { };
-  struct try_to_lock_t { };
-  struct adopt_lock_t { };
-  constexpr defer_lock_t defer_lock { };
-  constexpr try_to_lock_t try_to_lock { };
-  constexpr adopt_lock_t adopt_lock { };
-  template <class Mutex> class lock_guard;
-  template <class Mutex> class unique_lock;
-  template <class Mutex>
-  void swap(unique_lock<Mutex>& x, unique_lock<Mutex>& y) noexcept;
-  template <class L1, class L2, class... L3> int try_lock(L1&, L2&, L3&...);
-  template <class L1, class L2, class... L3> void lock(L1&, L2&, L3&...);
-  struct once_flag {
-    constexpr once_flag() noexcept;
-    once_flag(const once_flag&) = delete;
-    once_flag& operator=(const once_flag&) = delete;
-  };
-  template<class Callable, class ...Args>
-  void call_once(once_flag& flag, Callable func, Args&&... args);
-  }
-#+end_src
+头文件 =<mutex>= 分为: mutexes,locks和一些特殊函数. 
+具体见之后的[[mutex_header][Header <mutex> synopsis]].
+
++ *Mutexes* 是[[lockable_types][lockable types]],用来对关键区域代码访问保护: [[mutex_class][=mutex=]],
+  [[recursive_mutex_class][=recursive_mutex=]], [[timed_mutex_class][=timed_mutex=]], [[recursive_timed_mutex_class][=recursive_timed_mutex=]].
++ *Locks* 是用来管理mutex的对象,并对mutex的lifetime自我管
+  理:[[lock_guard_class][=lock_guard=]], [[unique_lock_class][=unique_lock=]].
++ *Functions* 可以同时锁多个mutexes([[try_lock_func][=try_lock=]], [[lock_func][=lock=]]),并使某个函数只
+  被调用一次([[call_once_func][=call_once=]]).
+
+** Lockable types
+<<lockable_types>>
+[[./Files/lockable_type.png]]
+
 ** =mutex= 类
+<<mutex_class>>
+
 #+begin_src c++
   namespace std {
   class mutex {
@@ -241,6 +408,8 @@ initial construct, joinable: 1
   }
 #+end_src
 ** =recursive_mutex= 类
+<<recursive_mutex_class>>
+
 #+begin_src c++
   namespace std {
   class recursive_mutex {
@@ -258,6 +427,7 @@ initial construct, joinable: 1
   }
 #+end_src
 ** =timed_mutex= 类
+<<timed_mutex_class>>
 #+begin_src c++
   namespace std {
   class timed_mutex {
@@ -279,6 +449,8 @@ initial construct, joinable: 1
   }
 #+end_src
 ** =recursive_timed_mutex= 类
+<<recursive_timed_mutex_class>>
+
 #+begin_src c++
   namespace std {
   class recursive_timed_mutex {
@@ -300,6 +472,7 @@ initial construct, joinable: 1
   }
 #+end_src
 ** =lock_guard= 类
+<<lock_guard_class>>
 #+begin_src c++
   namespace std {
   template <class Mutex>
@@ -317,6 +490,7 @@ initial construct, joinable: 1
   }
 #+end_src
 ** =unique_lock= 类
+<<unique_lock_class>>
 #+begin_src c++
   namespace std {
   template <class Mutex>
@@ -383,6 +557,12 @@ of the lock from one instance to another.
 
 So you always use lock_guard, unless you need the capabilities of
 unique_lock. A condition_variable needs a unique_lock.
+** =try_lock= 和 =lock=
+<<try_lock_func>>
+
+<<lock_func>>
+** =call_once=
+<<call_once_func>>
 * Condition variables
 ** =<condition_variable>= 概要
 #+begin_src c++
@@ -478,57 +658,9 @@ std::condition_variable_any can operate on any objects that have lock
 and unlock member functions.
 * Futures
 ** =<future>= 概要
-#+begin_src c++
-namespace std {
-enum class future_errc {
-broken_promise = implementation-defined ,
-future_already_retrieved = implementation-defined ,
-promise_already_satisfied = implementation-defined ,
-no_state = implementation-defined
-};
-enum class launch : unspecified {
-async = unspecified ,
-deferred = unspecified ,
-implementation-defined
-};
-enum class future_status {
-ready,
-timeout,
-deferred
-};
-template <> struct is_error_code_enum<future_errc> : public true_type { };
-error_code make_error_code(future_errc e) noexcept;
-error_condition make_error_condition(future_errc e) noexcept;
-const error_category& future_category() noexcept;
-class future_error;
-template <class R> class promise;
-template <class R> class promise<R&>;
-template <> class promise<void>;
-template <class R>
-void swap(promise<R>& x, promise<R>& y) noexcept;
-template <class R, class Alloc>
-struct uses_allocator<promise<R>, Alloc>;
-template <class R> class future;
-template <class R> class future<R&>;
-template <> class future<void>;
-template <class R> class shared_future;
-template <class R> class shared_future<R&>;
-template <> class shared_future<void>;
-template <class> class packaged_task; // undefined
-template <class R, class... ArgTypes>
-class packaged_task<R(ArgTypes...)>;
-template <class R>
-void swap(packaged_task<R(ArgTypes...)>&, packaged_task<R(ArgTypes...)>&) noexcept;
-template <class R, class Alloc>
-struct uses_allocator<packaged_task<R>, Alloc>;
-template <class F, class... Args>
-future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
-async(F&& f, Args&&... args);
-template <class F, class... Args>
-future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
-async(launch policy, F&& f, Args&&... args);
-}
-#+end_src
+
+<<future_header>>
+
 ** =future_error= 类
 #+begin_src c++
   namespace std {
@@ -687,7 +819,89 @@ void sleep_for(const chrono::duration<Rep, Period>& rel_time);
 }
 }
 #+end_src
-
+** =<mutex>= 
+<<mutex_header>>
+#+begin_src c++
+  // Header <mutex> synopsis
+  namespace std {
+  class mutex;
+  class recursive_mutex;
+  class timed_mutex;
+  class recursive_timed_mutex;
+  struct defer_lock_t { };
+  struct try_to_lock_t { };
+  struct adopt_lock_t { };
+  constexpr defer_lock_t defer_lock { };
+  constexpr try_to_lock_t try_to_lock { };
+  constexpr adopt_lock_t adopt_lock { };
+  template <class Mutex> class lock_guard;
+  template <class Mutex> class unique_lock;
+  template <class Mutex>
+  void swap(unique_lock<Mutex>& x, unique_lock<Mutex>& y) noexcept;
+  template <class L1, class L2, class... L3> int try_lock(L1&, L2&, L3&...);
+  template <class L1, class L2, class... L3> void lock(L1&, L2&, L3&...);
+  struct once_flag {
+    constexpr once_flag() noexcept;
+    once_flag(const once_flag&) = delete;
+    once_flag& operator=(const once_flag&) = delete;
+  };
+  template<class Callable, class ...Args>
+  void call_once(once_flag& flag, Callable func, Args&&... args);
+  }
+#+end_src
+** =<future>= 
+<<future_header>>
+#+begin_src c++
+namespace std {
+enum class future_errc {
+broken_promise = implementation-defined ,
+future_already_retrieved = implementation-defined ,
+promise_already_satisfied = implementation-defined ,
+no_state = implementation-defined
+};
+enum class launch : unspecified {
+async = unspecified ,
+deferred = unspecified ,
+implementation-defined
+};
+enum class future_status {
+ready,
+timeout,
+deferred
+};
+template <> struct is_error_code_enum<future_errc> : public true_type { };
+error_code make_error_code(future_errc e) noexcept;
+error_condition make_error_condition(future_errc e) noexcept;
+const error_category& future_category() noexcept;
+class future_error;
+template <class R> class promise;
+template <class R> class promise<R&>;
+template <> class promise<void>;
+template <class R>
+void swap(promise<R>& x, promise<R>& y) noexcept;
+template <class R, class Alloc>
+struct uses_allocator<promise<R>, Alloc>;
+template <class R> class future;
+template <class R> class future<R&>;
+template <> class future<void>;
+template <class R> class shared_future;
+template <class R> class shared_future<R&>;
+template <> class shared_future<void>;
+template <class> class packaged_task; // undefined
+template <class R, class... ArgTypes>
+class packaged_task<R(ArgTypes...)>;
+template <class R>
+void swap(packaged_task<R(ArgTypes...)>&, packaged_task<R(ArgTypes...)>&) noexcept;
+template <class R, class Alloc>
+struct uses_allocator<packaged_task<R>, Alloc>;
+template <class F, class... Args>
+future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
+async(F&& f, Args&&... args);
+template <class F, class... Args>
+future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
+async(launch policy, F&& f, Args&&... args);
+}
+#+end_src
 * 其他资料
 <<reference>>
 ** Books
