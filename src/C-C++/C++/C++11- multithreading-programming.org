@@ -388,9 +388,31 @@ int main() {
 <<lockable_types>>
 [[./Files/lockable_type.png]]
 
+C++11为mutex定义了不同类型的要求,如上图的层次,往右要求逐渐加强.
+
+*** BasicLockable
+BasicLockable 概念描述了最少特性类型,也就是满足(若m是BasicLockable类型
+):
++ =m.lock()=
++ =m.unlock()=
+
+所以所有mutex都满足BasicLockable类型: =mutex=, =recursive_mutex=,
+=timed_mutex=, =recursive_timed_mutex=, =unique_lock=.
+*** Lockable
+Lockable 概念扩展了 BasicLockable 概念,并支持 =try_lock=. 
+
+所以这些mutex满足Lockable类型: =mutex=, =recursive_mutex=,
+=timed_mutex=, =recursive_timed_mutex=.
+*** TimedLockable
+TimedLockable 概念扩展了 Lockable 概念,并支持 =try_lock_for= 和
+=try_lock_until=. 
+
+所以这些mutex满足TimedLockable类型: =timed_mutex=,
+=recursive_timed_mutex=.
+
 ** =mutex= 类
 <<mutex_class>>
-
+=mutex= 类提供了一个不可递归的排它锁.基本接口可以从如下类中参考.
 #+begin_src c++
   namespace std {
   class mutex {
@@ -407,9 +429,45 @@ int main() {
   };
   }
 #+end_src
-** =recursive_mutex= 类
-<<recursive_mutex_class>>
 
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <vector>
+#include <thread>
+#include <mutex>
+using std::cout;
+using std::endl;
+using std::vector;
+
+int g_value = 0;
+std::mutex count_mutex;
+
+void Increase() {
+  const int kLoops = 100;
+  for (int i = 0; i < kLoops; ++i) {
+    count_mutex.lock();
+    g_value++;
+    count_mutex.unlock();
+  }
+}
+
+int main(int argc, char *argv[]) {
+  const int kNumThreads = 5;
+  vector<std::thread> threads;
+  for (int i = 0; i < kNumThreads; ++i) {
+    threads.push_back(std::thread(Increase));
+  }
+  for (auto &thread : threads) {
+    thread.join();
+  }
+  cout << "value = " << g_value << endl;
+  return 0;
+}
+#+end_src
+** =recursive_mutex= 类
+<<recursive_mutex_class>>可递归的排它锁.如下基本接口如 =mutex= 基本一
+样.
 #+begin_src c++
   namespace std {
   class recursive_mutex {

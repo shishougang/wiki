@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>C++11 multithreading programming</title>
-<!-- 2014-08-19 Tue 23:23 -->
+<!-- 2014-08-20 Wed 23:09 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -756,15 +756,63 @@ Thread 2 is executing at priority 0
 <a id="lockable_types" name="lockable_types"></a>
 <img src="./Files/lockable_type.png" alt="lockable_type.png" />
 </p>
+
+<p>
+C++11为mutex定义了不同类型的要求,如上图的层次,往右要求逐渐加强.
+</p>
 </div>
+
+<ul class="org-ul"><li>BasicLockable<br  /><div class="outline-text-4" id="text-4-2-1">
+<p>
+BasicLockable 概念描述了最少特性类型,也就是满足(若m是BasicLockable类型
+):
+</p>
+<ul class="org-ul">
+<li><code>m.lock()</code>
+</li>
+<li><code>m.unlock()</code>
+</li>
+</ul>
+
+<p>
+所以所有mutex都满足BasicLockable类型: <code>mutex</code>, <code>recursive_mutex</code>,
+<code>timed_mutex</code>, <code>recursive_timed_mutex</code>, <code>unique_lock</code>.
+</p>
+</div>
+</li>
+
+<li>Lockable<br  /><div class="outline-text-4" id="text-4-2-2">
+<p>
+Lockable 概念扩展了 BasicLockable 概念,并支持 <code>try_lock</code>. 
+</p>
+
+<p>
+所以这些mutex满足Lockable类型: <code>mutex</code>, <code>recursive_mutex</code>,
+<code>timed_mutex</code>, <code>recursive_timed_mutex</code>.
+</p>
+</div>
+</li>
+
+<li>TimedLockable<br  /><div class="outline-text-4" id="text-4-2-3">
+<p>
+TimedLockable 概念扩展了 Lockable 概念,并支持 <code>try_lock_for</code> 和
+<code>try_lock_until</code>. 
+</p>
+
+<p>
+所以这些mutex满足TimedLockable类型: <code>timed_mutex</code>,
+<code>recursive_timed_mutex</code>.
+</p>
+</div>
+</li></ul>
 </div>
 <div id="outline-container-sec-4-3" class="outline-3">
 <h3 id="sec-4-3"><code>mutex</code> 类</h3>
 <div class="outline-text-3" id="text-4-3">
 <p>
 <a id="mutex_class" name="mutex_class"></a>
+<code>mutex</code> 类提供了一个不可递归的排它锁.基本接口可以从如下类中参考.
 </p>
-
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -783,6 +831,46 @@ Thread 2 is executing at priority 0
 }
 </pre>
 </div>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;vector&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;thread&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;mutex&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">cout</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">endl</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">vector</span>;
+
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">g_value</span> = 0;
+<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span> <span style="color: #eedd82;">count_mutex</span>;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Increase</span>() {
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kLoops</span> = 100;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kLoops; ++i) {
+    count_mutex.lock();
+    g_value++;
+    count_mutex.unlock();
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kNumThreads</span> = 5;
+  <span style="color: #98fb98;">vector</span>&lt;<span style="color: #7fffd4;">std</span>::thread&gt; <span style="color: #eedd82;">threads</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kNumThreads; ++i) {
+    threads.push_back(<span style="color: #7fffd4;">std</span>::thread(Increase));
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #00ffff;">auto</span> &amp;<span style="color: #eedd82;">thread</span> : threads) {
+    thread.join();
+  }
+  cout &lt;&lt; <span style="color: #ffa07a;">"value = "</span> &lt;&lt; g_value &lt;&lt; endl;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
 </div>
 </div>
 
@@ -790,9 +878,8 @@ Thread 2 is executing at priority 0
 <h3 id="sec-4-4"><code>recursive_mutex</code> 类</h3>
 <div class="outline-text-3" id="text-4-4">
 <p>
-<a id="recursive_mutex_class" name="recursive_mutex_class"></a>
+<a id="recursive_mutex_class" name="recursive_mutex_class"></a>可递归的排它锁.如下基本接口如 <code>mutex</code> 基本一样.
 </p>
-
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -1521,7 +1608,7 @@ constexpr <span style="color: #98fb98;">adopt_lock_t</span> <span style="color: 
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-08-19 Tue 23:23</p>
+<p class="date">Created: 2014-08-20 Wed 23:09</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
