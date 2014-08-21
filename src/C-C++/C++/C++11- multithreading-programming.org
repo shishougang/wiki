@@ -529,8 +529,34 @@ int main(int argc, char *argv[]) {
   };
   }
 #+end_src
+** Mutex Exception safety
+基本保证: 当exception被以上 mutex 的成员函数抛出时,这些mutex对象保持有效
+状态. 如果是 =lock= 操作被exception, lock不会被抛出exception的线程所拥
+有.
+
+抛出的是一个 =system_error= exception, 导致的基本情况是:
+| exception 类型 | error情况                             | 描述                   |
+|----------------+---------------------------------------+------------------------|
+| =system_error= | =errc::resource_deadlock_would_occur= | deadlock被检测到       |
+| =system_error= | =errc::operation_not_permitted=       | 线程没有权利做这个操作 |
+| =system_error= | =errc::device_or_resource_busy=       | native handle已经被锁  |
+
 ** =lock_guard= 类
 <<lock_guard_class>>
+
+之前的mutex必须写明lock和unlock调用,如果在lock和unlock之间产生
+exception,那么必须在exception处理中不能忘记处理unlock.当只是在一个关键区域
+内需要mutex保护,使用这样的mutex既不方便也容易忘记unlock而造成死锁.
+
+引入对之前的mutex的封装后的 =lock_guard= 和 =unique_lock= ,提供易用性
+的 [[http://en.wikipedia.com/wiki/Resource_Acquisition_Is_Initialization][RAII-style]] 机制来获取锁在一段区域内.
+
+lock guard 是一个用来管理一个 mutex 对象,并保持锁住它的对象.
+
+在构造时,mutex 对象被调用的线程锁住,然后在析构时,mutex 被解锁.它是最简
+单的lock,并且作为自动作用范围直到它的作用区域结束时特别有用.通过这种方
+法,它保证 mutex 对象得到解锁即使在exception被抛出时.
+
 #+begin_src c++
   namespace std {
   template <class Mutex>
@@ -547,8 +573,55 @@ int main(int argc, char *argv[]) {
   };
   }
 #+end_src
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <thread>
+#include <mutex>
+#include <stdexcept>
+
+std::mutex mtx;
+
+void PrintEven(int x) {
+  if (x % 2 == 0) {
+    std::cout << x << " is even\n";
+  } else {
+    throw(std::logic_error("not even"));
+  }
+}
+
+void PrintThreadEvenId(int id) {
+  try {
+    std::lock_guard<std::mutex> lck(mtx);
+    PrintEven(id);
+  } catch (std::logic_error&) {
+    std::cout << "[exception caught]" << std::endl;
+  }
+}
+
+int main() {
+  std::thread threads[10];
+  for (int i = 0; i < 10; ++i) {
+    threads[i] = std::thread(PrintThreadEvenId, i+1);
+  }
+  for (auto& th : threads) {
+    th.join();
+  }
+  return 0;
+}
+#+end_src
 ** =unique_lock= 类
 <<unique_lock_class>>
+
+=unique_lock= 与上面的 =lock_guard= 基本差不多,同样是 [[http://en.wikipedia.com/wiki/Resource_Acquisition_Is_Initialization][RAII-style]] 机制
+来获取锁在一段区域内的对象.
+
+但 =lock_guard= 非常简单,只提供构造自动拥有锁和析构释放锁,如果需要一些
+其他的操作,那么就需要更复杂和接口更多的类来处理, =lock_guard= 能满足如
+此要求. 它类基本接口如下.
+
+*** class
 #+begin_src c++
   namespace std {
   template <class Mutex>
@@ -593,7 +666,59 @@ int main(int argc, char *argv[]) {
   void swap(unique_lock<Mutex>& x, unique_lock<Mutex>& y) noexcept;
   }
 #+end_src
-*** more 
+*** lock type
+在[[mutex_header][mutex header概要]]中可以看到构造不同 =unique_lock= 对象传入不同的类型:
+
+#+begin_src c++
+struct defer_lock_t { };
+struct try_to_lock_t { };
+struct adopt_lock_t { };
+constexpr std::defer_lock_t defer_lock = std::defer_lock_t();
+constexpr std::try_to_lock_t try_to_lock = std::try_to_lock_t();
+constexpr std::adopt_lock_t adopt_lock = std::adopt_lock_t();
+#+end_src
+
+*** 实例
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <mutex>
+#include <thread>
+#include <chrono>
+using std::cout;
+using std::endl;
+
+struct Box {
+  explicit Box(int num) : num_things{num} {}
+  int num_things;
+  std::mutex m;
+};
+
+void Transfer(Box *from, Box *to, int num) {
+  // don't actually take the locks yet
+  std::unique_lock<std::mutex> lock1(from->m, std::defer_lock);
+  std::unique_lock<std::mutex> lock2(to->m, std::defer_lock);
+  // lock both unique_locks without deadlock
+  std::lock(lock1, lock2);
+  from->num_things -= num;
+  to->num_things += num;
+  // 'from.m' and 'to.m' mutexes unlocked in 'unique_lock' dtors
+}
+
+int main() {
+  Box acc1(100);
+  Box acc2(50);
+  cout << "acc1 num = " << acc1.num_things <<
+      " ,acc2 num = " << acc2.num_things << endl;
+  std::thread t1(Transfer, &acc1, &acc2, 10);
+  std::thread t2(Transfer, &acc2, &acc1, 5);
+  t1.join();
+  t2.join();
+  cout << "after transfer: " << "acc1 num = " << acc1.num_things <<
+      " ,acc2 num = " << acc2.num_things << endl;
+  return 0;
+}
+#+end_src
+** =lock_guard= VS =unique_lock=
 
 + lock multiple:
   http://stackoverflow.com/questions/17113619/whats-the-best-way-to-lock-multiple-stdmutexes/17113678#17113678
