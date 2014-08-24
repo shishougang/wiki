@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>C++11 multithreading programming</title>
-<!-- 2014-08-23 Sat 23:00 -->
+<!-- 2014-08-24 Sun 23:29 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -178,18 +178,18 @@ for the JavaScript code in this tag.
 <li><a href="#sec-5-1"><code>&lt;condition_variable&gt;</code> 概要</a></li>
 <li><a href="#sec-5-2"><code>condition_variable</code> 类</a></li>
 <li><a href="#sec-5-3"><code>condition_variable_any</code> 类</a></li>
-<li><a href="#sec-5-4"><code>condition_variable</code> vs <code>condition_variable_any</code></a></li>
+<li><a href="#sec-5-4"><code>condition_variable</code> VS <code>condition_variable_any</code></a></li>
 </ul>
 </li>
-<li><a href="#sec-6">Futures</a>
+<li><a href="#sec-6">Future</a>
 <ul>
 <li><a href="#sec-6-1"><code>&lt;future&gt;</code> 概要</a></li>
-<li><a href="#sec-6-2"><code>future_error</code> 类</a></li>
+<li><a href="#sec-6-2">Error handling</a></li>
 <li><a href="#sec-6-3"><code>template promise</code> 类</a></li>
-<li><a href="#sec-6-4"><code>template future</code> 类</a></li>
-<li><a href="#sec-6-5"><code>template shared_future</code> 类</a></li>
-<li><a href="#sec-6-6"><code>template async</code> 函数</a></li>
-<li><a href="#sec-6-7"><code>template packaged_task</code> 函数</a></li>
+<li><a href="#sec-6-4"><code>template packaged_task</code> 函数</a></li>
+<li><a href="#sec-6-5"><code>template future</code> 类</a></li>
+<li><a href="#sec-6-6"><code>template shared_future</code> 类</a></li>
+<li><a href="#sec-6-7">template async 函数</a></li>
 </ul>
 </li>
 <li><a href="#sec-7">Header synopsis</a>
@@ -1412,6 +1412,9 @@ constexpr <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;
 </div><div id="outline-container-sec-5-1" class="outline-3">
 <h3 id="sec-5-1"><code>&lt;condition_variable&gt;</code> 概要</h3>
 <div class="outline-text-3" id="text-5-1">
+<p>
+<code>&lt;condition_variable&gt;</code> 头文件主要包含两个 <code>condition_variable</code> 类, 一个全局函数.
+</p>
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -1424,6 +1427,10 @@ constexpr <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;
 </div>
 </div>
 <ul class="org-ul"><li><code>cv_status</code><br  /><div class="outline-text-4" id="text-5-1-1">
+<p>
+Condition variables与mutex之类在等待timeout时,返回的不一样,mutex之类放回 <code>bool</code> 类型, 而Condition variables特意为它定义了 <code>enum</code> 类型:
+<code>no_timeout</code> 和 <code>timeout</code>, 来判断等待是否成功.
+</p>
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">enum</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">cv_status</span> { <span style="color: #eedd82;">no_timeout</span>, <span style="color: #eedd82;">timeout</span> };
@@ -1431,49 +1438,68 @@ constexpr <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;
 </div>
 
 <ul class="org-ul">
-<li>cv<sub>status</sub>::no<sub>timeout</sub> The function returned without a timeout (i.e.,
+<li><code>cv_status::no_timeout</code> The function returned without a timeout (i.e.,
 it was notified).
 </li>
-<li>cv<sub>status</sub>::timeout        The function returned because it reached its
+<li><code>cv_status::timeout</code> The function returned because it reached its
 time limit (timeout).
 </li>
 </ul>
 </div>
 </li>
-
 <li><code>notify_all_at_thread_exit</code><br  /><div class="outline-text-4" id="text-5-1-2">
-<p>
-It operates as follows:
-</p>
-
-<p>
-Ownership of the previously acquired lock lk is transferred to internal storage. 
-</p>
-
-<p>
-The execution environment is modified such that when the current thread exits, the condition variable cond is notified as if by: 
-</p>
-
-<p>
-Calling this function if lock.mutex() is not locked by the current
-thread is undefined behavior.
-</p>
-
-<p>
-Calling this function if lock.mutex() is not the same mutex as the one
-used by all other threads that are currently waiting on the same
-condition variable is undefined behavior. 
-</p>
-
 <div class="org-src-container">
 
-<pre class="src src-c++">lck.unlock();
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">notify_all_at_thread_exit</span>(<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">condition_variable</span>&amp; <span style="color: #eedd82;">cond</span>,
+                                <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #7fffd4;">std</span>::mutex&gt; <span style="color: #eedd82;">lk</span>);
+</pre>
+</div>
+<p>
+<code>&lt;condition_variable&gt;</code> 头文件中有这个函数,它提供机制notify其他线程在调用这个函数的线程退出时. 它相当于操作(并包括清理所有 <code>thread_local</code> 对象):
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++">lk.unlock();
 cond.notify_all();
 </pre>
 </div>
+
+<p>
+虽然可以在调用线程的最后同样调用如上两句代码,但意图没有表现出来,表明
+cond的notify必须在线程退出时调用,后面维护者可能会在这之后继续添加代码.
+<code>notify_all_at_thread_exit</code> 用一句调用替代两个调用,既不用在函数最后去调用它,而且表明它的意图.
+</p>
+
+<p>
+它的操作流程如下:
+</p>
+<ol class="org-ol">
+<li>之前获取的锁lk的拥有权被转移到cond的内部.
+</li>
+<li>当此线程退出时, cond被notified通过:
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c++">lk.unlock();
+cond.notify_all();
+</pre>
+</div>
+
+<p>
+<b>Notes</b>
+</p>
+<ul class="org-ul">
+<li>如果 <code>lk.mutex()</code> 没有被当前线程锁住,调用此函数导致undefined behavior.
+</li>
+<li>如果 <code>lk.mutex()</code> 的 mutex 不是其他线程使用来等待 condition variable
+的同一个的话, 调用此函数导致undefined behavior.
+</li>
+</ul>
 </div>
 </li></ul>
 </div>
+
 <div id="outline-container-sec-5-2" class="outline-3">
 <h3 id="sec-5-2"><code>condition_variable</code> 类</h3>
 <div class="outline-text-3" id="text-5-2">
@@ -1508,6 +1534,90 @@ cond.notify_all();
   <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">implementation</span>-defined native_handle_type; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
   <span style="color: #98fb98;">native_handle_type</span> <span style="color: #87cefa;">native_handle</span>(); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">See 30.2.3</span>
 };
+}
+</pre>
+</div>
+<p>
+Condition Variable的基本概念可以从之前篇<a href="http://dreamrunner.org/blog/2014/08/07/C-multithreading-programming/#sec-5-4">浅谈C++ Multithreading
+ Programming</a>中获取.
+</p>
+
+<p>
+<code>condition_variable</code> 类的 <code>void wait(unique_lock&lt;mutex&gt;&amp; lock,
+Predicate pred);</code> 接口:
+</p>
+<ul class="org-ul">
+<li>需要传入 <code>unique_lock</code>.
+</li>
+<li><code>pred</code> 函数, 如果predicate返回 <code>false</code> ,等待. 相当于:
+</li>
+</ul>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">while</span> (!pred()) {
+    wait(lock);
+}
+</pre>
+</div>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;thread&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;mutex&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;condition_variable&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">string</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">cout</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">endl</span>;
+
+<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span> <span style="color: #eedd82;">m</span>;
+<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">condition_variable</span> <span style="color: #eedd82;">cv</span>;
+<span style="color: #98fb98;">string</span> <span style="color: #eedd82;">data</span>;
+<span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">g_ready</span> = <span style="color: #7fffd4;">false</span>;
+<span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">g_processed</span> = <span style="color: #7fffd4;">false</span>;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">WorkerThread</span>() {
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Wait until main() sends data</span>
+    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #eedd82;">lk</span>(m);
+    cv.wait(lk, []{<span style="color: #00ffff;">return</span> g_ready;});
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">after the wait, we own the lock.</span>
+    cout &lt;&lt; <span style="color: #ffa07a;">"Worker thread is processing data"</span> &lt;&lt; endl;
+    data += <span style="color: #ffa07a;">" after processing"</span>;
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Send data back to main()</span>
+    g_processed = <span style="color: #7fffd4;">true</span>;
+    cout &lt;&lt; <span style="color: #ffa07a;">"Worker thread signals data processing completed"</span> &lt;&lt; endl;
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Manual unlocking is done before notifying, to avoid</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">that the waiting thread gets blocked again.</span>
+    lk.unlock();
+    cv.notify_one();
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">worker</span>(WorkerThread);
+     data = <span style="color: #ffa07a;">"Example data"</span>;
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">send data to the worker thread</span>
+    {
+        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">lock_guard</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #eedd82;">lk</span>(m);
+        g_ready = <span style="color: #7fffd4;">true</span>;
+        cout &lt;&lt; <span style="color: #ffa07a;">"main() signals data ready for processing"</span> &lt;&lt; endl;
+    }
+    cv.notify_one();
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">wait for the worker</span>
+    {
+        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #eedd82;">lk</span>(m);
+        cv.wait(lk, []{<span style="color: #00ffff;">return</span> g_processed;});
+    }
+    cout &lt;&lt; <span style="color: #ffa07a;">"Back in main(), data = "</span> &lt;&lt; data &lt;&lt; <span style="color: #ffa07a;">'\n'</span>;
+    worker.join();
+    <span style="color: #00ffff;">return</span> 0;
 }
 </pre>
 </div>
@@ -1546,58 +1656,138 @@ cond.notify_all();
 }
 </pre>
 </div>
+
+<p>
+<code>condition_variable_any</code> 是 <code>condition_variable</code> 的一个通用版,它可以等待任何满足 BasicLockable 要求Lock类型的对象.其他与 <code>condition_variable</code>
+一样.
+</p>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;condition_variable&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;thread&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;chrono&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;vector&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">cout</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">endl</span>;
+
+<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">condition_variable_any</span> <span style="color: #eedd82;">cv</span>;
+<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span> <span style="color: #eedd82;">cv_m</span>;  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">This mutex is used for three purposes:</span>
+                  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">1) to synchronize accesses to i</span>
+                  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">2) to synchronize accesses to std::cout</span>
+                  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">3) for the condition variable cv</span>
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">g_wait_val</span> = 0;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">WaitVal</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id</span>) {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #eedd82;">lk</span>(cv_m);
+  cout &lt;&lt; <span style="color: #ffa07a;">"thread "</span> &lt;&lt; id &lt;&lt; <span style="color: #ffa07a;">" Waiting... "</span> &lt;&lt; endl;
+  cv.wait(lk, []{<span style="color: #00ffff;">return</span> g_wait_val == 1;});
+  cout &lt;&lt; <span style="color: #ffa07a;">"...finished waiting,"</span> &lt;&lt; <span style="color: #ffa07a;">"thread "</span> &lt;&lt; id &lt;&lt; endl;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Signals</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">this_thread</span>::sleep_for(<span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">chrono</span>::seconds(1));
+  {
+    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">lock_guard</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #eedd82;">lk</span>(cv_m);
+    cout &lt;&lt; <span style="color: #ffa07a;">"Notifying..."</span> &lt;&lt; endl;
+  }
+  cv.notify_all();
+  <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">this_thread</span>::sleep_for(<span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">chrono</span>::seconds(1));
+  {
+    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">lock_guard</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #eedd82;">lk</span>(cv_m);
+    g_wait_val = 1;
+    cout &lt;&lt; <span style="color: #ffa07a;">"Notifying again..."</span> &lt;&lt; endl;
+  }
+  cv.notify_all();
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">vector</span>&lt;<span style="color: #7fffd4;">std</span>::thread&gt; <span style="color: #eedd82;">threads</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; 3; ++i) {
+    threads.emplace_back(WaitVal, i);
+  }
+  threads.emplace_back(Signals);
+  <span style="color: #00ffff;">for</span> (<span style="color: #00ffff;">auto</span>&amp; <span style="color: #eedd82;">t</span> : threads) {
+        t.join();
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
 </div>
 </div>
 
 <div id="outline-container-sec-5-4" class="outline-3">
-<h3 id="sec-5-4"><code>condition_variable</code> vs <code>condition_variable_any</code></h3>
+<h3 id="sec-5-4"><code>condition_variable</code> VS <code>condition_variable_any</code></h3>
 <div class="outline-text-3" id="text-5-4">
 <p>
-std::condition<sub>variable</sub> is more specialized, and therefore can be more
-efficient when you don't need the flexibility of
-std::condition<sub>variable</sub><sub>any</sub>.
-</p>
-
-
-<p>
-From N3290 §30.5[thread.condition]/1
+引自N3690 §30.5[thread.condition]:
 </p>
 
 <p>
-Class condition<sub>variable</sub> provides a condition variable that can only
-wait on an object of type unique<sub>lock</sub>&lt;mutex&gt;, allowing maximum
-efficiency on some platforms. Class condition<sub>variable</sub><sub>any</sub> provides a
+Class <code>condition_variable</code> provides a condition variable that can only
+wait on an object of type <code>unique_lock&lt;mutex&gt;</code> , allowing maximum
+efficiency on some platforms. Class <code>condition_variable_any</code> provides a
 general condition variable that can wait on objects of user-supplied
 lock types.
 </p>
 
-
 <p>
-When using std::condition<sub>variable</sub><sub>any</sub>, there is potential for
-additional costs in terms of size, performance or operating system
-resources, because it is more general than std::condition<sub>variable</sub>.
-std::condition<sub>variable</sub> works with std::unique<sub>lock</sub>&lt;std::mutex&gt;, while
-std::condition<sub>variable</sub><sub>any</sub> can operate on any objects that have lock
-and unlock member functions.
+<code>condition_variable</code> 只与 <code>unique_lock&lt;mutex&gt;</code> 类型对象关联,在某些平台上,它可以更好的得到特定的优化,如果不需要
+<code>condition_variable_any</code> 的灵活性, 选更高效的 <code>condition_variable</code> 对象使用.
 </p>
 </div>
 </div>
 </div>
-
 <div id="outline-container-sec-6" class="outline-2">
-<h2 id="sec-6">Futures</h2>
+<h2 id="sec-6">Future</h2>
 <div class="outline-text-2" id="text-6">
 </div><div id="outline-container-sec-6-1" class="outline-3">
 <h3 id="sec-6-1"><code>&lt;future&gt;</code> 概要</h3>
 <div class="outline-text-3" id="text-6-1">
 <p>
-<a id="future_header" name="future_header"></a>
+如果要异步的获取一个函数的运行结果, 可以创建一个线程,并利用Condition
+varialbes 来同步线程间使得另外线程正确获取到这个结果. 但C++11的
+<code>future</code> 库使得这一过程更方便, 它提供接口使程序在一个线程中获取一个在同一个或其他线程中运行的函数的结果(值或异常), (这些类使用并不限制在
+multi-threaded 程序中,同样可以在 single-threaded 使用.
 </p>
+
+<p>
+<a href="#future_header">future的概要</a>主要分为:
+</p>
+<ul class="org-ul">
+<li>运行函数提供共享结果的Providers类: <code>promise</code> 和 <code>packaged_task</code> .
+</li>
+<li>获取共享结果的Futures类: <code>future</code> 和 <code>shared_future</code> .
+</li>
+<li>Error handling: <code>future_error</code> , <code>future_errc</code> 等.
+</li>
+<li>Providers提供函数: <code>async</code> .
+</li>
+</ul>
 </div>
 </div>
 <div id="outline-container-sec-6-2" class="outline-3">
-<h3 id="sec-6-2"><code>future_error</code> 类</h3>
+<h3 id="sec-6-2">Error handling</h3>
 <div class="outline-text-3" id="text-6-2">
+</div><ul class="org-ul"><li><code>future_error</code> 类<br  /><div class="outline-text-4" id="text-6-2-1">
+
+<div class="figure">
+<p><img src="./Files/future_error.png" alt="future_error.png" />
+</p>
+</div>
+
+<p>
+<code>future_error</code> 类定义对future对象非法操作抛出异常的对象类型. 也就是专门为future库中接口出现异常提供特定的异常类.
+</p>
+
+<p>
+从上图类图可知,这个类继承自 <a href="http://www.cplusplus.com/logic_error"><code>logic_error</code></a> , 并添加获取<a href="http://www.cplusplus.com/error_code"> <code>error_code</code></a> 的成员函数 <code>code</code> , 获取exception信息的 <code>what</code> 成员函数.
+</p>
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -1611,7 +1801,33 @@ and unlock member functions.
 <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">error_code</span>&amp; <span style="color: #87cefa;">code</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
 </pre>
 </div>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;future&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">empty</span>;
+  <span style="color: #00ffff;">try</span> {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = empty.get();
+  } <span style="color: #00ffff;">catch</span> (<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future_error</span>&amp; <span style="color: #eedd82;">e</span>) {
+    <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"Caught a future_error with code \""</span> &lt;&lt; e.code()
+              &lt;&lt; <span style="color: #ffa07a;">"\"\nMessage: \""</span> &lt;&lt; e.what() &lt;&lt; <span style="color: #ffa07a;">"\"\n"</span>;
+  }
+}
+</pre>
 </div>
+</div>
+</li>
+
+<li>future<sub>errc</sub><br  /></li>
+
+
+<li>future<sub>status</sub><br  /></li></ul>
 </div>
 
 <div id="outline-container-sec-6-3" class="outline-3">
@@ -1653,88 +1869,8 @@ and unlock member functions.
 </div>
 </div>
 <div id="outline-container-sec-6-4" class="outline-3">
-<h3 id="sec-6-4"><code>template future</code> 类</h3>
+<h3 id="sec-6-4"><code>template packaged_task</code> 函数</h3>
 <div class="outline-text-3" id="text-6-4">
-<div class="org-src-container">
-
-<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
-<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt;
-<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future</span> {
- <span style="color: #00ffff;">public</span>:
-  <span style="color: #87cefa;">future</span>() noexcept;
-  <span style="color: #87cefa;">future</span>(<span style="color: #98fb98;">future</span> &amp;&amp;) noexcept;
-  <span style="color: #87cefa;">future</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">future</span>&amp; <span style="color: #eedd82;">rhs</span>) = <span style="color: #00ffff;">delete</span>;
-  ~<span style="color: #87cefa;">future</span>();
-  <span style="color: #98fb98;">future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">future</span>&amp; <span style="color: #eedd82;">rhs</span>) = <span style="color: #00ffff;">delete</span>;
-  <span style="color: #98fb98;">future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">future</span>&amp;&amp;) noexcept;
-  <span style="color: #98fb98;">shared_future</span>&lt;<span style="color: #98fb98;">R</span>&gt; <span style="color: #87cefa;">share</span>();
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">retrieving the value</span>
-  see <span style="color: #98fb98;">below</span> <span style="color: #87cefa;">get</span>();
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">functions to check state</span>
-  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">valid</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
-  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>() <span style="color: #00ffff;">const</span>;
-  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
-  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>) <span style="color: #00ffff;">const</span>;
-  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
-  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>) <span style="color: #00ffff;">const</span>;
-};
-}
-</pre>
-</div>
-</div>
-</div>
-
-<div id="outline-container-sec-6-5" class="outline-3">
-<h3 id="sec-6-5"><code>template shared_future</code> 类</h3>
-<div class="outline-text-3" id="text-6-5">
-<div class="org-src-container">
-
-<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
-<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt;
-<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">shared_future</span> {
- <span style="color: #00ffff;">public</span>:
-  <span style="color: #87cefa;">shared_future</span>() noexcept;
-  <span style="color: #87cefa;">shared_future</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #eedd82;">rhs</span>);
-  <span style="color: #87cefa;">shared_future</span>(<span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">R</span>&gt;&amp;&amp;) noexcept;
-  <span style="color: #87cefa;">shared_future</span>(<span style="color: #98fb98;">shared_future</span>&amp;&amp; <span style="color: #eedd82;">rhs</span>) noexcept;
-  ~<span style="color: #87cefa;">shared_future</span>();
-  <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #eedd82;">rhs</span>);
-  <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">shared_future</span>&amp;&amp; rhs) noexcept;
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">retrieving the value</span>
-  see <span style="color: #98fb98;">below</span> <span style="color: #87cefa;">get</span>() <span style="color: #00ffff;">const</span>;
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">functions to check state</span>
-  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">valid</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
-  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>() <span style="color: #00ffff;">const</span>;
-  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
-  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>) <span style="color: #00ffff;">const</span>;
-  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
-  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>) <span style="color: #00ffff;">const</span>;
-};
-}
-</pre>
-</div>
-</div>
-</div>
-
-<div id="outline-container-sec-6-6" class="outline-3">
-<h3 id="sec-6-6"><code>template async</code> 函数</h3>
-<div class="outline-text-3" id="text-6-6">
-<div class="org-src-container">
-
-<pre class="src src-c++"><span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span>... Args&gt;
-<span style="color: #98fb98;">future</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">result_of</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">F</span>&gt;::<span style="color: #98fb98;">type</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;Args&gt;::<span style="color: #98fb98;">type</span>...)&gt;::<span style="color: #98fb98;">type</span>&gt;
-<span style="color: #87cefa;">async</span>(<span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
-<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span>... Args&gt;
-<span style="color: #98fb98;">future</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">result_of</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">F</span>&gt;::<span style="color: #98fb98;">type</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">Args</span>&gt;::<span style="color: #98fb98;">type</span>...)&gt;::<span style="color: #98fb98;">type</span>&gt;
-<span style="color: #87cefa;">async</span>(<span style="color: #98fb98;">launch</span> <span style="color: #eedd82;">policy</span>, <span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
-</pre>
-</div>
-</div>
-</div>
-
-<div id="outline-container-sec-6-7" class="outline-3">
-<h3 id="sec-6-7"><code>template packaged_task</code> 函数</h3>
-<div class="outline-text-3" id="text-6-7">
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -1772,6 +1908,89 @@ and unlock member functions.
 </pre>
 </div>
 </div>
+</div>
+
+<div id="outline-container-sec-6-5" class="outline-3">
+<h3 id="sec-6-5"><code>template future</code> 类</h3>
+<div class="outline-text-3" id="text-6-5">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">future</span>() noexcept;
+  <span style="color: #87cefa;">future</span>(<span style="color: #98fb98;">future</span> &amp;&amp;) noexcept;
+  <span style="color: #87cefa;">future</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">future</span>&amp; <span style="color: #eedd82;">rhs</span>) = <span style="color: #00ffff;">delete</span>;
+  ~<span style="color: #87cefa;">future</span>();
+  <span style="color: #98fb98;">future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">future</span>&amp; <span style="color: #eedd82;">rhs</span>) = <span style="color: #00ffff;">delete</span>;
+  <span style="color: #98fb98;">future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">future</span>&amp;&amp;) noexcept;
+  <span style="color: #98fb98;">shared_future</span>&lt;<span style="color: #98fb98;">R</span>&gt; <span style="color: #87cefa;">share</span>();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">retrieving the value</span>
+  see <span style="color: #98fb98;">below</span> <span style="color: #87cefa;">get</span>();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">functions to check state</span>
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">valid</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>() <span style="color: #00ffff;">const</span>;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>) <span style="color: #00ffff;">const</span>;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>) <span style="color: #00ffff;">const</span>;
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-6" class="outline-3">
+<h3 id="sec-6-6"><code>template shared_future</code> 类</h3>
+<div class="outline-text-3" id="text-6-6">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">R</span>&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">shared_future</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">shared_future</span>() noexcept;
+  <span style="color: #87cefa;">shared_future</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #eedd82;">rhs</span>);
+  <span style="color: #87cefa;">shared_future</span>(<span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">R</span>&gt;&amp;&amp;) noexcept;
+  <span style="color: #87cefa;">shared_future</span>(<span style="color: #98fb98;">shared_future</span>&amp;&amp; <span style="color: #eedd82;">rhs</span>) noexcept;
+  ~<span style="color: #87cefa;">shared_future</span>();
+  <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #eedd82;">rhs</span>);
+  <span style="color: #98fb98;">shared_future</span>&amp; <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">shared_future</span>&amp;&amp; rhs) noexcept;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">retrieving the value</span>
+  see <span style="color: #98fb98;">below</span> <span style="color: #87cefa;">get</span>() <span style="color: #00ffff;">const</span>;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">functions to check state</span>
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">valid</span>() <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">noexcept</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">wait</span>() <span style="color: #00ffff;">const</span>;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Rep</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Period</span>&gt;
+  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_for</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">Rep</span>, <span style="color: #98fb98;">Period</span>&gt;&amp; <span style="color: #eedd82;">rel_time</span>) <span style="color: #00ffff;">const</span>;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Clock</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Duration</span>&gt;
+  <span style="color: #98fb98;">future_status</span> <span style="color: #87cefa;">wait_until</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #98fb98;">Clock</span>, <span style="color: #98fb98;">Duration</span>&gt;&amp; <span style="color: #eedd82;">abs_time</span>) <span style="color: #00ffff;">const</span>;
+};
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-7" class="outline-3">
+<h3 id="sec-6-7">template async 函数</h3>
+<div class="outline-text-3" id="text-6-7">
+</div><ul class="org-ul"><li>Launching policy for async<br  /></li>
+<li>async<br  /><div class="outline-text-4" id="text-6-7-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span>... Args&gt;
+<span style="color: #98fb98;">future</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">result_of</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">F</span>&gt;::<span style="color: #98fb98;">type</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;Args&gt;::<span style="color: #98fb98;">type</span>...)&gt;::<span style="color: #98fb98;">type</span>&gt;
+<span style="color: #87cefa;">async</span>(<span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span>... Args&gt;
+<span style="color: #98fb98;">future</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">result_of</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">F</span>&gt;::<span style="color: #98fb98;">type</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">Args</span>&gt;::<span style="color: #98fb98;">type</span>...)&gt;::<span style="color: #98fb98;">type</span>&gt;
+<span style="color: #87cefa;">async</span>(<span style="color: #98fb98;">launch</span> <span style="color: #eedd82;">policy</span>, <span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
+</pre>
+</div>
+</div>
+</li></ul>
 </div>
 </div>
 
@@ -1962,7 +2181,7 @@ constexpr <span style="color: #98fb98;">adopt_lock_t</span> <span style="color: 
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-08-23 Sat 23:00</p>
+<p class="date">Created: 2014-08-24 Sun 23:29</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
