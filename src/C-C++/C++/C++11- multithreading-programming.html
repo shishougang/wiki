@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>C++11 multithreading programming</title>
-<!-- 2014-08-20 Wed 20:30 -->
+<!-- 2014-08-22 Fri 22:31 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -165,10 +165,12 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4-4"><code>recursive_mutex</code> 类</a></li>
 <li><a href="#sec-4-5"><code>timed_mutex</code> 类</a></li>
 <li><a href="#sec-4-6"><code>recursive_timed_mutex</code> 类</a></li>
-<li><a href="#sec-4-7"><code>lock_guard</code> 类</a></li>
-<li><a href="#sec-4-8"><code>unique_lock</code> 类</a></li>
-<li><a href="#sec-4-9"><code>try_lock</code> 和 <code>lock</code></a></li>
-<li><a href="#sec-4-10"><code>call_once</code></a></li>
+<li><a href="#sec-4-7">Mutex Exception safety</a></li>
+<li><a href="#sec-4-8"><code>lock_guard</code> 类</a></li>
+<li><a href="#sec-4-9"><code>unique_lock</code> 类</a></li>
+<li><a href="#sec-4-10"><code>lock_guard</code> VS <code>unique_lock</code></a></li>
+<li><a href="#sec-4-11"><code>try_lock</code> 和 <code>lock</code></a></li>
+<li><a href="#sec-4-12"><code>call_once</code></a></li>
 </ul>
 </li>
 <li><a href="#sec-5">Condition variables</a>
@@ -215,7 +217,8 @@ for the JavaScript code in this tag.
 上一篇<a href="http://dreamrunner.org/blog/2014/08/07/C-multithreading-programming/">浅谈C++ Multithreading Programming</a>主要介绍时下规范好的C++使用
 Pthread库和Boost Thread库实现C++多线程编程.这里主要谈谈正在规范的C++11
 引入的Thread库和Atomic库,终于自带的C++库能支持高效并可移植的
-Multithreading编程.分为2篇,这里先谈谈C++11的<a href="http://en.cppreference.com/w/cpp/thread">Thread的库</a>, 后一篇谈谈
+Multithreading编程.分为2篇,这里先谈谈C++11的<a href="http://en.cppreference.com/w/cpp/thread">Thread的库</a> (并包含对
+<a href="http://en.cppreference.com/w/c/thread">C的支持</a>), 后一篇谈谈
 C++11的<a href="http://en.cppreference.com/w/cpp/atomic">Atomic操作的库</a>.
 </p>
 
@@ -756,15 +759,63 @@ Thread 2 is executing at priority 0
 <a id="lockable_types" name="lockable_types"></a>
 <img src="./Files/lockable_type.png" alt="lockable_type.png" />
 </p>
+
+<p>
+C++11为mutex定义了不同类型的要求,如上图的层次,往右要求逐渐加强.
+</p>
 </div>
+
+<ul class="org-ul"><li>BasicLockable<br  /><div class="outline-text-4" id="text-4-2-1">
+<p>
+BasicLockable 概念描述了最少特性类型,也就是满足(若m是BasicLockable类型
+):
+</p>
+<ul class="org-ul">
+<li><code>m.lock()</code>
+</li>
+<li><code>m.unlock()</code>
+</li>
+</ul>
+
+<p>
+所以所有mutex都满足BasicLockable类型: <code>mutex</code>, <code>recursive_mutex</code>,
+<code>timed_mutex</code>, <code>recursive_timed_mutex</code>, <code>unique_lock</code>.
+</p>
+</div>
+</li>
+
+<li>Lockable<br  /><div class="outline-text-4" id="text-4-2-2">
+<p>
+Lockable 概念扩展了 BasicLockable 概念,并支持 <code>try_lock</code>. 
+</p>
+
+<p>
+所以这些mutex满足Lockable类型: <code>mutex</code>, <code>recursive_mutex</code>,
+<code>timed_mutex</code>, <code>recursive_timed_mutex</code>.
+</p>
+</div>
+</li>
+
+<li>TimedLockable<br  /><div class="outline-text-4" id="text-4-2-3">
+<p>
+TimedLockable 概念扩展了 Lockable 概念,并支持 <code>try_lock_for</code> 和
+<code>try_lock_until</code>. 
+</p>
+
+<p>
+所以这些mutex满足TimedLockable类型: <code>timed_mutex</code>,
+<code>recursive_timed_mutex</code>.
+</p>
+</div>
+</li></ul>
 </div>
 <div id="outline-container-sec-4-3" class="outline-3">
 <h3 id="sec-4-3"><code>mutex</code> 类</h3>
 <div class="outline-text-3" id="text-4-3">
 <p>
 <a id="mutex_class" name="mutex_class"></a>
+<code>mutex</code> 类提供了一个不可递归的排它锁.基本接口可以从如下类中参考.
 </p>
-
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -783,6 +834,46 @@ Thread 2 is executing at priority 0
 }
 </pre>
 </div>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;vector&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;thread&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;mutex&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">cout</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">endl</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">vector</span>;
+
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">g_value</span> = 0;
+<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span> <span style="color: #eedd82;">count_mutex</span>;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Increase</span>() {
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kLoops</span> = 100;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kLoops; ++i) {
+    count_mutex.lock();
+    g_value++;
+    count_mutex.unlock();
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">kNumThreads</span> = 5;
+  <span style="color: #98fb98;">vector</span>&lt;<span style="color: #7fffd4;">std</span>::thread&gt; <span style="color: #eedd82;">threads</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; kNumThreads; ++i) {
+    threads.push_back(<span style="color: #7fffd4;">std</span>::thread(Increase));
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #00ffff;">auto</span> &amp;<span style="color: #eedd82;">thread</span> : threads) {
+    thread.join();
+  }
+  cout &lt;&lt; <span style="color: #ffa07a;">"value = "</span> &lt;&lt; g_value &lt;&lt; endl;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
 </div>
 </div>
 
@@ -790,9 +881,8 @@ Thread 2 is executing at priority 0
 <h3 id="sec-4-4"><code>recursive_mutex</code> 类</h3>
 <div class="outline-text-3" id="text-4-4">
 <p>
-<a id="recursive_mutex_class" name="recursive_mutex_class"></a>
+<a id="recursive_mutex_class" name="recursive_mutex_class"></a>可递归的排它锁.如下基本接口如 <code>mutex</code> 基本一样.
 </p>
-
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -878,11 +968,78 @@ Thread 2 is executing at priority 0
 </div>
 
 <div id="outline-container-sec-4-7" class="outline-3">
-<h3 id="sec-4-7"><code>lock_guard</code> 类</h3>
+<h3 id="sec-4-7">Mutex Exception safety</h3>
 <div class="outline-text-3" id="text-4-7">
+<p>
+基本保证: 当exception被以上 mutex 的成员函数抛出时,这些mutex对象保持有效状态. 如果是 <code>lock</code> 操作被exception, lock不会被抛出exception的线程所拥有.
+</p>
+
+<p>
+抛出的是一个 <code>system_error</code> exception, 导致的基本情况是:
+</p>
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+
+
+<colgroup>
+<col  class="left" />
+
+<col  class="left" />
+
+<col  class="left" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="left">exception 类型</th>
+<th scope="col" class="left">error情况</th>
+<th scope="col" class="left">描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="left"><code>system_error</code></td>
+<td class="left"><code>errc::resource_deadlock_would_occur</code></td>
+<td class="left">deadlock被检测到</td>
+</tr>
+
+<tr>
+<td class="left"><code>system_error</code></td>
+<td class="left"><code>errc::operation_not_permitted</code></td>
+<td class="left">线程没有权利做这个操作</td>
+</tr>
+
+<tr>
+<td class="left"><code>system_error</code></td>
+<td class="left"><code>errc::device_or_resource_busy</code></td>
+<td class="left">native handle已经被锁</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div id="outline-container-sec-4-8" class="outline-3">
+<h3 id="sec-4-8"><code>lock_guard</code> 类</h3>
+<div class="outline-text-3" id="text-4-8">
 <p>
 <a id="lock_guard_class" name="lock_guard_class"></a>
 </p>
+
+<p>
+之前的mutex必须写明lock和unlock调用,如果在lock和unlock之间产生
+exception,那么必须在exception处理中不能忘记处理unlock.当只是在一个关键区域内需要mutex保护,使用这样的mutex既不方便也容易忘记unlock而造成死锁.
+</p>
+
+<p>
+引入对之前的mutex的封装后的 <code>lock_guard</code> 和 <code>unique_lock</code> ,提供易用性的 <a href="http://en.wikipedia.com/wiki/Resource_Acquisition_Is_Initialization">RAII-style</a> 机制来获取锁在一段区域内.
+</p>
+
+<p>
+lock guard 是一个用来管理一个 mutex 对象,并保持锁住它的对象.
+</p>
+
+<p>
+在构造时,mutex 对象被调用的线程锁住,然后在析构时,mutex 被解锁.它是最简单的lock,并且作为自动作用范围直到它的作用区域结束时特别有用.通过这种方法,它保证 mutex 对象得到解锁即使在exception被抛出时.
+</p>
+
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -901,15 +1058,68 @@ Thread 2 is executing at priority 0
 }
 </pre>
 </div>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;thread&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;mutex&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdexcept&gt;</span>
+
+<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span> <span style="color: #eedd82;">mtx</span>;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">PrintEven</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>) {
+  <span style="color: #00ffff;">if</span> (x % 2 == 0) {
+    <span style="color: #7fffd4;">std</span>::cout &lt;&lt; x &lt;&lt; <span style="color: #ffa07a;">" is even\n"</span>;
+  } <span style="color: #00ffff;">else</span> {
+    <span style="color: #00ffff;">throw</span>(<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">logic_error</span>(<span style="color: #ffa07a;">"not even"</span>));
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">PrintThreadEvenId</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id</span>) {
+  <span style="color: #00ffff;">try</span> {
+    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">lock_guard</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #eedd82;">lck</span>(mtx);
+    PrintEven(id);
+  } <span style="color: #00ffff;">catch</span> (<span style="color: #7fffd4;">std</span>::logic_error&amp;) {
+    <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"[exception caught]"</span> &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">threads</span>[10];
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; 10; ++i) {
+    threads[i] = <span style="color: #7fffd4;">std</span>::<span style="color: #eedd82;">thread</span>(PrintThreadEvenId, i+1);
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #00ffff;">auto</span>&amp; <span style="color: #eedd82;">th</span> : threads) {
+    th.join();
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
 </div>
 </div>
 
-<div id="outline-container-sec-4-8" class="outline-3">
-<h3 id="sec-4-8"><code>unique_lock</code> 类</h3>
-<div class="outline-text-3" id="text-4-8">
+<div id="outline-container-sec-4-9" class="outline-3">
+<h3 id="sec-4-9"><code>unique_lock</code> 类</h3>
+<div class="outline-text-3" id="text-4-9">
 <p>
 <a id="unique_lock_class" name="unique_lock_class"></a>
 </p>
+
+<p>
+<code>unique_lock</code> 与上面的 <code>lock_guard</code> 基本差不多,同样是 <a href="http://en.wikipedia.com/wiki/Resource_Acquisition_Is_Initialization">RAII-style</a> 机制来获取锁在一段区域内的对象.
+</p>
+
+<p>
+但 <code>lock_guard</code> 非常简单,只提供构造自动拥有锁和析构释放锁,如果需要一些其他的操作,那么就需要更复杂和接口更多的类来处理, <code>lock_guard</code> 能满足如此要求. 它类基本接口如下.
+</p>
+</div>
+
+<ul class="org-ul"><li>class<br  /><div class="outline-text-4" id="text-4-9-1">
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -957,7 +1167,106 @@ Thread 2 is executing at priority 0
 </pre>
 </div>
 </div>
-<ul class="org-ul"><li>more<br  /><div class="outline-text-4" id="text-4-8-1">
+</li>
+
+<li>Constructor<br  /><div class="outline-text-4" id="text-4-9-2">
+<p>
+在<a href="#mutex_header">mutex header概要</a>中可以看到有不同的构造函数,其中一类 <code>unique_lock</code> 构造传入不同的类型:
+</p>
+<ul class="org-ul">
+<li><code>defer_lock</code> : 不去获取mutex,只有要和mutex一样,手动去lock它.
+</li>
+<li><code>try_to_lock</code> : 相当于在构造时,调用 <code>try_lock</code>, 不阻塞,之后可通过成员函数=bool owns<sub>lock</sub>()= 或直接操作符 <code>explicit operator bool()
+  const</code> 判断是否获取锁成功.
+</li>
+<li><code>adopt_lock_t</code> : 认为调用的线程已经占有这个锁m.已经占有这个锁了,为什么要去创建一个 <code>unique_lock</code> 去包含它呢? 因为可以利用 <code>unique_lock</code>
+中途接手管理这个锁m, 比如想用 <a href="http://en.wikipedia.com/wiki/Resource_Acquisition_Is_Initialization">RAII-style</a> 机制管理它,使它exception
+safe等.
+</li>
+</ul>
+
+<p>
+这些类型在源代码定义基本如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">defer_lock_t</span> { };
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">try_to_lock_t</span> { };
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">adopt_lock_t</span> { };
+constexpr <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">defer_lock_t</span> <span style="color: #eedd82;">defer_lock</span> = <span style="color: #7fffd4;">std</span>::<span style="color: #87cefa;">defer_lock_t</span>();
+constexpr <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">try_to_lock_t</span> <span style="color: #eedd82;">try_to_lock</span> = <span style="color: #7fffd4;">std</span>::<span style="color: #87cefa;">try_to_lock_t</span>();
+constexpr <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">adopt_lock_t</span> <span style="color: #eedd82;">adopt_lock</span> = <span style="color: #7fffd4;">std</span>::<span style="color: #87cefa;">adopt_lock_t</span>();
+</pre>
+</div>
+
+<p>
+余下的构造:
+</p>
+<ul class="org-ul">
+<li><code>unique_lock();</code> :仅仅创建一个 <code>nique_lock</code> 对象,不和任何mutex相关联.
+</li>
+<li><code>nique_lock(unique_lock&amp;&amp; other);</code> :
+</li>
+<li><code>explicit unique_lock(mutex_type&amp; m);</code> :
+</li>
+<li><code>unique_lock(mutex_type&amp; m, const std::chrono::duration&lt;Rep,Period&gt;&amp;
+  timeout_duration);</code> :
+</li>
+<li><code>unique_lock( mutex_type&amp; m, const
+  std::chrono::time_point&lt;Clock,Duration&gt;&amp; timeout_time);</code> :
+</li>
+</ul>
+</div>
+</li>
+<li>实例<br  /><div class="outline-text-4" id="text-4-9-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;mutex&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;thread&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;chrono&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">cout</span>;
+<span style="color: #00ffff;">using</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">endl</span>;
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Box</span> {
+  <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">Box</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">num</span>) : num_things{num} {}
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">num_things</span>;
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span> <span style="color: #eedd82;">m</span>;
+};
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Transfer</span>(<span style="color: #98fb98;">Box</span> *<span style="color: #eedd82;">from</span>, <span style="color: #98fb98;">Box</span> *<span style="color: #eedd82;">to</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">num</span>) {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">don't actually take the locks yet</span>
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #eedd82;">lock1</span>(from-&gt;m, <span style="color: #7fffd4;">std</span>::defer_lock);
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">unique_lock</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">mutex</span>&gt; <span style="color: #eedd82;">lock2</span>(to-&gt;m, <span style="color: #7fffd4;">std</span>::defer_lock);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">lock both unique_locks without deadlock</span>
+  <span style="color: #7fffd4;">std</span>::lock(lock1, lock2);
+  from-&gt;num_things -= num;
+  to-&gt;num_things += num;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">'from.m' and 'to.m' mutexes unlocked in 'unique_lock' dtors</span>
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">Box</span> <span style="color: #eedd82;">acc1</span>(100);
+  <span style="color: #98fb98;">Box</span> <span style="color: #eedd82;">acc2</span>(50);
+  cout &lt;&lt; <span style="color: #ffa07a;">"acc1 num = "</span> &lt;&lt; acc1.num_things &lt;&lt;
+      <span style="color: #ffa07a;">" ,acc2 num = "</span> &lt;&lt; acc2.num_things &lt;&lt; endl;
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">t1</span>(Transfer, &amp;acc1, &amp;acc2, 10);
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">t2</span>(Transfer, &amp;acc2, &amp;acc1, 5);
+  t1.join();
+  t2.join();
+  cout &lt;&lt; <span style="color: #ffa07a;">"after transfer: "</span> &lt;&lt; <span style="color: #ffa07a;">"acc1 num = "</span> &lt;&lt; acc1.num_things &lt;&lt;
+      <span style="color: #ffa07a;">" ,acc2 num = "</span> &lt;&lt; acc2.num_things &lt;&lt; endl;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-4-10" class="outline-3">
+<h3 id="sec-4-10"><code>lock_guard</code> VS <code>unique_lock</code></h3>
+<div class="outline-text-3" id="text-4-10">
 <ul class="org-ul">
 <li>lock multiple:
   <a href="http://stackoverflow.com/questions/17113619/whats-the-best-way-to-lock-multiple-stdmutexes/17113678#17113678">http://stackoverflow.com/questions/17113619/whats-the-best-way-to-lock-multiple-stdmutexes/17113678#17113678</a>
@@ -990,12 +1299,11 @@ So you always use lock<sub>guard</sub>, unless you need the capabilities of
 unique<sub>lock</sub>. A condition<sub>variable</sub> needs a unique<sub>lock</sub>.
 </p>
 </div>
-</li></ul>
 </div>
 
-<div id="outline-container-sec-4-9" class="outline-3">
-<h3 id="sec-4-9"><code>try_lock</code> 和 <code>lock</code></h3>
-<div class="outline-text-3" id="text-4-9">
+<div id="outline-container-sec-4-11" class="outline-3">
+<h3 id="sec-4-11"><code>try_lock</code> 和 <code>lock</code></h3>
+<div class="outline-text-3" id="text-4-11">
 <p>
 <a id="try_lock_func" name="try_lock_func"></a>
 </p>
@@ -1006,9 +1314,9 @@ unique<sub>lock</sub>. A condition<sub>variable</sub> needs a unique<sub>lock</s
 </div>
 </div>
 
-<div id="outline-container-sec-4-10" class="outline-3">
-<h3 id="sec-4-10"><code>call_once</code></h3>
-<div class="outline-text-3" id="text-4-10">
+<div id="outline-container-sec-4-12" class="outline-3">
+<h3 id="sec-4-12"><code>call_once</code></h3>
+<div class="outline-text-3" id="text-4-12">
 <p>
 <a id="call_once_func" name="call_once_func"></a>
 </p>
@@ -1033,8 +1341,57 @@ unique<sub>lock</sub>. A condition<sub>variable</sub> needs a unique<sub>lock</s
 </pre>
 </div>
 </div>
+<ul class="org-ul"><li><code>cv_status</code><br  /><div class="outline-text-4" id="text-5-1-1">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">enum</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">cv_status</span> { <span style="color: #eedd82;">no_timeout</span>, <span style="color: #eedd82;">timeout</span> };
+</pre>
 </div>
 
+<ul class="org-ul">
+<li>cv<sub>status</sub>::no<sub>timeout</sub> The function returned without a timeout (i.e.,
+it was notified).
+</li>
+<li>cv<sub>status</sub>::timeout        The function returned because it reached its
+time limit (timeout).
+</li>
+</ul>
+</div>
+</li>
+
+<li><code>notify_all_at_thread_exit</code><br  /><div class="outline-text-4" id="text-5-1-2">
+<p>
+It operates as follows:
+</p>
+
+<p>
+Ownership of the previously acquired lock lk is transferred to internal storage. 
+</p>
+
+<p>
+The execution environment is modified such that when the current thread exits, the condition variable cond is notified as if by: 
+</p>
+
+<p>
+Calling this function if lock.mutex() is not locked by the current
+thread is undefined behavior.
+</p>
+
+<p>
+Calling this function if lock.mutex() is not the same mutex as the one
+used by all other threads that are currently waiting on the same
+condition variable is undefined behavior. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++">lck.unlock();
+cond.notify_all();
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
 <div id="outline-container-sec-5-2" class="outline-3">
 <h3 id="sec-5-2"><code>condition_variable</code> 类</h3>
 <div class="outline-text-3" id="text-5-2">
@@ -1501,6 +1858,8 @@ constexpr <span style="color: #98fb98;">adopt_lock_t</span> <span style="color: 
 </li>
 <li><a href="https://github.com/cplusplus/draft">C++ standards drafts on GitHub</a>
 </li>
+<li><a href="http://en.cppreference.com/w/c/thread">C documentation</a> for Thread support library
+</li>
 </ul>
 </div>
 </div>
@@ -1521,7 +1880,7 @@ constexpr <span style="color: #98fb98;">adopt_lock_t</span> <span style="color: 
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-08-20 Wed 20:30</p>
+<p class="date">Created: 2014-08-22 Fri 22:31</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

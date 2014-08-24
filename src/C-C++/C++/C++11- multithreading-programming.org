@@ -6,7 +6,8 @@
 上一篇[[http://dreamrunner.org/blog/2014/08/07/C-multithreading-programming/][浅谈C++ Multithreading Programming]]主要介绍时下规范好的C++使用
 Pthread库和Boost Thread库实现C++多线程编程.这里主要谈谈正在规范的C++11
 引入的Thread库和Atomic库,终于自带的C++库能支持高效并可移植的
-Multithreading编程.分为2篇,这里先谈谈C++11的[[http://en.cppreference.com/w/cpp/thread][Thread的库]], 后一篇谈谈
+Multithreading编程.分为2篇,这里先谈谈C++11的[[http://en.cppreference.com/w/cpp/thread][Thread的库]] (并包含对
+[[http://en.cppreference.com/w/c/thread][C的支持]]), 后一篇谈谈
 C++11的[[http://en.cppreference.com/w/cpp/atomic][Atomic操作的库]].
 
 [[https://en.wikipedia.org/wiki/C++11][C++11]](之前被成为C++0x)是编程语言C++最新版本的标准.它由 [[https://en.wikipedia.org/wiki/International_Organization_for_Standardization][ISO ]]在2011年8月
@@ -666,9 +667,19 @@ int main() {
   void swap(unique_lock<Mutex>& x, unique_lock<Mutex>& y) noexcept;
   }
 #+end_src
-*** lock type
-在[[mutex_header][mutex header概要]]中可以看到构造不同 =unique_lock= 对象传入不同的类型:
+*** Constructor
+在[[mutex_header][mutex header概要]]中可以看到有不同的构造函数,其中一类 =unique_lock= 构
+造传入不同的类型:
++ =defer_lock= : 不去获取mutex,只有要和mutex一样,手动去lock它.
++ =try_to_lock= : 相当于在构造时,调用 =try_lock=, 不阻塞,之后可通过成
+  员函数=bool owns_lock()= 或直接操作符 =explicit operator bool()
+  const= 判断是否获取锁成功.
++ =adopt_lock_t= : 认为调用的线程已经占有这个锁m.已经占有这个锁了,为什
+  么要去创建一个 =unique_lock= 去包含它呢? 因为可以利用 =unique_lock=
+  中途接手管理这个锁m, 比如想用 [[http://en.wikipedia.com/wiki/Resource_Acquisition_Is_Initialization][RAII-style]] 机制管理它,使它exception
+  safe等.
 
+这些类型在源代码定义基本如下:
 #+begin_src c++
 struct defer_lock_t { };
 struct try_to_lock_t { };
@@ -678,7 +689,23 @@ constexpr std::try_to_lock_t try_to_lock = std::try_to_lock_t();
 constexpr std::adopt_lock_t adopt_lock = std::adopt_lock_t();
 #+end_src
 
+余下的构造:
++ =unique_lock();= :仅仅创建一个 =nique_lock= 对象,不和任何mutex相关联.
++ =nique_lock(unique_lock&& other);= : 通过other的内容来构造
+  =nique_lock=  对像,使得other不和任何mutex相关连联.
++ =explicit unique_lock(mutex_type& m);= : 通过 =m.lock()= 来构造与m相
+  关联的 =unique_lock= 对象.
++ =unique_lock(mutex_type& m, const std::chrono::duration<Rep,Period>&
+  timeout_duration);= : 通过 =m.try_lock_for(timeout_duration)= 来构造与m相
+  关联的 =unique_lock= 对象.
++ =unique_lock( mutex_type& m, const
+  std::chrono::time_point<Clock,Duration>& timeout_time);= : 通过
+  =m.try_lock_until(timeout_time)= 来构造与m相关联的 =unique_lock= 对
+  象.
+
 *** 实例
+利用 =defer_lock=, 不去获取 mutex, 只创建与它相关联的 =unique_lock= 对
+象,之后用 =lock()= 同时去获取两个锁,防止死锁.
 #+begin_src c++
 #include <iostream>  // NOLINT
 #include <mutex>
@@ -719,33 +746,98 @@ int main() {
 }
 #+end_src
 ** =lock_guard= VS =unique_lock=
+=lock_guard= 和 =unique_lock= 很大程序上很相似,都是 [[http://en.wikipedia.com/wiki/Resource_Acquisition_Is_Initialization][RAII-style]] 机制来
+封装一个mutex的锁, =lock_guard= 可以说是 =unique_lock= 更严格并拥有限
+制的接口的版本.
 
-+ lock multiple:
-  http://stackoverflow.com/questions/17113619/whats-the-best-way-to-lock-multiple-stdmutexes/17113678#17113678
+如何合适的选择两者的使用呢? 如果 =lock_guard= 对于情况A足够,那么就使用
+它. 不仅仅是从效率(efficiency)考虑,更是从想要表达的功能(functionality)
+考虑. 使用 =lock_guard= 不仅避免了不需要的其他接口的开销,更是对读代码
+者表达它的意图,你将永远都不需要解锁这个guard.
 
- I think it's less a question of efficiency than of functionality. If
-  std::lock_guard is enough for your case A, then you should use it.
-  Not only it avoids unnecessary overhead but also shows intent to the
-  reader that you will never unlock this guard
-
-lock_guard and unique_lock are pretty much the same thing; lock_guard
-is a restricted version with a limited interface.
-
-
-A lock_guard always holds a lock from its construction to its
-destruction. A unique_lock can be created without immediately locking,
-can unlock at any point in its existence, and can transfer ownership
-of the lock from one instance to another.
-
-
-So you always use lock_guard, unless you need the capabilities of
-unique_lock. A condition_variable needs a unique_lock.
+所以你先考虑使用 =lock_guard=, 除非你需要 =unique_lock= 的功能. 比如
+=condition_variable= 就需要传入一个 =unique_lock= 对象.
 ** =try_lock= 和 =lock=
 <<try_lock_func>>
+#+begin_src c++
+template< class Lockable1, class Lockable2, class LockableN... >
+int try_lock(Lockable1& lock1, Lockable2& lock2, LockableN& lockn... );
+#+end_src
 
+按对象lock1, lock2, ..., lockn 从头到尾的顺序尝试去获取每个锁. 如果某
+个 =try_lock= 失败, unlock 所有对象并返回. 返回值:
++ 成功: -1.
++ 失败: 以0为起始点的获取锁失败的对象次序数(0对于lock1, 1对于lock2, ..).
 <<lock_func>>
+#+begin_src c++
+template< class Lockable1, class Lockable2, class LockableN... >
+void lock( Lockable1& lock1, Lockable2& lock2, LockableN& lockn... );
+#+end_src
+
+占有传入的锁lock1, lock2, ..., lockn,使用 *防止死锁算饭* 来防止死锁.
+
+对于传入对象按照不特定的顺序调用它们的成员函数 =lock= , =try_lock=,
+=unlock= ,确保最后所有的锁被获取成功在函数返回时.
 ** =call_once=
 <<call_once_func>>
+#+begin_src c++
+class once_flag;
+template< class Callable, class... Args >
+void call_once( std::once_flag& flag, Callable&& f, Args&&... args );
+#+end_src
+为了让一段代码只被多个线程只执行一次, mutex 文件中中包含了这个保证只调
+用一次的接口.
+
+=once_flag= 对象是辅助 =call_once= 的,作为多个线程共同执行这段的标识,
+所以这些个线程必须传入同一个 =once_flag= 对象.
+
+它并对 *exception* 做一定的处理,如果 =call_once= 执行的函数以exception
+退出,那么exception会抛给调用者.这次已exception退出的执行并不算一次,之
+后其他函数仍可以继续调用它一次.
+
+如下的实例, t1 和 t2线程抛出exception, t3仍然运行一次, t4无论是怎样,都
+得不到运行.
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <thread>
+#include <mutex>
+using std::cout;
+using std::endl;
+
+std::once_flag flag;
+
+inline void MayThrowFunction(bool do_throw) {
+  // only one instance of this function can be run simultaneously
+  if (do_throw) {
+    cout << "throw" << endl;  // this message may be printed from 0 to 3 times
+    // if function exits via exception, another function selected
+    throw std::exception();
+  }
+  cout << "once" << endl;  // printed exactly once, it's guaranteed that
+  // there are no messages after it
+}
+
+inline void DoOnce(bool do_throw) {
+  try {
+    std::call_once(flag, MayThrowFunction, do_throw);
+  }
+  catch (...) {
+  }
+}
+
+int main() {
+  std::thread t1(DoOnce, true);
+  std::thread t2(DoOnce, true);
+  std::thread t3(DoOnce, false);
+  std::thread t4(DoOnce, true);
+  t1.join();
+  t2.join();
+  t3.join();
+  t4.join();
+  return 0;
+}
+#+end_src
+
 * Condition variables
 ** =<condition_variable>= 概要
 #+begin_src c++
@@ -756,6 +848,34 @@ unique_lock. A condition_variable needs a unique_lock.
   enum class cv_status { no_timeout, timeout };
   }
 #+end_src
+*** =cv_status=
+#+begin_src c++
+enum class cv_status { no_timeout, timeout };
+#+end_src
+
++ cv_status::no_timeout	The function returned without a timeout (i.e.,
+  it was notified).
++ cv_status::timeout	The function returned because it reached its
+  time limit (timeout).
+*** =notify_all_at_thread_exit=
+It operates as follows:
+
+    Ownership of the previously acquired lock lk is transferred to internal storage. 
+
+    The execution environment is modified such that when the current thread exits, the condition variable cond is notified as if by: 
+
+Calling this function if lock.mutex() is not locked by the current
+thread is undefined behavior.
+
+Calling this function if lock.mutex() is not the same mutex as the one
+used by all other threads that are currently waiting on the same
+condition variable is undefined behavior. 
+
+#+begin_src c++
+lck.unlock();
+cond.notify_all();
+#+end_src
+
 ** =condition_variable= 类
 #+begin_src c++
   namespace std {
@@ -1096,6 +1216,7 @@ async(launch policy, F&& f, Args&&... args);
 + Bjarne Stroustrup的[[http://www.stroustrup.com/C++11FAQ.html][C++11 FAQ]]
 + [[https://en.wikipedia.org/wiki/C++11][C++11 Wiki]]
 + [[https://github.com/cplusplus/draft][C++ standards drafts on GitHub]]
++ [[http://en.cppreference.com/w/c/thread][C documentation]] for Thread support library
 * cc
 实例:
 #+begin_src c++
