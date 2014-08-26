@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>C++11 multithreading programming</title>
-<!-- 2014-08-24 Sun 23:29 -->
+<!-- 2014-08-26 Tue 20:07 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -185,8 +185,8 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-6-1"><code>&lt;future&gt;</code> 概要</a></li>
 <li><a href="#sec-6-2">Error handling</a></li>
-<li><a href="#sec-6-3"><code>template promise</code> 类</a></li>
-<li><a href="#sec-6-4"><code>template packaged_task</code> 函数</a></li>
+<li><a href="#sec-6-3"><code>template promise</code></a></li>
+<li><a href="#sec-6-4"><code>template packaged_task</code></a></li>
 <li><a href="#sec-6-5"><code>template future</code> 类</a></li>
 <li><a href="#sec-6-6"><code>template shared_future</code> 类</a></li>
 <li><a href="#sec-6-7">template async 函数</a></li>
@@ -205,7 +205,6 @@ for the JavaScript code in this tag.
 <li><a href="#sec-8-2">Online resources</a></li>
 </ul>
 </li>
-<li><a href="#sec-9">cc</a></li>
 </ul>
 </div>
 </div>
@@ -1176,7 +1175,7 @@ lock guard 是一个用来管理一个 mutex 对象,并保持锁住它的对象.
 <ul class="org-ul">
 <li><code>defer_lock</code> : 不去获取mutex,只有要和mutex一样,手动去lock它.
 </li>
-<li><code>try_to_lock</code> : 相当于在构造时,调用 <code>try_lock</code>, 不阻塞,之后可通过成员函数=bool owns<sub>lock</sub>()= 或直接操作符 <code>explicit operator bool()
+<li><code>try_to_lock</code> : 相当于在构造时,调用 <code>try_lock</code>, 不阻塞,之后可通过成员函数 <code>bool owns_lock()</code> 或直接操作符 <code>explicit operator bool()
   const</code> 判断是否获取锁成功.
 </li>
 <li><code>adopt_lock_t</code> : 认为调用的线程已经占有这个锁m.已经占有这个锁了,为什么要去创建一个 <code>unique_lock</code> 去包含它呢? 因为可以利用 <code>unique_lock</code>
@@ -1824,15 +1823,146 @@ multi-threaded 程序中,同样可以在 single-threaded 使用.
 </div>
 </li>
 
-<li>future<sub>errc</sub><br  /></li>
+<li><code>future_errc</code><br  /><div class="outline-text-4" id="text-6-2-2">
+<div class="org-src-container">
 
+<pre class="src src-c++"><span style="color: #00ffff;">enum</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future_errc</span> {
+    <span style="color: #eedd82;">broken_promise</span>             = <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">implementation-defined */</span>,
+    <span style="color: #eedd82;">future_already_retrieved</span>   = <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">implementation-defined */</span>,
+    <span style="color: #eedd82;">promise_already_satisfied</span>  = <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">implementation-defined */</span>,
+    <span style="color: #eedd82;">no_state</span>                   = <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">implementation-defined */</span>
+};
+</pre>
+</div>
 
-<li>future<sub>status</sub><br  /></li></ul>
+<p>
+这个enum class定义了future抛出异常的<a href="http://en.cppreference.com/w/cpp/error/error_condition">error condition</a>. <code>future_errc</code> 的值可以用来创建 <code>error_condition</code> 对象, 并与 <code>future_error</code> 的成员函数
+<code>code</code> 返回的值对比, 决定所抛出异常的类型.
+</p>
+
+<p>
+所以 <code>&lt;future&gt;</code> 另外有两个函数提供它们之间的转换:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">error_code</span> <span style="color: #87cefa;">make_error_code</span>( <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future_errc</span> <span style="color: #eedd82;">e</span> );
+<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">error_condition</span> <span style="color: #87cefa;">make_error_condition</span>( <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future_errc</span> <span style="color: #eedd82;">e</span> );
+<span style="color: #00ffff;">template</span>&lt;&gt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">is_error_condition_enum</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future_errc</span>&gt; : <span style="color: #7fffd4;">std</span>::true_type;
+</pre>
+</div>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;future&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">prom</span>;
+
+  <span style="color: #00ffff;">try</span> {
+    prom.get_future();
+    prom.get_future();
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">throws std::future_error with future_already_retrieved</span>
+  }
+  <span style="color: #00ffff;">catch</span> (<span style="color: #7fffd4;">std</span>::future_error&amp; e) {
+    <span style="color: #00ffff;">if</span> (e.code() ==
+        <span style="color: #7fffd4;">std</span>::make_error_condition(<span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">future_errc</span>::future_already_retrieved)) {
+      <span style="color: #7fffd4;">std</span>::cerr &lt;&lt; <span style="color: #ffa07a;">"[future already retrieved]\n"</span>;
+    } <span style="color: #00ffff;">else</span> {
+      <span style="color: #7fffd4;">std</span>::cerr &lt;&lt; <span style="color: #ffa07a;">"[unknown exception]\n"</span>;
+    }
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</li>
+
+<li><code>future_status</code><br  /><div class="outline-text-4" id="text-6-2-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">enum</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">future_status</span> {
+    <span style="color: #eedd82;">ready</span>,
+    <span style="color: #eedd82;">timeout</span>,
+    <span style="color: #eedd82;">deferred</span>
+};
+</pre>
+</div>
+
+<p>
+<code>future</code> 和 <code>shared_future</code> 类中属于wait类型的接口返回的状态.
+</p>
+<ul class="org-ul">
+<li>deferred: 返回这个类型是因为共享状态(shared state)含有的一个deferred
+函数.(见<a href="#async">async函数</a>)
+</li>
+</ul>
+</div>
+</li>
+<li><code>future_category</code><br  /><div class="outline-text-4" id="text-6-2-4">
+<p>
+用来识别future error种类.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">error_category</span>&amp; <span style="color: #87cefa;">future_category</span>();
+</pre>
+</div>
+
+<p>
+这个函数返回一个 <code>error_category</code> 类型的静态对象,拥有如下特性:
+</p>
+<ul class="org-ul">
+<li>它的 <code>name</code> 成员函数返回指向字符串"future"的指针.
+</li>
+</ul>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;future&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">prom</span>;
+  <span style="color: #00ffff;">try</span> {
+    prom.get_future();
+    prom.get_future();
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">throws a std::future_error of the future category</span>
+  }
+  <span style="color: #00ffff;">catch</span> (<span style="color: #7fffd4;">std</span>::future_error&amp; e) {
+    <span style="color: #00ffff;">if</span> (e.code().category() == <span style="color: #7fffd4;">std</span>::future_category()) {
+      <span style="color: #7fffd4;">std</span>::cerr &lt;&lt; <span style="color: #ffa07a;">"future_error of the future category thrown\n"</span>;
+    }
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</li></ul>
 </div>
 
 <div id="outline-container-sec-6-3" class="outline-3">
-<h3 id="sec-6-3"><code>template promise</code> 类</h3>
+<h3 id="sec-6-3"><code>template promise</code></h3>
 <div class="outline-text-3" id="text-6-3">
+<p>
+模版类 promise 提供一种方便的方法存储一个值或异常,之后可以异步的被
+future对象获取(同一个或其他线程).
+</p>
+
+<p>
+promise对象在共享状态(shared state)存储值的操作 <b>synchronizes-with</b> 在其他函数中成功获取这个共享状态的返回值(如 <code>future::get</code> ).
+</p>
+</div>
+<ul class="org-ul"><li>class<br  /><div class="outline-text-4" id="text-6-3-1">
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -1867,10 +1997,98 @@ multi-threaded 程序中,同样可以在 single-threaded 使用.
 </pre>
 </div>
 </div>
+</li>
+
+<li><code>set_value</code> and <code>set_value_at_thread_exit</code><br  /><div class="outline-text-4" id="text-6-3-2">
+<p>
+<code>set_value</code> 接口存储值到shared state,并使state准备好.这个操作是原子性的. 而 <code>set_value_at_thread_exit</code> 接口如名字,调用后不会马上设置值到
+shared state中,只在当前函数退出时.
+</p>
+
+<p>
+使用 <code>get_future</code> 返回与它相关联同一个shared state的future对象.
+</p>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;functional&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;thread&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;future&gt;</span>
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Print</span>(<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">int</span>&gt;&amp; <span style="color: #eedd82;">fut</span>) {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">(synchronizes with getting the future)</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span> = fut.get();
+  <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"value: "</span> &lt;&lt; x &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">prom</span>;
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">fut</span> = prom.get_future();
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">t1</span>(Print, <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">ref</span>(<span style="color: #eedd82;">fut</span>));
+  prom.set_value(10);  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">fulfill promise</span>
+  t1.join();
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
+</div>
+</li>
+
+<li><code>set_exception</code> and <code>set_exception_at_thread_exit</code><br  /><div class="outline-text-4" id="text-6-3-3">
+<p>
+这两个接口与上面 <code>set_value</code> 和  <code>set_value_at_thread_exit</code> 一样, 只是保存的是exception.
+</p>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;thread&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;future&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">result</span>;
+
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">t</span>([&amp;]{
+      <span style="color: #00ffff;">try</span> {
+        <span style="color: #00ffff;">throw</span> <span style="color: #7fffd4;">std</span>::runtime_error(<span style="color: #ffa07a;">"Example"</span>);
+      } <span style="color: #00ffff;">catch</span>(...) {
+        <span style="color: #00ffff;">try</span> {
+          <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">store anything thrown in the promise</span>
+          result.set_exception(<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">current_exception</span>());
+        } <span style="color: #00ffff;">catch</span>(...) {}  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">set_exception() may throw too</span>
+      }
+    });
+
+  <span style="color: #00ffff;">try</span> {
+    <span style="color: #7fffd4;">std</span>::cout &lt;&lt; result.get_future().get();
+  } <span style="color: #00ffff;">catch</span>(<span style="color: #00ffff;">const</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">exception</span>&amp; <span style="color: #eedd82;">e</span>) {
+    <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"Exception from the thread: "</span> &lt;&lt; e.what() &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+  }
+  t.join();
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+
 <div id="outline-container-sec-6-4" class="outline-3">
-<h3 id="sec-6-4"><code>template packaged_task</code> 函数</h3>
+<h3 id="sec-6-4"><code>template packaged_task</code></h3>
 <div class="outline-text-3" id="text-6-4">
+<p>
+<code>packaged_task</code> 与 <code>promise</code> 类似,都是提供异步获取值的方法,不同是
+<code>promise</code> 直接设置值, 而 <code>packaged_task</code> 封装一个可调用的元素,并把这个可调用任务的返回值异步到shared state中.
+</p>
+</div>
+<ul class="org-ul"><li>class<br  /><div class="outline-text-4" id="text-6-4-1">
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -1908,11 +2126,150 @@ multi-threaded 程序中,同样可以在 single-threaded 使用.
 </pre>
 </div>
 </div>
+</li>
+
+<li>construct and use<br  /><div class="outline-text-4" id="text-6-4-2">
+<p>
+<code>packaged_task</code> 的创建与 <code>thread</code> 类似, 它可以:
+</p>
+<ul class="org-ul">
+<li>Lambda表达式.
+</li>
+<li>Bind一个函数.
+</li>
+<li>直接传入函数.
+</li>
+</ul>
+
+<p>
+运行:
+</p>
+<ul class="org-ul">
+<li>因为它重载了操作符 <code>()</code> , 可以直接运行如: <code>task()</code> .
+</li>
+<li>可以 <code>move</code> 给一个线程运行.
+</li>
+</ul>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cmath&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;thread&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;future&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;functional&gt;</span>
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">unique function to avoid disambiguating the std::pow overload set</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FunPow</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>) {
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">std</span>::pow(x, y);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">TaskLambda</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">packaged_task</span>&lt;<span style="color: #98fb98;">int</span>(<span style="color: #98fb98;">int</span>, <span style="color: #98fb98;">int</span>)&gt; <span style="color: #eedd82;">task</span>([](<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">b</span>) {
+      <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">std</span>::pow(a, b);
+    });
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">result</span> = task.get_future();
+  task(2, 9);
+  <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"task_lambda:\t"</span> &lt;&lt; result.get() &lt;&lt; <span style="color: #ffa07a;">'\n'</span>;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">TaskBind</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">packaged_task</span>&lt;<span style="color: #98fb98;">int</span>()&gt; <span style="color: #eedd82;">task</span>(<span style="color: #7fffd4;">std</span>::bind(FunPow, 2, 11));
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">result</span> = task.get_future();
+  task();
+  <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"task_bind:\t"</span> &lt;&lt; result.get() &lt;&lt; <span style="color: #ffa07a;">'\n'</span>;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">TaskThread</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">packaged_task</span>&lt;<span style="color: #98fb98;">int</span>(<span style="color: #98fb98;">int</span>, <span style="color: #98fb98;">int</span>)&gt; <span style="color: #eedd82;">task</span>(FunPow);
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">result</span> = task.get_future();
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">task_td</span>(<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">move</span>(<span style="color: #eedd82;">task</span>), 2, 10);
+  task_td.join();
+  <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"task_thread:\t"</span> &lt;&lt; result.get() &lt;&lt; <span style="color: #ffa07a;">'\n'</span>;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  TaskLambda();
+  TaskBind();
+  TaskThread();
+}
+</pre>
+</div>
+</div>
+</li>
+
+<li>reset<br  /><div class="outline-text-4" id="text-6-4-3">
+<p>
+<code>packaged_task</code> 的 <code>reset</code> 接口, 重置状态,舍弃之前运行的结果.相当于: <code>*this = packaged_task(std::move(f))</code> .
+</p>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cmath&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;thread&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;future&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">packaged_task</span>&lt;<span style="color: #98fb98;">int</span>(<span style="color: #98fb98;">int</span>, <span style="color: #98fb98;">int</span>)&gt; <span style="color: #eedd82;">task</span>([](<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">b</span>) {
+        <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">std</span>::pow(a, b);
+    });
+    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">future</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">result</span> = task.get_future();
+    task(2, 9);
+    <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"2^9 = "</span> &lt;&lt; result.get() &lt;&lt; <span style="color: #ffa07a;">'\n'</span>;
+
+    task.reset();
+    result = task.get_future();
+    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">thread</span> <span style="color: #eedd82;">task_td</span>(<span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">move</span>(<span style="color: #eedd82;">task</span>), 2, 10);
+    task_td.join();
+    <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"2^10 = "</span> &lt;&lt; result.get() &lt;&lt; <span style="color: #ffa07a;">'\n'</span>;
+}
+</pre>
+</div>
+</div>
+</li></ul>
 </div>
 
 <div id="outline-container-sec-6-5" class="outline-3">
 <h3 id="sec-6-5"><code>template future</code> 类</h3>
 <div class="outline-text-3" id="text-6-5">
+<p>
+模版类 <code>future</code> 是用来异步获取共享状态里的结果. <code>future</code> 类是独占的,不能与其他 <code>future</code> 共享异步的获取结果. 若要多个 <code>future</code> 共享异步结果,
+使用之后的 <code>shared_future</code> 类.
+</p>
+
+<p>
+有效的与共享状态相关联的future对象,由如下函数构造:
+</p>
+<ul class="org-ul">
+<li><code>async</code> .
+</li>
+<li><code>promise::get_future</code> .
+</li>
+<li><code>package_task::get_future</code> .
+</li>
+</ul>
+
+<p>
+它的接口:
+</p>
+<ul class="org-ul">
+<li><code>share</code> : 转换 shared state 从 *this 到一个 <code>shared_future</code> 对象.
+</li>
+<li><code>get</code> : 返回shared state的值, 若未准备好,调用者阻塞等待它准备好.
+</li>
+<li><code>wait</code> : 阻塞等待结果直到有效.
+</li>
+<li><code>wait_for</code> 和 <code>wait_until</code> : 等待一段时间, 并通过 <code>future_status</code> 判断等待后的状态.
+</li>
+</ul>
+
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -1945,6 +2302,11 @@ multi-threaded 程序中,同样可以在 single-threaded 使用.
 <div id="outline-container-sec-6-6" class="outline-3">
 <h3 id="sec-6-6"><code>template shared_future</code> 类</h3>
 <div class="outline-text-3" id="text-6-6">
+<p>
+模版类 <code>shared_future</code> 与 <code>future</code> 基本一样, 不同就是多个
+<code>shared_future</code> 对象可以共享异步结果.
+</p>
+
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span> {
@@ -1971,13 +2333,90 @@ multi-threaded 程序中,同样可以在 single-threaded 使用.
 }
 </pre>
 </div>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;future&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;chrono&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">promise</span>&lt;<span style="color: #98fb98;">void</span>&gt; <span style="color: #eedd82;">ready_promise</span>, <span style="color: #eedd82;">t1_ready_promise</span>, <span style="color: #eedd82;">t2_ready_promise</span>;
+  <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">shared_future</span>&lt;<span style="color: #98fb98;">void</span>&gt; <span style="color: #eedd82;">ready_future</span>(ready_promise.get_future());
+  <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">time_point</span>&lt;<span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">chrono</span>::high_resolution_clock&gt; <span style="color: #eedd82;">start</span>;
+
+  <span style="color: #00ffff;">auto</span> <span style="color: #98fb98;">fun1</span> = [&amp;]() -&gt; <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">double</span>, <span style="color: #7fffd4;">std</span>::milli&gt; {
+    t1_ready_promise.set_value();
+    ready_future.wait();  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">waits for the signal from main()</span>
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">chrono</span>::<span style="color: #7fffd4;">high_resolution_clock</span>::now() - start;
+  };
+
+  <span style="color: #00ffff;">auto</span> <span style="color: #98fb98;">fun2</span> = [&amp;]() -&gt; <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">chrono</span>::<span style="color: #98fb98;">duration</span>&lt;<span style="color: #98fb98;">double</span>, <span style="color: #7fffd4;">std</span>::milli&gt; {
+    t2_ready_promise.set_value();
+    ready_future.wait();  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">waits for the signal from main()</span>
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">chrono</span>::<span style="color: #7fffd4;">high_resolution_clock</span>::now() - start;
+  };
+
+  <span style="color: #00ffff;">auto</span> <span style="color: #98fb98;">result1</span> = <span style="color: #7fffd4;">std</span>::async(<span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">launch</span>::async, fun1);
+  <span style="color: #00ffff;">auto</span> <span style="color: #98fb98;">result2</span> = <span style="color: #7fffd4;">std</span>::async(<span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">launch</span>::async, fun2);
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">wait for the threads to become ready</span>
+  t1_ready_promise.get_future().wait();
+  t2_ready_promise.get_future().wait();
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">the threads are ready, start the clock</span>
+  start = <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">chrono</span>::<span style="color: #7fffd4;">high_resolution_clock</span>::now();
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">signal the threads to go</span>
+  ready_promise.set_value();
+
+  <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"Thread 1 received the signal "</span>
+            &lt;&lt; result1.get().count() &lt;&lt; <span style="color: #ffa07a;">" ms after start\n"</span>
+            &lt;&lt; <span style="color: #ffa07a;">"Thread 2 received the signal "</span>
+            &lt;&lt; result2.get().count() &lt;&lt; <span style="color: #ffa07a;">" ms after start\n"</span>;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
 </div>
 </div>
 
 <div id="outline-container-sec-6-7" class="outline-3">
 <h3 id="sec-6-7">template async 函数</h3>
 <div class="outline-text-3" id="text-6-7">
-</div><ul class="org-ul"><li>Launching policy for async<br  /></li>
+<p>
+<a id="async" name="async"></a>
+模版函数 <code>asnyc</code> 异步运行函数f,并返回一个 <code>future</code> 对象来获取这个函数调用的结果.
+</p>
+</div>
+<ul class="org-ul"><li>Launching policy for async<br  /><div class="outline-text-4" id="text-6-7-1">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">enum</span> <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">launch</span> : <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">unspecified */</span> {
+    async =    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">unspecified */</span>,
+    deferred = <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">unspecified */</span>,
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">implementation-defined */</span>
+};
+</pre>
+</div>
+
+<p>
+函数 <code>async</code> 有不同的策略来运行函数:
+</p>
+<ul class="org-ul">
+<li><code>launch::async</code> :创建一个新的线程来调用函数ｆ.
+</li>
+<li><code>launch::deferred</code> :调用函数f延迟(deferred)到返回的future的shared
+state被访问时(wait或get).
+</li>
+<li><code>launch::async|launch::deferred</code> :函数自动选择策略运行.与系统的库实现有关.
+</li>
+</ul>
+</div>
+</li>
 <li>async<br  /><div class="outline-text-4" id="text-6-7-2">
 <div class="org-src-container">
 
@@ -1987,6 +2426,42 @@ multi-threaded 程序中,同样可以在 single-threaded 使用.
 <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">F</span>, <span style="color: #00ffff;">class</span>... Args&gt;
 <span style="color: #98fb98;">future</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">result_of</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">F</span>&gt;::<span style="color: #98fb98;">type</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">decay</span>&lt;<span style="color: #98fb98;">Args</span>&gt;::<span style="color: #98fb98;">type</span>...)&gt;::<span style="color: #98fb98;">type</span>&gt;
 <span style="color: #87cefa;">async</span>(<span style="color: #98fb98;">launch</span> <span style="color: #eedd82;">policy</span>, <span style="color: #98fb98;">F</span>&amp;&amp; <span style="color: #eedd82;">f</span>, <span style="color: #98fb98;">Args</span>&amp;&amp;... args);
+</pre>
+</div>
+
+<p>
+第一个接口没有 <code>policy</code> 作为传入参数, 相当于
+<code>async(std::launch::async | std::launch::deferred, f, args...)</code>
+</p>
+
+<p>
+实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">NOLINT</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;vector&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;algorithm&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;numeric&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;future&gt;</span>
+
+<span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">RAIter</span>&gt;
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ParallelSum</span>(<span style="color: #98fb98;">RAIter</span> <span style="color: #eedd82;">beg</span>, <span style="color: #98fb98;">RAIter</span> <span style="color: #eedd82;">end</span>) {
+  <span style="color: #00ffff;">auto</span> <span style="color: #98fb98;">len</span> = <span style="color: #7fffd4;">std</span>::distance(beg, end);
+  <span style="color: #00ffff;">if</span> (len &lt; 1000)
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">std</span>::accumulate(beg, end, 0);
+
+  <span style="color: #98fb98;">RAIter</span> <span style="color: #eedd82;">mid</span> = beg + len/2;
+  <span style="color: #00ffff;">auto</span> <span style="color: #98fb98;">handle</span> = <span style="color: #7fffd4;">std</span>::async(<span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">launch</span>::async,
+                           <span style="color: #98fb98;">ParallelSum</span>&lt;<span style="color: #98fb98;">RAIter</span>&gt;, mid, end);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">sum</span> = ParallelSum(beg, mid);
+  <span style="color: #00ffff;">return</span> sum + handle.get();
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">v</span>(10000, 1);
+    <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"The sum is "</span> &lt;&lt; ParallelSum(v.begin(), v.end()) &lt;&lt; <span style="color: #ffa07a;">'\n'</span>;
+}
 </pre>
 </div>
 </div>
@@ -2165,23 +2640,10 @@ constexpr <span style="color: #98fb98;">adopt_lock_t</span> <span style="color: 
 </div>
 </div>
 </div>
-
-<div id="outline-container-sec-9" class="outline-2">
-<h2 id="sec-9">cc</h2>
-<div class="outline-text-2" id="text-9">
-<p>
-实例:
-</p>
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
-</div>
-</div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-08-24 Sun 23:29</p>
+<p class="date">Created: 2014-08-26 Tue 20:07</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

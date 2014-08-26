@@ -672,7 +672,7 @@ int main() {
 造传入不同的类型:
 + =defer_lock= : 不去获取mutex,只有要和mutex一样,手动去lock它.
 + =try_to_lock= : 相当于在构造时,调用 =try_lock=, 不阻塞,之后可通过成
-  员函数=bool owns_lock()= 或直接操作符 =explicit operator bool()
+  员函数 =bool owns_lock()= 或直接操作符 =explicit operator bool()
   const= 判断是否获取锁成功.
 + =adopt_lock_t= : 认为调用的线程已经占有这个锁m.已经占有这个锁了,为什
   么要去创建一个 =unique_lock= 去包含它呢? 因为可以利用 =unique_lock=
@@ -1145,13 +1145,101 @@ int main() {
   }
 }
 #+end_src
-*** future_errc
+*** =future_errc=
+#+begin_src c++
+enum class future_errc {
+    broken_promise             = /* implementation-defined */,
+    future_already_retrieved   = /* implementation-defined */,
+    promise_already_satisfied  = /* implementation-defined */,
+    no_state                   = /* implementation-defined */
+};
+#+end_src
 
+这个enum class定义了future抛出异常的[[http://en.cppreference.com/w/cpp/error/error_condition][error condition]]. =future_errc= 的
+值可以用来创建 =error_condition= 对象, 并与 =future_error= 的成员函数
+=code= 返回的值对比, 决定所抛出异常的类型.
 
-*** future_status
+所以 =<future>= 另外有两个函数提供它们之间的转换:
+#+begin_src c++
+std::error_code make_error_code( std::future_errc e );
+std::error_condition make_error_condition( std::future_errc e );
+template<>
+struct is_error_condition_enum<std::future_errc> : std::true_type;
+#+end_src
 
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <future>
 
-** =template promise= 类
+int main() {
+  std::promise<int> prom;
+
+  try {
+    prom.get_future();
+    prom.get_future();
+    // throws std::future_error with future_already_retrieved
+  }
+  catch (std::future_error& e) {
+    if (e.code() ==
+        std::make_error_condition(std::future_errc::future_already_retrieved)) {
+      std::cerr << "[future already retrieved]\n";
+    } else {
+      std::cerr << "[unknown exception]\n";
+    }
+  }
+  return 0;
+}
+#+end_src
+*** =future_status=
+#+begin_src c++
+enum class future_status {
+    ready,
+    timeout,
+    deferred
+};
+#+end_src
+
+=future= 和 =shared_future= 类中属于wait类型的接口返回的状态.
++ deferred: 返回这个类型是因为共享状态(shared state)含有的一个deferred
+  函数.(见[[async][async函数]])
+
+*** =future_category=
+用来识别future error种类.
+#+begin_src c++
+const std::error_category& future_category();
+#+end_src
+
+这个函数返回一个 =error_category= 类型的静态对象,拥有如下特性:
++ 它的 =name= 成员函数返回指向字符串"future"的指针.
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <future>
+
+int main() {
+  std::promise<int> prom;
+  try {
+    prom.get_future();
+    prom.get_future();
+    // throws a std::future_error of the future category
+  }
+  catch (std::future_error& e) {
+    if (e.code().category() == std::future_category()) {
+      std::cerr << "future_error of the future category thrown\n";
+    }
+  }
+  return 0;
+}
+#+end_src
+** =template promise=
+模版类 promise 提供一种方便的方法存储一个值或异常,之后可以异步的被
+future对象获取(同一个或其他线程).
+
+promise对象在共享状态(shared state)存储值的操作 *synchronizes-with* 在
+其他函数中成功获取这个共享状态的返回值(如 =future::get= ).
+*** class
 #+begin_src c++
   namespace std {
   template <class R>
@@ -1183,8 +1271,73 @@ int main() {
   struct uses_allocator<promise<R>, Alloc>;
   }
 #+end_src
+*** =set_value= and =set_value_at_thread_exit=
+=set_value= 接口存储值到shared state,并使state准备好.这个操作是原子性
+的. 而 =set_value_at_thread_exit= 接口如名字,调用后不会马上设置值到
+shared state中,只在当前函数退出时.
 
-** =template packaged_task= 函数
+使用 =get_future= 返回与它相关联同一个shared state的future对象.
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <functional>
+#include <thread>
+#include <future>
+
+void Print(std::future<int>& fut) {
+  // (synchronizes with getting the future)
+  int x = fut.get();
+  std::cout << "value: " << x << std::endl;
+}
+
+int main() {
+  std::promise<int> prom;
+  std::future<int> fut = prom.get_future();
+  std::thread t1(Print, std::ref(fut));
+  prom.set_value(10);  // fulfill promise
+  t1.join();
+  return 0;
+}
+#+end_src
+*** =set_exception= and =set_exception_at_thread_exit=
+这两个接口与上面 =set_value= 和  =set_value_at_thread_exit= 一样, 只是
+保存的是exception.
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <thread>
+#include <future>
+
+int main() {
+  std::promise<int> result;
+
+  std::thread t([&]{
+      try {
+        throw std::runtime_error("Example");
+      } catch(...) {
+        try {
+          // store anything thrown in the promise
+          result.set_exception(std::current_exception());
+        } catch(...) {}  // set_exception() may throw too
+      }
+    });
+
+  try {
+    std::cout << result.get_future().get();
+  } catch(const std::exception& e) {
+    std::cout << "Exception from the thread: " << e.what() << std::endl;
+  }
+  t.join();
+  return 0;
+}
+#+end_src
+** =template packaged_task=
+=packaged_task= 与 =promise= 类似,都是提供异步获取值的方法,不同是
+=promise= 直接设置值, 而 =packaged_task= 封装一个可调用的元素,并把这个
+可调用任务的返回值异步到shared state中.
+*** class
 #+begin_src c++
   namespace std {
   template<class> class packaged_task; // undefined
@@ -1219,7 +1372,102 @@ int main() {
   struct uses_allocator<packaged_task<R>, Alloc>;
   }
 #+end_src
+*** construct and use
+=packaged_task= 的创建与 =thread= 类似, 它可以:
++ Lambda表达式.
++ Bind一个函数.
++ 直接传入函数.
+
+运行:
++ 因为它重载了操作符 =()= , 可以直接运行如: =task()= .
++ 可以 =move= 给一个线程运行.
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <cmath>
+#include <thread>
+#include <future>
+#include <functional>
+
+// unique function to avoid disambiguating the std::pow overload set
+int FunPow(int x, int y) {
+  return std::pow(x, y);
+}
+
+void TaskLambda() {
+  std::packaged_task<int(int, int)> task([](int a, int b) {
+      return std::pow(a, b);
+    });
+  std::future<int> result = task.get_future();
+  task(2, 9);
+  std::cout << "task_lambda:\t" << result.get() << '\n';
+}
+
+void TaskBind() {
+  std::packaged_task<int()> task(std::bind(FunPow, 2, 11));
+  std::future<int> result = task.get_future();
+  task();
+  std::cout << "task_bind:\t" << result.get() << '\n';
+}
+
+void TaskThread() {
+  std::packaged_task<int(int, int)> task(FunPow);
+  std::future<int> result = task.get_future();
+  std::thread task_td(std::move(task), 2, 10);
+  task_td.join();
+  std::cout << "task_thread:\t" << result.get() << '\n';
+}
+
+int main() {
+  TaskLambda();
+  TaskBind();
+  TaskThread();
+}
+#+end_src
+*** reset
+=packaged_task= 的 =reset= 接口, 重置状态,舍弃之前运行的结果.相当
+于: =*this = packaged_task(std::move(f))= .
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <cmath>
+#include <thread>
+#include <future>
+
+int main() {
+    std::packaged_task<int(int, int)> task([](int a, int b) {
+        return std::pow(a, b);
+    });
+    std::future<int> result = task.get_future();
+    task(2, 9);
+    std::cout << "2^9 = " << result.get() << '\n';
+
+    task.reset();
+    result = task.get_future();
+    std::thread task_td(std::move(task), 2, 10);
+    task_td.join();
+    std::cout << "2^10 = " << result.get() << '\n';
+}
+#+end_src
 ** =template future= 类
+模版类 =future= 是用来异步获取共享状态里的结果. =future= 类是独占的,不
+能与其他 =future= 共享异步的获取结果. 若要多个 =future= 共享异步结果,
+使用之后的 =shared_future= 类.
+
+有效的与共享状态相关联的future对象,由如下函数构造:
++ =async= .
++ =promise::get_future= .
++ =package_task::get_future= .
+
+它的接口:
++ =share= : 转换 shared state 从 *this 到一个 =shared_future= 对象.
++ =get= : 返回shared state的值, 若未准备好,调用者阻塞等待它准备好.
++ =wait= : 阻塞等待结果直到有效.
++ =wait_for= 和 =wait_until= : 等待一段时间, 并通过 =future_status= 判
+  断等待后的状态.
+
 #+begin_src c++
   namespace std {
   template <class R>
@@ -1245,6 +1493,9 @@ int main() {
   }
 #+end_src
 ** =template shared_future= 类
+模版类 =shared_future= 与 =future= 基本一样, 不同就是多个
+=shared_future= 对象可以共享异步结果.
+
 #+begin_src c++
   namespace std {
   template <class R>
@@ -1269,8 +1520,70 @@ int main() {
   };
   }
 #+end_src
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <future>
+#include <chrono>
+
+int main() {
+  std::promise<void> ready_promise, t1_ready_promise, t2_ready_promise;
+  std::shared_future<void> ready_future(ready_promise.get_future());
+  std::chrono::time_point<std::chrono::high_resolution_clock> start;
+
+  auto fun1 = [&]() -> std::chrono::duration<double, std::milli> {
+    t1_ready_promise.set_value();
+    ready_future.wait();  // waits for the signal from main()
+    return std::chrono::high_resolution_clock::now() - start;
+  };
+
+  auto fun2 = [&]() -> std::chrono::duration<double, std::milli> {
+    t2_ready_promise.set_value();
+    ready_future.wait();  // waits for the signal from main()
+    return std::chrono::high_resolution_clock::now() - start;
+  };
+
+  auto result1 = std::async(std::launch::async, fun1);
+  auto result2 = std::async(std::launch::async, fun2);
+
+  // wait for the threads to become ready
+  t1_ready_promise.get_future().wait();
+  t2_ready_promise.get_future().wait();
+
+  // the threads are ready, start the clock
+  start = std::chrono::high_resolution_clock::now();
+
+  // signal the threads to go
+  ready_promise.set_value();
+
+  std::cout << "Thread 1 received the signal "
+            << result1.get().count() << " ms after start\n"
+            << "Thread 2 received the signal "
+            << result2.get().count() << " ms after start\n";
+  return 0;
+}
+#+end_src
 ** template async 函数
+<<async>>
+模版函数 =asnyc= 异步运行函数f,并返回一个 =future= 对象来获取这个函数
+调用的结果.
 *** Launching policy for async
+#+begin_src c++
+enum class launch : /* unspecified */ {
+    async =    /* unspecified */,
+    deferred = /* unspecified */,
+    /* implementation-defined */
+};
+#+end_src
+
+函数 =async= 有不同的策略来运行函数:
++ =launch::async= :创建一个新的线程来调用函数ｆ.
++ =launch::deferred= :调用函数f延迟(deferred)到返回的future的shared
+  state被访问时(wait或get).
++ =launch::async|launch::deferred= :函数自动选择策略运行.与系统的库实
+  现有关.
+
 *** async
 #+begin_src c++
 template <class F, class... Args>
@@ -1279,6 +1592,36 @@ async(F&& f, Args&&... args);
 template <class F, class... Args>
 future<typename result_of<typename decay<F>::type(typename decay<Args>::type...)>::type>
 async(launch policy, F&& f, Args&&... args);
+#+end_src
+
+第一个接口没有 =policy= 作为传入参数, 相当于
+=async(std::launch::async | std::launch::deferred, f, args...)=
+
+实例:
+#+begin_src c++
+#include <iostream>  // NOLINT
+#include <vector>
+#include <algorithm>
+#include <numeric>
+#include <future>
+
+template <typename RAIter>
+int ParallelSum(RAIter beg, RAIter end) {
+  auto len = std::distance(beg, end);
+  if (len < 1000)
+    return std::accumulate(beg, end, 0);
+
+  RAIter mid = beg + len/2;
+  auto handle = std::async(std::launch::async,
+                           ParallelSum<RAIter>, mid, end);
+  int sum = ParallelSum(beg, mid);
+  return sum + handle.get();
+}
+
+int main() {
+    std::vector<int> v(10000, 1);
+    std::cout << "The sum is " << ParallelSum(v.begin(), v.end()) << '\n';
+}
 #+end_src
 * Header synopsis
 ** =<thread>=
@@ -1394,9 +1737,5 @@ async(launch policy, F&& f, Args&&... args);
 + [[https://en.wikipedia.org/wiki/C++11][C++11 Wiki]]
 + [[https://github.com/cplusplus/draft][C++ standards drafts on GitHub]]
 + [[http://en.cppreference.com/w/c/thread][C documentation]] for Thread support library
-* cc
-实例:
-#+begin_src c++
 
-#+end_src
 
