@@ -10,7 +10,7 @@ $ sudo pip install selenium
 #+end_src
 
 * use
-#+begin_src sh
+#+begin_src python
 #!/usr/bin/env python
 
 from selenium import webdriver
@@ -19,3 +19,69 @@ browser = webdriver.Firefox()
 browser.get('http://www.ubuntu.com/')
 #+end_src
 
+* example
+Use Firefox to check whether iphone6 is available and send the email
+once availability of it
+
+#+begin_src python
+#!/usr/bin/env python
+#coding=utf8
+from selenium import webdriver
+from selenium.webdriver.support.ui import Select
+import time
+import smtplib
+
+
+def sendemail(from_addr, to_addr_list, cc_addr_list,
+              subject, message,
+              login, password,
+              smtpserver='smtp.gmail.com:587'):
+    header  = 'From: %s\n' % from_addr
+    header += 'To: %s\n' % ','.join(to_addr_list)
+    header += 'Cc: %s\n' % ','.join(cc_addr_list)
+    header += 'Subject: %s\n\n' % subject
+    message = header + message
+ 
+    server = smtplib.SMTP(smtpserver)
+    server.ehlo()
+    server.starttls()
+    server.login(login,password)
+    problems = server.sendmail(from_addr, to_addr_list, message)
+    server.quit()
+
+def check_iphone(browser) :
+	products = Select(browser.find_element_by_name("products"))
+	if products.options[0].text == '':
+		return
+	#products.select_by_visible_text(u'iPhone 6 Plus')
+	products.select_by_visible_text(u'iPhone 6')
+	stores = Select(browser.find_element_by_name("stores"))
+	if stores.options[0].text == '':
+		return
+	#stores.select_by_visible_text('Aix-en-Provence')
+	stores.select_by_visible_text('Festival Walk')
+	check_availables = browser.find_elements_by_class_name("isAvailableText")
+	for avail in check_availables:
+		if avail.text != u'暫無供應':
+			print avail.text
+			sendemail('xxx@gmail.com', ['someone@gmail.com', 'someone@gmail.com'],
+				[], 'iphone', 'iphone', 'username', 'pwd')
+			return
+url = "https://reserve.cdn-apple.com/HK/zh_HK/reserve/iPhone/availability"
+#url = 'https://reserve.cdn-apple.com/FR/fr_FR/reserve/iPhone/availability'
+
+def run_func(): 
+    browser = webdriver.Firefox()
+    browser.get(url)
+
+    while True:
+        browser.refresh()
+        time.sleep(0.05)
+        try:
+            check_iphone(browser)
+        except:
+            print "some error"
+            run_func()
+	time.sleep(1)
+run_func()
+#+end_src

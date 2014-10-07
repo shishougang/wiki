@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Python with selenium webDriver</title>
-<!-- 2014-10-05 Sun 23:28 -->
+<!-- 2014-10-07 Tue 22:51 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -143,6 +143,7 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-1">install selenium</a></li>
 <li><a href="#sec-2">use</a></li>
+<li><a href="#sec-3">example</a></li>
 </ul>
 </div>
 </div>
@@ -164,12 +165,86 @@ $ sudo pip install selenium
 <div class="outline-text-2" id="text-2">
 <div class="org-src-container">
 
-<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/usr/bin/</span><span style="color: #00ffff;">env</span><span style="color: #ff7f24;"> python</span>
+<pre class="src src-python"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/usr/bin/env python</span>
 
-from selenium import webdriver
+<span style="color: #00ffff;">from</span> selenium <span style="color: #00ffff;">import</span> webdriver
 
-<span style="color: #eedd82;">browser</span> = webdriver.Firefox()
-<span style="color: #87cefa;">browser.get</span>(<span style="color: #ffa07a;">'http://www.ubuntu.com/'</span>)
+<span style="color: #ffebcd; background-color: #2f4f4f;">browser</span> = webdriver.Firefox()
+browser.get(<span style="color: #ffa07a;">'http://www.ubuntu.com/'</span>)
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">example</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+Use Firefox to check whether iphone6 is available and send the email
+once availability of it
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-python"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/usr/bin/env python</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">coding=utf8</span>
+<span style="color: #00ffff;">from</span> selenium <span style="color: #00ffff;">import</span> webdriver
+<span style="color: #00ffff;">from</span> selenium.webdriver.support.ui <span style="color: #00ffff;">import</span> Select
+<span style="color: #00ffff;">import</span> time
+<span style="color: #00ffff;">import</span> smtplib
+
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">sendemail</span>(from_addr, to_addr_list, cc_addr_list,
+              subject, message,
+              login, password,
+              <span style="color: #ffebcd; background-color: #2f4f4f;">smtpserver</span>=<span style="color: #ffa07a;">'smtp.gmail.com:587'</span>):
+    <span style="color: #ffebcd; background-color: #2f4f4f;">header</span>  = <span style="color: #ffa07a;">'From: %s\n'</span> % from_addr
+    <span style="color: #ffebcd; background-color: #2f4f4f;">header</span> += <span style="color: #ffa07a;">'To: %s\n'</span> % <span style="color: #ffa07a;">','</span>.join(to_addr_list)
+    <span style="color: #ffebcd; background-color: #2f4f4f;">header</span> += <span style="color: #ffa07a;">'Cc: %s\n'</span> % <span style="color: #ffa07a;">','</span>.join(cc_addr_list)
+    <span style="color: #ffebcd; background-color: #2f4f4f;">header</span> += <span style="color: #ffa07a;">'Subject: %s\n\n'</span> % subject
+    <span style="color: #ffebcd; background-color: #2f4f4f;">message</span> = header + message
+
+    <span style="color: #ffebcd; background-color: #2f4f4f;">server</span> = smtplib.SMTP(smtpserver)
+    server.ehlo()
+    server.starttls()
+    server.login(login,password)
+    <span style="color: #ffebcd; background-color: #2f4f4f;">problems</span> = server.sendmail(from_addr, to_addr_list, message)
+    server.quit()
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">check_iphone</span>(browser) :
+        <span style="color: #ffebcd; background-color: #2f4f4f;">products</span> = Select(browser.find_element_by_name(<span style="color: #ffa07a;">"products"</span>))
+        <span style="color: #00ffff;">if</span> products.options[0].text == <span style="color: #ffa07a;">''</span>:
+                <span style="color: #00ffff;">return</span>
+        <span style="color: #ff7f24;">#products.select_by_visible_text(u'iPhone 6 Plus')</span>
+        products.select_by_visible_text(u<span style="color: #ffa07a;">'iPhone 6'</span>)
+        <span style="color: #ffebcd; background-color: #2f4f4f;">stores</span> = Select(browser.find_element_by_name(<span style="color: #ffa07a;">"stores"</span>))
+        <span style="color: #00ffff;">if</span> stores.options[0].text == <span style="color: #ffa07a;">''</span>:
+                <span style="color: #00ffff;">return</span>
+        <span style="color: #ff7f24;">#stores.select_by_visible_text('Aix-en-Provence')</span>
+        stores.select_by_visible_text(<span style="color: #ffa07a;">'Festival Walk'</span>)
+        <span style="color: #ffebcd; background-color: #2f4f4f;">check_availables</span> = browser.find_elements_by_class_name(<span style="color: #ffa07a;">"isAvailableText"</span>)
+        <span style="color: #00ffff;">for</span> avail <span style="color: #00ffff;">in</span> check_availables:
+                <span style="color: #00ffff;">if</span> avail.text != u<span style="color: #ffa07a;">'&#26283;&#28961;&#20379;&#25033;'</span>:
+                        <span style="color: #b0c4de;">print</span> avail.text
+                        sendemail(<span style="color: #ffa07a;">'xxx@gmail.com'</span>, [<span style="color: #ffa07a;">'someone@gmail.com'</span>, <span style="color: #ffa07a;">'someone@gmail.com'</span>],
+                                [], <span style="color: #ffa07a;">'iphone'</span>, <span style="color: #ffa07a;">'iphone'</span>, <span style="color: #ffa07a;">'username'</span>, <span style="color: #ffa07a;">'pwd'</span>)
+                        <span style="color: #00ffff;">return</span>
+<span style="color: #ffebcd; background-color: #2f4f4f;">url</span> = <span style="color: #ffa07a;">"https://reserve.cdn-apple.com/HK/zh_HK/reserve/iPhone/availability"</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">url = 'https://reserve.cdn-apple.com/FR/fr_FR/reserve/iPhone/availability'</span>
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">run_func</span>(): 
+    <span style="color: #ffebcd; background-color: #2f4f4f;">browser</span> = webdriver.Firefox()
+    browser.get(url)
+
+    <span style="color: #00ffff;">while</span> <span style="color: #00ffff;">True</span>:
+        browser.refresh()
+        time.sleep(0.05)
+        <span style="color: #00ffff;">try:</span>
+            check_iphone(browser)
+        <span style="color: #00ffff;">except:</span>
+            <span style="color: #b0c4de;">print</span> <span style="color: #ffa07a;">"some error"</span>
+            run_func()
+        time.sleep(1)
+run_func()
 </pre>
 </div>
 </div>
@@ -177,7 +252,7 @@ from selenium import webdriver
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-10-05 Sun 23:28</p>
+<p class="date">Created: 2014-10-07 Tue 22:51</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
