@@ -2,13 +2,14 @@
 #+TITLE: list in kernel
 #+OPTIONS: num:nil
 
+ Simple doubly linked list implementation.
+
 
 http://isis.poly.edu/kulesh/stuff/src/klist/
 http://blog.csdn.net/xubin341719/article/details/7098611
 http://bbs.chinaunix.net/thread-1981115-1-1.html
 
-http://www.groad.net/bbs/read.php?tid-3544.html
-http://hi.baidu.com/ever__love/blog/item/ee8f40f9a99ec7294e4aea68.html
+
 
 * list_for_each_entry
 
@@ -46,3 +47,97 @@ http://hi.baidu.com/ever__love/blog/item/ee8f40f9a99ec7294e4aea68.html
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) );})
 
+
+* api
+struct list_head;
+static LIST_HEAD(dmatest_channels);
+list_for_each_entry_safe;
+INIT_LIST_HEAD;
+list_del;
+list_add_tail;
+
+* hash list
+struct hlist_head *list;
+
+hlist_add_head(&sk->sk_node, list);
+
+#+begin_src c
+struct list_head {
+	struct list_head *next, *prev;
+};
+#define LIST_HEAD(name) \
+	struct list_head name = LIST_HEAD_INIT(name)
+static inline void INIT_LIST_HEAD(struct list_head *list)
+{
+	list->next = list;
+	list->prev = list;
+}
+
+/**
+ * list_add - add a new entry
+ * @new: new entry to be added
+ * @head: list head to add it after
+ *
+ * Insert a new entry after the specified head.
+ * This is good for implementing stacks.
+ */
+static inline void list_add(struct list_head *new, struct list_head *head)
+{
+	__list_add(new, head, head->next);
+}
+
+
+/**
+ * list_add_tail - add a new entry
+ * @new: new entry to be added
+ * @head: list head to add it before
+ *
+ * Insert a new entry before the specified head.
+ * This is useful for implementing queues.
+ */
+static inline void list_add_tail(struct list_head *new, struct list_head *head)
+{
+	__list_add(new, head->prev, head);
+}
+
+
+#+end_src
+
+#+begin_src c
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/version.h>
+#include <linux/list.h>
+ 
+MODULE_LICENSE("Dual BSD/GPL");
+ 
+struct module *m = &__this_module;
+ 
+static void list_module_test(void)
+{
+        struct module *mod;
+        list_for_each_entry(mod, m->list.prev, list)
+                printk ("%s\n", mod->name);
+ 
+}
+static int list_module_init (void)
+{
+        list_module_test();
+        return 0;
+}
+ 
+static void list_module_exit (void)
+{
+        printk ("unload listmodule.ko\n");
+}
+ 
+module_init(list_module_init);
+module_exit(list_module_exit);
+#+end_src
+
+
+
+#+begin_src c
+
+#+end_src

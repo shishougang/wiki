@@ -1,6 +1,7 @@
 #+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
 #+TITLE: Direct memory access (DMA)
 #+OPTIONS: num:nil
+
 * Overview
 Direct memory access (DMA) is a feature of modern computers that
 allows certain hardware subsystems within the computer to access
@@ -37,8 +38,7 @@ controller to respond to DMA requests. The number of transfers
 performed, transfer modes used, and memory locations accessed depends
 on how the DMA channel is programmed.
 
-
-[[./DMA Controller Architecture.jpg]]
+[[./Files/DMA Controller Architecture.jpg]]
 
 When the value in the
 current count register goes from 0 to -1, a terminal count (TC) signal
@@ -58,8 +58,6 @@ processor whenever a channel terminates. DMA controllers also have
 mechanisms for automatically reprogramming a DMA channel when the DMA
 transfer sequence completes. These mechanisms include
 /autoinitialization/ and /buffer chaining/.
-
-
 
 * Modes of operation
 ** Burst mode
@@ -88,9 +86,262 @@ The *disadvantage* of the transparent mode is that the hardware needs to
 determine when the CPU is not using the system buses, which can be
 complex and relatively expensive.
 
+* CPU and DMA addresses[fn:4]
+#+begin_src sh
+
+               CPU                  CPU                  Bus
+             Virtual              Physical             Address
+             Address              Address               Space
+              Space                Space
+
+            +-------+             +------+             +------+
+            |       |             |MMIO  |   Offset    |      |
+            |       |  Virtual    |Space |   applied   |      |
+          C +-------+ --------> B +------+ ----------> +------+ A
+            |       |  mapping    |      |   by host   |      |
+  +-----+   |       |             |      |   bridge    |      |   +--------+
+  |     |   |       |             +------+             |      |   |        |
+  | CPU |   |       |             | RAM  |             |      |   | Device |
+  |     |   |       |             |      |             |      |   |        |
+  +-----+   +-------+             +------+             +------+   +--------+
+            |       |  Virtual    |Buffer|   Mapping   |      |
+          X +-------+ --------> Y +------+ <---------- +------+ Z
+            |       |  mapping    | RAM  |   by IOMMU
+            |       |             |      |
+            |       |             |      |
+            +-------+             +------+
+#+end_src
+* PCI初始话DMA实例
+以上是硬件实现DMA和DMA硬件传输模式的一些细节，仅做了解和参考。这里以
+PCI为例，看设备如何初始化DMA，为之后操作做准备。
+
+1. 在platform devices列表中加入pci device的定义：
+#+begin_src c
+static u64 pci_ep_dmamask = ~(u32)0;
+static struct platform_device ath_pci_ep_device = {
+        .name                           = "ath-pciep",
+        .id                             = 0,
+        .dev = {
+                .dma_mask               = &pci_ep_dmamask,
+                .coherent_dma_mask      = 0xffffffff,
+        },
+        .num_resources                  = ARRAY_SIZE(ath_pci_ep_resources),
+        .resource                       = ath_pci_ep_resources,
+};
+static struct resource ath_pci_ep_resources[] = {
+        [0] = {
+                .start  = ATH_PCI_EP_BASE_OFF,
+                .end    = ATH_PCI_EP_BASE_OFF + 0xdff - 1,
+                .flags  = IORESOURCE_MEM,
+        },
+        [1] = {
+                .start  = ATH_CPU_IRQ_PCI_EP,
+                .end    = ATH_CPU_IRQ_PCI_EP,
+                .flags  = IORESOURCE_IRQ,
+        },
+};
+#+end_src
+2. 之后 =platform_add_devices= 调用 =platform_device_register= 会注册
+   pci设备。
+3. 在需要使用pci的driver中定义pci driver：
+#+begin_src c
+static struct pci_driver ath_pci_driver = {
+    .name       = "ath_pci",
+    .id_table   = ath_pci_id_table,
+    .probe      = ath_pci_probe,
+    .remove     = ath_pci_remove,
+#ifdef ATH_BUS_PM
+    .suspend    = ath_pci_suspend,
+    .resume     = ath_pci_resume,
+#endif /* ATH_BUS_PM */
+    /* Linux 2.4.6 has save_state and enable_wake that are not used here */
+};
+#+end_src
+4. =pci_register_driver(&ath_pci_driver)= 注册相应driver。
+5. 在 =ath_pci_probe= 中 =pci_set_dma_mask(pdev, 0xffffffff)= 设置DMA
+   mask，并作完pci driver的初始化工作。
+6. 之后看实际怎么使用DMA来使CPU与设备间互传。
+
+* DMA使用与实例
+** DMA memory要求
++ 在物理地址上是连续的memory。
++ 可以使用由 =kmalloc= （最大到128KB）或 =__get_free_pages= （最大到
+  8MB）分配的memory。
++ 可以使用支持DMA的block I/O和networking buffers（如struct skb_buf）。
++ 不能使用 =vmalloc= 的memory。
+** 2种DMA mappings[fn:4]
+*** Consistent DMA mappings
+Consistent DMA mappings which are usually mapped at driver
+initialization, unmapped at the end。
+
+Think of "consistent" as "synchronous" or "coherent".
+
+ *IMPORTANT:* Consistent DMA memory does not preclude the usage of
+proper memory barriers.  The CPU may reorder stores to consistent
+memory just as it may normal memory.  
+
+Example: if it is important for the device to see the first word of a
+descriptor updated before the second, you must do something like:
+#+begin_src c
+  desc->word0 = address;
+  wmb();
+  desc->word1 = DESC_VALID;
+#+end_src
+in order to get correct behavior on all platforms.
+
+Summarize as follows:
++ DMA buffer allocated by the kernel
++ Set up for the whole module life 
++ Can be expensive. Not recommended.
++ Let both the CPU and device access the buffer at the same time.
+
+**** using consistent DMA mappings.
+#+begin_src c
+  dma_addr_t dma_handle;
+  cpu_addr = dma_alloc_coherent(dev, size, &dma_handle, gfp);
+  dma_free_coherent(dev, size, cpu_addr, dma_handle);
+#+end_src
+*** Streaming DMA mappings
+Streaming DMA mappings which are usually mapped for one DMA
+  transfer, unmapped right after it (unless you use =dma_sync_*= below)
+  and for which hardware can optimize for sequential accesses.
+
+This of "streaming" as "asynchronous" or "outside the coherency
+domain".
+
+Summarize as follows:
++ DMA buffer allocated by the driver.
++ Set up for each transfer.
++ Cheaper. Saves DMA registers.
++ Only the device can access the buffer when the mapping is active.
+
+**** Using streaming DMA mappings
+#+begin_src c
+  /* To map a single region, you do: */
+  struct device *dev = &my_dev->dev;
+  dma_addr_t dma_handle;
+  void *addr = buffer->ptr;
+  size_t size = buffer->len;
+  
+  dma_handle = dma_map_single(dev, addr, size, direction);
+  if (dma_mapping_error(dma_handle)) {
+    /*
+     ,* reduce current DMA mapping usage,
+     ,* delay and try again later or
+     ,* reset driver.
+     ,*/
+    goto map_error_handling;
+  }
+  /* and to unmap it: */
+  dma_unmap_single(dev, dma_handle, size, direction);
+#+end_src
+
+** PCI使用Streaming DMA mapping与WIFI芯片使用互传实例
+1. PCI driver初始化时，设置dma mask， =pci_set_dma_mask(pdev,
+   0xffffffff)=
+2. 发送到Device数据：
+#+begin_src c
+  adf_nbuf_map_single(pdev->osdev, netbuf_copy, ADF_OS_DMA_TO_DEVICE);
+  //==》
+  dma_map_single(osdev->dev, buf->data, 
+                 skb_end_pointer(buf) - buf->data, dir);
+#+end_src
+3. 发送完umap并free skb：
+#+begin_src c
+  adf_nbuf_unmap_single(
+      vap->iv_ic->ic_adf_dev, (adf_nbuf_t) skb, ADF_OS_DMA_TO_DEVICE);
+  //===》
+  dma_unmap_single(osdev->dev, NBUF_MAPPED_PADDR_LO(buf), 
+                   skb_end_pointer(buf) - buf->data, dir);
+  adf_nbuf_free(skb);
+#+end_src
+4. 从Device接收数据并umap:
+#+begin_src c
+  ret = adf_nbuf_map_single(scn->adf_dev, nbuf, ADF_OS_DMA_FROM_DEVICE);
+  adf_nbuf_unmap_single(scn->adf_dev, (adf_nbuf_t)transfer_context, ADF_OS_DMA_FROM_DEVICE);
+#+end_src
+
+** More examples:
++ [[http://lxr.free-electrons.com/source/drivers/dma/dmatest.c][dmatest.c]]
+* DMA API Reference[fn:3]
+#+begin_src c
+      #include <linux/dma-mapping.h>
+      /* Using large DMA-coherent buffers */
+      void *
+      dma_alloc_coherent(struct device *dev, size_t size,
+                                         dma_addr_t *dma_handle, gfp_t flag);
+      /* It returns a pointer to the allocated region (in the processor's virtual
+         address space) or NULL if the allocation failed. */
+      void *
+      dma_zalloc_coherent(struct device *dev, size_t size,
+                          dma_addr_t *dma_handle, gfp_t flag);
+      void
+      dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
+                        dma_addr_t dma_handle);
+          
+      /* Using small DMA-coherent buffers */
+      #include <linux/dmapool.h>
+      struct dma_pool *
+      dma_pool_create(const char *name, struct device *dev,
+                      size_t size, size_t align, size_t alloc);
+      void *dma_pool_alloc(struct dma_pool *pool, gfp_t gfp_flags,
+                           dma_addr_t *dma_handle);
+      void dma_pool_free(struct dma_pool *pool, void *vaddr,
+                         dma_addr_t addr);
+      void dma_pool_destroy(struct dma_pool *pool);
+      /* DMA addressing limitations */
+      int
+      dma_supported(struct device *dev, u64 mask);
+      int
+      dma_set_mask_and_coherent(struct device *dev, u64 mask);
+      int
+      dma_set_mask(struct device *dev, u64 mask);
+      int
+      dma_set_coherent_mask(struct device *dev, u64 mask);
+      u64
+      dma_get_required_mask(struct device *dev);
+      /* Streaming DMA mappings */
+      dma_addr_t
+      dma_map_single(struct device *dev, void *cpu_addr, size_t size,
+                     enum dma_data_direction direction);
+      void
+      dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
+                       enum dma_data_direction direction);
+      dma_addr_t
+      dma_map_page(struct device *dev, struct page *page,
+                   unsigned long offset, size_t size,
+                   enum dma_data_direction direction);
+      void
+      dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
+                     enum dma_data_direction direction);
+      int
+      dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
+  int
+          dma_map_sg(struct device *dev, struct scatterlist *sg,
+                  int nents, enum dma_data_direction direction);
+  void
+          dma_unmap_sg(struct device *dev, struct scatterlist *sg,
+                  int nhwentries, enum dma_data_direction direction);
+  void
+  dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
+                          enum dma_data_direction direction);
+  void
+  dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
+                             enum dma_data_direction direction);
+  void
+  dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
+                      enum dma_data_direction direction);
+  void
+  dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
+                         enum dma_data_direction direction);
+#+end_src
+
 * Footnotes
 
 [fn:1] [[http://en.wikipedia.org/wiki/Direct_memory_access][wiki]]
 
 [fn:2] [[./DMAFundamentals.pdf][DMA Fundamentals on Various PC Platforms]]
 
+[fn:3] https://www.kernel.org/doc/Documentation/DMA-API.txt
+
+[fn:4] https://www.kernel.org/doc/Documentation/DMA-API-HOWTO.txt
