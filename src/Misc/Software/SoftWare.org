@@ -42,3 +42,31 @@ https://www.dropbox.com/help/145/en
    typically through your /etc/fstab settings file. Please refer to
    your Linux distribution's documentation for instructions.
 
+* Ubuntu 下让sublime-text3支持中文输入法
+下载 [[./Files/sublime-imfix.c][sublime-imfix.c]] 并保存在sublime安装的目录下
+sublime_text3默认安装的目录：=/opt/sublime_text/=
+
+
+安装C/C++的编译环境和 =gtk libgtk2.0-dev= 并编译：
+
+#+begin_src sh
+sudo apt-get install build-essential  
+sudo apt-get install libgtk2.0-dev
+gcc -shared -o libsublime-imfix.so sublime-imfix.c  `pkg-config --libs --cflags gtk+-2.0` -fPIC
+#+end_src
+
+启动 Sublime Text 试一试，可以使用fcitx输入中文了
+#+begin_src sh
+LD_PRELOAD=./libsublime-imfix.so subl
+#+end_src
+
+#+begin_src sh
+mv libsublime-imfix.so /usr/lib
+gksu gedit /usr/share/applications/sublime-text.desktop
+# change Exec=/opt/sublime_text/sublime_text %F to
+Exec=bash -c 'LD_PRELOAD=/usr/lib/libsublime-imfix.so /opt/sublime_text/sublime_text' %F
+# change Exec=/opt/sublime_text/sublime_text -n
+Exec=bash -c 'LD_PRELOAD=/usr/lib/libsublime-imfix.so /opt/sublime_text/sublime_text' -n
+# change Exec=/opt/sublime_text/sublime_text --command new_file
+Exec=bash -c 'LD_PRELOAD=/usr/lib/libsublime-imfix.so /opt/sublime_text/sublime_text' --command new_file
+#+end_src
