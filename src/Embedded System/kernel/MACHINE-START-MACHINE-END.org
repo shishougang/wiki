@@ -4,16 +4,125 @@
 
 * Overview
 对于不同架构的CPU和不同的开发板，系统的初始化参数和函数不同，但Linux启
-动的整个流程是不变的，那么如何修改这些Linux启动起来针对不同
+动的整个流程是不变的，那么如何在Linux启动流程中为不同CPU和开发板修改或
+嵌入它们各自的函数与参数呢？
+
++ 像netfiler一样定义启动时可嵌入的hook函数，然后不同设备注册相应的hook
+  函数。
++ 或像 =struct file_operation= 定义好一组函数指针或变量的静态表，由不
+  同设备去赋值相应的具体实现。
++ 还是由Linux提供一个全是空函数的预定义的文件，不同设备去实现相应具体
+  函数。
+
+为了可维护性，并不漏掉相应的系统初始化要实现的接口，Linux如 =struct
+file_operation= 定义好一组函数指针或变量的静态表，集中式管理，以sm2410
+板子如下：
+
+#+begin_src c
+// /arch/arm/mach-s3c2410/mach-smdk2410.c
+MACHINE_START(SMDK2410, "SMDK2410") 
+	.phys_io	= S3C2410_PA_UART,
+	.io_pg_offst	= (((u32)S3C24XX_VA_UART) >> 18) & 0xfffc,
+	.boot_params	= S3C2410_SDRAM_PA + 0x100,
+	.map_io		= smdk2410_map_io,
+	.init_irq	= s3c24xx_init_irq,
+	.init_machine	= smdk2410_init,
+	.timer		= &s3c24xx_timer,
+MACHINE_END
+#+end_src
+
+* =MACHINE-START= and =MACHINE-END=
+=MACHINE-START= 和 =MACHINE-END= 是一对宏，如下：
+
+#+begin_src c
+#define MACHINE_START(_type,_name)			\
+static const struct machine_desc __mach_desc_##_type	\
+ __used							\
+ __attribute__((__section__(".arch.info.init"))) = {	\
+	.nr		= MACH_TYPE_##_type,		\
+	.name		= _name,
+
+#define MACHINE_END				\
+};
+#+end_src
+
+用上面的smdk2410展开这个宏，如下：
+#+begin_src c
+   static const struct machine_desc __mach_desc_SMDK2410 
+   __used                                                 \
+   __attribute__((__section__(".arch.info.init"))) = {
+    .nr = MACH_TYPE_SMDK2410, /* architecture number */
+    .name = "SMDK2410", /* architecture name */
+    .phys_io        = S3C2410_PA_UART,
+    .io_pg_offst    = (((u32)S3C24XX_VA_UART) >> 18) & 0xfffc,
+    .boot_params    = S3C2410_SDRAM_PA + 0x100,
+    .map_io         = smdk2410_map_io,
+    .init_irq       = s3c24xx_init_irq,
+    .init_machine   = smdk2410_init,
+    .timer          = &s3c24xx_timer,
+   }
+#+end_src
+
+这样就变的很清晰了，它就定义了一个类型是 =strcut machine_desc=
+（[[machine_desc][如下参考]]）的结构体 =__mach_desc_SMDK2410= 。它被放在
+=__section__(".arch.info.init")= 中， 是初始化数据，kernel启动起来后将
+被丢弃。
+
+=MACH_TYPE_SMDK2410= 是目标板的类型值，定义在
+=arch/include/asm-arm/mach-types.h= 中（ =#include <asm/mach-types.h>=
+），文件 =mach-types.h= 在未编译前是不存在的，它由目录
+=/arch/arm/tools/= 中的脚本 =gen-mach-types= 和 文件 =mach-types= 生成，
+在 =mach-types= 可以查找到
+#+begin_src c
+smdk2410		ARCH_SMDK2410 SMDK2410		193
+#+end_src
+
+其他字段如下：
++ =phys_io= :物理IO空间起始地址.
++ =io_pg_offst= :IO页表入口的偏移字节.
++ =boot_params= :bootloader产生的tagged list的开始地址.
++ =map_io= :IO mapping的函数.
++ =init_irq= :初始化板子IRQ系统的函数.
++ =init_machine= :初始化板子各个设备与接口的函数.
++ =timer= :系统tick timer的结构体.
++ other: 其他 =struct machine_desc= 中的成员一般用不到.
+
+* Linux启动使用或调用各个字段顺序
 
 
 
+
+* =struct machine_desc=
+<<machine_desc>>
+#+begin_src c
+struct machine_desc {
+	/*
+	 * Note! The first four elements are used
+	 * by assembler code in head-armv.S
+	 */
+	unsigned int		nr;		/* architecture number	*/
+	unsigned int		phys_io;	/* start of physical io	*/
+	unsigned int		io_pg_offst;	/* byte offset for io 
+						 * page tabe entry	*/
+	const char		*name;		/* architecture name	*/
+	unsigned long		boot_params;	/* tagged list		*/
+	unsigned int		video_start;	/* start of video RAM	*/
+	unsigned int		video_end;	/* end of video RAM	*/
+	unsigned int		reserve_lp0 :1;	/* never has lp0	*/
+	unsigned int		reserve_lp1 :1;	/* never has lp1	*/
+	unsigned int		reserve_lp2 :1;	/* never has lp2	*/
+	unsigned int		soft_reboot :1;	/* soft reboot		*/
+	void			(*fixup)(struct machine_desc *,
+					 struct tag *, char **,
+					 struct meminfo *);
+	void			(*map_io)(void);/* IO mapping function	*/
+	void			(*init_irq)(void);
+	struct sys_timer	*timer;		/* system tick timer	*/
+	void			(*init_machine)(void);
+};
+#+end_src
 * reference
-#+begin_src c++
+#+begin_src c
 
 #+end_src
 
-
-http://blog.csdn.net/thl789/article/details/6699259
-http://www.embedu.org/Column/Column225.htm
-http://blog.csdn.net/yuanyou/article/details/3844815
