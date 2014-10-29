@@ -3,8 +3,8 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<title>Dell M4800 install ubuntu 14.04</title>
-<!-- 2014-10-29 Wed 22:49 -->
+<title>Misc</title>
+<!-- 2014-10-29 Wed 22:50 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -138,129 +138,121 @@ for the JavaScript code in this tag.
 </head>
 <body>
 <div id="content">
-<h1 class="title">Dell M4800 install ubuntu 14.04</h1>
+<h1 class="title">Misc</h1>
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">Intel Corporation Wireless 7260</a></li>
-<li><a href="#sec-2"><code>serio1/input/input</code> message</a></li>
-<li><a href="#sec-3">AMD FirePro M5100</a>
-<ul>
-<li><a href="#sec-3-1">install the drivers</a></li>
-<li><a href="#sec-3-2">switch between Intel graphics and AMD</a></li>
-</ul>
-</li>
+<li><a href="#sec-1"><code>page_size</code></a></li>
+<li><a href="#sec-2"><code>__init, __initdata</code></a></li>
+<li><a href="#sec-3"><code>container_of</code></a></li>
+<li><a href="#sec-4"><code>subsys_initcall</code></a></li>
+<li><a href="#sec-5">likely和unlikely</a></li>
 </ul>
 </div>
 </div>
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">Intel Corporation Wireless 7260</h2>
+<h2 id="sec-1"><code>page_size</code></h2>
 <div class="outline-text-2" id="text-1">
 <p>
-update the latest firmware:
+In the <code>/arch/arm/include/asm/page.h</code>
 </p>
+
 <div class="org-src-container">
 
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">open  http://www.intel.com/support/wireless/wlan/sb/CS-034398.htm</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">download Intel&#174; Dual Band Wireless-AC 7260, latest firmware package </span>
-<span style="color: #ff7f24;">#       </span><span style="color: #ff7f24;">iwlwifi-7260-ucode-22.15.8.0.tgz</span>
-
-tar xvzf iwlwifi-7260-ucode-22.15.8.0.tgz
-sudo mv /lib/firmware/iwlwifi-7260-8.ucode ~/
-sudo cp ~/Downloads/iwlwifi-7260-ucode-22.15.8.0/iwlwifi-7260-8.ucode /lib/firmware
-sudo chown root:root /lib/firmware/iwlwifi-7260-8.ucode
-<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Restart computer</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">or </span>
-<span style="color: #b0c4de;">cd</span> /lib/firmware
-sudo mv iwlwifi-7260-8.ucode  iwlwifi-7260-8.ucode.bak
-sudo wget  https://git.kernel.org/cgit/linux/kernel/git/egrumbach/linux-firmware.git/plain/iwlwifi-7260-8.ucode
-sudo chown root:root /lib/firmware/iwlwifi-7260-8.ucode
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Restart computer</span>
+<pre class="src src-c"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">PAGE_SHIFT determines the page size </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PAGE_SHIFT</span>              12
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PAGE_SIZE</span>               (_AC(1,UL) &lt;&lt; PAGE_SHIFT)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PAGE_MASK</span>               (~(PAGE_SIZE-1))
 </pre>
 </div>
 </div>
 </div>
+
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2"><code>serio1/input/input</code> message</h2>
+<h2 id="sec-2"><code>__init, __initdata</code></h2>
 <div class="outline-text-2" id="text-2">
 <p>
-After installing ubuntu 14.04, use <code>dmesg</code> to check the kernel
-message:
+#define _<sub>init</sub> _<sub>section</sub>(.init.text) _<sub>cold</sub> notrace
+#define _<sub>initdata</sub> _<sub>section</sub>(.init.data)
 </p>
-<div class="org-src-container">
-
-<pre class="src src-sh">[12646.620535] input: DualPoint Stick as /devices/platform/i8042/serio1/input/input30
-[12646.633581] input: AlpsPS/2 ALPS DualPoint TouchPad as /devices/platform/i8042/serio1/input/input29
-....
-</pre>
-</div>
 
 <p>
-The following commands fixed it for me (temporarily until reboot):
+<a href="http://adrianhuang.blogspot.hk/2010/01/linux-kernel-init-initdata.html">http://adrianhuang.blogspot.hk/2010/01/linux-kernel-init-initdata.html</a>
+<a href="http://kernelnewbies.org/FAQ/InitExitMacros">http://kernelnewbies.org/FAQ/InitExitMacros</a>
+<a href="http://blog.chinaunix.net/uid-26694208-id-3078013.html">http://blog.chinaunix.net/uid-26694208-id-3078013.html</a>
+<a href="http://www.linuxidc.com/Linux/2008-10/16972.htm">http://www.linuxidc.com/Linux/2008-10/16972.htm</a>
 </p>
-<div class="org-src-container">
-
-<pre class="src src-sh">sudo rmmod psmouse
-sudo modprobe psmouse <span style="color: #eedd82;">proto</span>=imps
-</pre>
-</div>
-
-<p>
-And to make it permanent:
-</p>
-<div class="org-src-container">
-
-<pre class="src src-sh">sudo gedit /etc/modprobe.d/options  <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">if no this file, create it</span>
-<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Add this line:</span>
-options psmouse <span style="color: #eedd82;">proto</span>=imps
-</pre>
-</div>
 </div>
 </div>
 
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">AMD FirePro M5100</h2>
+<h2 id="sec-3"><code>container_of</code></h2>
 <div class="outline-text-2" id="text-3">
-</div><div id="outline-container-sec-3-1" class="outline-3">
-<h3 id="sec-3-1">install the drivers</h3>
-<div class="outline-text-3" id="text-3-1">
 <p>
-Open <b>Additional Drivers</b>, install <b>AMD graphics acceleratiors from
-fglrx-updates</b>:
-</p>
-
-
-<div class="figure">
-<p><img src="./Files/amd.jpg" alt="amd.jpg" width="700px" />
+<a href="http://adrianhuang.blogspot.hk/2010/01/linux-kernel-containerof.html">http://adrianhuang.blogspot.hk/2010/01/linux-kernel-containerof.html</a>
 </p>
 </div>
 </div>
-</div>
 
-<div id="outline-container-sec-3-2" class="outline-3">
-<h3 id="sec-3-2">switch between Intel graphics and AMD</h3>
-<div class="outline-text-3" id="text-3-2">
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4"><code>subsys_initcall</code></h2>
+<div class="outline-text-2" id="text-4">
+<p>
+<a href="http://blog.csdn.net/unbutun/article/details/4028914">http://blog.csdn.net/unbutun/article/details/4028914</a>
+</p>
+
+<p>
+<a href="http://blog.csdn.net/fenzhikeji/article/details/6860143">http://blog.csdn.net/fenzhikeji/article/details/6860143</a>
+<a href="http://blog.csdn.net/fudan_abc/article/details/5490849">http://blog.csdn.net/fudan_abc/article/details/5490849</a>
+<a href="http://blog.csdn.net/heyunqi/article/details/1897108">http://blog.csdn.net/heyunqi/article/details/1897108</a>
+<a href="http://wenku.baidu.com/view/3f42beb81a37f111f1855b2a.html">http://wenku.baidu.com/view/3f42beb81a37f111f1855b2a.html</a>
+<a href="http://blog.163.com/liuqiang_mail@126/blog/static/10996887520124741925773/">http://blog.163.com/liuqiang_mail@126/blog/static/10996887520124741925773/</a>
+<a href="http://book.51cto.com/art/201007/213593.htm">http://book.51cto.com/art/201007/213593.htm</a>
+</p>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">likely和unlikely</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+likely和unlikely是gcc扩展的跟处理器相关的宏：
+</p>
 <div class="org-src-container">
 
-<pre class="src src-sh">sudo amdcccle
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span>   <span style="color: #87cefa;">likely</span>(<span style="color: #eedd82;">x</span>)        __builtin_expect(!!(x), 1)
+<span style="color: #b0c4de;">#define</span>   <span style="color: #87cefa;">unlikely</span>(<span style="color: #eedd82;">x</span>)      __builtin_expect(!!(x), 0)
 </pre>
 </div>
 
-
-<div class="figure">
-<p><img src="./Files/amd_control.jpg" alt="amd_control.jpg" width="700px" />
+<p>
+现在处理器都是流水线的，有些里面有多个逻辑运算单元，系统可以提前取多条指令进行并行处理，但遇到跳转时，则需要重新取指令，这相对于不用重新去指令就降低了速度。所以就引入了likely和unlikely，目的是增加条件分支预测的准确性，cpu会提前装载后面的指令，遇到条件转移指令时会提前预测并装载某个分支的指令。unlikely 表示你可以确认该条件是极少发生的，相反likely表示该条件多数情况下会发生。编译器会产生相应的代码来优化cpu执行效率。因此程序员在编写代码时可以根据判断条件发生的概率来优化处理器的取指操作。例如：
 </p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #eedd82;">y</span>;
+<span style="color: #00ffff;">if</span>(unlikely(x &gt; 0))
+y = 1;
+<span style="color: #00ffff;">else</span>
+y = -1;
+</pre>
 </div>
-</div>
+<p>
+上面的代码中gcc编译的指令会预先读取 y = -1 这条指令，这适合 x 的值大于 0 的概率比较小的情况。如果 x 的值在大部分情况下是大于 0 的，就应该用 likely(x &gt; 0)，这样编译出的指令是预先读取 y = 1 这条指令了。这样系统在运行时就会减少重新取指了。
+</p>
+
+<p>
+Test:
+<a href="http://blog.man7.org/2012/10/how-much-do-builtinexpect-likely-and.html">http://blog.man7.org/2012/10/how-much-do-builtinexpect-likely-and.html</a>
+</p>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-10-29 Wed 22:49</p>
+<p class="date">Created: 2014-10-29 Wed 22:50</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

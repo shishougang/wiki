@@ -1,0 +1,940 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>list and hlist in kernel</title>
+<!-- 2014-10-29 Wed 22:50 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  pre.src-sh:before    { content: 'sh'; }
+  pre.src-bash:before  { content: 'sh'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-R:before     { content: 'R'; }
+  pre.src-perl:before  { content: 'Perl'; }
+  pre.src-java:before  { content: 'Java'; }
+  pre.src-sql:before   { content: 'SQL'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.right  { text-align: center;  }
+  th.left   { text-align: center;   }
+  th.center { text-align: center; }
+  td.right  { text-align: right;  }
+  td.left   { text-align: left;   }
+  td.center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara:nth-child(2) { display: inline; }
+  .footpara { display: block; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  /*]]>*/-->
+</style>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">list and hlist in kernel</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">list</a>
+<ul>
+<li><a href="#sec-2-1">list structure</a></li>
+<li><a href="#sec-2-2">list init</a>
+<ul>
+<li><a href="#sec-2-2-1">dynamic</a></li>
+<li><a href="#sec-2-2-2">static</a></li>
+</ul>
+</li>
+<li><a href="#sec-2-3">insert</a></li>
+<li><a href="#sec-2-4">delete from the list</a></li>
+<li><a href="#sec-2-5">replace</a></li>
+<li><a href="#sec-2-6">misc operations</a></li>
+<li><a href="#sec-2-7">splice</a></li>
+<li><a href="#sec-2-8">entry operations</a></li>
+<li><a href="#sec-2-9">iterate the list</a>
+<ul>
+<li><a href="#sec-2-9-1">example</a></li>
+</ul>
+</li>
+<li><a href="#sec-2-10">iterate the entry</a>
+<ul>
+<li><a href="#sec-2-10-1">example</a></li>
+</ul>
+</li>
+<li><a href="#sec-2-11">example</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">hlist</a>
+<ul>
+<li><a href="#sec-3-1">hlist structure</a></li>
+<li><a href="#sec-3-2">init head or node</a></li>
+<li><a href="#sec-3-3">delete node</a></li>
+<li><a href="#sec-3-4">add</a>
+<ul>
+<li><a href="#sec-3-4-1">add head</a></li>
+<li><a href="#sec-3-4-2">add node</a></li>
+</ul>
+</li>
+<li><a href="#sec-3-5">move</a></li>
+<li><a href="#sec-3-6">iterate node</a></li>
+<li><a href="#sec-3-7">iterate the entry</a></li>
+<li><a href="#sec-3-8">misc</a></li>
+<li><a href="#sec-3-9">example</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Overview</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Linux内核文件<a href="http://lxr.free-electrons.com/source/include/linux/list.h?v=3.1">list.h</a> 提供了一个简单双向链表list的实现和一个有链表头并通常用来作为hash表的双向链表hlist的实现。我们来看看如何正确的使用它们。
+</p>
+
+<p>
+首先，这里的链表有别于平时使用的<a href="http://en.wikipedia.org/wiki/Linked_list">linked list</a> ，一个linked list通常包含它需要链接的元素，如下：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">the_list</span> {
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">the_item</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">the_list</span> *<span style="color: #eedd82;">prev</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">the_list</span> *<span style="color: #eedd82;">next</span>;
+};
+</pre>
+</div>
+
+<p>
+kernel实现的linked list给人感觉list自己被包含在它链接的元素内，如果我们要创建一个 <code>kernel_list</code> ,那么如下：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kernel_list</span> {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">list</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">list structure in the kernel </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">the_item</span>;
+};
+</pre>
+</div>
+
+<p>
+List的基本特性如下：
+</p>
+<ul class="org-ul">
+<li>List在你需要链接数据元素的里面。
+</li>
+<li>可以把 <code>struct list_head</code> 放在structure的任何地方那个。
+</li>
+<li>可以吧 <code>struct list_head</code> 变量命名为任何名字。
+</li>
+<li>可以有多个lists在一个structure中。
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">list</h2>
+<div class="outline-text-2" id="text-2">
+</div><div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">list structure</h3>
+<div class="outline-text-3" id="text-2-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> {
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">next</span>, *<span style="color: #eedd82;">prev</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">list init</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+list的初始化可以分为静态和动态：
+</p>
+</div>
+<div id="outline-container-sec-2-2-1" class="outline-4">
+<h4 id="sec-2-2-1">dynamic</h4>
+<div class="outline-text-4" id="text-2-2-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">LIST_HEAD_INIT</span>(<span style="color: #eedd82;">name</span>) { &amp;(name), &amp;(name) }
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">or </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">INIT_LIST_HEAD</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">list</span>)
+{
+        list-&gt;next = list;
+        list-&gt;prev = list;
+}
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">example </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">my_list</span> = LIST_HEAD_INIT(my_list);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">your_list</span>;
+INIT_LIST_HEAD(&amp;your_list);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-2-2" class="outline-4">
+<h4 id="sec-2-2-2">static</h4>
+<div class="outline-text-4" id="text-2-2-2">
+<p>
+声明并初始化
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">LIST_HEAD</span>(<span style="color: #eedd82;">name</span>) \
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">name</span> = LIST_HEAD_INIT(name)
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">example </span><span style="color: #ff7f24;">*/</span>
+LIST_HEAD(rds_sock_list);  
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">==&gt; </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rds_sock_list</span> = { &amp;(rds_sock_list), &amp;(rds_sock_list) };
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">insert</h3>
+<div class="outline-text-3" id="text-2-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__list_add</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">new</span>,
+                              <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">prev</span>,
+                              <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">next</span>)
+{
+        next-&gt;prev = new;
+        new-&gt;next = next;
+        new-&gt;prev = prev;
+        prev-&gt;next = new;
+}
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">new &#25554;&#20837;&#21040;head&#20043;&#21518; </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">list_add</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">new</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">head</span>)
+{
+        __list_add(new, head, head-&gt;next);
+}
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">new &#25554;&#20837;&#21040;head&#20043;&#21069; </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">list_add_tail</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">new</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">head</span>)
+{
+        __list_add(new, head-&gt;prev, head);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">delete from the list</h3>
+<div class="outline-text-3" id="text-2-4">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__list_del</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> * <span style="color: #eedd82;">prev</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> * <span style="color: #eedd82;">next</span>)
+{
+        next-&gt;prev = prev;
+        prev-&gt;next = next;
+}
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">list_del</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">entry</span>)
+{
+        __list_del(entry-&gt;prev, entry-&gt;next);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5">replace</h3>
+<div class="outline-text-3" id="text-2-5">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">list_replace - replace old entry by new one </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">list_replace</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">old</span>,
+                                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">new</span>)
+{
+        new-&gt;next = old-&gt;next;
+        new-&gt;next-&gt;prev = new;
+        new-&gt;prev = old-&gt;prev;
+        new-&gt;prev-&gt;next = new;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">list_replace_init</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">old</span>,
+                                        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">new</span>)
+{
+        list_replace(old, new);
+        INIT_LIST_HEAD(old);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-6" class="outline-3">
+<h3 id="sec-2-6">misc operations</h3>
+<div class="outline-text-3" id="text-2-6">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">list_is_last</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">list</span>,
+                                <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">head</span>)
+{
+        <span style="color: #00ffff;">return</span> list-&gt;next == head;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">list_empty</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">head</span>)
+{
+        <span style="color: #00ffff;">return</span> head-&gt;next == head;
+}
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">list_empty_careful - tests whether a list is empty and not being modified </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">list_empty_careful</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">head</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">next</span> = head-&gt;next;
+        <span style="color: #00ffff;">return</span> (next == head) &amp;&amp; (next == head-&gt;prev);
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">list_is_singular</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">head</span>)
+{
+        <span style="color: #00ffff;">return</span> !list_empty(head) &amp;&amp; (head-&gt;next == head-&gt;prev);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-7" class="outline-3">
+<h3 id="sec-2-7">splice</h3>
+<div class="outline-text-3" id="text-2-7">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__list_splice</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">list</span>,
+                                 <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">prev</span>,
+                                 <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">next</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">first</span> = list-&gt;next;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">last</span> = list-&gt;prev;
+
+        first-&gt;prev = prev;
+        prev-&gt;next = first;
+
+        last-&gt;next = next;
+        next-&gt;prev = last;
+}
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">list &#21152;&#21040; head &#21069;&#38754; </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">list_splice</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">list</span>,
+                                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">head</span>)
+{
+        <span style="color: #00ffff;">if</span> (!list_empty(list))
+                __list_splice(list, head, head-&gt;next);
+}
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">list &#21152;&#21040; head &#21518;&#38754; </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">list_splice_tail</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">list</span>,
+                                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">head</span>)
+{
+        <span style="color: #00ffff;">if</span> (!list_empty(list))
+                __list_splice(list, head-&gt;prev, head);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-8" class="outline-3">
+<h3 id="sec-2-8">entry operations</h3>
+<div class="outline-text-3" id="text-2-8">
+<p>
+一般通过 <code>struct list_head</code> 维护链表，那么有一个指向 <code>struct
+list_head*</code> 的指针 <code>ptr</code> ,如何获取它所在的structure的指针然后访问它的元素呢？
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * @ptr:        &amp;struct list_head &#25351;&#38024;&#12290;</span>
+<span style="color: #ff7f24;"> * @type:       ptr&#25152;&#22312;&#30340;&#20803;&#32032;&#32467;&#26500;&#20307;&#30340;&#31867;&#22411;&#12290;</span>
+<span style="color: #ff7f24;"> * @member:     list_head&#22312;type&#32467;&#26500;&#20307;&#20013;&#30340;&#21517;&#23383;&#12290;</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">list_entry</span>(<span style="color: #eedd82;">ptr</span>, <span style="color: #eedd82;">type</span>, <span style="color: #eedd82;">member</span>) \
+        container_of(ptr, type, member)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">container_of</span>(<span style="color: #eedd82;">ptr</span>, <span style="color: #eedd82;">type</span>, <span style="color: #eedd82;">member</span>) ({                      \
+        <span style="color: #00ffff;">const</span> typeof( ((<span style="color: #98fb98;">type</span> *)0)-&gt;member ) *__mptr = (ptr);    \
+        (<span style="color: #98fb98;">type</span> *)( (<span style="color: #98fb98;">char</span> *)__mptr - offsetof(type,member) );})
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">offsetof</span>(<span style="color: #eedd82;">TYPE</span>, <span style="color: #eedd82;">MEMBER</span>) ((<span style="color: #98fb98;">size_t</span>) &amp;((<span style="color: #98fb98;">TYPE</span> *)0)-&gt;MEMBER)
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">&#21482;&#26159; ptr &#21464;&#25104; (ptr)-&gt;next </span><span style="color: #ff7f24;">*/</span> 
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">list_first_entry</span>(<span style="color: #eedd82;">ptr</span>, <span style="color: #eedd82;">type</span>, <span style="color: #eedd82;">member</span>) \
+        list_entry((ptr)-&gt;next, type, member)
+</pre>
+</div>
+
+<p>
+这里难点是通过0地址的指针强制转换成相应结构体，然后在获取其中元素所在位置，因为起始地址是0,这里得到的元素所在指针位置就是它相对于structure
+的位置，也就是这里 <code>offsetof</code> 所得到的以字节单位的值。
+</p>
+
+<p>
+有了这个值就好办了，list的指针地址是知道的，只要减去这个偏移值就能得到元素structure的地址，最后转换成其type就得到entry了。
+</p>
+
+<p>
+主要是扩展成：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">entry = (<span style="color: #98fb98;">type</span> *)( (<span style="color: #98fb98;">char</span> *)__mptr - offsetof(type,member);
+</pre>
+</div>
+
+<p>
+<b>example:</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">lh</span>;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inet_protosw</span> *<span style="color: #eedd82;">answer</span>;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inet_protosw</span> {
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">list</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>   <span style="color: #eedd82;">type</span>;    
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>   <span style="color: #eedd82;">protocol</span>;
+}
+<span style="color: #eedd82;">answer</span> = list_entry(lh, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inet_protosw</span>, list);
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-9" class="outline-3">
+<h3 id="sec-2-9">iterate the list</h3>
+<div class="outline-text-3" id="text-2-9">
+<p>
+safe的区别是多了另一个&amp;struct list<sub>head类型的临时变量n</sub>.变量n提前指向
+pos下一个元素,确保在访问的当前节点被其他进程删除时,仍能正常遍历整个list.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">@pos: &amp;struct list_head&#31867;&#22411;&#30340;loop cursor.</span>
+<span style="color: #ff7f24;">     @head: list&#30340;head.</span>
+<span style="color: #ff7f24;">  </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">  #define</span> <span style="color: #87cefa;">list_for_each</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">head</span>)                                    \
+    <span style="color: #00ffff;">for</span> (pos = (head)-&gt;next; prefetch(pos-&gt;next), pos != (head);      \
+         pos = pos-&gt;next)
+
+<span style="color: #b0c4de;">  #define</span> <span style="color: #87cefa;">list_for_each_prev</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">head</span>)                                \
+    <span style="color: #00ffff;">for</span> (pos = (head)-&gt;prev; prefetch(pos-&gt;prev), pos != (head);       \
+         pos = pos-&gt;prev)
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">@n: &#21478;&#19968;&#20010;&amp;struct list_head&#31867;&#22411;&#30340;&#20020;&#26102;&#21464;&#37327;.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">list_for_each_safe</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">n</span>, <span style="color: #eedd82;">head</span>)                       \
+        <span style="color: #00ffff;">for</span> (pos = (head)-&gt;next, n = pos-&gt;next; pos != (head); \
+                pos = n, n = pos-&gt;next)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">list_for_each_prev_safe</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">n</span>, <span style="color: #eedd82;">head</span>) \
+        <span style="color: #00ffff;">for</span> (pos = (head)-&gt;prev, n = pos-&gt;prev; \
+             prefetch(pos-&gt;prev), pos != (head); \
+             pos = n, n = pos-&gt;prev)
+</pre>
+</div>
+</div>
+
+<div id="outline-container-sec-2-9-1" class="outline-4">
+<h4 id="sec-2-9-1">example</h4>
+<div class="outline-text-4" id="text-2-9-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rfcomm_dlc</span> {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span>      <span style="color: #eedd82;">list</span>;
+  <span style="color: #98fb98;">u8</span>            <span style="color: #eedd82;">dlci</span>;
+};
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">dlc_list</span>;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">p</span>;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rfcomm_dlc</span> *<span style="color: #eedd82;">d</span>;
+<span style="color: #87cefa;">list_for_each</span>(<span style="color: #98fb98;">p</span>, &amp;dlc_list) {
+  d = list_entry(p, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rfcomm_dlc</span>, list);
+  <span style="color: #00ffff;">if</span> (d-&gt;dlci == dlci)
+    <span style="color: #00ffff;">return</span> d;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-10" class="outline-3">
+<h3 id="sec-2-10">iterate the entry</h3>
+<div class="outline-text-3" id="text-2-10">
+<p>
+<code>list_for_each</code> 与 <code>list_for_each_entry</code> 的区别是,前者pos的类型是
+<code>&amp;struct list_head</code> ,只遍历并返回链表指针,而后者pos的类型是 <code>type *</code> ,
+在遍历链表的同时,找出并返回list所在的元素指针.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * @pos:        the type * to use as a loop cursor.</span>
+<span style="color: #ff7f24;"> * @head:       the head for your list.</span>
+<span style="color: #ff7f24;"> * @member:     the name of the list_struct within the struct.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">list_for_each_entry</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">head</span>, <span style="color: #eedd82;">member</span>)                          \
+        <span style="color: #00ffff;">for</span> (pos = list_entry((head)-&gt;next, typeof(*pos), member);      \
+             prefetch(pos-&gt;member.next), &amp;pos-&gt;member != (head);        \
+             pos = list_entry(pos-&gt;member.next, typeof(*pos), member))
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">list_for_each_entry_reverse</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">head</span>, <span style="color: #eedd82;">member</span>)                  \
+        <span style="color: #00ffff;">for</span> (pos = list_entry((head)-&gt;prev, typeof(*pos), member);      \
+             prefetch(pos-&gt;member.prev), &amp;pos-&gt;member != (head);        \
+             pos = list_entry(pos-&gt;member.prev, typeof(*pos), member))
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">list_for_each_entry_continue</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">head</span>, <span style="color: #eedd82;">member</span>)                 \
+        <span style="color: #00ffff;">for</span> (pos = list_entry(pos-&gt;member.next, typeof(*pos), member);  \
+             prefetch(pos-&gt;member.next), &amp;pos-&gt;member != (head);        \
+             pos = list_entry(pos-&gt;member.next, typeof(*pos), member))
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">list_for_each_entry_continue_reverse</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">head</span>, <span style="color: #eedd82;">member</span>)         \
+        <span style="color: #00ffff;">for</span> (pos = list_entry(pos-&gt;member.prev, typeof(*pos), member);  \
+             prefetch(pos-&gt;member.prev), &amp;pos-&gt;member != (head);        \
+             pos = list_entry(pos-&gt;member.prev, typeof(*pos), member))
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">list_for_each_entry_safe</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">n</span>, <span style="color: #eedd82;">head</span>, <span style="color: #eedd82;">member</span>)                  \
+        <span style="color: #00ffff;">for</span> (pos = list_entry((head)-&gt;next, typeof(*pos), member),      \
+                n = list_entry(pos-&gt;member.next, typeof(*pos), member); \
+             &amp;pos-&gt;member != (head);                                    \
+             pos = n, n = list_entry(n-&gt;member.next, typeof(*n), member))
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">list_for_each_entry_safe_continue</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">n</span>, <span style="color: #eedd82;">head</span>, <span style="color: #eedd82;">member</span>)                 \
+        <span style="color: #00ffff;">for</span> (pos = list_entry(pos-&gt;member.next, typeof(*pos), member),          \
+                n = list_entry(pos-&gt;member.next, typeof(*pos), member);         \
+             &amp;pos-&gt;member != (head);                                            \
+             pos = n, n = list_entry(n-&gt;member.next, typeof(*n), member))
+</pre>
+</div>
+</div>
+<div id="outline-container-sec-2-10-1" class="outline-4">
+<h4 id="sec-2-10-1">example</h4>
+<div class="outline-text-4" id="text-2-10-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atm_dev_addr</span> {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr_atmsvc</span> <span style="color: #eedd82;">addr</span>;    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ATM address </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">entry</span>;         <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">next address </span><span style="color: #ff7f24;">*/</span>
+};
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atm_dev_addr</span> *<span style="color: #eedd82;">this</span>;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">head</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">list header </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">total</span> = 0;
+list_for_each_entry(this, head, entry)
+   total += <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr_atmsvc</span>);
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-11" class="outline-3">
+<h3 id="sec-2-11">example</h3>
+<div class="outline-text-3" id="text-2-11">
+<p>
+从当前module节点,遍历系统所有module.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/module.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/kernel.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/init.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/version.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/list.h&gt;</span>
+
+MODULE_LICENSE(<span style="color: #ffa07a;">"GPL"</span>);
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">module</span> *<span style="color: #eedd82;">m</span> = &amp;__this_module;
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">list_module_test</span>(<span style="color: #98fb98;">void</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">module</span> *<span style="color: #eedd82;">mod</span>;
+        list_for_each_entry(mod, m-&gt;list.prev, list)
+                printk (<span style="color: #ffa07a;">"%s\n"</span>, mod-&gt;name);
+
+}
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">list_module_init</span> (<span style="color: #98fb98;">void</span>)
+{
+        list_module_test();
+        <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">list_module_exit</span> (<span style="color: #98fb98;">void</span>)
+{
+        printk (<span style="color: #ffa07a;">"unload listmodule.ko\n"</span>);
+}
+
+module_init(list_module_init);
+module_exit(list_module_exit);
+</pre>
+</div>
+
+<p>
+Makefile:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #87cefa;">ifeq</span> ($(KERNELRELEASE),)
+    KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+    PWD := $(shell pwd)
+modules:
+        $(MAKE) -C $(KERNELDIR) <span style="color: #eedd82;">M</span>=$(PWD) modules
+
+modules_install:
+        $(MAKE) -C $(KERNELDIR) <span style="color: #eedd82;">M</span>=$(PWD) modules_install
+
+clean:
+        rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions
+
+.PHONY: modules modules_install clean
+<span style="color: #00ffff;">else</span>
+    obj-m := listmodule.o
+endif
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">hlist</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+拥有一个指针链表头的双向链表.它被分为 <code>struct hlist_head</code> 头节点和
+<code>struct hlist_node</code> 元素节点.元素节点的 <code>pprev</code> 指向前一个节点的next指针.
+</p>
+</div>
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">hlist structure</h3>
+<div class="outline-text-3" id="text-3-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_head</span> {
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">first</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> {
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">next</span>, **<span style="color: #eedd82;">pprev</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">init head or node</h3>
+<div class="outline-text-3" id="text-3-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HLIST_HEAD_INIT</span> { .first = <span style="color: #7fffd4;">NULL</span> }
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">HLIST_HEAD</span>(<span style="color: #eedd82;">name</span>) <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_head</span> <span style="color: #eedd82;">name</span> = {  .first = <span style="color: #7fffd4;">NULL</span> }
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">INIT_HLIST_HEAD</span>(<span style="color: #eedd82;">ptr</span>) ((ptr)-&gt;first = <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">INIT_HLIST_NODE</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">h</span>)
+{
+        h-&gt;next = <span style="color: #7fffd4;">NULL</span>;
+        h-&gt;pprev = <span style="color: #7fffd4;">NULL</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">delete node</h3>
+<div class="outline-text-3" id="text-3-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__hlist_del</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">n</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">next</span> = n-&gt;next;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> **<span style="color: #eedd82;">pprev</span> = n-&gt;pprev;
+        *pprev = next;
+        <span style="color: #00ffff;">if</span> (next)
+                next-&gt;pprev = pprev;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hlist_del</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">n</span>)
+{
+        __hlist_del(n);
+        n-&gt;next = LIST_POISON1;
+        n-&gt;pprev = LIST_POISON2;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hlist_del_init</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">n</span>)
+{
+        <span style="color: #00ffff;">if</span> (!hlist_unhashed(n)) {
+                __hlist_del(n);
+                INIT_HLIST_NODE(n);
+        }
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">add</h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+add操作分为两种插入方式: 1)新插入的节点成为head节点(相当于把新插入的节点排在第一位,得到优先搜索到); 2)节点间的插入
+</p>
+</div>
+<div id="outline-container-sec-3-4-1" class="outline-4">
+<h4 id="sec-3-4-1">add head</h4>
+<div class="outline-text-4" id="text-3-4-1">
+<p>
+n成为新的head节点,原本head节点后的元素节点成为n的next节点.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hlist_add_head</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">n</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_head</span> *<span style="color: #eedd82;">h</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">first</span> = h-&gt;first;
+        n-&gt;next = first;
+        <span style="color: #00ffff;">if</span> (first)
+                first-&gt;pprev = &amp;n-&gt;next;
+        h-&gt;first = n;
+        n-&gt;pprev = &amp;h-&gt;first;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-4-2" class="outline-4">
+<h4 id="sec-3-4-2">add node</h4>
+<div class="outline-text-4" id="text-3-4-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">&#33410;&#28857;n&#25554;&#20837;&#21040;&#33410;&#28857;next&#20043;&#21069; </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">next must be != NULL </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hlist_add_before</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">n</span>,
+                                        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">next</span>)
+{
+        n-&gt;pprev = next-&gt;pprev;
+        n-&gt;next = next;
+        next-&gt;pprev = &amp;n-&gt;next;
+        *(n-&gt;pprev) = n;
+}
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">&#33410;&#28857;n&#25554;&#20837;&#21040;&#33410;&#28857;next&#20043;&#21518; </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hlist_add_after</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">n</span>,
+                                        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">next</span>)
+{
+        next-&gt;next = n-&gt;next;
+        n-&gt;next = next;
+        next-&gt;pprev = &amp;n-&gt;next;
+
+        <span style="color: #00ffff;">if</span>(next-&gt;next)
+                next-&gt;next-&gt;pprev  = &amp;next-&gt;next;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-5" class="outline-3">
+<h3 id="sec-3-5">move</h3>
+<div class="outline-text-3" id="text-3-5">
+<p>
+把old头节点后的元素节点移动到new后面,old指向被置空.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hlist_move_list</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_head</span> *<span style="color: #eedd82;">old</span>,
+                                   <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_head</span> *<span style="color: #eedd82;">new</span>)
+{
+        new-&gt;first = old-&gt;first;
+        <span style="color: #00ffff;">if</span> (new-&gt;first)
+                new-&gt;first-&gt;pprev = &amp;new-&gt;first;
+        old-&gt;first = <span style="color: #7fffd4;">NULL</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-6" class="outline-3">
+<h3 id="sec-3-6">iterate node</h3>
+<div class="outline-text-3" id="text-3-6">
+<p>
+与iterate the list操作类似.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">hlist_for_each</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">head</span>) \
+        <span style="color: #00ffff;">for</span> (pos = (head)-&gt;first; pos &amp;&amp; ({ prefetch(pos-&gt;next); 1; }); \
+             pos = pos-&gt;next)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">hlist_for_each_safe</span>(<span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">n</span>, <span style="color: #eedd82;">head</span>) \
+        <span style="color: #00ffff;">for</span> (pos = (head)-&gt;first; pos &amp;&amp; ({ n = pos-&gt;next; 1; }); \
+             pos = n)
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-7" class="outline-3">
+<h3 id="sec-3-7">iterate the entry</h3>
+<div class="outline-text-3" id="text-3-7">
+<p>
+与如上iterate list's entries 类似.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">hlist_entry</span>(<span style="color: #eedd82;">ptr</span>, <span style="color: #eedd82;">type</span>, <span style="color: #eedd82;">member</span>) container_of(ptr,type,member)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">hlist_for_each_entry</span>(<span style="color: #eedd82;">tpos</span>, <span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">head</span>, <span style="color: #eedd82;">member</span>)                    \
+        <span style="color: #00ffff;">for</span> (pos = (head)-&gt;first;                                        \
+             pos &amp;&amp; ({ prefetch(pos-&gt;next); 1;}) &amp;&amp;                      \
+                ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+             pos = pos-&gt;next)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">hlist_for_each_entry_continue</span>(<span style="color: #eedd82;">tpos</span>, <span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">member</span>)                 \
+        <span style="color: #00ffff;">for</span> (pos = (pos)-&gt;next;                                          \
+             pos &amp;&amp; ({ prefetch(pos-&gt;next); 1;}) &amp;&amp;                      \
+                ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+             pos = pos-&gt;next)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">hlist_for_each_entry_from</span>(<span style="color: #eedd82;">tpos</span>, <span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">member</span>)                     \
+        <span style="color: #00ffff;">for</span> (; pos &amp;&amp; ({ prefetch(pos-&gt;next); 1;}) &amp;&amp;                    \
+                ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+             pos = pos-&gt;next)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">hlist_for_each_entry_safe</span>(<span style="color: #eedd82;">tpos</span>, <span style="color: #eedd82;">pos</span>, <span style="color: #eedd82;">n</span>, <span style="color: #eedd82;">head</span>, <span style="color: #eedd82;">member</span>)            \
+        <span style="color: #00ffff;">for</span> (pos = (head)-&gt;first;                                        \
+             pos &amp;&amp; ({ n = pos-&gt;next; 1; }) &amp;&amp;                           \
+                ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+             pos = n)
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-8" class="outline-3">
+<h3 id="sec-3-8">misc</h3>
+<div class="outline-text-3" id="text-3-8">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">hlist_unhashed</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> *<span style="color: #eedd82;">h</span>)
+{
+        <span style="color: #00ffff;">return</span> !h-&gt;pprev;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">hlist_empty</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_head</span> *<span style="color: #eedd82;">h</span>)
+{
+        <span style="color: #00ffff;">return</span> !h-&gt;first;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-9" class="outline-3">
+<h3 id="sec-3-9">example</h3>
+<div class="outline-text-3" id="text-3-9">
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2014-10-29 Wed 22:50</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

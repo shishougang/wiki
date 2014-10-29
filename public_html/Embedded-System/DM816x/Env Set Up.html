@@ -3,8 +3,8 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<title>Dell M4800 install ubuntu 14.04</title>
-<!-- 2014-10-29 Wed 22:49 -->
+<title>Env Set up</title>
+<!-- 2014-10-29 Wed 22:50 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -138,17 +138,31 @@ for the JavaScript code in this tag.
 </head>
 <body>
 <div id="content">
-<h1 class="title">Dell M4800 install ubuntu 14.04</h1>
+<h1 class="title">Env Set up</h1>
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">Intel Corporation Wireless 7260</a></li>
-<li><a href="#sec-2"><code>serio1/input/input</code> message</a></li>
-<li><a href="#sec-3">AMD FirePro M5100</a>
+<li><a href="#sec-1">Toolchain</a>
 <ul>
-<li><a href="#sec-3-1">install the drivers</a></li>
-<li><a href="#sec-3-2">switch between Intel graphics and AMD</a></li>
+<li><a href="#sec-1-1">Environment Setup</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">TFTP</a>
+<ul>
+<li><a href="#sec-2-1">step 1</a></li>
+<li><a href="#sec-2-2">step 2</a></li>
+<li><a href="#sec-2-3">step 3</a></li>
+<li><a href="#sec-2-4">step 4</a></li>
+<li><a href="#sec-2-5">step 5</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">NFS</a>
+<ul>
+<li><a href="#sec-3-1">step 1</a></li>
+<li><a href="#sec-3-2">step 2</a></li>
+<li><a href="#sec-3-3">step 3</a></li>
+<li><a href="#sec-3-4">step 4</a></li>
 </ul>
 </li>
 </ul>
@@ -156,103 +170,188 @@ for the JavaScript code in this tag.
 </div>
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">Intel Corporation Wireless 7260</h2>
+<h2 id="sec-1">Toolchain</h2>
 <div class="outline-text-2" id="text-1">
 <p>
-update the latest firmware:
+CodeSourcery ARM tool chain version 2009-q1 <a href="https://sourcery.mentor.com/sgpp/portal/release858">https://sourcery.mentor.com/sgpp/portal/release858</a>
 </p>
+</div>
+
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">Environment Setup</h3>
+<div class="outline-text-3" id="text-1-1">
 <div class="org-src-container">
 
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">open  http://www.intel.com/support/wireless/wlan/sb/CS-034398.htm</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">download Intel&#174; Dual Band Wireless-AC 7260, latest firmware package </span>
-<span style="color: #ff7f24;">#       </span><span style="color: #ff7f24;">iwlwifi-7260-ucode-22.15.8.0.tgz</span>
-
-tar xvzf iwlwifi-7260-ucode-22.15.8.0.tgz
-sudo mv /lib/firmware/iwlwifi-7260-8.ucode ~/
-sudo cp ~/Downloads/iwlwifi-7260-ucode-22.15.8.0/iwlwifi-7260-8.ucode /lib/firmware
-sudo chown root:root /lib/firmware/iwlwifi-7260-8.ucode
-<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Restart computer</span>
-
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">or </span>
-<span style="color: #b0c4de;">cd</span> /lib/firmware
-sudo mv iwlwifi-7260-8.ucode  iwlwifi-7260-8.ucode.bak
-sudo wget  https://git.kernel.org/cgit/linux/kernel/git/egrumbach/linux-firmware.git/plain/iwlwifi-7260-8.ucode
-sudo chown root:root /lib/firmware/iwlwifi-7260-8.ucode
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Restart computer</span>
+<pre class="src src-sh">$ export <span style="color: #eedd82;">PATH</span>=/opt/toolchain/2009-q1/bin:$<span style="color: #eedd82;">PATH</span>
+$ export <span style="color: #eedd82;">PATH</span>=/opt/u-boot/tools:$<span style="color: #eedd82;">PATH</span>
 </pre>
 </div>
 </div>
 </div>
+</div>
+
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2"><code>serio1/input/input</code> message</h2>
+<h2 id="sec-2">TFTP</h2>
 <div class="outline-text-2" id="text-2">
+</div><div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">step 1</h3>
+<div class="outline-text-3" id="text-2-1">
 <p>
-After installing ubuntu 14.04, use <code>dmesg</code> to check the kernel
-message:
+install the package and find the directory
 </p>
 <div class="org-src-container">
 
-<pre class="src src-sh">[12646.620535] input: DualPoint Stick as /devices/platform/i8042/serio1/input/input30
-[12646.633581] input: AlpsPS/2 ALPS DualPoint TouchPad as /devices/platform/i8042/serio1/input/input29
-....
-</pre>
-</div>
-
-<p>
-The following commands fixed it for me (temporarily until reboot):
-</p>
-<div class="org-src-container">
-
-<pre class="src src-sh">sudo rmmod psmouse
-sudo modprobe psmouse <span style="color: #eedd82;">proto</span>=imps
-</pre>
-</div>
-
-<p>
-And to make it permanent:
-</p>
-<div class="org-src-container">
-
-<pre class="src src-sh">sudo gedit /etc/modprobe.d/options  <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">if no this file, create it</span>
-<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Add this line:</span>
-options psmouse <span style="color: #eedd82;">proto</span>=imps
+<pre class="src src-sh">$ sudo apt-get install xinetd tftpd tftp
+$ sudo mkdir /home/test/tftpboot
+$ sudo chmod -R 777 /home/test/tftpboot
+$ sudo chown -R nobody /home/test/tftpboot
 </pre>
 </div>
 </div>
 </div>
 
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">step 2</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+copy the uimage to the folder
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo cp uimage $<span style="color: #eedd82;">tftproot</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">step 3</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+create the file /etc/xinetd.d/tftp
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo vim /etc/xinetd.d/tftp
+
+service tftp
+{
+        <span style="color: #eedd82;">protocol</span> = udp
+        <span style="color: #eedd82;">port</span> = 69
+        <span style="color: #eedd82;">socket_type</span> = dgram
+        <span style="color: #eedd82;">wait</span> = yes
+        <span style="color: #eedd82;">user</span> = nobody
+        <span style="color: #eedd82;">server</span> = /usr/sbin/in.tftpd
+        <span style="color: #eedd82;">server_args</span> = /home/test/tftpboot
+        <span style="color: #eedd82;">disable</span> = no
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">step 4</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+start and stop the tftp server
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo /etc/init.d/xinetd stop
+
+sudo /etc/init.d/xinetd start
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5">step 5</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+test
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ ifconfig &gt; /home/renee/test/test.txt
+$ tftp 127.0.0.1
+tftp&gt; get text.txt
+Received 1445 bytes<span style="color: #00ffff;"> in</span> 0.0 seconds
+tftp&gt; quit
+$ ls
+test.txt
+</pre>
+</div>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">AMD FirePro M5100</h2>
+<h2 id="sec-3">NFS</h2>
 <div class="outline-text-2" id="text-3">
 </div><div id="outline-container-sec-3-1" class="outline-3">
-<h3 id="sec-3-1">install the drivers</h3>
+<h3 id="sec-3-1">step 1</h3>
 <div class="outline-text-3" id="text-3-1">
 <p>
-Open <b>Additional Drivers</b>, install <b>AMD graphics acceleratiors from
-fglrx-updates</b>:
+find the location
 </p>
 
-
-<div class="figure">
-<p><img src="./Files/amd.jpg" alt="amd.jpg" width="700px" />
-</p>
-</div>
-</div>
-</div>
-
-<div id="outline-container-sec-3-2" class="outline-3">
-<h3 id="sec-3-2">switch between Intel graphics and AMD</h3>
-<div class="outline-text-3" id="text-3-2">
 <div class="org-src-container">
 
-<pre class="src src-sh">sudo amdcccle
+<pre class="src src-sh"><span style="color: #eedd82;">dst</span>=<span style="color: #ffa07a;">"${HOME}/targetfs"</span>
+mkdir -p $<span style="color: #eedd82;">dst</span>
 </pre>
 </div>
-
-
-<div class="figure">
-<p><img src="./Files/amd_control.jpg" alt="amd_control.jpg" width="700px" />
+</div>
+</div>
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">step 2</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+extract the filesystem
 </p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">me</span>=<span style="color: #ffa07a;">'whoami'</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">if exist the old filesystem, then sudo rm -rf $dst</span>
+sudo tar xzf xxx.tar.gz -C $<span style="color: #eedd82;">dst</span>
+
+sudo chown $<span style="color: #eedd82;">me</span>:$<span style="color: #eedd82;">me</span> $<span style="color: #eedd82;">dst</span>
+sudo chown -R $<span style="color: #eedd82;">me</span>:$<span style="color: #eedd82;">me</span> $<span style="color: #eedd82;">dst</span>/home $<span style="color: #eedd82;">dst</span>/usr $<span style="color: #eedd82;">dst</span>/etc $<span style="color: #eedd82;">dst</span>/lib $<span style="color: #eedd82;">dst</span>/opt $<span style="color: #eedd82;">dst</span>/boot
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">step 3</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+export the target filesystem for NFS access
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo chmod 666 /etc/exports
+sudo echo <span style="color: #ffa07a;">"$dst *(rw,nohide,insecure,no_subtree_check,async,no_root_squash)"</span> &gt;&gt; /etc/exports
+sudo chmod 644 /etc/exports
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">step 4</h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+start and stop the NFS server
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo /etc/init.d/nfs-kernel-server stop
+
+sudo /etc/init.d/nfs-kernel-server start
+</pre>
 </div>
 </div>
 </div>
@@ -260,7 +359,7 @@ fglrx-updates</b>:
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-10-29 Wed 22:49</p>
+<p class="date">Created: 2014-10-29 Wed 22:50</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

@@ -1,0 +1,719 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Direct memory access (DMA)</title>
+<!-- 2014-10-29 Wed 22:50 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  pre.src-sh:before    { content: 'sh'; }
+  pre.src-bash:before  { content: 'sh'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-R:before     { content: 'R'; }
+  pre.src-perl:before  { content: 'Perl'; }
+  pre.src-java:before  { content: 'Java'; }
+  pre.src-sql:before   { content: 'SQL'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.right  { text-align: center;  }
+  th.left   { text-align: center;   }
+  th.center { text-align: center; }
+  td.right  { text-align: right;  }
+  td.left   { text-align: left;   }
+  td.center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara:nth-child(2) { display: inline; }
+  .footpara { display: block; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  /*]]>*/-->
+</style>
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Direct memory access (DMA)</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">Modes of operation</a>
+<ul>
+<li><a href="#sec-2-1">Burst mode</a></li>
+<li><a href="#sec-2-2">Cycle stealing mode</a></li>
+<li><a href="#sec-2-3">Transparent mode</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">CPU and DMA addresses</a></li>
+<li><a href="#sec-4">PCI初始话DMA实例</a></li>
+<li><a href="#sec-5">DMA使用与实例</a>
+<ul>
+<li><a href="#sec-5-1">DMA memory要求</a></li>
+<li><a href="#sec-5-2">2种DMA mappings</a>
+<ul>
+<li><a href="#sec-5-2-1">Consistent DMA mappings</a>
+<ul>
+<li><a href="#sec-5-2-1-1">using consistent DMA mappings.</a></li>
+</ul>
+</li>
+<li><a href="#sec-5-2-2">Streaming DMA mappings</a>
+<ul>
+<li><a href="#sec-5-2-2-1">Using streaming DMA mappings</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#sec-5-3">PCI使用Streaming DMA mapping与WIFI芯片使用互传实例</a></li>
+<li><a href="#sec-5-4">More examples:</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">DMA API Reference</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Overview</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Direct memory access (DMA) is a feature of modern computers that
+allows certain hardware subsystems within the computer to access
+system memory independently of the central processing unit
+(CPU).<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
+</p>
+
+<p>
+The three primary data transfer mechanisms for computer-based data
+acquisition are polling, interrupts (also known as programmed I/O),
+and direct memory access (DMA).<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup>
+</p>
+
+<p>
+DMA has several advantages over polling and interrupts.
+</p>
+<ul class="org-ul">
+<li>DMA is fast because a dedicated piece of hardware transfers data
+from one computer location to another and only one or two bus
+read/write cycles are required per piece of data transferred.
+</li>
+<li>DMA also minimizes latency in servicing a data acquisition device
+because the dedicated hardware responds more quickly than
+interrupts, and transfer time is short.
+</li>
+<li>DMA also off-loads the processor, which means the processor does not
+have to execute any instructions to transfer data.
+</li>
+</ul>
+
+
+<p>
+A DMA controller manages several DMA channels, each of which can be
+programmed to perform a sequence of these DMA transfers. Devices,
+usually I/O peripherals, that acquire data that must be read (or
+devices that must output data and be written to) signal the DMA
+controller to perform a DMA transfer by asserting a hardware DMA
+request signal. A DMA request signal for each channel is routed to the
+DMA controller. This signal is monitored and responded to in much the
+same way that a processor handles interrupts. When the DMA controller
+sees a DMA request, the DMA controller responds by performing one or
+many data transfers from that I/O device into system memory or vice
+versa. Channels must be enabled by the processor for the DMA
+controller to respond to DMA requests. The number of transfers
+performed, transfer modes used, and memory locations accessed depends
+on how the DMA channel is programmed.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/DMA Controller Architecture.jpg" alt="DMA Controller Architecture.jpg" />
+</p>
+</div>
+
+<p>
+When the value in the
+current count register goes from 0 to -1, a terminal count (TC) signal
+is generated, which signifies the
+completion of the DMA transfer sequence. This termination event is
+referred to as reaching terminal count. DMA controllers often generate
+a hardware TC pulse during the last cycle of a DMA transfer sequence.
+This signal can be monitored by the I/O devices participating in the DMA
+transfers.
+</p>
+
+<p>
+DMA controllers require reprogramming when a DMA channel reaches TC.
+Thus, DMA controllers require some CPU time, but far less than is
+required for the CPU to service device I/O interrupts. When a DMA
+channel reaches TC, the processor may need to reprogram the controller
+for additional DMA transfers. Some DMA controllers interrupt the
+processor whenever a channel terminates. DMA controllers also have
+mechanisms for automatically reprogramming a DMA channel when the DMA
+transfer sequence completes. These mechanisms include
+<i>autoinitialization</i> and <i>buffer chaining</i>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Modes of operation</h2>
+<div class="outline-text-2" id="text-2">
+</div><div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Burst mode</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+An entire block of data is transferred in one contiguous sequence.
+Once the DMA controller is granted access to the system bus by the
+CPU, it transfers all bytes of data in the data block before releasing
+control of the system buses back to the CPU. The mode is also called
+<code>Block Transfer Mode</code>.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">Cycle stealing mode</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+In the cycle stealing mode, the DMA controller obtains access to the
+system bus the same way as in burst mode, using BR (Bus Request) and
+BG (Bus Grant) signals, which are the two signals controlling the
+interface between the CPU and the DMA controller. However, in cycle
+stealing mode, after one byte of data transfer, the control of the
+system bus is deasserted to the CPU via BG. It is then continually
+requested again via BR, transferring one byte of data per request,
+until the entire block of data has been transferred.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">Transparent mode</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+The transparent mode takes the most time to transfer a block of data,
+yet it is also the most efficient mode in terms of overall system
+performance. The DMA controller only transfers data when the CPU is
+performing operations that do not use the system buses. It is the
+primary <b>advantage</b> of the transparent mode that the CPU never stops
+executing its programs and the DMA transfer is free in terms of time.
+The <b>disadvantage</b> of the transparent mode is that the hardware needs to
+determine when the CPU is not using the system buses, which can be
+complex and relatively expensive.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">CPU and DMA addresses<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup></h2>
+<div class="outline-text-2" id="text-3">
+<div class="org-src-container">
+
+<pre class="src src-sh">             CPU                  CPU                  Bus
+           Virtual              Physical             Address
+           Address              Address               Space
+            Space                Space
+
+          +-------+             +------+             +------+
+          |       |             |MMIO  |   Offset    |      |
+          |       |  Virtual    |Space |   applied   |      |
+        C +-------+ --------&gt; B +------+ ----------&gt; +------+ A
+          |       |  mapping    |      |   by host   |      |
++-----+   |       |             |      |   bridge    |      |   +--------+
+|     |   |       |             +------+             |      |   |        |
+| CPU |   |       |             | RAM  |             |      |   | Device |
+|     |   |       |             |      |             |      |   |        |
++-----+   +-------+             +------+             +------+   +--------+
+          |       |  Virtual    |Buffer|   Mapping   |      |
+        X +-------+ --------&gt; Y +------+ &lt;---------- +------+ Z
+          |       |  mapping    | RAM  |   by IOMMU
+          |       |             |      |
+          |       |             |      |
+          +-------+             +------+
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">PCI初始话DMA实例</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+以上是硬件实现DMA和DMA硬件传输模式的一些细节，仅做了解和参考。这里以
+PCI为例，看设备如何初始化DMA，为之后操作做准备。
+</p>
+
+<ol class="org-ol">
+<li>在platform devices列表中加入pci device的定义：
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">u64</span> <span style="color: #eedd82;">pci_ep_dmamask</span> = ~(<span style="color: #98fb98;">u32</span>)0;
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">platform_device</span> <span style="color: #eedd82;">ath_pci_ep_device</span> = {
+        .name                           = <span style="color: #ffa07a;">"ath-pciep"</span>,
+        .id                             = 0,
+        .dev = {
+                .dma_mask               = &amp;pci_ep_dmamask,
+                .coherent_dma_mask      = 0xffffffff,
+        },
+        .num_resources                  = ARRAY_SIZE(ath_pci_ep_resources),
+        .resource                       = ath_pci_ep_resources,
+};
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">resource</span> <span style="color: #eedd82;">ath_pci_ep_resources</span>[] = {
+        [0] = {
+                .start  = ATH_PCI_EP_BASE_OFF,
+                .end    = ATH_PCI_EP_BASE_OFF + 0xdff - 1,
+                .flags  = IORESOURCE_MEM,
+        },
+        [1] = {
+                .start  = ATH_CPU_IRQ_PCI_EP,
+                .end    = ATH_CPU_IRQ_PCI_EP,
+                .flags  = IORESOURCE_IRQ,
+        },
+};
+</pre>
+</div>
+<ol class="org-ol">
+<li>之后 <code>platform_add_devices</code> 调用 <code>platform_device_register</code> 会注册
+pci设备。
+</li>
+<li>在需要使用pci的driver中定义pci driver：
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">pci_driver</span> <span style="color: #eedd82;">ath_pci_driver</span> = {
+    .name       = <span style="color: #ffa07a;">"ath_pci"</span>,
+    .id_table   = ath_pci_id_table,
+    .probe      = ath_pci_probe,
+    .remove     = ath_pci_remove,
+<span style="color: #b0c4de;">#ifdef</span> ATH_BUS_PM
+    .suspend    = ath_pci_suspend,
+    .resume     = ath_pci_resume,
+<span style="color: #b0c4de;">#endif</span> <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ATH_BUS_PM </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Linux 2.4.6 has save_state and enable_wake that are not used here </span><span style="color: #ff7f24;">*/</span>
+};
+</pre>
+</div>
+<ol class="org-ol">
+<li><code>pci_register_driver(&amp;ath_pci_driver)</code> 注册相应driver。
+</li>
+<li>在 <code>ath_pci_probe</code> 中 <code>pci_set_dma_mask(pdev, 0xffffffff)</code> 设置DMA
+mask，并作完pci driver的初始化工作。
+</li>
+<li>之后看实际怎么使用DMA来使CPU与设备间互传。
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">DMA使用与实例</h2>
+<div class="outline-text-2" id="text-5">
+</div><div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">DMA memory要求</h3>
+<div class="outline-text-3" id="text-5-1">
+<ul class="org-ul">
+<li>在物理地址上是连续的memory。
+</li>
+<li>可以使用由 <code>kmalloc</code> （最大到128KB）或 <code>__get_free_pages</code> （最大到
+8MB）分配的memory。
+</li>
+<li>可以使用支持DMA的block I/O和networking buffers（如struct skb<sub>buf）。</sub>
+</li>
+<li>不能使用 <code>vmalloc</code> 的memory。
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">2种DMA mappings<sup><a id="fnr.3.100" name="fnr.3.100" class="footref" href="#fn.3">3</a></sup></h3>
+<div class="outline-text-3" id="text-5-2">
+</div><div id="outline-container-sec-5-2-1" class="outline-4">
+<h4 id="sec-5-2-1">Consistent DMA mappings</h4>
+<div class="outline-text-4" id="text-5-2-1">
+<p>
+Consistent DMA mappings which are usually mapped at driver
+initialization, unmapped at the end。
+</p>
+
+<p>
+Think of "consistent" as "synchronous" or "coherent".
+</p>
+
+<p>
+ <b>IMPORTANT:</b> Consistent DMA memory does not preclude the usage of
+proper memory barriers.  The CPU may reorder stores to consistent
+memory just as it may normal memory.  
+</p>
+
+<p>
+Example: if it is important for the device to see the first word of a
+descriptor updated before the second, you must do something like:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">desc-&gt;word0 = address;
+wmb();
+desc-&gt;word1 = DESC_VALID;
+</pre>
+</div>
+<p>
+in order to get correct behavior on all platforms.
+</p>
+
+<p>
+Summarize as follows:
+</p>
+<ul class="org-ul">
+<li>DMA buffer allocated by the kernel
+</li>
+<li>Set up for the whole module life 
+</li>
+<li>Can be expensive. Not recommended.
+</li>
+<li>Let both the CPU and device access the buffer at the same time.
+</li>
+</ul>
+</div>
+
+<div id="outline-container-sec-5-2-1-1" class="outline-5">
+<h5 id="sec-5-2-1-1">using consistent DMA mappings.</h5>
+<div class="outline-text-5" id="text-5-2-1-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">dma_addr_t</span> <span style="color: #eedd82;">dma_handle</span>;
+cpu_addr = dma_alloc_coherent(dev, size, &amp;dma_handle, gfp);
+dma_free_coherent(dev, size, cpu_addr, dma_handle);
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5-2-2" class="outline-4">
+<h4 id="sec-5-2-2">Streaming DMA mappings</h4>
+<div class="outline-text-4" id="text-5-2-2">
+<p>
+Streaming DMA mappings which are usually mapped for one DMA
+  transfer, unmapped right after it (unless you use <code>dma_sync_*</code> below)
+  and for which hardware can optimize for sequential accesses.
+</p>
+
+<p>
+This of "streaming" as "asynchronous" or "outside the coherency
+domain".
+</p>
+
+<p>
+Summarize as follows:
+</p>
+<ul class="org-ul">
+<li>DMA buffer allocated by the driver.
+</li>
+<li>Set up for each transfer.
+</li>
+<li>Cheaper. Saves DMA registers.
+</li>
+<li>Only the device can access the buffer when the mapping is active.
+</li>
+</ul>
+</div>
+
+<div id="outline-container-sec-5-2-2-1" class="outline-5">
+<h5 id="sec-5-2-2-1">Using streaming DMA mappings</h5>
+<div class="outline-text-5" id="text-5-2-2-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">To map a single region, you do: </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span> = &amp;my_dev-&gt;dev;
+<span style="color: #98fb98;">dma_addr_t</span> <span style="color: #eedd82;">dma_handle</span>;
+<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">addr</span> = buffer-&gt;ptr;
+<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span> = buffer-&gt;len;
+
+dma_handle = dma_map_single(dev, addr, size, direction);
+<span style="color: #00ffff;">if</span> (dma_mapping_error(dma_handle)) {
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * reduce current DMA mapping usage,</span>
+<span style="color: #ff7f24;">   * delay and try again later or</span>
+<span style="color: #ff7f24;">   * reset driver.</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">map_error_handling</span>;
+}
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">and to unmap it: </span><span style="color: #ff7f24;">*/</span>
+dma_unmap_single(dev, dma_handle, size, direction);
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3">PCI使用Streaming DMA mapping与WIFI芯片使用互传实例</h3>
+<div class="outline-text-3" id="text-5-3">
+<ol class="org-ol">
+<li>PCI driver初始化时，设置dma mask， <code>pci_set_dma_mask(pdev,
+   0xffffffff)</code>
+</li>
+<li>发送到Device数据：
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c">adf_nbuf_map_single(pdev-&gt;osdev, netbuf_copy, ADF_OS_DMA_TO_DEVICE);
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">==&#12299;</span>
+dma_map_single(osdev-&gt;dev, buf-&gt;data, 
+               skb_end_pointer(buf) - buf-&gt;data, dir);
+</pre>
+</div>
+<ol class="org-ol">
+<li>发送完umap并free skb：
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c">adf_nbuf_unmap_single(
+    vap-&gt;iv_ic-&gt;ic_adf_dev, (<span style="color: #98fb98;">adf_nbuf_t</span>) skb, ADF_OS_DMA_TO_DEVICE);
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">===&#12299;</span>
+dma_unmap_single(osdev-&gt;dev, NBUF_MAPPED_PADDR_LO(buf), 
+                 skb_end_pointer(buf) - buf-&gt;data, dir);
+adf_nbuf_free(skb);
+</pre>
+</div>
+<ol class="org-ol">
+<li>从Device接收数据并umap:
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-c">ret = adf_nbuf_map_single(scn-&gt;adf_dev, nbuf, ADF_OS_DMA_FROM_DEVICE);
+adf_nbuf_unmap_single(scn-&gt;adf_dev, (<span style="color: #98fb98;">adf_nbuf_t</span>)transfer_context, ADF_OS_DMA_FROM_DEVICE);
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5-4" class="outline-3">
+<h3 id="sec-5-4">More examples:</h3>
+<div class="outline-text-3" id="text-5-4">
+<ul class="org-ul">
+<li><a href="http://lxr.free-electrons.com/source/drivers/dma/dmatest.c">dmatest.c</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">DMA API Reference<sup><a id="fnr.4" name="fnr.4" class="footref" href="#fn.4">4</a></sup></h2>
+<div class="outline-text-2" id="text-6">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">    #include</span> <span style="color: #ffa07a;">&lt;linux/dma-mapping.h&gt;</span>
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Using large DMA-coherent buffers </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">void</span> *
+    <span style="color: #87cefa;">dma_alloc_coherent</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>,
+                                       <span style="color: #98fb98;">dma_addr_t</span> *<span style="color: #eedd82;">dma_handle</span>, <span style="color: #98fb98;">gfp_t</span> <span style="color: #eedd82;">flag</span>);
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">It returns a pointer to the allocated region (in the processor's virtual</span>
+<span style="color: #ff7f24;">       address space) or NULL if the allocation failed. </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">void</span> *
+    <span style="color: #87cefa;">dma_zalloc_coherent</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>,
+                        <span style="color: #98fb98;">dma_addr_t</span> *<span style="color: #eedd82;">dma_handle</span>, <span style="color: #98fb98;">gfp_t</span> <span style="color: #eedd82;">flag</span>);
+    <span style="color: #98fb98;">void</span>
+    <span style="color: #87cefa;">dma_free_coherent</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">cpu_addr</span>,
+                      <span style="color: #98fb98;">dma_addr_t</span> <span style="color: #eedd82;">dma_handle</span>);
+
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Using small DMA-coherent buffers </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">    #include</span> <span style="color: #ffa07a;">&lt;linux/dmapool.h&gt;</span>
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dma_pool</span> *
+    <span style="color: #87cefa;">dma_pool_create</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>,
+                    <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">align</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">alloc</span>);
+    <span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">dma_pool_alloc</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dma_pool</span> *<span style="color: #eedd82;">pool</span>, <span style="color: #98fb98;">gfp_t</span> <span style="color: #eedd82;">gfp_flags</span>,
+                         <span style="color: #98fb98;">dma_addr_t</span> *<span style="color: #eedd82;">dma_handle</span>);
+    <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">dma_pool_free</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dma_pool</span> *<span style="color: #eedd82;">pool</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">vaddr</span>,
+                       <span style="color: #98fb98;">dma_addr_t</span> <span style="color: #eedd82;">addr</span>);
+    <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">dma_pool_destroy</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dma_pool</span> *<span style="color: #eedd82;">pool</span>);
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">DMA addressing limitations </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">int</span>
+    <span style="color: #87cefa;">dma_supported</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">u64</span> <span style="color: #eedd82;">mask</span>);
+    <span style="color: #98fb98;">int</span>
+    <span style="color: #87cefa;">dma_set_mask_and_coherent</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">u64</span> <span style="color: #eedd82;">mask</span>);
+    <span style="color: #98fb98;">int</span>
+    <span style="color: #87cefa;">dma_set_mask</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">u64</span> <span style="color: #eedd82;">mask</span>);
+    <span style="color: #98fb98;">int</span>
+    <span style="color: #87cefa;">dma_set_coherent_mask</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">u64</span> <span style="color: #eedd82;">mask</span>);
+    <span style="color: #98fb98;">u64</span>
+    <span style="color: #87cefa;">dma_get_required_mask</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>);
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Streaming DMA mappings </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">dma_addr_t</span>
+    <span style="color: #87cefa;">dma_map_single</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">cpu_addr</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>,
+                   <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">dma_data_direction</span> <span style="color: #eedd82;">direction</span>);
+    <span style="color: #98fb98;">void</span>
+    <span style="color: #87cefa;">dma_unmap_single</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">dma_addr_t</span> <span style="color: #eedd82;">dma_addr</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>,
+                     <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">dma_data_direction</span> <span style="color: #eedd82;">direction</span>);
+    <span style="color: #98fb98;">dma_addr_t</span>
+    <span style="color: #87cefa;">dma_map_page</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">page</span> *<span style="color: #eedd82;">page</span>,
+                 <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">offset</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>,
+                 <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">dma_data_direction</span> <span style="color: #eedd82;">direction</span>);
+    <span style="color: #98fb98;">void</span>
+    <span style="color: #87cefa;">dma_unmap_page</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">dma_addr_t</span> <span style="color: #eedd82;">dma_address</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>,
+                   <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">dma_data_direction</span> <span style="color: #eedd82;">direction</span>);
+    <span style="color: #98fb98;">int</span>
+    <span style="color: #87cefa;">dma_mapping_error</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">dma_addr_t</span> <span style="color: #eedd82;">dma_addr</span>);
+<span style="color: #98fb98;">int</span>
+        <span style="color: #87cefa;">dma_map_sg</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">scatterlist</span> *<span style="color: #eedd82;">sg</span>,
+                <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nents</span>, <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">dma_data_direction</span> <span style="color: #eedd82;">direction</span>);
+<span style="color: #98fb98;">void</span>
+        <span style="color: #87cefa;">dma_unmap_sg</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">scatterlist</span> *<span style="color: #eedd82;">sg</span>,
+                <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nhwentries</span>, <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">dma_data_direction</span> <span style="color: #eedd82;">direction</span>);
+<span style="color: #98fb98;">void</span>
+<span style="color: #87cefa;">dma_sync_single_for_cpu</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">dma_addr_t</span> <span style="color: #eedd82;">dma_handle</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>,
+                        <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">dma_data_direction</span> <span style="color: #eedd82;">direction</span>);
+<span style="color: #98fb98;">void</span>
+<span style="color: #87cefa;">dma_sync_single_for_device</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #98fb98;">dma_addr_t</span> <span style="color: #eedd82;">dma_handle</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>,
+                           <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">dma_data_direction</span> <span style="color: #eedd82;">direction</span>);
+<span style="color: #98fb98;">void</span>
+<span style="color: #87cefa;">dma_sync_sg_for_cpu</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">scatterlist</span> *<span style="color: #eedd82;">sg</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nelems</span>,
+                    <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">dma_data_direction</span> <span style="color: #eedd82;">direction</span>);
+<span style="color: #98fb98;">void</span>
+<span style="color: #87cefa;">dma_sync_sg_for_device</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">scatterlist</span> *<span style="color: #eedd82;">sg</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nelems</span>,
+                       <span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">dma_data_direction</span> <span style="color: #eedd82;">direction</span>);
+</pre>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://en.wikipedia.org/wiki/Direct_memory_access">wiki</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="./DMAFundamentals.pdf">DMA Fundamentals on Various PC Platforms</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.3" name="fn.3" class="footnum" href="#fnr.3">3</a></sup> <p class="footpara">
+<a href="https://www.kernel.org/doc/Documentation/DMA-API-HOWTO.txt">https://www.kernel.org/doc/Documentation/DMA-API-HOWTO.txt</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.4" name="fn.4" class="footnum" href="#fnr.4">4</a></sup> <p class="footpara">
+<a href="https://www.kernel.org/doc/Documentation/DMA-API.txt">https://www.kernel.org/doc/Documentation/DMA-API.txt</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2014-10-29 Wed 22:50</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

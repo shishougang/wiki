@@ -1,0 +1,528 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: list and hlist in kernel
+#+OPTIONS: num:nil
+
+* Overview
+Linux内核文件[[http://lxr.free-electrons.com/source/include/linux/list.h?v=3.1][list.h]] 提供了一个简单双向链表list的实现和一个有链表头并通
+常用来作为hash表的双向链表hlist的实现。我们来看看如何正确的使用它们。
+
+首先，这里的链表有别于平时使用的[[http://en.wikipedia.org/wiki/Linked_list][linked list]] ，一个linked list通常包含
+它需要链接的元素，如下：
+#+begin_src c
+  struct the_list {
+    void *the_item;
+    struct the_list *prev;
+    struct the_list *next;
+  };
+#+end_src
+
+kernel实现的linked list给人感觉list自己被包含在它链接的元素内，如果我
+们要创建一个 =kernel_list= ,那么如下：
+#+begin_src c
+  struct kernel_list {
+    struct list_head list; /* list structure in the kernel */
+    void *the_item;
+  };
+#+end_src
+
+List的基本特性如下：
++ List在你需要链接数据元素的里面。
++ 可以把 =struct list_head= 放在structure的任何地方那个。
++ 可以吧 =struct list_head= 变量命名为任何名字。
++ 可以有多个lists在一个structure中。
+
+* list
+** list structure
+#+begin_src c
+struct list_head {
+	struct list_head *next, *prev;
+};
+#+end_src
+** list init
+list的初始化可以分为静态和动态：
+*** dynamic
+#+begin_src c
+#define LIST_HEAD_INIT(name) { &(name), &(name) }
+/* or */
+static inline void INIT_LIST_HEAD(struct list_head *list)
+{
+	list->next = list;
+	list->prev = list;
+}
+
+/* example */
+struct list_head my_list = LIST_HEAD_INIT(my_list);
+struct list_head your_list;
+INIT_LIST_HEAD(&your_list);
+#+end_src
+*** static
+声明并初始化
+#+begin_src c
+#define LIST_HEAD(name) \
+	struct list_head name = LIST_HEAD_INIT(name)
+
+/* example */
+LIST_HEAD(rds_sock_list);  
+/* ==> */
+struct rds_sock_list = { &(rds_sock_list), &(rds_sock_list) };
+#+end_src
+
+** insert
+#+begin_src c
+static inline void __list_add(struct list_head *new,
+			      struct list_head *prev,
+			      struct list_head *next)
+{
+	next->prev = new;
+	new->next = next;
+	new->prev = prev;
+	prev->next = new;
+}
+/* new 插入到head之后 */
+static inline void list_add(struct list_head *new, struct list_head *head)
+{
+	__list_add(new, head, head->next);
+}
+/* new 插入到head之前 */
+static inline void list_add_tail(struct list_head *new, struct list_head *head)
+{
+	__list_add(new, head->prev, head);
+}
+#+end_src
+** delete from the list
+#+begin_src c
+static inline void __list_del(struct list_head * prev, struct list_head * next)
+{
+	next->prev = prev;
+	prev->next = next;
+}
+static inline void list_del(struct list_head *entry)
+{
+	__list_del(entry->prev, entry->next);
+}
+#+end_src
+** replace 
+#+begin_src c
+/* list_replace - replace old entry by new one */
+static inline void list_replace(struct list_head *old,
+				struct list_head *new)
+{
+	new->next = old->next;
+	new->next->prev = new;
+	new->prev = old->prev;
+	new->prev->next = new;
+}
+
+static inline void list_replace_init(struct list_head *old,
+					struct list_head *new)
+{
+	list_replace(old, new);
+	INIT_LIST_HEAD(old);
+}
+#+end_src
+** misc operations
+#+begin_src c
+static inline int list_is_last(const struct list_head *list,
+				const struct list_head *head)
+{
+	return list->next == head;
+}
+
+static inline int list_empty(const struct list_head *head)
+{
+	return head->next == head;
+}
+/* list_empty_careful - tests whether a list is empty and not being modified */
+static inline int list_empty_careful(const struct list_head *head)
+{
+	struct list_head *next = head->next;
+	return (next == head) && (next == head->prev);
+}
+
+static inline int list_is_singular(const struct list_head *head)
+{
+	return !list_empty(head) && (head->next == head->prev);
+}
+
+#+end_src
+** splice
+#+begin_src c
+static inline void __list_splice(const struct list_head *list,
+				 struct list_head *prev,
+				 struct list_head *next)
+{
+	struct list_head *first = list->next;
+	struct list_head *last = list->prev;
+
+	first->prev = prev;
+	prev->next = first;
+
+	last->next = next;
+	next->prev = last;
+}
+
+/* list 加到 head 前面 */
+static inline void list_splice(const struct list_head *list,
+				struct list_head *head)
+{
+	if (!list_empty(list))
+		__list_splice(list, head, head->next);
+}
+/* list 加到 head 后面 */
+static inline void list_splice_tail(struct list_head *list,
+				struct list_head *head)
+{
+	if (!list_empty(list))
+		__list_splice(list, head->prev, head);
+}
+#+end_src
+** entry operations
+一般通过 =struct list_head= 维护链表，那么有一个指向 =struct
+list_head*= 的指针 =ptr= ,如何获取它所在的structure的指针然后访问它的
+元素呢？
+
+#+begin_src c
+/*
+ * @ptr:	&struct list_head 指针。
+ * @type:	ptr所在的元素结构体的类型。
+ * @member:	list_head在type结构体中的名字。
+ */
+#define list_entry(ptr, type, member) \
+	container_of(ptr, type, member)
+#define container_of(ptr, type, member) ({			\
+	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+	(type *)( (char *)__mptr - offsetof(type,member) );})
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+/* 只是 ptr 变成 (ptr)->next */ 
+#define list_first_entry(ptr, type, member) \
+	list_entry((ptr)->next, type, member)
+#+end_src
+
+这里难点是通过0地址的指针强制转换成相应结构体，然后在获取其中元素所在
+位置，因为起始地址是0,这里得到的元素所在指针位置就是它相对于structure
+的位置，也就是这里 =offsetof= 所得到的以字节单位的值。
+
+有了这个值就好办了，list的指针地址是知道的，只要减去这个偏移值就能得到
+元素structure的地址，最后转换成其type就得到entry了。
+
+主要是扩展成：
+#+begin_src c
+entry = (type *)( (char *)__mptr - offsetof(type,member);
+#+end_src
+
+ *example:*
+#+begin_src c
+struct list_head *lh;
+struct inet_protosw *answer;
+struct inet_protosw {
+	struct list_head list;
+	unsigned short	 type;	  
+	unsigned short	 protocol;
+}
+answer = list_entry(lh, struct inet_protosw, list);
+#+end_src
+
+** iterate the list
+safe的区别是多了另一个&struct list_head类型的临时变量n.变量n提前指向
+pos下一个元素,确保在访问的当前节点被其他进程删除时,仍能正常遍历整个list.
+#+begin_src c
+      /* @pos: &struct list_head类型的loop cursor.
+         @head: list的head.
+      */
+      #define list_for_each(pos, head)                                    \
+        for (pos = (head)->next; prefetch(pos->next), pos != (head);      \
+             pos = pos->next)
+      
+      #define list_for_each_prev(pos, head)                                \
+        for (pos = (head)->prev; prefetch(pos->prev), pos != (head);       \
+             pos = pos->prev)
+    /* @n: 另一个&struct list_head类型的临时变量.
+     */
+    #define list_for_each_safe(pos, n, head)                       \
+            for (pos = (head)->next, n = pos->next; pos != (head); \
+                    pos = n, n = pos->next)
+    #define list_for_each_prev_safe(pos, n, head) \
+            for (pos = (head)->prev, n = pos->prev; \
+                 prefetch(pos->prev), pos != (head); \
+                 pos = n, n = pos->prev)
+#+end_src
+
+*** example
+#+begin_src c
+  struct rfcomm_dlc {
+    struct list_head      list;
+    u8            dlci;
+  };
+  struct list_head dlc_list;
+  struct list_head *p;
+  struct rfcomm_dlc *d;
+  list_for_each(p, &dlc_list) {
+    d = list_entry(p, struct rfcomm_dlc, list);
+    if (d->dlci == dlci)
+      return d;
+  }
+#+end_src
+
+** iterate the entry
+=list_for_each= 与 =list_for_each_entry= 的区别是,前者pos的类型是
+=&struct list_head= ,只遍历并返回链表指针,而后者pos的类型是 =type *= ,
+在遍历链表的同时,找出并返回list所在的元素指针.
+
+#+begin_src c
+/*
+ * @pos:	the type * to use as a loop cursor.
+ * @head:	the head for your list.
+ * @member:	the name of the list_struct within the struct.
+ */
+#define list_for_each_entry(pos, head, member)				\
+	for (pos = list_entry((head)->next, typeof(*pos), member);	\
+	     prefetch(pos->member.next), &pos->member != (head); 	\
+	     pos = list_entry(pos->member.next, typeof(*pos), member))
+#define list_for_each_entry_reverse(pos, head, member)			\
+	for (pos = list_entry((head)->prev, typeof(*pos), member);	\
+	     prefetch(pos->member.prev), &pos->member != (head); 	\
+	     pos = list_entry(pos->member.prev, typeof(*pos), member))
+#define list_for_each_entry_continue(pos, head, member) 		\
+	for (pos = list_entry(pos->member.next, typeof(*pos), member);	\
+	     prefetch(pos->member.next), &pos->member != (head);	\
+	     pos = list_entry(pos->member.next, typeof(*pos), member))
+#define list_for_each_entry_continue_reverse(pos, head, member)		\
+	for (pos = list_entry(pos->member.prev, typeof(*pos), member);	\
+	     prefetch(pos->member.prev), &pos->member != (head);	\
+	     pos = list_entry(pos->member.prev, typeof(*pos), member))
+
+#define list_for_each_entry_safe(pos, n, head, member)			\
+	for (pos = list_entry((head)->next, typeof(*pos), member),	\
+		n = list_entry(pos->member.next, typeof(*pos), member);	\
+	     &pos->member != (head); 					\
+	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
+#define list_for_each_entry_safe_continue(pos, n, head, member) 		\
+	for (pos = list_entry(pos->member.next, typeof(*pos), member), 		\
+		n = list_entry(pos->member.next, typeof(*pos), member);		\
+	     &pos->member != (head);						\
+	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
+#+end_src
+*** example
+#+begin_src c
+  struct atm_dev_addr {
+    struct sockaddr_atmsvc addr;    /* ATM address */
+    struct list_head entry;         /* next address */
+  };
+  struct atm_dev_addr *this;
+  struct list_head *head; /* list header */
+  int total = 0;
+  list_for_each_entry(this, head, entry)
+     total += sizeof(struct sockaddr_atmsvc);
+#+end_src
+** example
+从当前module节点,遍历系统所有module.
+#+begin_src c
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/version.h>
+#include <linux/list.h>
+ 
+MODULE_LICENSE("GPL");
+ 
+struct module *m = &__this_module;
+ 
+static void list_module_test(void)
+{
+        struct module *mod;
+        list_for_each_entry(mod, m->list.prev, list)
+                printk ("%s\n", mod->name);
+ 
+}
+static int list_module_init (void)
+{
+        list_module_test();
+        return 0;
+}
+ 
+static void list_module_exit (void)
+{
+        printk ("unload listmodule.ko\n");
+}
+ 
+module_init(list_module_init);
+module_exit(list_module_exit);
+#+end_src
+
+Makefile:
+#+begin_src sh
+ifeq ($(KERNELRELEASE),)
+    KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+    PWD := $(shell pwd)
+modules:
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules
+
+modules_install:
+	$(MAKE) -C $(KERNELDIR) M=$(PWD) modules_install
+
+clean:
+	rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions
+
+.PHONY: modules modules_install clean
+else
+    obj-m := listmodule.o
+endif
+#+end_src
+* hlist
+拥有一个指针链表头的双向链表.它被分为 =struct hlist_head= 头节点和
+=struct hlist_node= 元素节点.元素节点的 =pprev= 指向前一个节点的next指
+针.
+** hlist structure
+#+begin_src c
+struct hlist_head {
+	struct hlist_node *first;
+};
+
+struct hlist_node {
+	struct hlist_node *next, **pprev;
+};
+#+end_src
+** init head or node
+#+begin_src c
+#define HLIST_HEAD_INIT { .first = NULL }
+#define HLIST_HEAD(name) struct hlist_head name = {  .first = NULL }
+#define INIT_HLIST_HEAD(ptr) ((ptr)->first = NULL)
+static inline void INIT_HLIST_NODE(struct hlist_node *h)
+{
+	h->next = NULL;
+	h->pprev = NULL;
+}
+#+end_src
+** delete node
+#+begin_src c
+static inline void __hlist_del(struct hlist_node *n)
+{
+	struct hlist_node *next = n->next;
+	struct hlist_node **pprev = n->pprev;
+	*pprev = next;
+	if (next)
+		next->pprev = pprev;
+}
+
+static inline void hlist_del(struct hlist_node *n)
+{
+	__hlist_del(n);
+	n->next = LIST_POISON1;
+	n->pprev = LIST_POISON2;
+}
+
+static inline void hlist_del_init(struct hlist_node *n)
+{
+	if (!hlist_unhashed(n)) {
+		__hlist_del(n);
+		INIT_HLIST_NODE(n);
+	}
+}
+#+end_src
+** add 
+add操作分为两种插入方式: 1)新插入的节点成为head节点(相当于把新插入的
+节点排在第一位,得到优先搜索到); 2)节点间的插入
+*** add head
+n成为新的head节点,原本head节点后的元素节点成为n的next节点.
+#+begin_src c
+static inline void hlist_add_head(struct hlist_node *n, struct hlist_head *h)
+{
+	struct hlist_node *first = h->first;
+	n->next = first;
+	if (first)
+		first->pprev = &n->next;
+	h->first = n;
+	n->pprev = &h->first;
+}
+#+end_src
+*** add node
+#+begin_src c
+/* 节点n插入到节点next之前 */
+/* next must be != NULL */
+static inline void hlist_add_before(struct hlist_node *n,
+					struct hlist_node *next)
+{
+	n->pprev = next->pprev;
+	n->next = next;
+	next->pprev = &n->next;
+	*(n->pprev) = n;
+}
+/* 节点n插入到节点next之后 */
+static inline void hlist_add_after(struct hlist_node *n,
+					struct hlist_node *next)
+{
+	next->next = n->next;
+	n->next = next;
+	next->pprev = &n->next;
+
+	if(next->next)
+		next->next->pprev  = &next->next;
+}
+#+end_src
+** move
+把old头节点后的元素节点移动到new后面,old指向被置空.
+#+begin_src c
+static inline void hlist_move_list(struct hlist_head *old,
+				   struct hlist_head *new)
+{
+	new->first = old->first;
+	if (new->first)
+		new->first->pprev = &new->first;
+	old->first = NULL;
+}
+#+end_src
+
+** iterate node
+与iterate the list操作类似.
+#+begin_src c
+#define hlist_for_each(pos, head) \
+	for (pos = (head)->first; pos && ({ prefetch(pos->next); 1; }); \
+	     pos = pos->next)
+
+#define hlist_for_each_safe(pos, n, head) \
+	for (pos = (head)->first; pos && ({ n = pos->next; 1; }); \
+	     pos = n)
+#+end_src
+
+** iterate the entry
+与如上iterate list's entries 类似.
+#+begin_src c
+#define hlist_entry(ptr, type, member) container_of(ptr,type,member)
+
+#define hlist_for_each_entry(tpos, pos, head, member)			 \
+	for (pos = (head)->first;					 \
+	     pos && ({ prefetch(pos->next); 1;}) &&			 \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = pos->next)
+#define hlist_for_each_entry_continue(tpos, pos, member)		 \
+	for (pos = (pos)->next;						 \
+	     pos && ({ prefetch(pos->next); 1;}) &&			 \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = pos->next)
+#define hlist_for_each_entry_from(tpos, pos, member)			 \
+	for (; pos && ({ prefetch(pos->next); 1;}) &&			 \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = pos->next)
+#define hlist_for_each_entry_safe(tpos, pos, n, head, member) 		 \
+	for (pos = (head)->first;					 \
+	     pos && ({ n = pos->next; 1; }) && 				 \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = n)
+#+end_src
+** misc
+#+begin_src c
+static inline int hlist_unhashed(const struct hlist_node *h)
+{
+	return !h->pprev;
+}
+
+static inline int hlist_empty(const struct hlist_head *h)
+{
+	return !h->first;
+}
+#+end_src
+
+** example
+#+begin_src c
+
+#+end_src
