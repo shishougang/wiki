@@ -88,9 +88,52 @@ smdk2410		ARCH_SMDK2410 SMDK2410		193
 + other: 其他 =struct machine_desc= 中的成员一般用不到.
 
 * Linux启动使用或调用各个字段顺序
+Linux kernel启动的整个流程k可见这篇[[http://wiki.dreamrunner.org/public_html/Embedded-System/kernel/Linux-startup-process.html][Linux startup process]],这里针对大部
+分板子特定 =struct machine_desc= 里参数的顺序:
 
+#+begin_src c
+  static const struct machine_desc __mach_desc_SMDK2410 = {
+   .nr = MACH_TYPE_SMDK2410, /* architecture number */
+   .name = "SMDK2410", /* architecture name */
+   .phys_io        = S3C2410_PA_UART,
+   .io_pg_offst    = (((u32)S3C24XX_VA_UART) >> 18) & 0xfffc,
+   .boot_params    = S3C2410_SDRAM_PA + 0x100,
+   .map_io         = smdk2410_map_io,
+   .init_irq       = s3c24xx_init_irq,
+   .init_machine   = smdk2410_init,
+   .timer          = &s3c24xx_timer,
+  }
+#+end_src
 
+=init_machine= 在 =customize_machine= 中被调用,而它被放在
+=arch_initcall= 中,也就是被 =do_initcalls();= 依次调用 =initcall= 段的函数
+实现,是在 =kernel_init= 的中部调用 =do_basic_setup();= 时调用.
+#+begin_src c
+arch_initcall(customize_machine);
+#+end_src
 
+=nr= 作为板子的特定编号,在 =setup_arch= 中 =mdesc =
+setup_machine(machine_arch_type);= 传入 =machine_arch_type= 与各个
+=nr= 对比找到对应的 =struct machine_desc *mdesc;= 结构,也就是这里的
+=__mach_desc_SMDK2410=.
+
+然后在 =setup_arch()= 中:
+#+begin_src c
+  /*
+   ,* Set up various architecture-specific pointers
+   ,*/
+  init_arch_irq = mdesc->init_irq;
+  system_timer = mdesc->timer;
+  init_machine = mdesc->init_machine;
+#+end_src
+
+1. =start_kernel()= -> =setup_arch(&command_line);= ->
+   =paging_init(&meminfo, mdesc);= -> =devicemaps_init(mdesc);= ->
+   =mdesc->map_io();=.
+2. =start_kernel()= -> =init_IRQ();(arch/arm/kernel/irq.c)= -> =init_arch_irq();= .
+3. =start_kernel()= -> =time_init();= -> =system_timer->init();=.
+4. =start_kernel()= -> =rest_init();= -> =kernel_thread(kernel_init,
+   NULL, CLONE_FS | CLONE_SIGHAND);= -> =do_basic_setup()=.
   
 * =struct machine_desc=
 <<machine_desc>>
@@ -120,9 +163,5 @@ struct machine_desc {
 	struct sys_timer	*timer;		/* system tick timer	*/
 	void			(*init_machine)(void);
 };
-#+end_src
-* reference
-#+begin_src c
-
 #+end_src
 

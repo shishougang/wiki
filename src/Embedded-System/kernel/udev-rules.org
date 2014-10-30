@@ -1,0 +1,80 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Writing udev rules and kernel examples
+#+OPTIONS: num:nil
+
+
+* Introduction
+Linux内核2.6之后,由用户空间的工具udev来提供动态目录 =/dev= 下固定设备
+名的方法. 之前由 /devfs/ 来实现/dev,现在被废除.udev的原码包和源码文档
+在[[https://www.kernel.org/pub/linux/utils/kernel/hotplug/][kernel/hotplug]] 下. 
+
+
+* 规则文件和语义 
+为决定如何命名设备以及执行什么另外动作,udev会读取一系列规则文件. 这些
+文件保存在/etc/udev/rules.d目录下并且都必须有.rules后缀名.
+
+在一个规则文件中, 以"#"开头的行被认为是注释. 每一个非空的行都是一条规
+则. 规则不能跨越多行.
+
+一个设备可以被多条规则匹配到, 这有着很实用的优点, 例如, 我们可以写两个
+匹配同一个设备的规则, 每一个规则为设备提供了它自己的可选命名. 即使分开
+在不同的文件种, 两个可选命名也都会被创建, 要明白udev在找到一个匹配规则
+后不会停止处理其他规则, 它仍然会继续查找并尝试应用已知的每条规则, 这很
+重要.
+
+规则语法 
+每条规则通过一系列键值对创建,这些键值对通过逗号分隔. 匹配键是用来识别
+要应用规则的设备的条件, 但规则中对应设备的所有匹配键被处理后,就会应用
+规则并且赋值键的行为也会触发. 每条规则应该包含至少一个匹配键和至少一个
+赋值键.
+
+这是用来阐述上面内容的一个例子规则:
+  KERNEL=="hdb",NAME="my_spare_disk"
+上述规则包含一个匹配键(KERNEL)以及一个赋值键(NAME). 这些键和它们的属性
+  的语义将在稍后具体说明. 注意到匹配键通过连等号(==)与它的值联系起来,
+  赋值键通过等号(=)与它的值关联.
+
+
+注意udev不支持任何形式的行连接符, 不要在你的规则种插入任何断行符,这将
+会导致udev把你的一条规则看做是多条规则但不会按预料工作.
+
+
+$ udevadm info  -a -p /sys/block/sda
+sudo  udevadm test  /class/sound/dsp 
+
+* udevadm in Ubuntu
+
+#+begin_src sh
+Usage: udevadm [--help] [--version] [--debug] COMMAND [COMMAND OPTIONS]
+  info         query sysfs or the udev database
+  trigger      request events from the kernel
+  settle       wait for the event queue to finish
+  control      control the udev daemon
+  monitor      listen to kernel and udev events
+  test         test an event run
+  test-builtin test a built-in command
+#+end_src
+
+* UDev urls 
+
+
+#+begin_src c++
+
+#+end_src
+
+
+#+begin_src sh
+
+#+end_src
+
+
+
+
+Writing udev rules
+http://www.reactivated.net/writing_udev_rules.html
+
+http://www.cnitblog.com/luofuchong/archive/2007/12/18/37831.html
+
+
+
+

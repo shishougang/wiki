@@ -3,8 +3,8 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<title>udev</title>
-<!-- 2014-10-29 Wed 22:49 -->
+<title>Writing udev rules and kernel examples</title>
+<!-- 2014-10-30 Thu 22:36 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -138,95 +138,118 @@ for the JavaScript code in this tag.
 </head>
 <body>
 <div id="content">
-<h1 class="title">udev</h1>
+<h1 class="title">Writing udev rules and kernel examples</h1>
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">UDev urls</a></li>
-<li><a href="#sec-2">Most helpful urls</a></li>
-<li><a href="#sec-3">UDEV Primer</a></li>
-<li><a href="#sec-4">misc</a></li>
+<li><a href="#sec-1">Introduction</a></li>
+<li><a href="#sec-2">规则文件和语义</a></li>
+<li><a href="#sec-3">udevadm in Ubuntu</a></li>
+<li><a href="#sec-4">UDev urls</a></li>
 </ul>
 </div>
 </div>
-<p>
-<a href="http://xpt.sourceforge.net/techdocs/nix/dev/devm02-UDev/ar01s05.html">http://xpt.sourceforge.net/techdocs/nix/dev/devm02-UDev/ar01s05.html</a>
-</p>
 
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">UDev urls</h2>
+<h2 id="sec-1">Introduction</h2>
 <div class="outline-text-2" id="text-1">
 <p>
-<a href="http://www.kernel.org/pub/linux/utils/kernel/hotplug/udev.html">http://www.kernel.org/pub/linux/utils/kernel/hotplug/udev.html</a>
-</p>
-
-<p>
-FAQ
-<a href="http://www.kernel.org/pub/linux/utils/kernel/hotplug/udev-FAQ">http://www.kernel.org/pub/linux/utils/kernel/hotplug/udev-FAQ</a>
-</p>
-
-<p>
-A general udev primer
-<a href="http://webpages.charter.net/decibelshelp/LinuxHelp_UDEVPrimer.html">http://webpages.charter.net/decibelshelp/LinuxHelp_UDEVPrimer.html</a>
+Linux内核2.6之后,由用户空间的工具udev来提供动态目录 <code>/dev</code> 下固定设备名的方法. 之前由 <i>devfs</i> 来实现/dev,现在被废除.udev的原码包和源码文档在<a href="https://www.kernel.org/pub/linux/utils/kernel/hotplug/">kernel/hotplug</a> 下. 
 </p>
 </div>
 </div>
+
 
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">Most helpful urls</h2>
+<h2 id="sec-2">规则文件和语义</h2>
 <div class="outline-text-2" id="text-2">
 <p>
-udevilicios
-<a href="http://www.linux-noob.com/forums/index.php?showtopic=1436&mode=threaded">http://www.linux-noob.com/forums/index.php?showtopic=1436&mode=threaded</a>
+为决定如何命名设备以及执行什么另外动作,udev会读取一系列规则文件. 这些文件保存在/etc/udev/rules.d目录下并且都必须有.rules后缀名.
 </p>
 
 <p>
-Udev in LinuxAdministration
-<a href="http://www.think-future.de/wiki/index.php?title=LinuxAdministration">http://www.think-future.de/wiki/index.php?title=LinuxAdministration</a>
+在一个规则文件中, 以"#"开头的行被认为是注释. 每一个非空的行都是一条规则. 规则不能跨越多行.
 </p>
+
+<p>
+一个设备可以被多条规则匹配到, 这有着很实用的优点, 例如, 我们可以写两个匹配同一个设备的规则, 每一个规则为设备提供了它自己的可选命名. 即使分开在不同的文件种, 两个可选命名也都会被创建, 要明白udev在找到一个匹配规则后不会停止处理其他规则, 它仍然会继续查找并尝试应用已知的每条规则, 这很重要.
+</p>
+
+<p>
+规则语法每条规则通过一系列键值对创建,这些键值对通过逗号分隔. 匹配键是用来识别要应用规则的设备的条件, 但规则中对应设备的所有匹配键被处理后,就会应用规则并且赋值键的行为也会触发. 每条规则应该包含至少一个匹配键和至少一个赋值键.
+</p>
+
+<p>
+这是用来阐述上面内容的一个例子规则:
+  KERNEL=="hdb",NAME="my<sub>spare</sub><sub>disk</sub>"
+上述规则包含一个匹配键(KERNEL)以及一个赋值键(NAME). 这些键和它们的属性的语义将在稍后具体说明. 注意到匹配键通过连等号(<code>=)与它的值联系起来,
+  赋值键通过等号(</code>)与它的值关联.
+</p>
+
+
+<p>
+注意udev不支持任何形式的行连接符, 不要在你的规则种插入任何断行符,这将会导致udev把你的一条规则看做是多条规则但不会按预料工作.
+</p>
+
+
+<p>
+$ udevadm info  -a -p /sys/block/sda
+sudo  udevadm test  /class/sound/dsp 
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">udevadm in Ubuntu</h2>
+<div class="outline-text-2" id="text-3">
+<div class="org-src-container">
+
+<pre class="src src-sh">Usage: udevadm [--help] [--version] [--debug] COMMAND [COMMAND OPTIONS]
+  info         query sysfs or the udev database
+  trigger      request events from the kernel
+  settle       wait for the event queue to finish
+  control      control the udev daemon
+  monitor      listen to kernel and udev events
+  test         test an event run
+  test-builtin test a built-in command
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">UDev urls</h2>
+<div class="outline-text-2" id="text-4">
+<div class="org-src-container">
+
+<pre class="src src-c++"></pre>
+</div>
+
+
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+
+
+
 
 <p>
 Writing udev rules
 <a href="http://www.reactivated.net/writing_udev_rules.html">http://www.reactivated.net/writing_udev_rules.html</a>
 </p>
-</div>
-</div>
-<div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">UDEV Primer</h2>
-<div class="outline-text-2" id="text-3">
-<p>
-<a href="http://webpages.charter.net/decibelshelp/LinuxHelp_UDEVPrimer.html">http://webpages.charter.net/decibelshelp/LinuxHelp_UDEVPrimer.html</a>
-</p>
-</div>
-</div>
-
-
-<div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">misc</h2>
-<div class="outline-text-2" id="text-4">
-<p>
-<a href="http://hi.baidu.com/fore2222/blog/item/f6da2001bdbc0e051d958398.html">http://hi.baidu.com/fore2222/blog/item/f6da2001bdbc0e051d958398.html</a>
-</p>
 
 <p>
 <a href="http://www.cnitblog.com/luofuchong/archive/2007/12/18/37831.html">http://www.cnitblog.com/luofuchong/archive/2007/12/18/37831.html</a>
-</p>
-
-<p>
-<a href="http://blog.csdn.net/steganography/article/details/657620">http://blog.csdn.net/steganography/article/details/657620</a>
-</p>
-
-<p>
-<a href="http://gnawux.bokee.com/3225765.html">http://gnawux.bokee.com/3225765.html</a>
 </p>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-10-29 Wed 22:49</p>
+<p class="date">Created: 2014-10-30 Thu 22:36</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
