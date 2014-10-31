@@ -2,13 +2,163 @@
 #+TITLE: Linux startup process
 #+OPTIONS: num:nil H:2
 
+主要以ARM架构的启动过程.ho
+* bootloader
+以Uboot为例, =bootm addr= , 从Linux kernel所在起始地址启动.
+* =head.S=
+=/arch/arm/kernel/head.S= 为kernel的起始代码,对CPU和Memory做一下汇编级
+的初始化,最后  ~`#include "head-common.S"`~
 
-* cc
-#+begin_src python
+在同目录下的 =head-common.S= 最后调用跳转指令 =b start_kernel=,进入C语
+言级architecture-independent的初始化.
+* =start_kernel=
+函数 =start_kernel()= 在 =linux/init/main.c= 中,它不会放回到它的调用者
+那,它最终调用死循环函数 [[cpu_idle][=cpu_idle()=]] .
 
+中断们仍然被关闭此时.做写必要的准备工作,然后打开它们.先
+=lock_kernel();= .
+
+=printk(linux_banner);= 打印字符串 =linux_banner= (这字符串在
+=linux/init/version.c= 中). *Note:* =printk()= 此时并没有实际把这字符
+串打印到终端,它只是缓存字符串直到终端设备把自己注册到内核.然后内核把缓
+存的终端log内容传递给注册的终端设备.同时可以存在多个注册的终端设备.
+
+=printk()= can be called very early because it doesn't actually print to
+anywhere. It just logs the message to "=log_buf=" , which is allocated
+statically in "=linux/kernel/printk.c=". The messages that are saved in
+"=log_buf=" are passed to registered console devices as they register.
+** 架构有关的初始化 =setup_arch=
+Call [[setup_arch][=setup_arch(&command_line);=]] :
+
+This performs architecture-specific initializations (details below).
+Then back to architecture-independent initialization
+
+The remainder of =start_kernel()= is done as follows for all processor
+architecures, although several of these function calls are to
+architecture-specific setup/init functions.
+** 继续architecture-independent初始化
+
+
+* =rest_init=
+
+* =kernel_init=
+
+* =Initcalls=
+
+
+
+* =start_kernel()=
+* reference
+** =cpu_idle=
+<<cpu_idle>>
+#+begin_src c
+  void cpu_idle(void) {
+    local_fiq_enable();
+    /* endless idle loop with no priority at all */
+    while (1) {
+      void (*idle)(void) = pm_idle;
+      if (!idle)
+        idle = default_idle;
+      leds_event(led_idle_start);
+      tick_nohz_stop_sched_tick();
+      while (!need_resched())
+        idle();
+      leds_event(led_idle_end);
+      tick_nohz_restart_sched_tick();
+      preempt_enable_no_resched();
+      schedule();
+      preempt_disable();
+    }
+  }
 #+end_src
+** =setup_arch=
+<<setup_arch>>
+=arch/arm/kernel/setup.c=
+#+begin_src c
+void __init setup_arch(char **cmdline_p)
+{
+	struct tag *tags = (struct tag *)&init_tags;
+	struct machine_desc *mdesc;
+	char *from = default_command_line;
 
-#+begin_src c++
+	setup_processor();
+	mdesc = setup_machine(machine_arch_type);
+	machine_name = mdesc->name;
+
+	if (mdesc->soft_reboot)
+		reboot_setup("s");
+
+	if (__atags_pointer)
+		tags = phys_to_virt(__atags_pointer);
+	else if (mdesc->boot_params)
+		tags = phys_to_virt(mdesc->boot_params);
+
+#ifdef CONFIG_KEXEC
+	kexec_boot_params_copy = virt_to_phys(kexec_boot_params_buf);
+	kexec_boot_params = (unsigned long)kexec_boot_params_buf;
+	if (__atags_pointer) {
+		kexec_boot_params_address = __atags_pointer;
+		memcpy((void *)kexec_boot_params, tags, KEXEC_BOOT_PARAMS_SIZE);
+	} else if (mdesc->boot_params) {
+		kexec_boot_params_address = mdesc->boot_params;
+		memcpy((void *)kexec_boot_params, tags, KEXEC_BOOT_PARAMS_SIZE);
+	}
+#endif
+
+	/*
+	 * If we have the old style parameters, convert them to
+	 * a tag list.
+	 */
+	if (tags->hdr.tag != ATAG_CORE)
+		convert_to_tag_list(tags);
+	if (tags->hdr.tag != ATAG_CORE)
+		tags = (struct tag *)&init_tags;
+
+	if (mdesc->fixup)
+		mdesc->fixup(mdesc, tags, &from, &meminfo);
+
+	if (tags->hdr.tag == ATAG_CORE) {
+		if (meminfo.nr_banks != 0)
+			squash_mem_tags(tags);
+		parse_tags(tags);
+	}
+
+	init_mm.start_code = (unsigned long) &_text;
+	init_mm.end_code   = (unsigned long) &_etext;
+	init_mm.end_data   = (unsigned long) &_edata;
+	init_mm.brk	   = (unsigned long) &_end;
+
+	memcpy(boot_command_line, from, COMMAND_LINE_SIZE);
+	boot_command_line[COMMAND_LINE_SIZE-1] = '\0';
+	parse_cmdline(cmdline_p, from);
+	paging_init(&meminfo, mdesc);
+	request_standard_resources(&meminfo, mdesc);
+
+#ifdef CONFIG_SMP
+	smp_init_cpus();
+#endif
+
+	cpu_init();
+
+	/*
+	 * Set up various architecture-specific pointers
+	 */
+	init_arch_irq = mdesc->init_irq;
+	system_timer = mdesc->timer;
+	init_machine = mdesc->init_machine;
+
+#ifdef CONFIG_VT
+#if defined(CONFIG_VGA_CONSOLE)
+	conswitchp = &vga_con;
+#elif defined(CONFIG_DUMMY_CONSOLE)
+	conswitchp = &dummy_con;
+#endif
+#endif
+}
+#+end_src
+* cc
+
+#+begin_src c
 
 #+end_src
 

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>sk<sub>buff结构解析</sub></title>
-<!-- 2014-10-30 Thu 22:36 -->
+<!-- 2014-10-31 Fri 23:21 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -143,7 +143,8 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">cc</a></li>
+<li><a href="#sec-1">socket buffer</a></li>
+<li><a href="#sec-2">cc</a></li>
 </ul>
 </div>
 </div>
@@ -154,9 +155,76 @@ for the JavaScript code in this tag.
 <p>
 <a href="http://blog.sina.com.cn/s/blog_4826456d0100ohlw.html">http://blog.sina.com.cn/s/blog_4826456d0100ohlw.html</a>
 </p>
+
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">cc</h2>
+<h2 id="sec-1">socket buffer</h2>
 <div class="outline-text-2" id="text-1">
+<p>
+当网络包被内核分析时,底层协议的数据被传送更高层.当数据传送时过程反过来.由不同协议产生的数据(包括头和负载)不断往下层传递直到它们最终被发送.因为这些操作的速度对于网络层的表现至关重要,内核使用一个特定的结构叫
+<code>socket buffer</code> ,定义如下.Socket buffer被用来在网络实现层交换数据而 <b>不用拷贝来或去数据包</b> &#x2013;这显著获得速度收益.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">include/linux/skbuff.h </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> {
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">These two members must be first. </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">next</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">prev</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> *<span style="color: #eedd82;">sk</span>;
+  <span style="color: #98fb98;">ktime_t</span> <span style="color: #eedd82;">tstamp</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">dst_entry</span> *<span style="color: #eedd82;">dst</span>;
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">cb</span>[48];
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>,
+    <span style="color: #eedd82;">data_len</span>;
+  <span style="color: #98fb98;">__u16</span> <span style="color: #eedd82;">mac_len</span>,
+    <span style="color: #eedd82;">hdr_len</span>;
+  <span style="color: #00ffff;">union</span> {
+    <span style="color: #98fb98;">__wsum</span> <span style="color: #eedd82;">csum</span>;
+    <span style="color: #00ffff;">struct</span> {
+      <span style="color: #98fb98;">__u16</span> <span style="color: #eedd82;">csum_start</span>;
+      <span style="color: #98fb98;">__u16</span> <span style="color: #eedd82;">csum_offset</span>;
+    };
+  };
+  <span style="color: #98fb98;">__u32</span> <span style="color: #eedd82;">priority</span>;
+  <span style="color: #98fb98;">__u8</span> <span style="color: #eedd82;">local_df</span>:1,
+    <span style="color: #eedd82;">cloned</span>:1,
+    <span style="color: #eedd82;">ip_summed</span>:2,
+    <span style="color: #eedd82;">nohdr</span>:1,
+    <span style="color: #eedd82;">nfctinfo</span>:3;
+  <span style="color: #98fb98;">__u8</span> <span style="color: #eedd82;">pkt_type</span>:3,
+    <span style="color: #eedd82;">fclone</span>:2,
+    <span style="color: #eedd82;">ipvs_property</span>:1;
+ nf_trace:1;
+  <span style="color: #98fb98;">__be16</span> <span style="color: #eedd82;">protocol</span>;
+  ...
+  <span style="color: #98fb98;">void</span> (*destructor)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>);
+  ...
+  <span style="color: #98fb98;">int</span> iif;
+  ...
+  sk_buff_data_t transport_header;
+  <span style="color: #98fb98;">sk_buff_data_t</span> <span style="color: #eedd82;">network_header</span>;
+  <span style="color: #98fb98;">sk_buff_data_t</span> <span style="color: #eedd82;">mac_header</span>;
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">These elements must be at the end, see alloc_skb() for details. </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">sk_buff_data_t</span> <span style="color: #eedd82;">tail</span>;
+  <span style="color: #98fb98;">sk_buff_data_t</span> <span style="color: #eedd82;">end</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">head</span>,
+    *<span style="color: #eedd82;">data</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">truesize</span>;
+  <span style="color: #98fb98;">atomic_t</span> <span style="color: #eedd82;">users</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+
+
+
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">cc</h2>
+<div class="outline-text-2" id="text-2">
 <div class="org-src-container">
 
 <pre class="src src-python"></pre>
@@ -177,7 +245,7 @@ for the JavaScript code in this tag.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-10-30 Thu 22:36</p>
+<p class="date">Created: 2014-10-31 Fri 23:21</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

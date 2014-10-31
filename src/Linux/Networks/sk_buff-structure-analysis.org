@@ -5,6 +5,68 @@
 http://blog.csdn.net/ivan_/article/details/6998505
 
 http://blog.sina.com.cn/s/blog_4826456d0100ohlw.html
+
+* socket buffer
+当网络包被内核分析时,底层协议的数据被传送更高层.当数据传送时过程反过来.由
+不同协议产生的数据(包括头和负载)不断往下层传递直到它们最终被发送.因为
+这些操作的速度对于网络层的表现至关重要,内核使用一个特定的结构叫
+=socket buffer= ,定义如下.Socket buffer被用来在网络实现层交换数据而 *不
+用拷贝来或去数据包* --这显著获得速度收益.
+
+#+begin_src c
+    /* include/linux/skbuff.h */
+    struct sk_buff {
+    /* These two members must be first. */
+      struct sk_buff *next;
+      struct sk_buff *prev;
+      struct sock *sk;
+      ktime_t tstamp;
+      struct net_device *dev;
+      struct dst_entry *dst;
+      char cb[48];
+      unsigned int len,
+        data_len;
+      __u16 mac_len,
+        hdr_len;
+      union {
+        __wsum csum;
+        struct {
+          __u16 csum_start;
+          __u16 csum_offset;
+        };
+      };
+      __u32 priority;
+      __u8 local_df:1,
+        cloned:1,
+        ip_summed:2,
+        nohdr:1,
+        nfctinfo:3;
+      __u8 pkt_type:3,
+        fclone:2,
+        ipvs_property:1;
+     nf_trace:1;
+      __be16 protocol;
+      ...
+      void (*destructor)(struct sk_buff *skb);
+      ...
+      int iif;
+      ...
+      sk_buff_data_t transport_header;
+      sk_buff_data_t network_header;
+      sk_buff_data_t mac_header;
+      /* These elements must be at the end, see alloc_skb() for details. */
+      sk_buff_data_t tail;
+      sk_buff_data_t end;
+      unsigned char *head,
+        ,*data;
+      unsigned int truesize;
+      atomic_t users;
+    };
+#+end_src
+
+
+
+
 * cc
 #+begin_src python
 
