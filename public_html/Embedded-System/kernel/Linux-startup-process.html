@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Linux startup process</title>
-<!-- 2014-10-29 Wed 22:50 -->
+<!-- 2014-10-31 Fri 23:23 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -143,23 +143,250 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">cc</a></li>
+<li><a href="#sec-1">bootloader</a></li>
+<li><a href="#sec-2"><code>head.S</code></a></li>
+<li><a href="#sec-3"><code>start_kernel</code></a>
+<ul>
+<li><a href="#sec-3-1">架构有关的初始化 <code>setup_arch</code></a></li>
+<li><a href="#sec-3-2">继续architecture-independent初始化</a></li>
+</ul>
+</li>
+<li><a href="#sec-4"><code>rest_init</code></a></li>
+<li><a href="#sec-5"><code>kernel_init</code></a></li>
+<li><a href="#sec-6"><code>Initcalls</code></a></li>
+<li><a href="#sec-7"><code>start_kernel()</code></a></li>
+<li><a href="#sec-8">reference</a>
+<ul>
+<li><a href="#sec-8-1"><code>cpu_idle</code></a></li>
+<li><a href="#sec-8-2"><code>setup_arch</code></a></li>
+</ul>
+</li>
+<li><a href="#sec-9">cc</a></li>
 </ul>
 </div>
 </div>
-
-
+<p>
+主要以ARM架构的启动过程.ho
+</p>
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">cc</h2>
+<h2 id="sec-1">bootloader</h2>
 <div class="outline-text-2" id="text-1">
-<div class="org-src-container">
+<p>
+以Uboot为例, <code>bootm addr</code> , 从Linux kernel所在起始地址启动.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2"><code>head.S</code></h2>
+<div class="outline-text-2" id="text-2">
+<p>
+<code>/arch/arm/kernel/head.S</code> 为kernel的起始代码,对CPU和Memory做一下汇编级的初始化,最后  <code>`#include "head-common.S"`</code>
+</p>
 
-<pre class="src src-python"></pre>
+<p>
+在同目录下的 <code>head-common.S</code> 最后调用跳转指令 <code>b start_kernel</code>,进入C语言级architecture-independent的初始化.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3"><code>start_kernel</code></h2>
+<div class="outline-text-2" id="text-3">
+<p>
+函数 <code>start_kernel()</code> 在 <code>linux/init/main.c</code> 中,它不会放回到它的调用者那,它最终调用死循环函数 <a href="#cpu_idle"><code>cpu_idle()</code></a> .
+</p>
+
+<p>
+中断们仍然被关闭此时.做写必要的准备工作,然后打开它们.先
+<code>lock_kernel();</code> .
+</p>
+
+<p>
+<code>printk(linux_banner);</code> 打印字符串 <code>linux_banner</code> (这字符串在
+<code>linux/init/version.c</code> 中). <b>Note:</b> <code>printk()</code> 此时并没有实际把这字符串打印到终端,它只是缓存字符串直到终端设备把自己注册到内核.然后内核把缓存的终端log内容传递给注册的终端设备.同时可以存在多个注册的终端设备.
+</p>
+
+<p>
+<code>printk()</code> can be called very early because it doesn't actually print to
+anywhere. It just logs the message to "<code>log_buf</code>" , which is allocated
+statically in "<code>linux/kernel/printk.c</code>". The messages that are saved in
+"<code>log_buf</code>" are passed to registered console devices as they register.
+</p>
+</div>
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">架构有关的初始化 <code>setup_arch</code></h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+Call <a href="#setup_arch"><code>setup_arch(&amp;command_line);</code></a> :
+</p>
+
+<p>
+This performs architecture-specific initializations (details below).
+Then back to architecture-independent initialization
+</p>
+
+<p>
+The remainder of <code>start_kernel()</code> is done as follows for all processor
+architecures, although several of these function calls are to
+architecture-specific setup/init functions.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">继续architecture-independent初始化</h3>
+</div>
 </div>
 
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4"><code>rest_init</code></h2>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5"><code>kernel_init</code></h2>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6"><code>Initcalls</code></h2>
+</div>
+
+
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7"><code>start_kernel()</code></h2>
+</div>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">reference</h2>
+<div class="outline-text-2" id="text-8">
+</div><div id="outline-container-sec-8-1" class="outline-3">
+<h3 id="sec-8-1"><code>cpu_idle</code></h3>
+<div class="outline-text-3" id="text-8-1">
+<p>
+<a id="cpu_idle" name="cpu_idle"></a>
+</p>
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">cpu_idle</span>(<span style="color: #98fb98;">void</span>) {
+  local_fiq_enable();
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">endless idle loop with no priority at all </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">while</span> (1) {
+    <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">idle</span>)(<span style="color: #98fb98;">void</span>) = pm_idle;
+    <span style="color: #00ffff;">if</span> (!idle)
+      idle = default_idle;
+    leds_event(led_idle_start);
+    tick_nohz_stop_sched_tick();
+    <span style="color: #00ffff;">while</span> (!need_resched())
+      idle();
+    leds_event(led_idle_end);
+    tick_nohz_restart_sched_tick();
+    preempt_enable_no_resched();
+    schedule();
+    preempt_disable();
+  }
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-8-2" class="outline-3">
+<h3 id="sec-8-2"><code>setup_arch</code></h3>
+<div class="outline-text-3" id="text-8-2">
+<p>
+<a id="setup_arch" name="setup_arch"></a>
+<code>arch/arm/kernel/setup.c</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__init</span> setup_arch(<span style="color: #98fb98;">char</span> **<span style="color: #eedd82;">cmdline_p</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tag</span> *<span style="color: #eedd82;">tags</span> = (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tag</span> *)&amp;init_tags;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">machine_desc</span> *<span style="color: #eedd82;">mdesc</span>;
+        <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">from</span> = default_command_line;
+
+        setup_processor();
+        mdesc = setup_machine(machine_arch_type);
+        machine_name = mdesc-&gt;name;
+
+        <span style="color: #00ffff;">if</span> (mdesc-&gt;soft_reboot)
+                reboot_setup(<span style="color: #ffa07a;">"s"</span>);
+
+        <span style="color: #00ffff;">if</span> (__atags_pointer)
+                tags = phys_to_virt(__atags_pointer);
+        <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (mdesc-&gt;boot_params)
+                tags = phys_to_virt(mdesc-&gt;boot_params);
+
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_KEXEC
+        kexec_boot_params_copy = virt_to_phys(kexec_boot_params_buf);
+        kexec_boot_params = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>)kexec_boot_params_buf;
+        <span style="color: #00ffff;">if</span> (__atags_pointer) {
+                kexec_boot_params_address = __atags_pointer;
+                memcpy((<span style="color: #98fb98;">void</span> *)kexec_boot_params, tags, KEXEC_BOOT_PARAMS_SIZE);
+        } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (mdesc-&gt;boot_params) {
+                kexec_boot_params_address = mdesc-&gt;boot_params;
+                memcpy((<span style="color: #98fb98;">void</span> *)kexec_boot_params, tags, KEXEC_BOOT_PARAMS_SIZE);
+        }
+<span style="color: #b0c4de;">#endif</span>
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * If we have the old style parameters, convert them to</span>
+<span style="color: #ff7f24;">         * a tag list.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (tags-&gt;hdr.tag != ATAG_CORE)
+                convert_to_tag_list(tags);
+        <span style="color: #00ffff;">if</span> (tags-&gt;hdr.tag != ATAG_CORE)
+                tags = (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tag</span> *)&amp;init_tags;
+
+        <span style="color: #00ffff;">if</span> (mdesc-&gt;fixup)
+                mdesc-&gt;fixup(mdesc, tags, &amp;from, &amp;meminfo);
+
+        <span style="color: #00ffff;">if</span> (tags-&gt;hdr.tag == ATAG_CORE) {
+                <span style="color: #00ffff;">if</span> (meminfo.nr_banks != 0)
+                        squash_mem_tags(tags);
+                parse_tags(tags);
+        }
+
+        init_mm.start_code = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>) &amp;_text;
+        init_mm.end_code   = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>) &amp;_etext;
+        init_mm.end_data   = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>) &amp;_edata;
+        init_mm.brk        = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>) &amp;_end;
+
+        memcpy(boot_command_line, from, COMMAND_LINE_SIZE);
+        boot_command_line[COMMAND_LINE_SIZE-1] = <span style="color: #ffa07a;">'\0'</span>;
+        parse_cmdline(cmdline_p, from);
+        paging_init(&amp;meminfo, mdesc);
+        request_standard_resources(&amp;meminfo, mdesc);
+
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_SMP
+        smp_init_cpus();
+<span style="color: #b0c4de;">#endif</span>
+
+        cpu_init();
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Set up various architecture-specific pointers</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        init_arch_irq = mdesc-&gt;init_irq;
+        system_timer = mdesc-&gt;timer;
+        init_machine = mdesc-&gt;init_machine;
+
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_VT
+<span style="color: #b0c4de;">#if</span> <span style="color: #b0c4de;">defined</span>(CONFIG_VGA_CONSOLE)
+        conswitchp = &amp;vga_con;
+<span style="color: #b0c4de;">#elif</span> <span style="color: #b0c4de;">defined</span>(CONFIG_DUMMY_CONSOLE)
+        conswitchp = &amp;dummy_con;
+<span style="color: #b0c4de;">#endif</span>
+<span style="color: #b0c4de;">#endif</span>
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">cc</h2>
+<div class="outline-text-2" id="text-9">
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
 </div>
 
 
@@ -172,7 +399,7 @@ for the JavaScript code in this tag.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-10-29 Wed 22:50</p>
+<p class="date">Created: 2014-10-31 Fri 23:23</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

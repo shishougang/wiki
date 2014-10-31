@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Writing udev rules and kernel examples</title>
-<!-- 2014-10-30 Thu 22:36 -->
+<!-- 2014-10-31 Fri 23:23 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -144,66 +144,447 @@ for the JavaScript code in this tag.
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">Introduction</a></li>
-<li><a href="#sec-2">规则文件和语义</a></li>
-<li><a href="#sec-3">udevadm in Ubuntu</a></li>
-<li><a href="#sec-4">UDev urls</a></li>
+<li><a href="#sec-2">The concepts</a></li>
+<li><a href="#sec-3">Why?</a></li>
+<li><a href="#sec-4">Rule writing</a>
+<ul>
+<li><a href="#sec-4-1">Rule files and semantics</a></li>
+<li><a href="#sec-4-2">Rule syntax</a></li>
+<li><a href="#sec-4-3">Basic Rules</a></li>
+<li><a href="#sec-4-4">Matching sysfs attributes</a></li>
+<li><a href="#sec-4-5">Device hierarchy</a></li>
+<li><a href="#sec-4-6">String substitutions</a></li>
+<li><a href="#sec-4-7">String matching</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">Finding information from sysfs</a>
+<ul>
+<li><a href="#sec-5-1">The sysfs tree</a></li>
+<li><a href="#sec-5-2">udevadm info</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">Advanced topics</a>
+<ul>
+<li><a href="#sec-6-1">Controlling permissions and ownership</a></li>
+</ul>
+</li>
+<li><a href="#sec-7">Testing and debugging</a></li>
+<li><a href="#sec-8">kernel examples</a></li>
+<li><a href="#sec-9">udevadm in Ubuntu</a></li>
 </ul>
 </div>
 </div>
-
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">Introduction</h2>
 <div class="outline-text-2" id="text-1">
 <p>
-Linux内核2.6之后,由用户空间的工具udev来提供动态目录 <code>/dev</code> 下固定设备名的方法. 之前由 <i>devfs</i> 来实现/dev,现在被废除.udev的原码包和源码文档在<a href="https://www.kernel.org/pub/linux/utils/kernel/hotplug/">kernel/hotplug</a> 下. 
+Linux内核2.6之后,由用户空间的工具udev 来提供动态目录 <code>/dev</code> 下固定设备名的方法. 之前由 <i>devfs</i> 来实现/dev,现在被废除.udev 的原码包和源码文档在<a href="https://www.kernel.org/pub/linux/utils/kernel/hotplug/">kernel/hotplug</a> 下.随源码附带的<a href="http://www.reactivated.net/writing_udev_rules.html">Writing udev rules在这里</a>.
 </p>
 </div>
 </div>
-
 
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">规则文件和语义</h2>
+<h2 id="sec-2">The concepts</h2>
 <div class="outline-text-2" id="text-2">
 <p>
-为决定如何命名设备以及执行什么另外动作,udev会读取一系列规则文件. 这些文件保存在/etc/udev/rules.d目录下并且都必须有.rules后缀名.
+<b>udev</b> 是管理 /dev 目录的新式方法,被设计出来清理之前/dev 实现的一些问题,和提供稳健的向前开发.为了创建并命名系统中相应的/dev 设备节点,udev依赖于与 <i>sysfs</i> 提供的信息相匹配的由用户提供的 <i>rules</i>.
 </p>
 
 <p>
-在一个规则文件中, 以"#"开头的行被认为是注释. 每一个非空的行都是一条规则. 规则不能跨越多行.
-</p>
-
-<p>
-一个设备可以被多条规则匹配到, 这有着很实用的优点, 例如, 我们可以写两个匹配同一个设备的规则, 每一个规则为设备提供了它自己的可选命名. 即使分开在不同的文件种, 两个可选命名也都会被创建, 要明白udev在找到一个匹配规则后不会停止处理其他规则, 它仍然会继续查找并尝试应用已知的每条规则, 这很重要.
-</p>
-
-<p>
-规则语法每条规则通过一系列键值对创建,这些键值对通过逗号分隔. 匹配键是用来识别要应用规则的设备的条件, 但规则中对应设备的所有匹配键被处理后,就会应用规则并且赋值键的行为也会触发. 每条规则应该包含至少一个匹配键和至少一个赋值键.
-</p>
-
-<p>
-这是用来阐述上面内容的一个例子规则:
-  KERNEL=="hdb",NAME="my<sub>spare</sub><sub>disk</sub>"
-上述规则包含一个匹配键(KERNEL)以及一个赋值键(NAME). 这些键和它们的属性的语义将在稍后具体说明. 注意到匹配键通过连等号(<code>=)与它的值联系起来,
-  赋值键通过等号(</code>)与它的值关联.
-</p>
-
-
-<p>
-注意udev不支持任何形式的行连接符, 不要在你的规则种插入任何断行符,这将会导致udev把你的一条规则看做是多条规则但不会按预料工作.
-</p>
-
-
-<p>
-$ udevadm info  -a -p /sys/block/sda
-sudo  udevadm test  /class/sound/dsp 
+<b>sysfs</b> 是2.6内核的新文件系统.它由内核管理,并导出当前系统插入设备的基本信息.udev能使用这些信息来创建对应硬件的设备节点.sysfsz挂载在 /sys下并可浏览.
 </p>
 </div>
 </div>
 
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">udevadm in Ubuntu</h2>
+<h2 id="sec-3">Why?</h2>
 <div class="outline-text-2" id="text-3">
+<p>
+使用规则它能达到:
+</p>
+<ol class="org-ol">
+<li>重命名设备节点的缺省名字为其他名字.
+</li>
+<li>通过创建符号链接到缺省设备节点来提供一个可选的固定的设备节点名字.
+</li>
+<li>基于程序的输出命名设备节点.
+</li>
+<li>改变设备节点的权限和所有权.
+</li>
+<li>但设备节点被创建或删除时(通常是添加设备或拔出设备时)执行一个脚本.
+</li>
+<li>重命名网络接口.
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Rule writing</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">Rule files and semantics</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+为决定如何命名设备以及执行什么另外动作,udev 会读取一系列规则文件. 这些文件保存在 <code>/etc/udev/rules.d</code> 目录下,并且都必须以 <code>.rules</code> 为后缀.
+</p>
+
+<p>
+<code>/etc/udev/rules.d/</code> 下面的文件通过 <b>lexical顺序</b> 解析,在某些情况下规则的解析顺序很重要.所以一般rules文件命名是 <code>num-xxx.rules</code> .
+</p>
+
+<p>
+在一个rules文件中, 以"#"开头的行被认为是注释. 每一个非空的行都是一条规则. 规则不能跨越多行.
+</p>
+
+<p>
+一个设备可以被多条规则匹配到, 这有着很实用的优点, 例如, 我们可以写两个匹配同一个设备的规则, 每一个规则为设备提供了它自己的可选命名. 即使分开在不同的文件种, 两个可选命名也都会被创建, 要明白udev在找到一个匹配规则后不会停止处理其他规则, 它仍然会继续查找并尝试应用已知的每条规则, 这很重要.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">Rule syntax</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+每条规则通过一系列键值对创建,这些键值对通过 <b>逗号分隔</b> . <b>匹配键</b> 是用来识别要应用规则的设备的条件, 但规则中对应设备的所有匹配键被处理后,就会应用规则并且 <b>赋值键</b> 的行为也会触发. 每条规则应该包含至少一个匹配键和至少一个赋值键.
+</p>
+
+<p>
+这是用一个例子规则:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"hdb"</span>,<span style="color: #eedd82;">NAME</span>=<span style="color: #ffa07a;">"my_spare_disk"</span>
+</pre>
+</div>
+<p>
+上述规则包含一个匹配键(KERNEL)以及一个赋值键(NAME).注意到匹配键通过连
+<b>等号(==)</b> 与它的值联系起来,赋值键通过 <b>等号(=)</b> 与它的值关联.
+</p>
+
+<p>
+注意udev 不支持任何形式的行连接符, 不要在你的规则种插入任何断行符,这将会导致udev 把你的一条规则看做是多条规则但不会按预料工作.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3">Basic Rules</h3>
+<div class="outline-text-3" id="text-4-3">
+<p>
+一些常用键,完整的list见<a href="http://www.freedesktop.org/software/systemd/man/udev.html">udev man page</a>.
+</p>
+<ul class="org-ul">
+<li>KERNEL - 为设备匹配的内核名字.
+</li>
+<li>SUBSYSTEM - 匹配设备的子系统.
+</li>
+<li>DRIVER - 匹配支持设备的驱动名称.
+</li>
+</ul>
+
+<p>
+最基本的赋值键:
+</p>
+<ul class="org-ul">
+<li>NAME - 设备节点应该使用的名字.
+</li>
+<li>SYMLINK - 一个设备节点可选名字的符号链接列表.
+</li>
+</ul>
+
+<p>
++=. 你可以在一个规则中附加多个符号链接到列表中,每个链接通过空格分开.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"hdb"</span>, <span style="color: #eedd82;">NAME</span>=<span style="color: #ffa07a;">"my_spare_disk"</span>
+</pre>
+</div>
+<p>
+匹配一个设备命名为hdb的设备,把它重新命名为my<sub>spare</sub><sub>disk</sub>. 设备节点出现在/dev/my<sub>spare</sub><sub>disk</sub>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"hdc"</span>, <span style="color: #eedd82;">SYMLINK</span>+=<span style="color: #ffa07a;">"cdrom cdrom0"</span>
+</pre>
+</div>
+<p>
+它在/dev/cdrom和/dev/cdrom0创建了两个符号链接,都指向/dev/hdc.没有NAME
+赋值键,所以使用缺省的内核名字(hdc).
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4">Matching sysfs attributes</h3>
+<div class="outline-text-3" id="text-4-4">
+<p>
+udev 允许我们使用 <code>ATTR</code> 键通过稍微不同的语法来匹配 sysfs 信息到自己的规则中.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">SUBSYSTEM</span>==<span style="color: #ffa07a;">"block"</span>, ATTR{size}==<span style="color: #ffa07a;">"234441648"</span>, <span style="color: #eedd82;">SYMLINK</span>+=<span style="color: #ffa07a;">"my_disk"</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-5" class="outline-3">
+<h3 id="sec-4-5">Device hierarchy</h3>
+<div class="outline-text-3" id="text-4-5">
+<p>
+Linux内核实际上以树状结构展示设备, 这个信息通过sysfs显露出来,在书写规则时这非常有用. 
+</p>
+
+<p>
+udev 提供了在树中向上查找的匹配键变量:
+</p>
+<ul class="org-ul">
+<li>KERNELS - 为设备匹配的内核名字,或任何双亲设备中的内核名.
+</li>
+<li>SUBSYSTEMS - 匹配设备的子系统名,或任何双亲设备中的子系统名.
+</li>
+<li>DRIVERS - 匹配支持设备的驱动名,或任何支持双亲设备的驱动名.
+</li>
+<li>ATTRS - 匹配设备的sysfs属性,或任何双亲设备的sysfs属性.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-4-6" class="outline-3">
+<h3 id="sec-4-6">String substitutions</h3>
+<div class="outline-text-3" id="text-4-6">
+<p>
+最常用的操作是 <code>%k</code> 和 <code>%n</code> . <code>%k</code> 等同于设备的内核名. <code>%n</code> 等同于设备内核号.
+</p>
+
+<p>
+在规则中匹配字符%, 你必需写成%%,希望匹配字符$, 你必须写成$$.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"mice"</span>, <span style="color: #eedd82;">NAME</span>=<span style="color: #ffa07a;">"input/%k"</span>
+<span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"loop0"</span>, <span style="color: #eedd82;">NAME</span>=<span style="color: #ffa07a;">"loop/%n"</span>, <span style="color: #eedd82;">SYMLINK</span>+=<span style="color: #ffa07a;">"%k"</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>第一条规则确保鼠标设备节点一定出现在/dev/input目录下(缺省是在/dev/mice
+</li>
+</ul>
+<p>
+下面). 
+</p>
+<ul class="org-ul">
+<li>第二条规则确保名字为loop0的设备节点在/dev/loop/0创建,也会照常创建一个符号链接/dev/loop0.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-4-7" class="outline-3">
+<h3 id="sec-4-7">String matching</h3>
+<div class="outline-text-3" id="text-4-7">
+<ul class="org-ul">
+<li>* - 匹配任何字符, 匹配0次或多次
+</li>
+<li>? - 匹配任何字符,但只匹配一次.
+</li>
+<li>[] - 匹配任何单个字符, 这些字符在方括号里面指定, 范围也是允许的.
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"fd[0-9]*"</span>, <span style="color: #eedd82;">NAME</span>=<span style="color: #ffa07a;">"floppy/%n"</span>, <span style="color: #eedd82;">SYMLINK</span>+=<span style="color: #ffa07a;">"%k"</span>
+<span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"hiddev*"</span>, <span style="color: #eedd82;">NAME</span>=<span style="color: #ffa07a;">"usb/%k"</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Finding information from sysfs</h2>
+<div class="outline-text-2" id="text-5">
+</div><div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">The sysfs tree</h3>
+<div class="outline-text-3" id="text-5-1">
+<p>
+顶层设备路径可以被分类为包含dev文件的sysfs目录, 下列命令可以列举出这些文件:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">find /sys -name dev</span>
+</pre>
+</div>
+
+<p>
+可以这样读硬盘的大小:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">cat /sys/block/sda/size</span>
+234441648
+</pre>
+</div>
+<p>
+在一个udev规则里面, 可以使用ATTR{size}=="234441648"来识别这个磁盘.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">udevadm info</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+Ubuntu下提供<a href="#udevadm">udevadm</a>工具来察看设备信息,如:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">$ udevadm info  -a -p /sys/block/sda
+  looking at device <span style="color: #ffa07a;">'/devices/pci0000:00/0000:00:1f.2/host0/target0:0:0/0:0:0:0/block/sda'</span>:
+    <span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"sda"</span>
+    <span style="color: #eedd82;">SUBSYSTEM</span>==<span style="color: #ffa07a;">"block"</span>
+    <span style="color: #eedd82;">DRIVER</span>==<span style="color: #ffa07a;">""</span>
+    ATTR{range}==<span style="color: #ffa07a;">"16"</span>
+    ATTR{ext_range}==<span style="color: #ffa07a;">"256"</span>
+    ATTR{removable}==<span style="color: #ffa07a;">"0"</span>
+    ATTR{ro}==<span style="color: #ffa07a;">"0"</span>
+    ATTR{size}==<span style="color: #ffa07a;">"976773168"</span>
+    ATTR{alignment_offset}==<span style="color: #ffa07a;">"0"</span>
+    ATTR{discard_alignment}==<span style="color: #ffa07a;">"0"</span>
+    ATTR{capability}==<span style="color: #ffa07a;">"50"</span>
+    ATTR{stat}==<span style="color: #ffa07a;">" 1115589   409173 22216954 10473160   670249   939130 35003688 64945096        0  6941616 75553064"</span>
+    ATTR{inflight}==<span style="color: #ffa07a;">"       0        0"</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Advanced topics</h2>
+<div class="outline-text-2" id="text-6">
+</div><div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1">Controlling permissions and ownership</h3>
+<div class="outline-text-3" id="text-6-1">
+<p>
+GROUP赋值允许你定义哪个Unix组应该拥有设备节点,定义video组拥有framebuffer设备:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"fb[0-9]*"</span>, <span style="color: #eedd82;">NAME</span>=<span style="color: #ffa07a;">"fb/%n"</span>, <span style="color: #eedd82;">SYMLINK</span>+=<span style="color: #ffa07a;">"%k"</span>, <span style="color: #eedd82;">GROUP</span>=<span style="color: #ffa07a;">"video"</span>
+</pre>
+</div>
+
+<p>
+OWNER键允许你定义哪个Unix用户应该具有设备节点的拥有权限. 假设有个临时情况要你让join拥有软盘设备,你可以使用:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"fd[0-9]*"</span>, <span style="color: #eedd82;">OWNER</span>=<span style="color: #ffa07a;">"john"</span>
+</pre>
+</div>
+
+<p>
+udev缺省用Unix的0660权限(拥有者和组员拥有读写功能)创建设备节点. 需要的话你可以在特定设备的规则中使用包含MODE赋值键覆盖这些缺省值. 下面的规则定义了 inotify 节点可以被每个人读写:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"inotify"</span>, <span style="color: #eedd82;">NAME</span>=<span style="color: #ffa07a;">"misc/%k"</span>, <span style="color: #eedd82;">SYMLINK</span>+=<span style="color: #ffa07a;">"%k"</span>, <span style="color: #eedd82;">MODE</span>=<span style="color: #ffa07a;">"0666"</span>
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">Testing and debugging</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+为使符号链接显示, 你可以断开并重连你的相机或者在非可移除设备情况下运行
+<code>udevadm test</code>.
+</p>
+
+<p>
+如果你知道sysfs中的顶级设备路径, 你可以使用 <code>udevadm test</code> 来显示udev将要执行的动作, 这可能会帮你调试你的规则.如想调试作用在/sys/class/sound/dsp上的规则:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ udevadm test /class/sound/dsp 
+run_command: calling: test
+adm_test: version 175
+This program is for debugging only, it does not run any program,
+specified by a RUN key. It may show incorrect results, because
+some values may be different, or not available at a simulation run.
+
+parse_file: reading <span style="color: #ffa07a;">'/etc/udev/rules.d/10-vboxdrv.rules'</span> as rules file
+parse_file: reading <span style="color: #ffa07a;">'/lib/udev/rules.d/40-crda.rules'</span> as rules file
+parse_file: reading <span style="color: #ffa07a;">'/lib/udev/rules.d/40-fuse.rules'</span> as rules file
+parse_file: reading <span style="color: #ffa07a;">'/lib/udev/rules.d/40-gnupg.rules'</span> as rules file
+parse_file: reading <span style="color: #ffa07a;">'/lib/udev/rules.d/40-hplip.rules'</span> as rules file
+parse_file: reading <span style="color: #ffa07a;">'/lib/udev/rules.d/40-ia64.rules'</span> as rules file
+parse_file: reading <span style="color: #ffa07a;">'/lib/udev/rules.d/40-inputattach.rules'</span> as rules file
+parse_file: reading <span style="color: #ffa07a;">'/lib/udev/rules.d/40-libgphoto2-2.rules'</span> as rules file
+...
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">kernel examples</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+创建设备节点/dev/hello,并创建udev rules来创建它的链接并修改访问权限让所有人能直接访问它.整个包源码:<a href="./Files/hello_dev_and_udev.tar.gz">hello<sub>dev</sub><sub>and</sub><sub>udev</sub>.tar.gz</a>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">$ make
+$ sudo insmod ./hello_dev.ko
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">now create the /dev/hello</span>
+$ sudo cat /dev/hello
+Hello, world!
+$ cat /dev/hello
+cat: /dev/hello: Permission denied
+$ ls -l /dev/hello
+crw-rw---- 1 root root 10, 61 2007-06-20 14:31 /dev/hello
+</pre>
+</div>
+
+<p>
+创建udev rules:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">KERNEL</span>==<span style="color: #ffa07a;">"hello"</span>, <span style="color: #eedd82;">SYMLINK</span>+=<span style="color: #ffa07a;">"hello_world"</span>, <span style="color: #eedd82;">MODE</span>=<span style="color: #ffa07a;">"0444"</span>
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo cp ./hello.rules /etc/udev/rules.d/051-hello.rules
+$ sudo rmmod hello_dev
+$ sudo insmod ./hello_dev.ko
+$ ls -l /dev/hello*
+cr--r--r-- 1 root root 10, 61 2007-06-19 21:21 /dev/hello
+lrwxrwxrwx 1 root root      5 2007-06-19 21:21 /dev/hello_world -&gt; hello
+$ cat /dev/hello_world
+Hello, world!
+$ cat /dev/hello
+Hello, world!
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">udevadm in Ubuntu</h2>
+<div class="outline-text-2" id="text-9">
+<p>
+<a id="udevadm" name="udevadm"></a>
+</p>
 <div class="org-src-container">
 
 <pre class="src src-sh">Usage: udevadm [--help] [--version] [--debug] COMMAND [COMMAND OPTIONS]
@@ -218,38 +599,10 @@ sudo  udevadm test  /class/sound/dsp
 </div>
 </div>
 </div>
-
-<div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">UDev urls</h2>
-<div class="outline-text-2" id="text-4">
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
-
-
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
-</div>
-
-
-
-
-<p>
-Writing udev rules
-<a href="http://www.reactivated.net/writing_udev_rules.html">http://www.reactivated.net/writing_udev_rules.html</a>
-</p>
-
-<p>
-<a href="http://www.cnitblog.com/luofuchong/archive/2007/12/18/37831.html">http://www.cnitblog.com/luofuchong/archive/2007/12/18/37831.html</a>
-</p>
-</div>
-</div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-10-30 Thu 22:36</p>
+<p class="date">Created: 2014-10-31 Fri 23:23</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
