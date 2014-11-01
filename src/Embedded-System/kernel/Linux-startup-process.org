@@ -2,7 +2,7 @@
 #+TITLE: Linux startup process
 #+OPTIONS: num:nil H:2
 
-主要以ARM架构的启动过程.ho
+主要以Linux kernel 2.6.24的ARM架构的启动过程为例.
 * bootloader
 以Uboot为例, =bootm addr= , 从Linux kernel所在起始地址启动.
 * =head.S=
@@ -15,9 +15,16 @@
 函数 =start_kernel()= 在 =linux/init/main.c= 中,它不会放回到它的调用者
 那,它最终调用死循环函数 [[cpu_idle][=cpu_idle()=]] .
 
-中断们仍然被关闭此时.做写必要的准备工作,然后打开它们.先
+中断们 =local_irq_disable();= 仍然被关闭此时.做写必要的准备工作,然后打开它们.先
 =lock_kernel();= .
 
+若打开 =CONFIG_TRACE_IRQFLAGS= , =early_init_irq_lock_class();= 为一个
+全局中断描述符表格 =struct irq_desc irq_desc[NR_IRQS];= 中所有locks映
+射到单一的一个lock-class.
+
+若打开 =CONFIG_HIGHMEM=, =page_address_init(void)= 初始化页地址,用链表
+把它们串起来.
+** =printk(linux_banner);=
 =printk(linux_banner);= 打印字符串 =linux_banner= (这字符串在
 =linux/init/version.c= 中). *Note:* =printk()= 此时并没有实际把这字符
 串打印到终端,它只是缓存字符串直到终端设备把自己注册到内核.然后内核把缓
@@ -37,6 +44,39 @@ The remainder of =start_kernel()= is done as follows for all processor
 architecures, although several of these function calls are to
 architecture-specific setup/init functions.
 ** 继续architecture-independent初始化
+=setup_command_line(command_line);= 
+#+begin_src c
+  /*
+   ,* We need to store the untouched command line for future reference.
+   ,* We also need to store the touched command line since the parameter
+   ,* parsing is performed in place, and we should allow a component to
+   ,* store reference of name/value for future reference.
+   ,*/
+  strcpy (saved_command_line, boot_command_line);
+  strcpy (static_command_line, command_line);
+#+end_src
+** =setup_per_cpu_areas();= 
+设置下SMP的每个CPU分配pre-cpu结构内存， 并将.data.percpu段的数据复制到
+其中.
+** =smp_prepare_boot_cpu();=
+SMP相关,ARM架构下只是简单设置了下idle进程:
+
+#+begin_src c
+  void __init smp_prepare_boot_cpu(void)
+  {
+    unsigned int cpu = smp_processor_id();
+    per_cpu(cpu_data, cpu).idle = current;
+  }
+#+end_src
+** =sched_init();=
+=/kernel/sched.c= 
+
++ Set the =init_task='s processor ID.
++ Clear the pidhash table. 
++ call =init_timervecs()=.
++ call =init_bh()= to init "bottom half" queues for =timer_bh=,
+  =tqueue_bh=, and =immediate_bh=.
+
 
 
 * =rest_init=
@@ -48,6 +88,8 @@ architecture-specific setup/init functions.
 
 
 * =start_kernel()=
+
+
 * reference
 ** =cpu_idle=
 <<cpu_idle>>
