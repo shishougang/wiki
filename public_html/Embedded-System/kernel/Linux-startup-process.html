@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Linux startup process</title>
-<!-- 2014-11-01 Sat 23:24 -->
+<!-- 2014-11-02 Sun 23:12 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -153,16 +153,63 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3-4"><code>setup_per_cpu_areas();</code></a></li>
 <li><a href="#sec-3-5"><code>smp_prepare_boot_cpu();</code></a></li>
 <li><a href="#sec-3-6"><code>sched_init();</code></a></li>
+<li><a href="#sec-3-7">Parsing command line options</a></li>
+<li><a href="#sec-3-8"><code>sort_main_extable();</code></a></li>
+<li><a href="#sec-3-9"><code>trap_init();</code></a></li>
+<li><a href="#sec-3-10"><code>init_IRQ();</code></a></li>
+<li><a href="#sec-3-11"><code>pidhash_init();</code></a></li>
+<li><a href="#sec-3-12"><code>init_timers();</code></a></li>
+<li><a href="#sec-3-13"><code>hrtimers_init();</code></a></li>
+<li><a href="#sec-3-14"><code>softirq_init();</code></a></li>
+<li><a href="#sec-3-15"><code>timekeeping_init();</code></a></li>
+<li><a href="#sec-3-16"><code>time_init();</code></a></li>
+<li><a href="#sec-3-17"><code>console_init();</code></a></li>
+<li><a href="#sec-3-18"><code>lockdep_info();</code></a></li>
+<li><a href="#sec-3-19"><code>mem_init();</code></a></li>
+<li><a href="#sec-3-20"><code>kmem_cache_init();</code></a></li>
+<li><a href="#sec-3-21"><code>calibrate_delay();</code></a></li>
+<li><a href="#sec-3-22">some inits</a></li>
+<li><a href="#sec-3-23"><code>fork_init(num_physpages);</code></a></li>
+<li><a href="#sec-3-24"><code>proc_caches_init();</code></a></li>
+<li><a href="#sec-3-25"><code>buffer_init(void)</code></a></li>
+<li><a href="#sec-3-26"><code>vfs_caches_init(num_physpages);</code></a></li>
+<li><a href="#sec-3-27"><code>signals_init();</code></a></li>
+<li><a href="#sec-3-28"><code>proc_root_init();</code></a></li>
+<li><a href="#sec-3-29"><code>check_bugs();</code></a></li>
+<li><a href="#sec-3-30"><code>rest_init();</code></a></li>
 </ul>
 </li>
-<li><a href="#sec-4"><code>rest_init</code></a></li>
-<li><a href="#sec-5"><code>kernel_init</code></a></li>
-<li><a href="#sec-6"><code>Initcalls</code></a></li>
-<li><a href="#sec-7"><code>start_kernel()</code></a></li>
+<li><a href="#sec-4"><code>rest_init</code></a>
+<ul>
+<li><a href="#sec-4-1">start init thread</a></li>
+<li><a href="#sec-4-2">create kthreadd thread</a></li>
+<li><a href="#sec-4-3"><code>unlock_kernel();</code></a></li>
+<li><a href="#sec-4-4"><code>schedule();</code> and <code>cpu_idle();</code></a></li>
+</ul>
+</li>
+<li><a href="#sec-5"><code>setup_arch(&amp;command_line)</code></a>
+<ul>
+<li><a href="#sec-5-1"><code>setup_processor</code></a></li>
+<li><a href="#sec-5-2"><code>setup_machine</code></a></li>
+<li><a href="#sec-5-3">Set memory limits</a></li>
+<li><a href="#sec-5-4"><code>parse_cmdline(cmdline_p, from);</code></a></li>
+<li><a href="#sec-5-5"><code>cpu_init();</code></a></li>
+<li><a href="#sec-5-6">Set up various architecture-specific pointers</a></li>
+</ul>
+</li>
+<li><a href="#sec-6"><code>kernel_init</code> thread</a></li>
+<li><a href="#sec-7"><code>do_basic_setup</code></a>
+<ul>
+<li><a href="#sec-7-1"><code>do_initcalls</code></a></li>
+</ul>
+</li>
 <li><a href="#sec-8">reference</a>
 <ul>
 <li><a href="#sec-8-1"><code>cpu_idle</code></a></li>
 <li><a href="#sec-8-2"><code>setup_arch</code></a></li>
+<li><a href="#sec-8-3"><code>kernel_init</code></a></li>
+<li><a href="#sec-8-4"><code>init_post</code></a></li>
+<li><a href="#sec-8-5"><code>do_basic_setup</code></a></li>
 </ul>
 </li>
 <li><a href="#sec-9">cc</a></li>
@@ -301,39 +348,633 @@ SMP相关,ARM架构下只是简单设置了下idle进程:
 </p>
 
 <ul class="org-ul">
-<li>Set the <code>init_task</code>'s processor ID.
+<li>set the <code>struct task_struct init_task = INIT_TASK(init_task);</code>.
 </li>
-<li>Clear the pidhash table. 
-</li>
-<li>call <code>init_timervecs()</code>.
-</li>
-<li>call <code>init_bh()</code> to init "bottom half" queues for <code>timer_bh</code>,
-<code>tqueue_bh</code>, and <code>immediate_bh</code>.
+<li>init idle thread, <code>init_idle(current, smp_processor_id());</code>.
 </li>
 </ul>
 </div>
 </div>
+<div id="outline-container-sec-3-7" class="outline-3">
+<h3 id="sec-3-7">Parsing command line options</h3>
+<div class="outline-text-3" id="text-3-7">
+<p>
+<code>parse_early_param();</code> parse "eary options", as <code>parse_args("early
+options", tmp_cmdline, NULL, 0, do_early_param);</code>
+</p>
+
+<p>
+<code>parse_args</code>: Parse the kernel options on the command line. This is
+  a simple kernel command line parsing function. It parses the command
+  line and fills in the arguments and environment to init (thread) as
+  appropriate. Any command-line option is taken to be an environment
+  variable if it contains the character '='. It also checks for
+  options meant for the kernel by calling <code>unknown_bootoption</code>, and
+  in it call <code>obsolete_checksetup()</code> ,hich checks the command line for
+  kernel parameters, these being specified by declaring them using
+  "<code>__setup</code>", as in:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">__setup(<span style="color: #ffa07a;">"debug"</span>, debug_kernel);
+</pre>
 </div>
 
+<p>
+This declaration causes the <code>debug_kernel()</code> function to be called when
+the string "debug" is scanned. See
+"linux/Documentation/kernel-parameters.txt" for the list of kernel
+parameters.
+</p>
 
+<p>
+These options are not given to init &#x2013; they are for internal kernel
+use only. The default argument list for the init thread is <code>{"init",
+NULL}</code>, with a maximum of 8 command-line arguments. The default
+environment list for the init thread is <code>{"HOME=/", "TERM=linux",
+NULL}</code>, with a maximum of 8 command-line environment variable
+settings.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-8" class="outline-3">
+<h3 id="sec-3-8"><code>sort_main_extable();</code></h3>
+<div class="outline-text-3" id="text-3-8">
+<p>
+Sort the kernel's built-in exception table.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-9" class="outline-3">
+<h3 id="sec-3-9"><code>trap_init();</code></h3>
+<div class="outline-text-3" id="text-3-9">
+<p>
+in <code>/arch/arm/kernel/traps.c</code>.
+对中断向量表进行初始化,如下:
+</p>
 
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">vectors</span> = CONFIG_VECTORS_BASE;
+memcpy((<span style="color: #98fb98;">void</span> *)vectors, __vectors_start, __vectors_end - __vectors_start);
+memcpy((<span style="color: #98fb98;">void</span> *)vectors + 0x200, __stubs_start, __stubs_end - __stubs_start);
+memcpy((<span style="color: #98fb98;">void</span> *)vectors + 0x1000 - kuser_sz, __kuser_helper_start, kuser_sz);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-10" class="outline-3">
+<h3 id="sec-3-10"><code>init_IRQ();</code></h3>
+<div class="outline-text-3" id="text-3-10">
+<p>
+<code>arch/arm/kernel/irq.c</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">for</span> (irq = 0; irq &lt; NR_IRQS; irq++)
+                irq_desc[irq].status |= IRQ_NOREQUEST | IRQ_NOPROBE;
+</pre>
+</div>
+<p>
+初始化了从中断向量表，不过，这时的中断响应程序由于中断控制器的引脚还未被占用，自然是空程序了。当我们确切地知道了一个引脚到底连接了什么设备，并知道了该设备的驱动程序后，填写该引脚对应的中断门时，中断响应程序的偏移地址才被填写进中断向量表。
+</p>
+
+<pre class="example">
+// in =setup_arch()=
+init_arch_irq = mdesc-&gt;init_irq;
+init_arch_irq();
+</pre>
+
+<p>
+Run architecture-specific initial irq.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-11" class="outline-3">
+<h3 id="sec-3-11"><code>pidhash_init();</code></h3>
+<div class="outline-text-3" id="text-3-11">
+<p>
+The pid hash table is scaled according to the amount of memory in the
+machine.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-12" class="outline-3">
+<h3 id="sec-3-12"><code>init_timers();</code></h3>
+<div class="outline-text-3" id="text-3-12">
+<p>
+初始化定时器:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">open_softirq(TIMER_SOFTIRQ, run_timer_softirq, <span style="color: #7fffd4;">NULL</span>);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-13" class="outline-3">
+<h3 id="sec-3-13"><code>hrtimers_init();</code></h3>
+<div class="outline-text-3" id="text-3-13">
+<p>
+初始化高精度时钟.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-14" class="outline-3">
+<h3 id="sec-3-14"><code>softirq_init();</code></h3>
+<div class="outline-text-3" id="text-3-14">
+<p>
+<code>kernel/softirq.c</code>
+打开两个softirq:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">open_softirq(TASKLET_SOFTIRQ, tasklet_action, <span style="color: #7fffd4;">NULL</span>);
+open_softirq(HI_SOFTIRQ, tasklet_hi_action, <span style="color: #7fffd4;">NULL</span>);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-15" class="outline-3">
+<h3 id="sec-3-15"><code>timekeeping_init();</code></h3>
+<div class="outline-text-3" id="text-3-15">
+<p>
+<code>kernel/time/timekeeping.c</code>
+</p>
+
+<p>
+Initializes the clocksource and common timekeeping values.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-16" class="outline-3">
+<h3 id="sec-3-16"><code>time_init();</code></h3>
+<div class="outline-text-3" id="text-3-16">
+<p>
+<code>/arch/arm/kernel/time.c</code>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">setup_arch()</span>
+system_timer = mdesc-&gt;timer;
+system_timer-&gt;init();
+</pre>
+</div>
+<p>
+以ARM的mach-smdk2410为例,初始化 <code>timer_startval</code> , <code>timer_usec_ticks</code>
+和安装 <code>IRQ_TIMER4</code>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__init</span> s3c2410_timer_init (<span style="color: #98fb98;">void</span>)
+{
+  s3c2410_timer_setup();
+  setup_irq(IRQ_TIMER4, &amp;s3c2410_timer_irq);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-17" class="outline-3">
+<h3 id="sec-3-17"><code>console_init();</code></h3>
+<div class="outline-text-3" id="text-3-17">
+<p>
+HACK ALERT! This is early. We're enabling the console before we've
+done PCI setups etc., and <code>console_init()</code> must be aware of this. But we
+do want output early, in case something goes wrong.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-18" class="outline-3">
+<h3 id="sec-3-18"><code>lockdep_info();</code></h3>
+<div class="outline-text-3" id="text-3-18">
+<p>
+=CONFIG<sub>LOCKDEP</sub>=打开,打印锁依赖信息.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-19" class="outline-3">
+<h3 id="sec-3-19"><code>mem_init();</code></h3>
+<div class="outline-text-3" id="text-3-19">
+<ul class="org-ul">
+<li>free each online node memory.
+</li>
+<li>calculate the real number of pages we have in this system.
+
+<p>
+<code>get_free_pages()</code> can be used after <code>mem_init()</code>.
+</p>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-3-20" class="outline-3">
+<h3 id="sec-3-20"><code>kmem_cache_init();</code></h3>
+<div class="outline-text-3" id="text-3-20">
+<p>
+<code>/mm/slab.c</code>
+Called after the page allocator have been initialised and before
+<code>smp_init()</code>.
+</p>
+
+<ol class="org-ol">
+<li>create the cache<sub>cache</sub>.
+</li>
+<li>create the kmalloc caches.
+</li>
+<li>Replace the bootstrap head arrays.
+</li>
+<li>Replace the bootstrap kmem<sub>list3's</sub>.
+</li>
+<li>resize the head arrays to their final sizes.
+
+<p>
+<code>kmalloc()</code> can be used after <code>kmem_cache_sizes_init()</code>
+</p>
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-3-21" class="outline-3">
+<h3 id="sec-3-21"><code>calibrate_delay();</code></h3>
+<div class="outline-text-3" id="text-3-21">
+<p>
+Calculate the "<code>loops_per_jiffy</code>" delay loop value and print it in
+BogoMIPS.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-22" class="outline-3">
+<h3 id="sec-3-22">some inits</h3>
+<div class="outline-text-3" id="text-3-22">
+<div class="org-src-container">
+
+<pre class="src src-c">pidmap_init();
+pgtable_cache_init();
+prio_tree_init();
+anon_vma_init();
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-23" class="outline-3">
+<h3 id="sec-3-23"><code>fork_init(num_physpages);</code></h3>
+<div class="outline-text-3" id="text-3-23">
+<p>
+根据物理内存大小计算允许创建进程的数量.
+The default maximum number of threads is set to a safe value: the
+thread structures can take up at most half of memory.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c">max_threads = mempages / (8 * THREAD_SIZE / PAGE_SIZE);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-24" class="outline-3">
+<h3 id="sec-3-24"><code>proc_caches_init();</code></h3>
+<div class="outline-text-3" id="text-3-24">
+<p>
+<code>kernel/fork.c</code>
+</p>
+
+<p>
+Call <code>kmem_cache_create()</code> to create slab caches for <code>signal_act</code> (signal
+action), <code>files_cache</code> (<code>files_struct</code>), <code>fs_cache</code> (<code>fs_struct</code>),
+<code>vm_area_struct</code>, and <code>mm_struct</code>.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-25" class="outline-3">
+<h3 id="sec-3-25"><code>buffer_init(void)</code></h3>
+<div class="outline-text-3" id="text-3-25">
+<p>
+<code>/fs/buffer.c</code>
+Call <code>kmem_cache_create()</code> to create slab caches for <code>buffer_head</code>.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-26" class="outline-3">
+<h3 id="sec-3-26"><code>vfs_caches_init(num_physpages);</code></h3>
+<div class="outline-text-3" id="text-3-26">
+<p>
+<code>vfs_caches_init(num_physpages);</code>
+</p>
+
+<ul class="org-ul">
+<li>Call <code>kmem_cache_create()</code> to create slab caches for <code>names_cache</code>,
+filp.
+</li>
+<li>Call <code>dcache_init()</code> to create the <code>dentry_cache</code> and
+<code>dentry_hashtable</code>.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3-27" class="outline-3">
+<h3 id="sec-3-27"><code>signals_init();</code></h3>
+<div class="outline-text-3" id="text-3-27">
+<p>
+<code>/kernel/signal.c</code>
+</p>
+
+<p>
+Call <code>kmem_cache_create()</code> to create the "sigqueue" SLAB cache.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-28" class="outline-3">
+<h3 id="sec-3-28"><code>proc_root_init();</code></h3>
+<div class="outline-text-3" id="text-3-28">
+<p>
+<code>linux/fs/proc/root.c</code>
+</p>
+
+<p>
+For <code>CONFIG_PROC_FS</code> configurations:
+</p>
+
+<ul class="org-ul">
+<li>call <code>proc_misc_init()</code>.
+</li>
+<li>mkdir <code>/proc/net</code>.
+</li>
+<li>for <code>CONFIG_SYSVIPC</code>, mkdir <code>/proc/sysvipc</code>.
+</li>
+<li>mkdir <code>/proc/fs</code>.
+</li>
+<li>mkdir <code>/proc/driver</code>.
+</li>
+<li>call <code>proc_tty_init()</code>.
+</li>
+<li>mkdir <code>/proc/bus</code>.
+</li>
+<li>for <code>CONFIG_SYSCTL</code>, mkdir <code>/proc/sys</code>.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3-29" class="outline-3">
+<h3 id="sec-3-29"><code>check_bugs();</code></h3>
+<div class="outline-text-3" id="text-3-29">
+<p>
+<code>include/asm-arm/bugs.h</code>
+ARM仅仅做 <code>check_writebuffer_bugs()</code>.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-30" class="outline-3">
+<h3 id="sec-3-30"><code>rest_init();</code></h3>
+<div class="outline-text-3" id="text-3-30">
+<p>
+Do the rest non-_<sub>init'ed</sub>, we're now alive 
+</p>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-4" class="outline-2">
 <h2 id="sec-4"><code>rest_init</code></h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">start init thread</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+We count on the initial thread going OK.
+</p>
+
+<p>
+Like idlers, init is an unlocked kernel thread, which will make
+syscalls (and thus be locked).
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c">kernel_thread(kernel_init, <span style="color: #7fffd4;">NULL</span>, CLONE_FS | CLONE_SIGHAND);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">create kthreadd thread</h3>
+<div class="outline-text-3" id="text-4-2">
+<div class="org-src-container">
+
+<pre class="src src-c">pid = kernel_thread(kthreadd, <span style="color: #7fffd4;">NULL</span>, CLONE_FS | CLONE_FILES);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3"><code>unlock_kernel();</code></h3>
+<div class="outline-text-3" id="text-4-3">
+<p>
+Release the BKL.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4"><code>schedule();</code> and <code>cpu_idle();</code></h3>
+<div class="outline-text-3" id="text-4-4">
+<p>
+This function remains as process number 0. Its purpose is to use up
+idle CPU cycles. If the kernel is configured for APM support or ACPI
+support, <code>cpu_idle()</code> invokes the supported power-saving features of
+these specifications. Otherwise it nominally executes a "hlt"
+instruction.
+</p>
+</div>
+</div>
 </div>
 
 <div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5"><code>kernel_init</code></h2>
+<h2 id="sec-5"><code>setup_arch(&amp;command_line)</code></h2>
+<div class="outline-text-2" id="text-5">
+<p>
+<code>/arch/arm/kernel/setup.c</code>
+</p>
 </div>
 
+<div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1"><code>setup_processor</code></h3>
+<div class="outline-text-3" id="text-5-1">
+<p>
+use <code>processor_id</code> look up the processor type, and do the initials.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2"><code>setup_machine</code></h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+use <code>machine_arch_type</code> look up the machine type, get the <code>struct
+machine_desc *mdesc;</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3">Set memory limits</h3>
+<div class="outline-text-3" id="text-5-3">
+<p>
+Set values for the start of kernel code, end of kernel code, end of
+kernel data, and "<code>_end</code>" (end of kernel code = the "brk" address).
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">init_mm.start_code = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>) &amp;_text;
+init_mm.end_code   = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>) &amp;_etext;
+init_mm.end_data   = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>) &amp;_edata;
+init_mm.brk        = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>) &amp;_end;
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5-4" class="outline-3">
+<h3 id="sec-5-4"><code>parse_cmdline(cmdline_p, from);</code></h3>
+<div class="outline-text-3" id="text-5-4">
+<p>
+parsing of the command line.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-5" class="outline-3">
+<h3 id="sec-5-5"><code>cpu_init();</code></h3>
+<div class="outline-text-3" id="text-5-5">
+<p>
+<code>cpu_init</code> dumps the cache information, initialises SMP specific
+information, and sets up the per-CPU stacks.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-6" class="outline-3">
+<h3 id="sec-5-6">Set up various architecture-specific pointers</h3>
+<div class="outline-text-3" id="text-5-6">
+<div class="org-src-container">
+
+<pre class="src src-c">init_arch_irq = mdesc-&gt;init_irq;
+system_timer = mdesc-&gt;timer;
+init_machine = mdesc-&gt;init_machine;
+</pre>
+</div>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-6" class="outline-2">
-<h2 id="sec-6"><code>Initcalls</code></h2>
+<h2 id="sec-6"><code>kernel_init</code> thread</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+<code>/init/main.c</code>
+</p>
+
+<p>
+The <code>kernel_init</code> thread begins at the <code>kernel_init()</code> function in
+"<code>linux/init/main.c</code>". This is always expected to be process number 1.
+</p>
+
+<ul class="org-ul">
+<li><code>kernel_init()</code> first locks the kernel.
+</li>
+<li>do some smp prepare and initials
+<div class="org-src-container">
+
+<pre class="src src-c">do_pre_smp_initcalls();
+smp_init();
+sched_init_smp();
+cpuset_init_smp();
+</pre>
 </div>
-
-
-
+</li>
+<li>calls <code>do_basic_setup()</code> to perform lots of bus and device
+initialization {more detail below}. After <code>do_basic_setup()</code>, most
+kernel initialization has been completed.
+</li>
+<li><code>init_post();</code> call <code>free_initmem();</code> frees any memory that was
+specified as being for initialization only [marked with "<code>__init</code>",
+"<code>__initdata</code>", "<code>__init_call</code>", or "<code>__initsetup</code>"]
+</li>
+<li>unlocks the kernel (BKL).
+</li>
+<li><code>init_post();</code> next opens /dev/console and duplicates that file
+descriptor two times to create stdin, stdout, and stderr files for
+init and all of its children.
+</li>
+<li>Finally <code>init_post();</code> tries to execute the command specified on the
+kernel parameters command line if there was one, or an init program
+or script if it can find one in {/sbin/init, /etc/init, /bin/init},
+and lastly /bin/sh. If <code>init_post();</code> cannot execute any of these,
+it <code>panics("No init found. Try passing init= option to kernel.")</code>.
+</li>
+</ul>
+</div>
+</div>
 <div id="outline-container-sec-7" class="outline-2">
-<h2 id="sec-7"><code>start_kernel()</code></h2>
+<h2 id="sec-7"><code>do_basic_setup</code></h2>
+<div class="outline-text-2" id="text-7">
+<p>
+The machine is now initialized. None of the devices have been touched
+yet, but the CPU subsystem is up and running, and memory and process
+management works.
+</p>
+
+<ul class="org-ul">
+<li><code>init_workqueues();</code>
+</li>
+<li><code>usermodehelper_init();</code> : <code>khelper_wq =
+  create_singlethread_workqueue("khelper");</code>
+</li>
+<li><code>driver_init();</code>: initial many devices and buses.
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__init</span> driver_init(<span style="color: #98fb98;">void</span>)
+{
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">These are the core pieces </span><span style="color: #ff7f24;">*/</span>
+  devices_init();
+  buses_init();
+  classes_init();
+  firmware_init();
+  hypervisor_init();
+
+  platform_bus_init();
+  system_bus_init();
+  cpu_dev_init();
+  memory_dev_init();
+  attribute_container_init();
+}
+</pre>
 </div>
+</li>
+<li><code>init_irq_proc();</code> : create /proc/irq.
+</li>
+<li><code>do_initcalls();</code>: Call all functions marked as "_<sub>initcall</sub>"
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-7-1" class="outline-3">
+<h3 id="sec-7-1"><code>do_initcalls</code></h3>
+<div class="outline-text-3" id="text-7-1">
+<p>
+<code>/init/main.c</code>, this initializes many functions and some subsystems.
+The function is simple, just a loop call each initcall sub functions:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">for</span> (call = __initcall_start; call &lt; __initcall_end; call++) {
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+
 
 
 <div id="outline-container-sec-8" class="outline-2">
@@ -462,7 +1103,108 @@ SMP相关,ARM架构下只是简单设置了下idle进程:
 </div>
 </div>
 </div>
+<div id="outline-container-sec-8-3" class="outline-3">
+<h3 id="sec-8-3"><code>kernel_init</code></h3>
+<div class="outline-text-3" id="text-8-3">
+<p>
+<code>/init/main.c</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">__init</span> kernel_init(<span style="color: #98fb98;">void</span> * <span style="color: #eedd82;">unused</span>)
+{
+  lock_kernel();
+  set_cpus_allowed(current, CPU_MASK_ALL);
+  init_pid_ns.child_reaper = current;
+
+  __set_special_pids(1, 1);
+  cad_pid = task_pid(current);
+
+  smp_prepare_cpus(max_cpus);
+
+  do_pre_smp_initcalls();
+
+  smp_init();
+  sched_init_smp();
+
+  cpuset_init_smp();
+
+  do_basic_setup();
+
+  <span style="color: #00ffff;">if</span> (!ramdisk_execute_command)
+    ramdisk_execute_command = <span style="color: #ffa07a;">"/init"</span>;
+
+  <span style="color: #00ffff;">if</span> (sys_access((<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">__user</span> *) ramdisk_execute_command, 0) != 0) {
+    ramdisk_execute_command = <span style="color: #7fffd4;">NULL</span>;
+    prepare_namespace();
+  }
+  init_post();
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
+</div>
+</div>
+<div id="outline-container-sec-8-4" class="outline-3">
+<h3 id="sec-8-4"><code>init_post</code></h3>
+<div class="outline-text-3" id="text-8-4">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">noinline</span> init_post(<span style="color: #98fb98;">void</span>)
+{
+  free_initmem();
+  unlock_kernel();
+  mark_rodata_ro();
+  system_state = SYSTEM_RUNNING;
+  numa_default_policy();
+
+  <span style="color: #00ffff;">if</span> (sys_open((<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">__user</span> *) <span style="color: #ffa07a;">"/dev/console"</span>, O_RDWR, 0) &lt; 0)
+    printk(KERN_WARNING <span style="color: #ffa07a;">"Warning: unable to open an initial console.\n"</span>);
+
+  (<span style="color: #98fb98;">void</span>) sys_dup(0);
+  (<span style="color: #98fb98;">void</span>) sys_dup(0);
+
+  <span style="color: #00ffff;">if</span> (ramdisk_execute_command) {
+          run_init_process(ramdisk_execute_command);
+          printk(KERN_WARNING <span style="color: #ffa07a;">"Failed to execute %s\n"</span>,
+                 ramdisk_execute_command);
+  }
+
+  <span style="color: #00ffff;">if</span> (execute_command) {
+    run_init_process(execute_command);
+    printk(KERN_WARNING <span style="color: #ffa07a;">"Failed to execute %s.  Attempting "</span>
+           <span style="color: #ffa07a;">"defaults...\n"</span>, execute_command);
+  }
+  run_init_process(<span style="color: #ffa07a;">"/sbin/init"</span>);
+  run_init_process(<span style="color: #ffa07a;">"/etc/init"</span>);
+  run_init_process(<span style="color: #ffa07a;">"/bin/init"</span>);
+  run_init_process(<span style="color: #ffa07a;">"/bin/sh"</span>);
+
+  panic(<span style="color: #ffa07a;">"No init found.  Try passing init= option to kernel."</span>);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-8-5" class="outline-3">
+<h3 id="sec-8-5"><code>do_basic_setup</code></h3>
+<div class="outline-text-3" id="text-8-5">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__init</span> do_basic_setup(<span style="color: #98fb98;">void</span>)
+{
+  init_workqueues();
+  usermodehelper_init();
+  driver_init();
+  init_irq_proc();
+  do_initcalls();
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+
 <div id="outline-container-sec-9" class="outline-2">
 <h2 id="sec-9">cc</h2>
 <div class="outline-text-2" id="text-9">
@@ -481,7 +1223,7 @@ SMP相关,ARM架构下只是简单设置了下idle进程:
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-01 Sat 23:24</p>
+<p class="date">Created: 2014-11-02 Sun 23:12</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

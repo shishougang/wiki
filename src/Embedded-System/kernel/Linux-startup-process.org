@@ -71,23 +71,306 @@ SMP相关,ARM架构下只是简单设置了下idle进程:
 ** =sched_init();=
 =/kernel/sched.c= 
 
-+ Set the =init_task='s processor ID.
-+ Clear the pidhash table. 
-+ call =init_timervecs()=.
-+ call =init_bh()= to init "bottom half" queues for =timer_bh=,
-  =tqueue_bh=, and =immediate_bh=.
++ set the =struct task_struct init_task = INIT_TASK(init_task);=.
++ init idle thread, =init_idle(current, smp_processor_id());=.
+** Parsing command line options
+=parse_early_param();= parse "eary options", as =parse_args("early
+options", tmp_cmdline, NULL, 0, do_early_param);=
 
+=parse_args=: Parse the kernel options on the command line. This is
+  a simple kernel command line parsing function. It parses the command
+  line and fills in the arguments and environment to init (thread) as
+  appropriate. Any command-line option is taken to be an environment
+  variable if it contains the character '='. It also checks for
+  options meant for the kernel by calling =unknown_bootoption=, and
+  in it call =obsolete_checksetup()= ,hich checks the command line for
+  kernel parameters, these being specified by declaring them using
+  "=__setup=", as in:
+#+begin_src c
+__setup("debug", debug_kernel);
+#+end_src
 
+This declaration causes the =debug_kernel()= function to be called when
+the string "debug" is scanned. See
+"linux/Documentation/kernel-parameters.txt" for the list of kernel
+parameters.
 
+These options are not given to init -- they are for internal kernel
+use only. The default argument list for the init thread is ~{"init",
+NULL}~, with a maximum of 8 command-line arguments. The default
+environment list for the init thread is ~{"HOME=/", "TERM=linux",
+NULL}~, with a maximum of 8 command-line environment variable
+settings.
+** =sort_main_extable();=
+Sort the kernel's built-in exception table.
+** =trap_init();=
+in =/arch/arm/kernel/traps.c=.
+对中断向量表进行初始化,如下:
+
+#+begin_src c
+  unsigned long vectors = CONFIG_VECTORS_BASE;
+  memcpy((void *)vectors, __vectors_start, __vectors_end - __vectors_start);
+  memcpy((void *)vectors + 0x200, __stubs_start, __stubs_end - __stubs_start);
+  memcpy((void *)vectors + 0x1000 - kuser_sz, __kuser_helper_start, kuser_sz);
+#+end_src
+** =init_IRQ();=
+=arch/arm/kernel/irq.c=
+#+begin_src c
+for (irq = 0; irq < NR_IRQS; irq++)
+		irq_desc[irq].status |= IRQ_NOREQUEST | IRQ_NOPROBE;
+#+end_src
+初始化了从中断向量表，不过，这时的中
+断响应程序由于中断控制器的引脚还未被占用，自然是空程序了。当我们确切地
+知道了一个引脚到底连接了什么设备，并知道了该设备的驱动程序后，填写该引
+脚对应的中断门时，中断响应程序的偏移地址才被填写进中断向量表。
+
+#+begin_src 
+// in =setup_arch()=
+init_arch_irq = mdesc->init_irq;
+init_arch_irq();
+#+end_src
+
+Run architecture-specific initial irq.
+** =pidhash_init();=
+The pid hash table is scaled according to the amount of memory in the
+machine.
+** =init_timers();=
+初始化定时器:
+#+begin_src c
+  open_softirq(TIMER_SOFTIRQ, run_timer_softirq, NULL);
+#+end_src
+** =hrtimers_init();=
+初始化高精度时钟.
+** =softirq_init();=
+=kernel/softirq.c=
+打开两个softirq:
+#+begin_src c
+  open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
+  open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
+#+end_src
+** =timekeeping_init();=
+=kernel/time/timekeeping.c=
+ 
+Initializes the clocksource and common timekeeping values.
+** =time_init();=
+=/arch/arm/kernel/time.c=
+
+#+begin_src c
+// setup_arch()
+system_timer = mdesc->timer;
+system_timer->init();
+#+end_src
+以ARM的mach-smdk2410为例,初始化 =timer_startval= , =timer_usec_ticks=
+和安装 =IRQ_TIMER4=.
+
+#+begin_src c
+  static void __init s3c2410_timer_init (void)
+  {
+    s3c2410_timer_setup();
+    setup_irq(IRQ_TIMER4, &s3c2410_timer_irq);
+  }
+#+end_src
+** =console_init();=
+HACK ALERT! This is early. We're enabling the console before we've
+done PCI setups etc., and =console_init()= must be aware of this. But we
+do want output early, in case something goes wrong.
+** =lockdep_info();=
+=CONFIG_LOCKDEP=打开,打印锁依赖信息.
+** =mem_init();=
++ free each online node memory.
++ calculate the real number of pages we have in this system.
+
+ =get_free_pages()= can be used after =mem_init()=.
+
+** =kmem_cache_init();=
+=/mm/slab.c=
+Called after the page allocator have been initialised and before
+=smp_init()=.
+
+1. create the cache_cache.
+2. create the kmalloc caches.
+3. Replace the bootstrap head arrays.
+4. Replace the bootstrap kmem_list3's.
+5. resize the head arrays to their final sizes.
+
+ =kmalloc()= can be used after =kmem_cache_sizes_init()=
+** =calibrate_delay();=
+Calculate the "=loops_per_jiffy=" delay loop value and print it in
+BogoMIPS.
+** some inits
+#+begin_src c
+  pidmap_init();
+  pgtable_cache_init();
+  prio_tree_init();
+  anon_vma_init();
+#+end_src
+** =fork_init(num_physpages);=
+根据物理内存大小计算允许创建进程的数量.
+The default maximum number of threads is set to a safe value: the
+thread structures can take up at most half of memory.
+
+#+begin_src c
+max_threads = mempages / (8 * THREAD_SIZE / PAGE_SIZE);
+#+end_src
+** =proc_caches_init();=
+=kernel/fork.c=
+
+Call =kmem_cache_create()= to create slab caches for =signal_act= (signal
+action), =files_cache= (=files_struct=), =fs_cache= (=fs_struct=),
+=vm_area_struct=, and =mm_struct=.
+** =buffer_init(void)=
+=/fs/buffer.c=
+Call =kmem_cache_create()= to create slab caches for =buffer_head=.
+** =vfs_caches_init(num_physpages);=
+=vfs_caches_init(num_physpages);=
+
++ Call =kmem_cache_create()= to create slab caches for =names_cache=,
+  filp.
++ Call =dcache_init()= to create the =dentry_cache= and
+  =dentry_hashtable=.
+** =signals_init();=
+=/kernel/signal.c=
+
+Call =kmem_cache_create()= to create the "sigqueue" SLAB cache.
+** =proc_root_init();=
+=linux/fs/proc/root.c=
+
+For =CONFIG_PROC_FS= configurations:
+
++ call =proc_misc_init()=.
++ mkdir =/proc/net=.
++ for =CONFIG_SYSVIPC=, mkdir =/proc/sysvipc=.
++ mkdir =/proc/fs=.
++ mkdir =/proc/driver=.
++ call =proc_tty_init()=.
++ mkdir =/proc/bus=.
++ for =CONFIG_SYSCTL=, mkdir =/proc/sys=.
+** =check_bugs();=
+=include/asm-arm/bugs.h=
+ARM仅仅做 =check_writebuffer_bugs()=.
+** =rest_init();=
+Do the rest non-__init'ed, we're now alive 
 * =rest_init=
+** start init thread
+We count on the initial thread going OK.
 
-* =kernel_init=
+Like idlers, init is an unlocked kernel thread, which will make
+syscalls (and thus be locked).
 
-* =Initcalls=
+#+begin_src c
+kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
+#+end_src
+** create kthreadd thread
+#+begin_src c
+pid = kernel_thread(kthreadd, NULL, CLONE_FS | CLONE_FILES);
+#+end_src
+** =unlock_kernel();=
+Release the BKL.
+** =schedule();= and =cpu_idle();=
+This function remains as process number 0. Its purpose is to use up
+idle CPU cycles. If the kernel is configured for APM support or ACPI
+support, =cpu_idle()= invokes the supported power-saving features of
+these specifications. Otherwise it nominally executes a "hlt"
+instruction.
 
+* =setup_arch(&command_line)=
+=/arch/arm/kernel/setup.c=
 
+** =setup_processor=
+use =processor_id= look up the processor type, and do the initials.
 
-* =start_kernel()=
+** =setup_machine=
+use =machine_arch_type= look up the machine type, get the =struct
+machine_desc *mdesc;=.
+
+** Set memory limits
+Set values for the start of kernel code, end of kernel code, end of
+kernel data, and "=_end=" (end of kernel code = the "brk" address).
+#+begin_src c
+  init_mm.start_code = (unsigned long) &_text;
+  init_mm.end_code   = (unsigned long) &_etext;
+  init_mm.end_data   = (unsigned long) &_edata;
+  init_mm.brk        = (unsigned long) &_end;
+#+end_src
+
+** =parse_cmdline(cmdline_p, from);=
+parsing of the command line.
+
+** =cpu_init();=
+=cpu_init= dumps the cache information, initialises SMP specific
+information, and sets up the per-CPU stacks.
+
+** Set up various architecture-specific pointers
+#+begin_src c
+  init_arch_irq = mdesc->init_irq;
+  system_timer = mdesc->timer;
+  init_machine = mdesc->init_machine;
+#+end_src
+* =kernel_init= thread
+=/init/main.c=
+
+The =kernel_init= thread begins at the =kernel_init()= function in
+"=linux/init/main.c=". This is always expected to be process number 1.
+
++ =kernel_init()= first locks the kernel.
++ do some smp prepare and initials
+  #+begin_src c
+    do_pre_smp_initcalls();
+    smp_init();
+    sched_init_smp();
+    cpuset_init_smp();
+  #+end_src
++ calls =do_basic_setup()= to perform lots of bus and device
+  initialization {more detail below}. After =do_basic_setup()=, most
+  kernel initialization has been completed.
++ =init_post();= call =free_initmem();= frees any memory that was
+  specified as being for initialization only [marked with "=__init=",
+  "=__initdata=", "=__init_call=", or "=__initsetup="]
++ unlocks the kernel (BKL).
++ =init_post();= next opens /dev/console and duplicates that file
+  descriptor two times to create stdin, stdout, and stderr files for
+  init and all of its children.
++ Finally =init_post();= tries to execute the command specified on the
+  kernel parameters command line if there was one, or an init program
+  or script if it can find one in {/sbin/init, /etc/init, /bin/init},
+  and lastly /bin/sh. If =init_post();= cannot execute any of these,
+  it ~panics("No init found. Try passing init= option to kernel.")~.
+* =do_basic_setup=
+The machine is now initialized. None of the devices have been touched
+yet, but the CPU subsystem is up and running, and memory and process
+management works.
+
++ =init_workqueues();=
++ =usermodehelper_init();= : =khelper_wq =
+  create_singlethread_workqueue("khelper");=
++ =driver_init();=: initial many devices and buses.
+  #+begin_src c
+    void __init driver_init(void)
+    {
+            /* These are the core pieces */
+      devices_init();
+      buses_init();
+      classes_init();
+      firmware_init();
+      hypervisor_init();
+            
+      platform_bus_init();
+      system_bus_init();
+      cpu_dev_init();
+      memory_dev_init();
+      attribute_container_init();
+    }
+  #+end_src
++ =init_irq_proc();= : create /proc/irq.
++ =do_initcalls();=: Call all functions marked as "__initcall"
+** =do_initcalls=
+=/init/main.c=, this initializes many functions and some subsystems.
+The function is simple, just a loop call each initcall sub functions:
+#+begin_src c
+  for (call = __initcall_start; call < __initcall_end; call++) {
+  }
+#+end_src
+
 
 
 * reference
@@ -198,6 +481,87 @@ void __init setup_arch(char **cmdline_p)
 #endif
 }
 #+end_src
+** =kernel_init=
+=/init/main.c=
+#+begin_src c
+  static int __init kernel_init(void * unused)
+  {
+    lock_kernel();
+    set_cpus_allowed(current, CPU_MASK_ALL);
+    init_pid_ns.child_reaper = current;
+    
+    __set_special_pids(1, 1);
+    cad_pid = task_pid(current);
+    
+    smp_prepare_cpus(max_cpus);
+    
+    do_pre_smp_initcalls();
+    
+    smp_init();
+    sched_init_smp();
+
+    cpuset_init_smp();
+
+    do_basic_setup();
+
+    if (!ramdisk_execute_command)
+      ramdisk_execute_command = "/init";
+    
+    if (sys_access((const char __user *) ramdisk_execute_command, 0) != 0) {
+      ramdisk_execute_command = NULL;
+      prepare_namespace();
+    }
+    init_post();
+    return 0;
+  }
+#+end_src
+** =init_post=
+#+begin_src c
+  static int noinline init_post(void)
+  {
+    free_initmem();
+    unlock_kernel();
+    mark_rodata_ro();
+    system_state = SYSTEM_RUNNING;
+    numa_default_policy();
+
+    if (sys_open((const char __user *) "/dev/console", O_RDWR, 0) < 0)
+      printk(KERN_WARNING "Warning: unable to open an initial console.\n");
+    
+    (void) sys_dup(0);
+    (void) sys_dup(0);
+    
+    if (ramdisk_execute_command) {
+            run_init_process(ramdisk_execute_command);
+            printk(KERN_WARNING "Failed to execute %s\n",
+                   ramdisk_execute_command);
+    }
+
+    if (execute_command) {
+      run_init_process(execute_command);
+      printk(KERN_WARNING "Failed to execute %s.  Attempting "
+             "defaults...\n", execute_command);
+    }
+    run_init_process("/sbin/init");
+    run_init_process("/etc/init");
+    run_init_process("/bin/init");
+    run_init_process("/bin/sh");
+    
+    panic("No init found.  Try passing init= option to kernel.");
+  }
+#+end_src
+** =do_basic_setup=
+#+begin_src c
+  static void __init do_basic_setup(void)
+  {
+    init_workqueues();
+    usermodehelper_init();
+    driver_init();
+    init_irq_proc();
+    do_initcalls();
+  }
+#+end_src
+
 * cc
 
 #+begin_src c
