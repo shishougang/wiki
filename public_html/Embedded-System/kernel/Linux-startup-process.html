@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Linux startup process</title>
-<!-- 2014-11-02 Sun 23:12 -->
+<!-- 2014-11-03 Mon 20:43 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -972,9 +972,104 @@ The function is simple, just a loop call each initcall sub functions:
 </pre>
 </div>
 </div>
+<ul class="org-ul"><li><a id="sec-7-1-1" name="sec-7-1-1"></a><code>__initcall_start</code> and <code>__initcall_end</code><br  /><div class="outline-text-4" id="text-7-1-1">
+<p>
+They are in <code>init</code> section, in arch/xxx/kernel/vmlinux.lds.S:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"> SECTIONS
+ {
+.init : {                       <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Init code and data           </span><span style="color: #ff7f24;">*/</span>
+     __initcall_start = .;
+     <span style="color: #98fb98;">INITCALLS</span>
+         <span style="color: #eedd82;">__initcall_end</span> = .;
+   }
+ }
+</pre>
 </div>
+</div>
+</li>
+<li><a id="sec-7-1-2" name="sec-7-1-2"></a>INITCALLS<br  /><div class="outline-text-4" id="text-7-1-2">
+<p>
+It is defined in include/asm-generic/vmlinux.lds.h:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">INITCALLS</span>                                                       \
+        *(.initcall0.init)                                              \
+        *(.initcall0s.init)                                             \
+        *(.initcall1.init)                                              \
+        *(.initcall1s.init)                                             \
+        *(.initcall2.init)                                              \
+        *(.initcall2s.init)                                             \
+        *(.initcall3.init)                                              \
+        *(.initcall3s.init)                                             \
+        *(.initcall4.init)                                              \
+        *(.initcall4s.init)                                             \
+        *(.initcall5.init)                                              \
+        *(.initcall5s.init)                                             \
+        *(.initcallrootfs.init)                                         \
+        *(.initcall6.init)                                              \
+        *(.initcall6s.init)                                             \
+        *(.initcall7.init)                                              \
+        *(.initcall7s.init)
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-7-1-3" name="sec-7-1-3"></a>initcall<br  /><div class="outline-text-4" id="text-7-1-3">
+<p>
+Linux内核代码中有很多初始化标志 <code>arch_initcall(fn)</code>,
+<code>device_initcall(fn)</code> 等,它们的定义在include/linux/init.h中:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">pure_initcall</span>(<span style="color: #eedd82;">fn</span>)               __define_initcall(<span style="color: #ffa07a;">"0"</span>,fn,0)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">core_initcall</span>(<span style="color: #eedd82;">fn</span>)               __define_initcall(<span style="color: #ffa07a;">"1"</span>,fn,1)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">core_initcall_sync</span>(<span style="color: #eedd82;">fn</span>)          __define_initcall(<span style="color: #ffa07a;">"1s"</span>,fn,1s)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">postcore_initcall</span>(<span style="color: #eedd82;">fn</span>)           __define_initcall(<span style="color: #ffa07a;">"2"</span>,fn,2)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">postcore_initcall_sync</span>(<span style="color: #eedd82;">fn</span>)      __define_initcall(<span style="color: #ffa07a;">"2s"</span>,fn,2s)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">arch_initcall</span>(<span style="color: #eedd82;">fn</span>)               __define_initcall(<span style="color: #ffa07a;">"3"</span>,fn,3)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">arch_initcall_sync</span>(<span style="color: #eedd82;">fn</span>)          __define_initcall(<span style="color: #ffa07a;">"3s"</span>,fn,3s)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">subsys_initcall</span>(<span style="color: #eedd82;">fn</span>)             __define_initcall(<span style="color: #ffa07a;">"4"</span>,fn,4)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">subsys_initcall_sync</span>(<span style="color: #eedd82;">fn</span>)        __define_initcall(<span style="color: #ffa07a;">"4s"</span>,fn,4s)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">fs_initcall</span>(<span style="color: #eedd82;">fn</span>)                 __define_initcall(<span style="color: #ffa07a;">"5"</span>,fn,5)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">fs_initcall_sync</span>(<span style="color: #eedd82;">fn</span>)            __define_initcall(<span style="color: #ffa07a;">"5s"</span>,fn,5s)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">rootfs_initcall</span>(<span style="color: #eedd82;">fn</span>)             __define_initcall(<span style="color: #ffa07a;">"rootfs"</span>,fn,rootfs)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">device_initcall</span>(<span style="color: #eedd82;">fn</span>)             __define_initcall(<span style="color: #ffa07a;">"6"</span>,fn,6)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">device_initcall_sync</span>(<span style="color: #eedd82;">fn</span>)        __define_initcall(<span style="color: #ffa07a;">"6s"</span>,fn,6s)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">late_initcall</span>(<span style="color: #eedd82;">fn</span>)               __define_initcall(<span style="color: #ffa07a;">"7"</span>,fn,7)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">late_initcall_sync</span>(<span style="color: #eedd82;">fn</span>)          __define_initcall(<span style="color: #ffa07a;">"7s"</span>,fn,7s)
+</pre>
 </div>
 
+<p>
+<code>__define_initcall</code> 是个宏,如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__define_initcall</span>(<span style="color: #eedd82;">level</span>,<span style="color: #eedd82;">fn</span>,<span style="color: #eedd82;">id</span>) \
+        <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">initcall_t</span> <span style="color: #87cefa;">__initcall_</span>##fn##id __attribute_used__ \
+        <span style="color: #00ffff;">__attribute__</span>((__section__(<span style="color: #ffa07a;">".initcall"</span> level <span style="color: #ffa07a;">".init"</span>))) = fn
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">int</span> (*<span style="color: #98fb98;">initcall_t</span>)(<span style="color: #98fb98;">void</span>);
+</pre>
+</div>
+<ul class="org-ul">
+<li><code>initcall</code> 是函数指针,所以定义了名为 <code>__initcall_##fn##id</code> 的函数指针.
+</li>
+
+<li>函数指针指向函数fn.
+</li>
+<li><code>__attribute__((__section__(".initcall" level ".init"))</code> 表示编译的时候把这个函数指针变量放置到名为 <code>(".initcall" level ".init")</code> 的
+section中.
+</li>
+</ul>
+</div>
+</li></ul>
+</div>
+</div>
 
 
 <div id="outline-container-sec-8" class="outline-2">
@@ -1212,18 +1307,12 @@ The function is simple, just a loop call each initcall sub functions:
 
 <pre class="src src-c"></pre>
 </div>
-
-
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
-</div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-02 Sun 23:12</p>
+<p class="date">Created: 2014-11-03 Mon 20:43</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
