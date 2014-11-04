@@ -1,10 +1,7 @@
 #+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
-#+TITLE: sk_buff结构解析
+#+TITLE: socket buffer结构解析
 #+OPTIONS: num:nil H:2
 
-http://blog.csdn.net/ivan_/article/details/6998505
-
-http://blog.sina.com.cn/s/blog_4826456d0100ohlw.html
 
 * socket buffer
 当网络包被内核分析时,底层协议的数据被传送更高层.当数据传送时过程反过来.由
@@ -64,15 +61,58 @@ http://blog.sina.com.cn/s/blog_4826456d0100ohlw.html
     };
 #+end_src
 
+* Using Socket Buffers
+Socket buffers 由许多指针链接而成,如下图.图中假设32位系统,在64位机器上
+socket buffer的结构稍微有点不同.
+[[./Files/link-socket-buff.jpeg]]
 
+socket buffer的基本理念是通过操作不同的指针来添加或取出协议的头部.
++ head和end指向数据缓存区域的start和end.
++ data和tail指向实际协议数据区域的start和end.
++ =mac_header= 指向MAC头的start, =network_header= 和
+  =transport_header= 分别指向network和transport层的数据头.在32位的系统
+  中,用来定义上面变量的数据类型 =sk_buff_data_t= 仅仅是一个简单的指针:
+  #+begin_src c
+    //<skbuff.h>
+    typedef unsigned char *sk_buff_data_t;
+  #+end_src
+  使得kernel对于不同的协议类型都能使用socket buffer.简单的类型转换对于
+  正确解析数据是必要的.比如一个socket buffer包含TCP包,TCP头如何从这个
+  socket buffer获得:
+  #+begin_src c
+    //<tcp.h>
+    static inline struct tcphdr *tcp_hdr(const struct sk_buff *skb)
+    {
+      return (struct tcphdr *)skb_transport_header(skb);
+    }
+  #+end_src
+  其他类似的转换的函数以 =xxx_hdr= 形式.
+
+因为对于网络层来说,低内存占用和高处理速度是必要的,所以对于 =struct
+sk_buff= 来说,希望这个结构尽可能的小.在64位系统中,使用小技巧来节省一
+些空间. =sk_buff_data_t= 定义变成一个整型变量:
+#+begin_src c
+  //<skbuff.h>
+  typedef unsigned int sk_buff_data_t;
+#+end_src
+因为整型只需要指针内存的一半(4取代8字节)在一些系统架构上,那么这个结
+  构节省20字节.data和head仍然是普通指针,其他 =sk_buff_data_t= 元素现在
+  被解析成相对这些指针的偏移量.指向transport头的起始指针现在如下计算:
+#+begin_src c
+  static inline unsigned char *skb_transport_header(const struct sk_buff *skb)
+  {
+    return skb->head + skb->transport_header;
+  }
+#+end_src
+用这个方法是可行的,因为4字节足够表示4G的内存空间,而一个socket buffer永
+远不会超过这个大小.
+
+data和tail
 
 
 * cc
-#+begin_src python
 
-#+end_src
-
-#+begin_src c++
+#+begin_src c
 
 #+end_src
 
