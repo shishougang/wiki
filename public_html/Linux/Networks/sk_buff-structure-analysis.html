@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>socket buffer结构解析</title>
-<!-- 2014-11-04 Tue 23:03 -->
+<!-- 2014-11-05 Wed 23:21 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -144,8 +144,26 @@ for the JavaScript code in this tag.
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">socket buffer</a></li>
-<li><a href="#sec-2">Using Socket Buffers</a></li>
-<li><a href="#sec-3">cc</a></li>
+<li><a href="#sec-2">Using Socket Buffers</a>
+<ul>
+<li><a href="#sec-2-1">Operations on socket buffers</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">Management Data of Socket Buffers</a>
+<ul>
+<li><a href="#sec-3-1"><code>dev</code></a></li>
+<li><a href="#sec-3-2"><code>h</code> , <code>nh</code> and <code>mac</code></a></li>
+<li><a href="#sec-3-3"><code>cloned</code></a></li>
+<li><a href="#sec-3-4"><code>pkt_type</code></a></li>
+<li><a href="#sec-3-5"><code>protocol</code></a></li>
+</ul>
+</li>
+<li><a href="#sec-4">reference</a>
+<ul>
+<li><a href="#sec-4-1"><code>__alloc_skb</code></a></li>
+</ul>
+</li>
+<li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
 </div>
@@ -284,15 +302,275 @@ sk_buff</code> 来说,希望这个结构尽可能的小.在64位系统中,使用
 </p>
 
 <p>
-data和tail
+data和tail使得数据在不同协议层间传递不用显示的拷贝操作,如下图.显示包如何处理.
 </p>
+
+<p>
+当一个新包产生,TCP 层先在用户空间分配内存来存储包的数据(包括头和负载).比数据更多的足够的空间被预留使得底层能加入更多的头部数据.head和end指向预留空间的start和end,而TCP 数据在data和tail之间.
+</p>
+
+<p>
+当socket buffer传递到IP 层,新的协议头要加入其中,其他指针不变,除了data
+现在指向IP 头的起始处.同样的操作被之后的下层协议重复,直到完成的包被发送往网络.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/manipulation-socket-buffer.jpeg" alt="manipulation-socket-buffer.jpeg" />
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Operations on socket buffers</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+看 <code>include/linux/skbuff.h</code> 中ocket buffer的一些常用的操作:
+</p>
+</div>
+<ul class="org-ul"><li><a id="sec-2-1-1" name="sec-2-1-1"></a>allocate <code>sk_buff</code><br  /><div class="outline-text-4" id="text-2-1-1">
+<p>
+<code>sk_buff</code> 有两部分组成: <code>sk_buff</code> (<code>skb_buff</code> 本身描述符 和 其中data内从空间) 和 <code>skb_share_info</code>.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/skb-buff.png" alt="skb-buff.png" />
+</p>
+</div>
+
+<p>
+<code>alloc_skb</code> 调用了一个内部函数 <code>__alloc_skb</code> (详见<a href="#alloc_skb"><code>__alloc_skb</code></a>). 并且:
+</p>
+<ul class="org-ul">
+<li>fclone=0 : 不从fclone cache分配skb的头, 从head cache中.
+</li>
+<li>node=-1: NUMA不使用.
+</li>
+</ul>
+
+<p>
+分配过程主要分为:
+</p>
+<ol class="org-ol">
+<li>从cache中分配skb的本身描述符.
+</li>
+<li>优化对cache的对齐,对数据大小做algin操作: <code>size =
+   SKB_DATA_ALIGN(size);</code> .
+</li>
+<li>分配data内存,包括size和 <code>skb_shared_info</code> 大小: <code>data = kmalloc_node_track_caller(size + sizeof(struct skb_shared_info),
+   gfp_mask, node);</code>
+</li>
+<li>对skb字段做一些初始化,其中 <code>skb-&gt;truesize = size + sizeof(struct
+   sk_buff);</code> 是总的大小.
+</li>
+<li>最后对 <code>skb_shared_info</code> 做一些初始化.
+</li>
+</ol>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #87cefa;">alloc_skb</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>,
+                                        <span style="color: #98fb98;">gfp_t</span> <span style="color: #eedd82;">priority</span>)
+{
+  <span style="color: #00ffff;">return</span> __alloc_skb(size, priority, 0, -1);
+}
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">example</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skbn</span>;
+<span style="color: #00ffff;">if</span> ((skbn = alloc_skb(len, GFP_ATOMIC)) == <span style="color: #7fffd4;">NULL</span>)
+  <span style="color: #00ffff;">return</span>;
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="sec-2-1-2" name="sec-2-1-2"></a>free <code>sk_buff</code><br  /><div class="outline-text-4" id="text-2-1-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">kfree_skb</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+  <span style="color: #00ffff;">if</span> (unlikely(!skb))
+    <span style="color: #00ffff;">return</span>;
+  <span style="color: #00ffff;">if</span> (likely(atomic_read(&amp;skb-&gt;users) == 1))
+    smp_rmb();
+  <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (likely(!atomic_dec_and_test(&amp;skb-&gt;users)))
+    <span style="color: #00ffff;">return</span>;
+  __kfree_skb(skb);
+}
+</pre>
+</div>
+<p>
+稍微分析一下:
+</p>
+<ol class="org-ol">
+<li>若skb是NULL,直接返回.
+</li>
+<li>如果 <code>skb-&gt;users = 1</code>, 那么说明没有其他代码在使用它,需要free,
+<code>smp_rmb();</code> 是一个memory barrier, 防止内存乱序执行,防止的是多线程释放的情况,更多内容见<a href="http://dreamrunner.org/blog/2014/06/28/qian-tan-memory-reordering/">浅谈Memory Reordering</a>.
+</li>
+<li><code>atomic_dec_and_test(&amp;skb-&gt;users)</code> 减1后再次判断引用是否为0,上面已经判断不是1了,这里是否必要再次判断?是需要的, <code>if</code> 和 <code>else
+   if</code> 间不是原子操作,其他进程在这之间可以插入free这个skb.所以原子减后需要再次判断是否能free.
+</li>
+</ol>
+</div>
+</li>
+
+<li><a id="sec-2-1-3" name="sec-2-1-3"></a>copy of <code>sk_buff</code><br  /></li>
+
+<li><a id="sec-2-1-4" name="sec-2-1-4"></a>clone of <code>sk_buff</code><br  /></li>
+
+<li><a id="sec-2-1-5" name="sec-2-1-5"></a><code>skb_tailroom</code><br  /></li>
+
+<li><a id="sec-2-1-6" name="sec-2-1-6"></a><code>skb_headroom</code><br  /></li>
+
+<li><a id="sec-2-1-7" name="sec-2-1-7"></a><code>skb_realloc_headroom</code><br  /></li>
+
+<li><a id="sec-2-1-8" name="sec-2-1-8"></a><code>skb_reserve</code><br  /></li>
+
+<li><a id="sec-2-1-9" name="sec-2-1-9"></a>transport/network/mac operation<br  /></li></ul>
 </div>
 </div>
 
 
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">cc</h2>
+<h2 id="sec-3">Management Data of Socket Buffers</h2>
 <div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1"><code>dev</code></h3>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2"><code>h</code> , <code>nh</code> and <code>mac</code></h3>
+</div>
+
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3"><code>cloned</code></h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+当被设置时，表示这个结构是另一个sk<sub>buff的克隆</sub>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4"><code>pkt_type</code></h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+这个变量表示帧的类型，分类是由L2的目的地址来决定的。这个值在网卡驱动程序中由函数eth<sub>type</sub><sub>trans通过判断目的以太网地址来确定。如果</sub> 目的地址是
+FF:FF:FF:FF:FF:FF，则为广播地址，pkt<sub>type</sub> = PACKET<sub>BROADCAST；如果最高</sub>
+位为1,则为组播地址，pkt<sub>type</sub> = PACKET<sub>MULTICAST；如果目的mac地址跟本机</sub>
+mac地址不相等，则不是发给本机的数据报，pkt<sub>type</sub> = PACKET<sub>OTHERHOST；否</sub>
+则就是缺省值PACKET<sub>HOST。</sub>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3-5" class="outline-3">
+<h3 id="sec-3-5"><code>protocol</code></h3>
+<div class="outline-text-3" id="text-3-5">
+<p>
+这个变量是高层协议从二层设备的角度所看到的协议。典型的协议包括IP，IPV6
+和ARP。完整的列表在 include/linux/if<sub>ether</sub>.h中。由于每个协议都有自己的协议处理函数来处理接收到的包，因此，这个域被设备驱动用于通知上层调用哪个协议处理函数。每个网络驱动都调用netif<sub>rx来通知上层网络协议的协议处理</sub>
+函数，因此protocol变量必须在这些协议处理函数调用之前初始化。
+</p>
+
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_HOST</span>         0      
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_BROADCAST</span>    1      
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_MULTICAST</span>    2      
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_OTHERHOST</span>    3      
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_OUTGOING</span>     4
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">reference</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1"><code>__alloc_skb</code></h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+<a id="alloc_skb" name="alloc_skb"></a>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> *      __alloc_skb     -       allocate a network buffer</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@size</span><span style="color: #ffa07a;">: size to allocate</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@gfp_mask</span><span style="color: #ffa07a;">: allocation mask</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@fclone</span><span style="color: #ffa07a;">: allocate from fclone cache instead of head cache</span>
+<span style="color: #ffa07a;"> *              and allocate a cloned (child) skb</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@node</span><span style="color: #ffa07a;">: numa node to allocate memory on</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #87cefa;">__alloc_skb</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>, <span style="color: #98fb98;">gfp_t</span> <span style="color: #eedd82;">gfp_mask</span>,
+                            <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">fclone</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">node</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kmem_cache</span> *<span style="color: #eedd82;">cache</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">skb_shared_info</span> *<span style="color: #eedd82;">shinfo</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>;
+        <span style="color: #98fb98;">u8</span> *<span style="color: #eedd82;">data</span>;
+
+        cache = fclone ? skbuff_fclone_cache : skbuff_head_cache;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Get the HEAD </span><span style="color: #ff7f24;">*/</span>
+        skb = kmem_cache_alloc_node(cache, gfp_mask &amp; ~__GFP_DMA, node);
+        <span style="color: #00ffff;">if</span> (!skb)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+
+        size = SKB_DATA_ALIGN(size);
+        data = kmalloc_node_track_caller(size + <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">skb_shared_info</span>),
+                        gfp_mask, node);
+        <span style="color: #00ffff;">if</span> (!data)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">nodata</span>;
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * See comment in sk_buff definition, just before the 'tail' member</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        memset(skb, 0, offsetof(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span>, tail));
+        skb-&gt;truesize = size + <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span>);
+        atomic_set(&amp;skb-&gt;users, 1);
+        skb-&gt;head = data;
+        skb-&gt;data = data;
+        skb_reset_tail_pointer(skb);
+        skb-&gt;end = skb-&gt;tail + size;
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">make sure we initialize shinfo sequentially </span><span style="color: #ff7f24;">*/</span>
+        shinfo = skb_shinfo(skb);
+        atomic_set(&amp;shinfo-&gt;dataref, 1);
+        shinfo-&gt;nr_frags  = 0;
+        shinfo-&gt;gso_size = 0;
+        shinfo-&gt;gso_segs = 0;
+        shinfo-&gt;gso_type = 0;
+        shinfo-&gt;ip6_frag_id = 0;
+        shinfo-&gt;frag_list = <span style="color: #7fffd4;">NULL</span>;
+
+        <span style="color: #00ffff;">if</span> (fclone) {
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">child</span> = skb + 1;
+                <span style="color: #98fb98;">atomic_t</span> *<span style="color: #eedd82;">fclone_ref</span> = (<span style="color: #98fb98;">atomic_t</span> *) (child + 1);
+
+                skb-&gt;fclone = SKB_FCLONE_ORIG;
+                atomic_set(fclone_ref, 1);
+
+                child-&gt;fclone = SKB_FCLONE_UNAVAILABLE;
+        }
+<span style="color: #7fffd4;">out</span>:
+        <span style="color: #00ffff;">return</span> skb;
+<span style="color: #7fffd4;">nodata</span>:
+        kmem_cache_free(cache, skb);
+        skb = <span style="color: #7fffd4;">NULL</span>;
+        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">cc</h2>
+<div class="outline-text-2" id="text-5">
 <div class="org-src-container">
 
 <pre class="src src-c"></pre>
@@ -308,7 +586,7 @@ data和tail
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-04 Tue 23:03</p>
+<p class="date">Created: 2014-11-05 Wed 23:21</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

@@ -107,9 +107,194 @@ sk_buff= 来说,希望这个结构尽可能的小.在64位系统中,使用小技
 用这个方法是可行的,因为4字节足够表示4G的内存空间,而一个socket buffer永
 远不会超过这个大小.
 
-data和tail
+data和tail使得数据在不同协议层间传递不用显示的拷贝操作,如下图.显示包如
+何处理.
+
+当一个新包产生,TCP 层先在用户空间分配内存来存储包的数据(包括头和负载).比
+数据更多的足够的空间被预留使得底层能加入更多的头部数据.head和end指向预
+留空间的start和end,而TCP 数据在data和tail之间.
+
+当socket buffer传递到IP 层,新的协议头要加入其中,其他指针不变,除了data
+现在指向IP 头的起始处.同样的操作被之后的下层协议重复,直到完成的包被发
+送往网络.
+
+[[./Files/manipulation-socket-buffer.jpeg]]
+
+** Operations on socket buffers
+看 =include/linux/skbuff.h= 中ocket buffer的一些常用的操作:
+*** allocate =sk_buff=
+=sk_buff= 有两部分组成: =sk_buff= (=skb_buff= 本身描述符 和 其中data内
+从空间) 和 =skb_share_info=.
+
+[[./Files/skb-buff.png]]
+
+=alloc_skb= 调用了一个内部函数 =__alloc_skb= (详见[[alloc_skb][=__alloc_skb=]]). 并
+且:
++ fclone=0 : 不从fclone cache分配skb的头, 从head cache中.
++ node=-1: NUMA不使用.
+
+分配过程主要分为:
+1. 从cache中分配skb的本身描述符.
+2. 优化对cache的对齐,对数据大小做algin操作: =size =
+   SKB_DATA_ALIGN(size);= .
+3. 分配data内存,包括size和 =skb_shared_info= 大小: ~data = kmalloc_node_track_caller(size + sizeof(struct skb_shared_info),
+   gfp_mask, node);~
+4. 对skb字段做一些初始化,其中 =skb->truesize = size + sizeof(struct
+   sk_buff);= 是总的大小.
+6. 最后对 =skb_shared_info= 做一些初始化.
+
+#+begin_src c
+  static inline struct sk_buff *alloc_skb(unsigned int size,
+                                          gfp_t priority)
+  {
+    return __alloc_skb(size, priority, 0, -1);
+  }
+  // example
+  struct sk_buff *skbn;
+  if ((skbn = alloc_skb(len, GFP_ATOMIC)) == NULL)
+    return;
+#+end_src
+
+*** free =sk_buff=
+#+begin_src c
+  void kfree_skb(struct sk_buff *skb)
+  {
+    if (unlikely(!skb))
+      return;
+    if (likely(atomic_read(&skb->users) == 1))
+      smp_rmb();
+    else if (likely(!atomic_dec_and_test(&skb->users)))
+      return;
+    __kfree_skb(skb);
+  }
+#+end_src
+稍微分析一下:
+1. 若skb是NULL,直接返回.
+2. 如果 =skb->users = 1=, 那么说明没有其他代码在使用它,需要free,
+   =smp_rmb();= 是一个memory barrier, 防止内存乱序执行,防止的是多线程
+   释放的情况,更多内容见[[http://dreamrunner.org/blog/2014/06/28/qian-tan-memory-reordering/][浅谈Memory Reordering]].
+3. =atomic_dec_and_test(&skb->users)= 减1后再次判断引用是否为0,上面已
+   经判断不是1了,这里是否必要再次判断?是需要的, =if= 和 =else
+   if= 间不是原子操作,其他进程在这之间可以插入free这个skb.所以原子减后
+   需要再次判断是否能free.
+
+*** copy of =sk_buff=
+
+*** clone of =sk_buff=
+
+*** =skb_tailroom=
+
+*** =skb_headroom=
+
+*** =skb_realloc_headroom=
+
+*** =skb_reserve=
+
+*** transport/network/mac operation
 
 
+* Management Data of Socket Buffers
+
+** =dev=
+
+** =h= , =nh= and =mac=
+
+** =cloned=
+当被设置时，表示这个结构是另一个sk_buff的克隆
+
+** =pkt_type=
+这个变量表示帧的类型，分类是由L2的目的地址来决定的。这个值在网卡驱动程
+序中由函数eth_type_trans通过判断目的以太网地址来确定。如果 目的地址是
+FF:FF:FF:FF:FF:FF，则为广播地址，pkt_type = PACKET_BROADCAST；如果最高
+位为1,则为组播地址，pkt_type = PACKET_MULTICAST；如果目的mac地址跟本机
+mac地址不相等，则不是发给本机的数据报，pkt_type = PACKET_OTHERHOST；否
+则就是缺省值PACKET_HOST。
+
+** =protocol=
+这个变量是高层协议从二层设备的角度所看到的协议。典型的协议包括IP，IPV6
+和ARP。完整的列表在 include/linux/if_ether.h中。由于每个协议都有自己的
+协议处理函数来处理接收到的包，因此，这个域被设备驱动用于通知上层调用哪
+个协议处理函数。每个网络驱动都调用netif_rx来通知上层网络协议的协议处理
+函数，因此protocol变量必须在这些协议处理函数调用之前初始化。
+
+
+#+begin_src c
+#define PACKET_HOST         0      
+#define PACKET_BROADCAST    1      
+#define PACKET_MULTICAST    2      
+#define PACKET_OTHERHOST    3      
+#define PACKET_OUTGOING     4    
+#+end_src
+* reference
+** =__alloc_skb=
+<<alloc_skb>>
+#+begin_src c
+/**
+ *	__alloc_skb	-	allocate a network buffer
+ *	@size: size to allocate
+ *	@gfp_mask: allocation mask
+ *	@fclone: allocate from fclone cache instead of head cache
+ *		and allocate a cloned (child) skb
+ *	@node: numa node to allocate memory on
+ */
+struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
+			    int fclone, int node)
+{
+	struct kmem_cache *cache;
+	struct skb_shared_info *shinfo;
+	struct sk_buff *skb;
+	u8 *data;
+
+	cache = fclone ? skbuff_fclone_cache : skbuff_head_cache;
+
+	/* Get the HEAD */
+	skb = kmem_cache_alloc_node(cache, gfp_mask & ~__GFP_DMA, node);
+	if (!skb)
+		goto out;
+
+	size = SKB_DATA_ALIGN(size);
+	data = kmalloc_node_track_caller(size + sizeof(struct skb_shared_info),
+			gfp_mask, node);
+	if (!data)
+		goto nodata;
+
+	/*
+	 * See comment in sk_buff definition, just before the 'tail' member
+	 */
+	memset(skb, 0, offsetof(struct sk_buff, tail));
+	skb->truesize = size + sizeof(struct sk_buff);
+	atomic_set(&skb->users, 1);
+	skb->head = data;
+	skb->data = data;
+	skb_reset_tail_pointer(skb);
+	skb->end = skb->tail + size;
+	/* make sure we initialize shinfo sequentially */
+	shinfo = skb_shinfo(skb);
+	atomic_set(&shinfo->dataref, 1);
+	shinfo->nr_frags  = 0;
+	shinfo->gso_size = 0;
+	shinfo->gso_segs = 0;
+	shinfo->gso_type = 0;
+	shinfo->ip6_frag_id = 0;
+	shinfo->frag_list = NULL;
+
+	if (fclone) {
+		struct sk_buff *child = skb + 1;
+		atomic_t *fclone_ref = (atomic_t *) (child + 1);
+
+		skb->fclone = SKB_FCLONE_ORIG;
+		atomic_set(fclone_ref, 1);
+
+		child->fclone = SKB_FCLONE_UNAVAILABLE;
+	}
+out:
+	return skb;
+nodata:
+	kmem_cache_free(cache, skb);
+	skb = NULL;
+	goto out;
+}
+#+end_src
 * cc
 
 #+begin_src c
