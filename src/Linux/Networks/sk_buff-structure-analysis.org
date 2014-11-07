@@ -178,15 +178,143 @@ data和tail使得数据在不同协议层间传递不用显示的拷贝操作,�
    if= 间不是原子操作,其他进程在这之间可以插入free这个skb.所以原子减后
    需要再次判断是否能free.
 
+在[[kfree_skb][ ~__kfree_skb(skb);~ ]]中release data时会判断 =!skb->cloned= 不是clone
+的才会释放data空间.
+
 *** copy of =sk_buff=
+#+begin_src c
+struct sk_buff *skb_copy(const struct sk_buff *skb, gfp_t gfp_mask)
+{
+	int headerlen = skb->data - skb->head;
+	/*
+	 *	Allocate the copy buffer
+	 */
+	struct sk_buff *n;
+#ifdef NET_SKBUFF_DATA_USES_OFFSET
+	n = alloc_skb(skb->end + skb->data_len, gfp_mask);
+#else
+	n = alloc_skb(skb->end - skb->head + skb->data_len, gfp_mask);
+#endif
+	if (!n)
+		return NULL;
 
+	/* Set the data pointer */
+	skb_reserve(n, headerlen);
+	/* Set the tail pointer and length */
+	skb_put(n, skb->len);
+
+	if (skb_copy_bits(skb, -headerlen, n->head, headerlen + skb->len))
+		BUG();
+
+	copy_skb_header(n, skb);
+	return n;
+}
+#+end_src
+
+拷贝整个 =skb_buff= 结构,包括描述符和数据缓存区.
+#+begin_src c
+//example
+struct sk_buff *skbn = skb_copy(skb, GFP_ATOMIC);
+#+end_src
 *** clone of =sk_buff=
+#+begin_src c
+struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
+{
+	struct sk_buff *n;
 
-*** =skb_tailroom=
+	n = skb + 1;
+	if (skb->fclone == SKB_FCLONE_ORIG &&
+	    n->fclone == SKB_FCLONE_UNAVAILABLE) {
+		atomic_t *fclone_ref = (atomic_t *) (n + 1);
+		n->fclone = SKB_FCLONE_CLONE;
+		atomic_inc(fclone_ref);
+	} else {
+		n = kmem_cache_alloc(skbuff_head_cache, gfp_mask);
+		if (!n)
+			return NULL;
+		n->fclone = SKB_FCLONE_UNAVAILABLE;
+	}
 
-*** =skb_headroom=
+	return __skb_clone(n, skb);
+}
+#+end_src
 
+clone和copy不一样,只生成新的 =sk_buff= 的描述符结构,数据缓存区直接指向
+旧的,基本步骤:
+1. 分配新的 =sk_buff= 结构体.
+2. 拷贝结构体内容.
+3. =atomic_set(&n->users, 1);= :has a reference count of 1.
+4. =skb->cloned = 1;= :设置clone位.
+
+*** =skb_put=
+#+begin_src c
+  static inline unsigned char *skb_put(struct sk_buff *skb, unsigned int len)
+  {
+    unsigned char *tmp = skb_tail_pointer(skb);
+    SKB_LINEAR_ASSERT(skb);
+    skb->tail += len;
+    skb->len  += len;
+    if (unlikely(skb->tail > skb->end))
+      skb_over_panic(skb, len, current_text_addr());
+    return tmp;
+  }
+#+end_src
+
+扩展被使用的data区域.并返回准备存储data的起始位置的指针.
+ *example:* 从ipbuf中拷贝16字节到 skb 中 data 的末尾处.
+#+begin_src c
+//example
+memcpy(skb_put(skb,16),ipbuf,16);
+#+end_src
+*** =skb_tailroom= and  =skb_headroom=
+#+begin_src c
+    /**
+     ,*      skb_tailroom - bytes at buffer end
+     ,*/
+    static inline int skb_tailroom(const struct sk_buff *skb)
+    {
+      return skb_is_nonlinear(skb) ? 0 : skb->end - skb->tail;
+    }
+    static inline int skb_is_nonlinear(const struct sk_buff *skb)
+    {
+      return skb->data_len;
+    }
+  /**
+   *      skb_headroom - bytes at buffer head
+  */
+  static inline unsigned int skb_headroom(const struct sk_buff *skb)
+  {
+          return skb->data - skb->head;
+  }
+#+end_src
++ =skb_headroom= 返回data缓存区前部分的空闲大小.
++ =skb_tailroom= 而返回data缓存区后部分空闲大小.
+
+=skb->data_len= 是分片内存中数据长度,通过它来判断skb的数据缓存区是否线
+程,不是线性,skb 尾部空的内存大小为0, 若线性的, 尾部空的内存空间是
+=skb->end - skb->tail= .
+
+*example:* 把skb的data扩展到区域大小扩展到 =min_frame_size= .
+#+begin_src c
+  int min_frame_size = 62;
+  if (skb->len < min_frame_size) {
+    if ((skb->len + skb_tailroom(skb)) < min_frame_size) {
+      skb2 = skb_copy_expand(skb, 0,
+                             min_frame_size - skb->truesize,
+                             GFP_ATOMIC);
+      dev_kfree_skb(skb);
+      if (skb2 == NULL) {
+        priv->stats.tx_dropped++;
+        return 0;
+      }
+      skb = skb2;
+    }
+    skb_put(skb, min_frame_size - skb->len);
+  }
+#+end_src
 *** =skb_realloc_headroom=
+
+
 
 *** =skb_reserve=
 
@@ -295,6 +423,79 @@ nodata:
 	goto out;
 }
 #+end_src
+** =__kfree_skb=
+<<kfree_skb>>
+#+begin_src c
+  void __kfree_skb(struct sk_buff *skb)
+  {
+    skb_release_all(skb);
+    kfree_skbmem(skb);
+  }
+static void skb_release_all(struct sk_buff *skb)
+{
+	dst_release(skb->dst);
+#ifdef CONFIG_XFRM
+	secpath_put(skb->sp);
+#endif
+	if (skb->destructor) {
+		WARN_ON(in_irq());
+		skb->destructor(skb);
+	}
+#if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
+	nf_conntrack_put(skb->nfct);
+	nf_conntrack_put_reasm(skb->nfct_reasm);
+#endif
+#ifdef CONFIG_BRIDGE_NETFILTER
+	nf_bridge_put(skb->nf_bridge);
+#endif
+/* XXX: IS this still necessary? - JHS */
+#ifdef CONFIG_NET_SCHED
+	skb->tc_index = 0;
+#ifdef CONFIG_NET_CLS_ACT
+	skb->tc_verd = 0;
+#endif
+#endif
+	skb_release_data(skb);
+}
+static void skb_release_data(struct sk_buff *skb)
+{
+	if (!skb->cloned ||
+	    !atomic_sub_return(skb->nohdr ? (1 << SKB_DATAREF_SHIFT) + 1 : 1,
+			       &skb_shinfo(skb)->dataref)) {
+		if (skb_shinfo(skb)->nr_frags) {
+			int i;
+			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+				put_page(skb_shinfo(skb)->frags[i].page);
+		}
+
+		if (skb_shinfo(skb)->frag_list)
+			skb_drop_fraglist(skb);
+
+		kfree(skb->head);
+	}
+}
+#+end_src
+** =skb_realloc_headroom=
+#+begin_src c
+struct sk_buff *skb_realloc_headroom(struct sk_buff *skb, unsigned int headroom)
+{
+	struct sk_buff *skb2;
+	int delta = headroom - skb_headroom(skb);
+
+	if (delta <= 0)
+		skb2 = pskb_copy(skb, GFP_ATOMIC);
+	else {
+		skb2 = skb_clone(skb, GFP_ATOMIC);
+		if (skb2 && pskb_expand_head(skb2, SKB_DATA_ALIGN(delta), 0,
+					     GFP_ATOMIC)) {
+			kfree_skb(skb2);
+			skb2 = NULL;
+		}
+	}
+	return skb2;
+}
+#+end_src
+
 * cc
 
 #+begin_src c
