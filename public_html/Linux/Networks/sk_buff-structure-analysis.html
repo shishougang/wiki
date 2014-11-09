@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>socket buffer结构解析</title>
-<!-- 2014-11-07 Fri 23:23 -->
+<!-- 2014-11-09 Sun 14:51 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -152,10 +152,17 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3">Management Data of Socket Buffers</a>
 <ul>
 <li><a href="#sec-3-1"><code>dev</code></a></li>
-<li><a href="#sec-3-2"><code>h</code> , <code>nh</code> and <code>mac</code></a></li>
-<li><a href="#sec-3-3"><code>cloned</code></a></li>
-<li><a href="#sec-3-4"><code>pkt_type</code></a></li>
-<li><a href="#sec-3-5"><code>protocol</code></a></li>
+<li><a href="#sec-3-2"><code>tstamp</code></a></li>
+<li><a href="#sec-3-3"><code>sk</code></a></li>
+<li><a href="#sec-3-4"><code>dst</code></a></li>
+<li><a href="#sec-3-5"><code>next</code> 和 <code>prev</code></a></li>
+<li><a href="#sec-3-6"><code>cloned</code></a></li>
+<li><a href="#sec-3-7"><code>len</code>, <code>data_len</code> 和 <code>truesize</code></a></li>
+<li><a href="#sec-3-8">head, data, tail, end</a></li>
+<li><a href="#sec-3-9"><code>transport_header</code>, <code>network_header</code>, 和 <code>mac_header</code></a></li>
+<li><a href="#sec-3-10"><code>cb[48]</code></a></li>
+<li><a href="#sec-3-11"><code>pkt_type</code></a></li>
+<li><a href="#sec-3-12"><code>protocol</code></a></li>
 </ul>
 </li>
 <li><a href="#sec-4">reference</a>
@@ -163,13 +170,12 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4-1"><code>__alloc_skb</code></a></li>
 <li><a href="#sec-4-2"><code>__kfree_skb</code></a></li>
 <li><a href="#sec-4-3"><code>skb_realloc_headroom</code></a></li>
+<li><a href="#sec-4-4">transport/network/mac</a></li>
 </ul>
 </li>
-<li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
 </div>
-
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">socket buffer</h2>
@@ -593,69 +599,255 @@ memcpy(skb_put(skb,16),ipbuf,16);
 </div>
 </div>
 </li>
-<li><a id="sec-2-1-7" name="sec-2-1-7"></a><code>skb_realloc_headroom</code><br  /></li>
+<li><a id="sec-2-1-7" name="sec-2-1-7"></a><code>skb_realloc_headroom</code><br  /><div class="outline-text-4" id="text-2-1-7">
+<p>
+当skb的headroom大小不够时,可以用这个函数扩展其大小.它完成了两个功能:
+</p>
+<ol class="org-ol">
+<li>扩展headroom.
+</li>
+<li>创建新的skb结构,并复制之前的skb和部分它的数据.
+</li>
+<li>返回的skb的reference count是1.
+</li>
+</ol>
 
+<div class="org-src-container">
 
-
-<li><a id="sec-2-1-8" name="sec-2-1-8"></a><code>skb_reserve</code><br  /></li>
-
-<li><a id="sec-2-1-9" name="sec-2-1-9"></a>transport/network/mac operation<br  /></li></ul>
+<pre class="src src-c"><span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">example</span>
+<span style="color: #00ffff;">if</span> (skb_headroom(skb) &lt; len) {
+  <span style="color: #00ffff;">if</span> ((skbn = skb_realloc_headroom(skb, len)) == <span style="color: #7fffd4;">NULL</span>) {
+    printk(KERN_CRIT <span style="color: #ffa07a;">"out of memory\n"</span>);
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+  }
+  <span style="color: #00ffff;">if</span> (skb-&gt;sk != <span style="color: #7fffd4;">NULL</span>)
+    skb_set_owner_w(skbn, skb-&gt;sk);
+  kfree_skb(skb);
+  skb = skbn;
+}
+</pre>
 </div>
 </div>
+</li>
+<li><a id="sec-2-1-8" name="sec-2-1-8"></a><code>skb_reserve</code><br  /><div class="outline-text-4" id="text-2-1-8">
+<div class="org-src-container">
 
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">skb_reserve</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>)
+{
+  skb-&gt;data += len;
+  skb-&gt;tail += len;
+}
+</pre>
+</div>
+<ul class="org-ul">
+<li>通过减少tail的空间来增加headroom的大小.
+</li>
+<li>它只允许对空buffer操作.
+</li>
+</ul>
+</div>
+</li>
+
+<li><a id="sec-2-1-9" name="sec-2-1-9"></a>transport/network/mac operation<br  /><div class="outline-text-4" id="text-2-1-9">
+<p>
+<code>sk_buff</code> 中有3个头结构的域: <code>transport_header</code> , <code>network_header</code> 和
+<code>mac_header</code>.
+</p>
+
+<p>
+对于它们的操作类似,主要有:
+</p>
+<ul class="org-ul">
+<li><code>skb_xx_header</code> : 获取相应头的起始处.
+</li>
+<li><code>skb_reset_xx_header</code> : 重新赋值为 <code>skb-&gt;data</code> .
+</li>
+<li><code>skb_set_xx_header</code> : 设置为 <code>skb-&gt;data + offset;</code> .
+</li>
+</ul>
+</div>
+</li></ul>
+</div>
+</div>
 
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">Management Data of Socket Buffers</h2>
 <div class="outline-text-2" id="text-3">
-</div><div id="outline-container-sec-3-1" class="outline-3">
+<p>
+socket buffer结构体中主要被使用的元素:
+</p>
+</div>
+<div id="outline-container-sec-3-1" class="outline-3">
 <h3 id="sec-3-1"><code>dev</code></h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+类型是 <code>net_device</code> , <code>net_device</code> 它代表一个网络设备。dev的作用与这个包是准备发出的包还是刚接收的包有关.当收到一个包时,设备驱动会把 <code>sk_buff</code> 的dev指针指向收到这个包的网络设备;当一个包被发送时,这个变量代表将要发送这个包的设备.
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-3-2" class="outline-3">
-<h3 id="sec-3-2"><code>h</code> , <code>nh</code> and <code>mac</code></h3>
+<h3 id="sec-3-2"><code>tstamp</code></h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+存储包到达的时间.
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-3-3" class="outline-3">
-<h3 id="sec-3-3"><code>cloned</code></h3>
+<h3 id="sec-3-3"><code>sk</code></h3>
 <div class="outline-text-3" id="text-3-3">
 <p>
-当被设置时，表示这个结构是另一个sk<sub>buff的克隆</sub>
+sk是将处理包的socket实例的指针.
 </p>
 </div>
 </div>
 
 <div id="outline-container-sec-3-4" class="outline-3">
-<h3 id="sec-3-4"><code>pkt_type</code></h3>
+<h3 id="sec-3-4"><code>dst</code></h3>
 <div class="outline-text-3" id="text-3-4">
 <p>
-这个变量表示帧的类型，分类是由L2的目的地址来决定的。这个值在网卡驱动程序中由函数eth<sub>type</sub><sub>trans通过判断目的以太网地址来确定。如果</sub> 目的地址是
-FF:FF:FF:FF:FF:FF，则为广播地址，pkt<sub>type</sub> = PACKET<sub>BROADCAST；如果最高</sub>
-位为1,则为组播地址，pkt<sub>type</sub> = PACKET<sub>MULTICAST；如果目的mac地址跟本机</sub>
-mac地址不相等，则不是发给本机的数据报，pkt<sub>type</sub> = PACKET<sub>OTHERHOST；否</sub>
-则就是缺省值PACKET<sub>HOST。</sub>
+通过network实现层时,指示包如何route.使用这一特殊的结构 <code>struct
+dst_entry</code> .
 </p>
 </div>
 </div>
 
 <div id="outline-container-sec-3-5" class="outline-3">
-<h3 id="sec-3-5"><code>protocol</code></h3>
+<h3 id="sec-3-5"><code>next</code> 和 <code>prev</code></h3>
 <div class="outline-text-3" id="text-3-5">
 <p>
-这个变量是高层协议从二层设备的角度所看到的协议。典型的协议包括IP，IPV6
-和ARP。完整的列表在 include/linux/if<sub>ether</sub>.h中。由于每个协议都有自己的协议处理函数来处理接收到的包，因此，这个域被设备驱动用于通知上层调用哪个协议处理函数。每个网络驱动都调用netif<sub>rx来通知上层网络协议的协议处理</sub>
-函数，因此protocol变量必须在这些协议处理函数调用之前初始化。
+<code>next</code> 和 <code>prev</code> 使得socket buffer链接在一个双向链表中.<a href="http://wiki.dreamrunner.org/public_html/Embedded-System/kernel/list-and-hlist.html">kernel标准的
+list </a>实现并没有在这里使用,取而代之的是手动的版本. list头被用来实现
+socket buffers的等待队列,它的结构如下:
 </p>
-
 
 <div class="org-src-container">
 
-<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_HOST</span>         0      
-<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_BROADCAST</span>    1      
-<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_MULTICAST</span>    2      
-<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_OTHERHOST</span>    3      
-<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_OUTGOING</span>     4
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff_head</span> {
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">These two members must be first. </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span>  *<span style="color: #eedd82;">next</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span>  *<span style="color: #eedd82;">prev</span>;
+
+        <span style="color: #98fb98;">__u32</span>           <span style="color: #eedd82;">qlen</span>;
+        <span style="color: #98fb98;">spinlock_t</span>      <span style="color: #eedd82;">lock</span>;
+};
 </pre>
 </div>
+
+
+<div class="figure">
+<p><img src="./Files/managing-in-doubly-linked.jpeg" alt="managing-in-doubly-linked.jpeg" />
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-6" class="outline-3">
+<h3 id="sec-3-6"><code>cloned</code></h3>
+<div class="outline-text-3" id="text-3-6">
+<p>
+当被设置时，表示这个结构是另一个sk<sub>buff的克隆</sub>.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-7" class="outline-3">
+<h3 id="sec-3-7"><code>len</code>, <code>data_len</code> 和 <code>truesize</code></h3>
+<div class="outline-text-3" id="text-3-7">
+<ul class="org-ul">
+<li><code>len</code> : 当前协议数据包的长度.包括data中的缓冲数据和分片中的数据.
+</li>
+<li><code>data_len</code> : 只包含分片中数据.
+</li>
+<li><code>truesize</code> : 整个data的长度和 <code>sk_buff</code> 描述符的长度.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3-8" class="outline-3">
+<h3 id="sec-3-8">head, data, tail, end</h3>
+<div class="outline-text-3" id="text-3-8">
+<p>
+head和end指向缓冲区的头部和尾部，而data和 tail指向实际数据的头部和尾部。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-9" class="outline-3">
+<h3 id="sec-3-9"><code>transport_header</code>, <code>network_header</code>, 和 <code>mac_header</code></h3>
+<div class="outline-text-3" id="text-3-9">
+<p>
+这些是指向TCP/IP 各层协议头的指针：th指向L4(传输层)，nh指向L3(网络层)，
+mach指向L2(数据链路层)。
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3-10" class="outline-3">
+<h3 id="sec-3-10"><code>cb[48]</code></h3>
+<div class="outline-text-3" id="text-3-10">
+<p>
+它是一个 control buffer. 在每一层,它都可以自由使用,所以把私有控制变量放在这个缓存空间.如果想在层与层之间使用,必须先做 <code>skb_clone()</code> .一般访问这个变量使用宏来实现以增强代码的可读性。比如TCP使用这个变量存储
+<code>tcp_skb_cb</code> 结构。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">TCP_SKB_CB</span>(<span style="color: #eedd82;">__skb</span>)       ((<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tcp_skb_cb</span> *)&amp;((__skb)-&gt;cb[0]))
+</pre>
+</div>
+<p>
+使用实例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">net/ipv4/tcp_output.c</span>
+TCP_SKB_CB(buff)-&gt;seq = TCP_SKB_CB(skb)-&gt;seq + len;
+TCP_SKB_CB(buff)-&gt;end_seq = TCP_SKB_CB(skb)-&gt;end_seq;
+TCP_SKB_CB(skb)-&gt;end_seq = TCP_SKB_CB(buff)-&gt;seq;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-11" class="outline-3">
+<h3 id="sec-3-11"><code>pkt_type</code></h3>
+<div class="outline-text-3" id="text-3-11">
+<p>
+这个变量表示帧的类型，分类是由L2的目的地址来决定的。这个值在网卡驱动程序中由函数 <code>eth_type_trans</code> 通过判断目的以太网地址来确定。
+</p>
+<ul class="org-ul">
+<li>如果目的地址是FF:FF:FF:FF:FF:FF，则为广播地址, <code>pkt_type =
+  PACKET_BROADCAST</code> ；
+</li>
+<li>如果最高位为1,则为组播地址. <code>pkt_type = PACKET_MULTICAST</code> ；
+</li>
+<li>如果目的mac地址跟本机mac地址不相等，则不是发给本机的数据报，
+<code>pkt_type = PACKET_OTHERHOST</code> ；
+</li>
+<li>否则就是缺省值 <code>PACKET_HOST</code> 。
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">include/linux/if_packet.h</span>
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Packet types </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_HOST</span>             0               <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">To us                </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_BROADCAST</span>        1               <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">To all               </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_MULTICAST</span>        2               <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">To group             </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_OTHERHOST</span>        3               <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">To someone else      </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">PACKET_OUTGOING</span>         4               <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Outgoing of any type </span><span style="color: #ff7f24;">*/</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-12" class="outline-3">
+<h3 id="sec-3-12"><code>protocol</code></h3>
+<div class="outline-text-3" id="text-3-12">
+<p>
+这个变量是高层协议从二层设备的角度所看到的协议。典型的协议包括IP，IPV6
+和ARP。完整的列表在 <code>include/linux/if_ether.h</code> 中。由于每个协议都有自己的协议处理函数来处理接收到的包，因此，这个域被设备驱动用于通知上层调用哪个协议处理函数。详细见 <code>netif_receive_skb</code> 函数中,比对socket buffer的
+protocol,传递到相应的协议处理函数中去.
+</p>
 </div>
 </div>
 </div>
@@ -825,27 +1017,71 @@ mac地址不相等，则不是发给本机的数据报，pkt<sub>type</sub> = PA
 </div>
 </div>
 </div>
-</div>
-
-<div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">cc</h2>
-<div class="outline-text-2" id="text-5">
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4">transport/network/mac</h3>
+<div class="outline-text-3" id="text-4-4">
 <div class="org-src-container">
 
-<pre class="src src-c"></pre>
+<pre class="src src-c"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">not NET_SKBUFF_DATA_USES_OFFSET </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">skb_transport_header</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+        <span style="color: #00ffff;">return</span> skb-&gt;transport_header;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">skb_reset_transport_header</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+        skb-&gt;transport_header = skb-&gt;data;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">skb_set_transport_header</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>,
+                                            <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">offset</span>)
+{
+        skb-&gt;transport_header = skb-&gt;data + offset;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">skb_network_header</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+        <span style="color: #00ffff;">return</span> skb-&gt;network_header;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">skb_reset_network_header</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+        skb-&gt;network_header = skb-&gt;data;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">skb_set_network_header</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">offset</span>)
+{
+        skb-&gt;network_header = skb-&gt;data + offset;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">skb_mac_header</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+        <span style="color: #00ffff;">return</span> skb-&gt;mac_header;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">skb_mac_header_was_set</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+        <span style="color: #00ffff;">return</span> skb-&gt;mac_header != <span style="color: #7fffd4;">NULL</span>;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">skb_reset_mac_header</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+        skb-&gt;mac_header = skb-&gt;data;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">skb_set_mac_header</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">offset</span>)
+{
+        skb-&gt;mac_header = skb-&gt;data + offset;
+}
+</pre>
 </div>
-
-
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
 </div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-07 Fri 23:23</p>
+<p class="date">Created: 2014-11-09 Sun 14:51</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

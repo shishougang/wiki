@@ -2,7 +2,6 @@
 #+TITLE: socket buffer结构解析
 #+OPTIONS: num:nil H:2
 
-
 * socket buffer
 当网络包被内核分析时,底层协议的数据被传送更高层.当数据传送时过程反过来.由
 不同协议产生的数据(包括头和负载)不断往下层传递直到它们最终被发送.因为
@@ -313,46 +312,132 @@ memcpy(skb_put(skb,16),ipbuf,16);
   }
 #+end_src
 *** =skb_realloc_headroom=
-
-
-
-*** =skb_reserve=
-
-*** transport/network/mac operation
-
-
-* Management Data of Socket Buffers
-
-** =dev=
-
-** =h= , =nh= and =mac=
-
-** =cloned=
-当被设置时，表示这个结构是另一个sk_buff的克隆
-
-** =pkt_type=
-这个变量表示帧的类型，分类是由L2的目的地址来决定的。这个值在网卡驱动程
-序中由函数eth_type_trans通过判断目的以太网地址来确定。如果 目的地址是
-FF:FF:FF:FF:FF:FF，则为广播地址，pkt_type = PACKET_BROADCAST；如果最高
-位为1,则为组播地址，pkt_type = PACKET_MULTICAST；如果目的mac地址跟本机
-mac地址不相等，则不是发给本机的数据报，pkt_type = PACKET_OTHERHOST；否
-则就是缺省值PACKET_HOST。
-
-** =protocol=
-这个变量是高层协议从二层设备的角度所看到的协议。典型的协议包括IP，IPV6
-和ARP。完整的列表在 include/linux/if_ether.h中。由于每个协议都有自己的
-协议处理函数来处理接收到的包，因此，这个域被设备驱动用于通知上层调用哪
-个协议处理函数。每个网络驱动都调用netif_rx来通知上层网络协议的协议处理
-函数，因此protocol变量必须在这些协议处理函数调用之前初始化。
-
+当skb的headroom大小不够时,可以用这个函数扩展其大小.它完成了两个功能:
+1. 扩展headroom.
+2. 创建新的skb结构,并复制之前的skb和部分它的数据.
+3. 返回的skb的reference count是1.
 
 #+begin_src c
-#define PACKET_HOST         0      
-#define PACKET_BROADCAST    1      
-#define PACKET_MULTICAST    2      
-#define PACKET_OTHERHOST    3      
-#define PACKET_OUTGOING     4    
+  //example
+  if (skb_headroom(skb) < len) {
+    if ((skbn = skb_realloc_headroom(skb, len)) == NULL) {
+      printk(KERN_CRIT "out of memory\n");
+      return NULL;
+    }
+    if (skb->sk != NULL)
+      skb_set_owner_w(skbn, skb->sk);
+    kfree_skb(skb);
+    skb = skbn;
+  }
 #+end_src
+*** =skb_reserve=
+#+begin_src c
+  static inline void skb_reserve(struct sk_buff *skb, int len)
+  {
+    skb->data += len;
+    skb->tail += len;
+  }
+#+end_src
++ 通过减少tail的空间来增加headroom的大小.
++ 它只允许对空buffer操作.
+
+*** transport/network/mac operation
+=sk_buff= 中有3个头结构的域: =transport_header= , =network_header= 和
+=mac_header=.
+
+对于它们的操作类似,主要有:
++ =skb_xx_header= : 获取相应头的起始处.
++ =skb_reset_xx_header= : 重新赋值为 =skb->data= .
++ =skb_set_xx_header= : 设置为 =skb->data + offset;= .
+
+* Management Data of Socket Buffers
+socket buffer结构体中主要被使用的元素:
+** =dev=
+  类型是 =net_device= , =net_device= 它代表一个网络设备。dev的作用
+  与这个包是准备发出的包还是刚接收的包有关.当收到一个包时,设备驱动
+  会把 =sk_buff= 的dev指针指向收到这个包的网络设备;当一个包被发送时,这个
+  变量代表将要发送这个包的设备.
+
+** =tstamp=
+存储包到达的时间.
+
+** =sk=
+sk是将处理包的socket实例的指针.
+
+** =dst=
+通过network实现层时,指示包如何route.使用这一特殊的结构 =struct
+dst_entry= .
+
+** =next= 和 =prev=
+=next= 和 =prev= 使得socket buffer链接在一个双向链表中.[[http://wiki.dreamrunner.org/public_html/Embedded-System/kernel/list-and-hlist.html][kernel标准的
+list ]]实现并没有在这里使用,取而代之的是手动的版本. list头被用来实现
+socket buffers的等待队列,它的结构如下:
+
+#+begin_src c
+struct sk_buff_head {
+	/* These two members must be first. */
+	struct sk_buff	*next;
+	struct sk_buff	*prev;
+
+	__u32		qlen;
+	spinlock_t	lock;
+};
+#+end_src
+
+[[./Files/managing-in-doubly-linked.jpeg]]
+** =cloned=
+当被设置时，表示这个结构是另一个sk_buff的克隆.
+** =len=, =data_len= 和 =truesize=
++ =len= : 当前协议数据包的长度.包括data中的缓冲数据和分片中的数据.
++ =data_len= : 只包含分片中数据.
++ =truesize= : 整个data的长度和 =sk_buff= 描述符的长度.
+** head, data, tail, end
+head和end指向缓冲区的头部和尾部，而data和 tail指向实际数据的头部和尾部。
+** =transport_header=, =network_header=, 和 =mac_header=
+这些是指向TCP/IP 各层协议头的指针：th指向L4(传输层)，nh指向L3(网络层)，
+mach指向L2(数据链路层)。
+
+** =cb[48]=
+它是一个 control buffer. 在每一层,它都可以自由使用,所以把私有控制变量
+放在这个缓存空间.如果想在层与层之间使用,必须先做 =skb_clone()= .一般访
+问这个变量使用宏来实现以增强代码的可读性。比如TCP使用这个变量存储
+=tcp_skb_cb= 结构。
+
+#+begin_src c
+#define TCP_SKB_CB(__skb)	((struct tcp_skb_cb *)&((__skb)->cb[0]))
+#+end_src
+使用实例:
+#+begin_src c
+  // net/ipv4/tcp_output.c
+  TCP_SKB_CB(buff)->seq = TCP_SKB_CB(skb)->seq + len;
+  TCP_SKB_CB(buff)->end_seq = TCP_SKB_CB(skb)->end_seq;
+  TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(buff)->seq;
+#+end_src
+** =pkt_type=
+这个变量表示帧的类型，分类是由L2的目的地址来决定的。这个值在网卡驱动程
+序中由函数 =eth_type_trans= 通过判断目的以太网地址来确定。
++ 如果目的地址是FF:FF:FF:FF:FF:FF，则为广播地址, ~pkt_type =
+  PACKET_BROADCAST~ ；
++ 如果最高位为1,则为组播地址. ~pkt_type = PACKET_MULTICAST~ ；
++ 如果目的mac地址跟本机mac地址不相等，则不是发给本机的数据报，
+  ~pkt_type = PACKET_OTHERHOST~ ；
++ 否则就是缺省值 =PACKET_HOST= 。
+
+#+begin_src c
+// include/linux/if_packet.h
+/* Packet types */
+#define PACKET_HOST		0		/* To us		*/
+#define PACKET_BROADCAST	1		/* To all		*/
+#define PACKET_MULTICAST	2		/* To group		*/
+#define PACKET_OTHERHOST	3		/* To someone else 	*/
+#define PACKET_OUTGOING		4		/* Outgoing of any type */
+#+end_src
+** =protocol=
+这个变量是高层协议从二层设备的角度所看到的协议。典型的协议包括IP，IPV6
+和ARP。完整的列表在 =include/linux/if_ether.h= 中。由于每个协议都有自己的
+协议处理函数来处理接收到的包，因此，这个域被设备驱动用于通知上层调用哪
+个协议处理函数。详细见 =netif_receive_skb= 函数中,比对socket buffer的
+protocol,传递到相应的协议处理函数中去.
 * reference
 ** =__alloc_skb=
 <<alloc_skb>>
@@ -495,14 +580,58 @@ struct sk_buff *skb_realloc_headroom(struct sk_buff *skb, unsigned int headroom)
 	return skb2;
 }
 #+end_src
-
-* cc
-
+** transport/network/mac
 #+begin_src c
+/* not NET_SKBUFF_DATA_USES_OFFSET */
+static inline unsigned char *skb_transport_header(const struct sk_buff *skb)
+{
+	return skb->transport_header;
+}
 
+static inline void skb_reset_transport_header(struct sk_buff *skb)
+{
+	skb->transport_header = skb->data;
+}
+
+static inline void skb_set_transport_header(struct sk_buff *skb,
+					    const int offset)
+{
+	skb->transport_header = skb->data + offset;
+}
+
+static inline unsigned char *skb_network_header(const struct sk_buff *skb)
+{
+	return skb->network_header;
+}
+
+static inline void skb_reset_network_header(struct sk_buff *skb)
+{
+	skb->network_header = skb->data;
+}
+
+static inline void skb_set_network_header(struct sk_buff *skb, const int offset)
+{
+	skb->network_header = skb->data + offset;
+}
+
+static inline unsigned char *skb_mac_header(const struct sk_buff *skb)
+{
+	return skb->mac_header;
+}
+
+static inline int skb_mac_header_was_set(const struct sk_buff *skb)
+{
+	return skb->mac_header != NULL;
+}
+
+static inline void skb_reset_mac_header(struct sk_buff *skb)
+{
+	skb->mac_header = skb->data;
+}
+
+static inline void skb_set_mac_header(struct sk_buff *skb, const int offset)
+{
+	skb->mac_header = skb->data + offset;
+}
 #+end_src
 
-
-#+begin_src sh
-
-#+end_src
