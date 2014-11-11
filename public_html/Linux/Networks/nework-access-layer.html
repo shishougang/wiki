@@ -3,8 +3,8 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<title>Network access layer</title>
-<!-- 2014-11-10 Mon 22:06 -->
+<title>Linux network and Network access layer</title>
+<!-- 2014-11-11 Tue 20:40 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -138,41 +138,694 @@ for the JavaScript code in this tag.
 </head>
 <body>
 <div id="content">
-<h1 class="title">Network access layer</h1>
+<h1 class="title">Linux network and Network access layer</h1>
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">cc</a></li>
+<li><a href="#sec-1">Layer Model of Network</a></li>
+<li><a href="#sec-2">Networking Namespaces</a></li>
+<li><a href="#sec-3">Network access layer</a>
+<ul>
+<li><a href="#sec-3-1">Representation of Network Devices</a></li>
+<li><a href="#sec-3-2">Example</a></li>
+<li><a href="#sec-3-3">Receiving Packets</a></li>
+<li><a href="#sec-3-4">Sending Packets</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">Reference</a>
+<ul>
+<li><a href="#sec-4-1"><code>net_device_ops</code></a></li>
+<li><a href="#sec-4-2"><code>header_ops</code></a></li>
+<li><a href="#sec-4-3"><code>athr_gmac_init</code></a></li>
+</ul>
+</li>
+<li><a href="#sec-5">cc</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Layer Model of Network</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+TCP/IP 与 ISO/OSI分层对比如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/tcp-ip-reference-model.jpeg" alt="tcp-ip-reference-model.jpeg" />
+</p>
+</div>
+
+<p>
+而在Linux kernel中实现的分层模型如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/implementation-layer-model-kernel.jpeg" alt="implementation-layer-model-kernel.jpeg" />
+</p>
+</div>
+
+<p>
+整个代码分层结构实现,每层都有不同的数据结构去封装好,代码流程中充满了各种函数指针而不是直接的函数调用.这也是不可避免的,因为层与层的组成有很多方式,这也导致不是那么容易和清晰去追踪代码流程.
+</p>
+
+<p>
+针对Linux Network的实现分析也分层来解析:
+</p>
+<ul class="org-ul">
+<li>这篇主要介绍<a href="http://wiki.dreamrunner.org/public_html/Linux/Networks/nework-access-layer.html">linux network整体结果与Network access层</a>.
+</li>
+<li><a href="http://wiki.dreamrunner.org/public_html/Linux/Networks/sk_buff-structure-analysis.html">socket buffer结构解析</a>.
+</li>
+<li><a href="http://wiki.dreamrunner.org/public_html/Linux/Networks/network-layer.html">Network layer</a>.
+</li>
+<li><a href="http://wiki.dreamrunner.org/public_html/Linux/Networks/transport-layer.html">Transport layer</a>.
+</li>
+<li><a href="http://wiki.dreamrunner.org/public_html/Linux/Networks/netfilter.html">Linux Netfilter</a>.
+</li>
+<li><a href="http://wiki.dreamrunner.org/public_html/Linux/Networks/application-layer.html">Application Layer</a>.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Networking Namespaces</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+从2.6开始,kernel采用namespaces管理networking subsystem.
+</p>
+
+<p>
+一个集中式的结构来管理所有可用的namesapce,如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">include/net/net_namespace.h</span>
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net</span> {
+    <span style="color: #98fb98;">atomic_t</span> <span style="color: #eedd82;">count</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">To decided when the network</span>
+<span style="color: #ff7f24;">                   * namespace should be freed.</span>
+<span style="color: #ff7f24;">                   </span><span style="color: #ff7f24;">*/</span>
+    ...
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> list; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">list of network namespaces </span><span style="color: #ff7f24;">*/</span>
+    ...
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> *proc_net;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> *<span style="color: #eedd82;">proc_net_stat</span>;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span> *<span style="color: #eedd82;">proc_net_root</span>;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">loopback_dev</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">The loopback </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">dev_base_head</span>;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_head</span> *<span style="color: #eedd82;">dev_name_head</span>;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_head</span> *<span style="color: #eedd82;">dev_index_head</span>;
+  };
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>count</code>: 使用计数.
+</li>
+<li><code>list</code>: 所有namespaces用一个以 <code>net_namespace_list</code> 为头的doubly
+linked list来维护. <code>copy_net_ns</code> 函数把新的namespace加入list中去.
+</li>
+<li><code>proc_net</code> 表示 <code>/proc/net</code> , <code>proc_net_stat</code> 表示
+<code>/proct/net/stats</code> ,而 <code>proc_net_root</code> 表示 <code>/proc</code> .
+</li>
+<li>Network devices由数据结果 <code>struct net_device</code> 表示.在一个namespace中的所有设备通过以 <code>dev_base_head</code> 为头的doubly linked list来存储.并且存储在另外两个hash表中: 使用device name为key的 <code>dev_name_head</code>, 和使用interface index为key的 <code>dev_index_head</code>. 
+
+<p>
+devices和interfaces的概念有点不同.devices表示提供物理传输能力的硬件设备.而interfaces可以是虚拟的点.可能基于实际设备上实现.比如一个网卡可以提供两个interfaces.
+</p>
+</li>
+</ul>
+
+<p>
+每个network namespace包换许多元件,所以当一个新的network namespace被创建,这些元件必须被初始化.同样,当它被删除时,需要做必要的清理工作.Kernel
+引入了如下结构来维护所有需要做的 initialization/cleanup 工作:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">include/net/net_namespace.h</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">pernet_operations</span> {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">list</span>;
+  <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">init</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net</span> *<span style="color: #eedd82;">net</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">exit</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net</span> *<span style="color: #eedd82;">net</span>);
+};
+</pre>
+</div>
+
+<p>
+当一个新的network namespace被创建, kernel遍历 <code>pernet_operations</code> 的
+list,并调用其init函数.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Network access layer</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+Network access layer主要负责在设备与网卡驱动互传数据.
+</p>
+</div>
+
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">Representation of Network Devices</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+在kernel中,每个网络设备都用 <code>net_device</code> 结构体实例来表示.一旦一个结构体实例被分配和初始化,它必须在kernel中注册,使用 <code>net/core/dev.c</code> 里的
+<code>register_netdev</code> .这个函数做一些初始化工作,并同普通设备一样注册这个设备.它同时创建一个 <code>sysfs</code> 点 <code>/sys/class/net/&lt;device&gt;</code> . 如:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c">felix@felix-altai:~/Desktop$ ls -l /sys/class/net
+total 0
+lrwxrwxrwx 1 root root 0 Nov  5 16:19 eth0 -&gt; ../../devices/pci0000:00/0000:00:19.0/net/eth0
+lrwxrwxrwx 1 root root 0 Nov 11 10:10 lo -&gt; ../../devices/virtual/net/lo
+</pre>
+</div>
+
+<p>
+在分析 <code>struct net_device</code> 前,先搞清楚kernel如何维护可用的network
+devices,并如何寻找特定的network device.在net namespace的net中:
+</p>
+<ul class="org-ul">
+<li>所有设备以 <code>dev_base_head</code> 为头的doubly linked list来存储. 可以通过
+<code>for_each_netdev</code> 来遍历所有net下的设备.
+</li>
+<li>通过device name的hash. <code>dev_get_by_name(struct net *net, const char
+  *name)</code> 函数在此hash上找寻特定设备.
+</li>
+<li>通过interface index的hash. <code>dev_get_by_index(struct net *net, int
+  ifindex)</code> 函数在此hash上找寻特定设备.
+</li>
+</ul>
+
+<p>
+<code>net_device</code> 结构包含device能想到的所有信息.整个结构非常的大.基本的结果如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">/include/linux/netdevice.h</span>
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span>
+  {
+    <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">name</span>[IFNAMSIZ];
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">device name hash chain </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hlist_node</span> <span style="color: #eedd82;">name_hlist</span>;
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">I/O specific fields </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">mem_end</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">shared mem end </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">mem_start</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">shared mem start </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">base_addr</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">device I/O address </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">device IRQ number </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">state</span>;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">dev_list</span>;
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Interface index. Unique device identifier        </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">int</span>                     <span style="color: #eedd82;">ifindex</span>;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device_stats</span>     <span style="color: #eedd82;">stats</span>;
+      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Management operations </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device_ops</span> *<span style="color: #eedd82;">netdev_ops</span>;
+    <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">ethtool_ops</span> *<span style="color: #eedd82;">ethtool_ops</span>;
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Hardware header description </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">header_ops</span> *<span style="color: #eedd82;">header_ops</span>;
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">flags</span>;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">interface flags (a la BSD)   </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>          <span style="color: #eedd82;">gflags</span>;
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>          <span style="color: #eedd82;">priv_flags</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Like 'flags' but invisible to userspace. </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>          <span style="color: #eedd82;">padded</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">How much padding added by alloc_netdev() </span><span style="color: #ff7f24;">*/</span>
+
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>           <span style="color: #eedd82;">operstate</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">RFC2863 operstate </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>           <span style="color: #eedd82;">link_mode</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">mapping policy to operstate </span><span style="color: #ff7f24;">*/</span>
+
+    <span style="color: #98fb98;">unsigned</span>                <span style="color: #eedd82;">mtu</span>;    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">interface MTU value          </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>          <span style="color: #eedd82;">type</span>;   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">interface hardware type      </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>          <span style="color: #eedd82;">hard_header_len</span>;        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">hardware hdr length  </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net</span>          *<span style="color: #eedd82;">nd_net</span>;
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">class/net/name entry </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">device</span>           <span style="color: #eedd82;">dev</span>;
+...
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>name</code> and <code>ifindex</code> : <code>dev_get_by_name</code> 和 <code>dev_get_by_index</code> 查找的key.
+</li>
+<li><code>type</code>: 设备使用的硬件类型,来自 <code>&lt;if_arp.h&gt;</code>.比如 <code>ARPHRD_ETHER</code> 和
+<code>ARPHDR_IEEE802</code> 代表10 Mbit and 802.2 Ethernet.
+</li>
+<li><code>dev_addr</code>: 存储设备硬件地址.(比如Ethernet卡的MAC address).
+<code>addr_len</code> 指定地址长度. <code>broadcast</code> 是广播地址.
+</li>
+<li><code>ip_ptr</code>, <code>ip6_ptr</code> 之类是指向特定协议数据的指针.
+<p class="info">这些指针中一些会非null值,因为一个网络设备可以同时被不同网络协议使用.</p>
+</li>
+<li><code>struct net_device_stats stats</code>: 设备的各种统计信息在此结构中.
+</li>
+<li><code>struct net_device_ops *netdev_ops;</code> 和 <code>struct header_ops
+  *header_ops;</code>: 相较于前面的kernel版本,把操作类函数封装到结构体中.
+</li>
 </ul>
 </div>
 </div>
 
 
-<div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">cc</h2>
-<div class="outline-text-2" id="text-1">
-<div class="org-src-container">
 
-<pre class="src src-python"></pre>
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">Example</h3>
 </div>
 
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">Receiving Packets</h3>
 </div>
 
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">Sending Packets</h3>
+</div>
+</div>
 
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Reference</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1"><code>net_device_ops</code></h3>
+<div class="outline-text-3" id="text-4-1">
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-c"><span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * This structure defines the management hooks for network devices.</span>
+<span style="color: #ff7f24;"> * The following hooks can be defined; unless noted otherwise, they are</span>
+<span style="color: #ff7f24;"> * optional and can be filled with a null pointer.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * int (*ndo_init)(struct net_device *dev);</span>
+<span style="color: #ff7f24;"> *     This function is called once when network device is registered.</span>
+<span style="color: #ff7f24;"> *     The network device can use this to any late stage initializaton</span>
+<span style="color: #ff7f24;"> *     or semantic validattion. It can fail with an error code which will</span>
+<span style="color: #ff7f24;"> *     be propogated back to register_netdev</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * void (*ndo_uninit)(struct net_device *dev);</span>
+<span style="color: #ff7f24;"> *     This function is called when device is unregistered or when registration</span>
+<span style="color: #ff7f24;"> *     fails. It is not called if init fails.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * int (*ndo_open)(struct net_device *dev);</span>
+<span style="color: #ff7f24;"> *     This function is called when network device transistions to the up</span>
+<span style="color: #ff7f24;"> *     state.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * int (*ndo_stop)(struct net_device *dev);</span>
+<span style="color: #ff7f24;"> *     This function is called when network device transistions to the down</span>
+<span style="color: #ff7f24;"> *     state.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * netdev_tx_t (*ndo_start_xmit)(struct sk_buff *skb,</span>
+<span style="color: #ff7f24;"> *                               struct net_device *dev);</span>
+<span style="color: #ff7f24;"> *      Called when a packet needs to be transmitted.</span>
+<span style="color: #ff7f24;"> *      Must return NETDEV_TX_OK , NETDEV_TX_BUSY.</span>
+<span style="color: #ff7f24;"> *        (can also return NETDEV_TX_LOCKED iff NETIF_F_LLTX)</span>
+<span style="color: #ff7f24;"> *      Required can not be NULL.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * u16 (*ndo_select_queue)(struct net_device *dev, struct sk_buff *skb);</span>
+<span style="color: #ff7f24;"> *      Called to decide which queue to when device supports multiple</span>
+<span style="color: #ff7f24;"> *      transmit queues.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * void (*ndo_change_rx_flags)(struct net_device *dev, int flags);</span>
+<span style="color: #ff7f24;"> *      This function is called to allow device receiver to make</span>
+<span style="color: #ff7f24;"> *      changes to configuration when multicast or promiscious is enabled.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * void (*ndo_set_rx_mode)(struct net_device *dev);</span>
+<span style="color: #ff7f24;"> *      This function is called device changes address list filtering.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * void (*ndo_set_multicast_list)(struct net_device *dev);</span>
+<span style="color: #ff7f24;"> *      This function is called when the multicast address list changes.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * int (*ndo_set_mac_address)(struct net_device *dev, void *addr);</span>
+<span style="color: #ff7f24;"> *      This function  is called when the Media Access Control address</span>
+<span style="color: #ff7f24;"> *      needs to be changed. If this interface is not defined, the</span>
+<span style="color: #ff7f24;"> *      mac address can not be changed.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * int (*ndo_validate_addr)(struct net_device *dev);</span>
+<span style="color: #ff7f24;"> *      Test if Media Access Control address is valid for the device.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * int (*ndo_do_ioctl)(struct net_device *dev, struct ifreq *ifr, int cmd);</span>
+<span style="color: #ff7f24;"> *      Called when a user request an ioctl which can't be handled by</span>
+<span style="color: #ff7f24;"> *      the generic interface code. If not defined ioctl's return</span>
+<span style="color: #ff7f24;"> *      not supported error code.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * int (*ndo_set_config)(struct net_device *dev, struct ifmap *map);</span>
+<span style="color: #ff7f24;"> *      Used to set network devices bus interface parameters. This interface</span>
+<span style="color: #ff7f24;"> *      is retained for legacy reason, new devices should use the bus</span>
+<span style="color: #ff7f24;"> *      interface (PCI) for low level management.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * int (*ndo_change_mtu)(struct net_device *dev, int new_mtu);</span>
+<span style="color: #ff7f24;"> *      Called when a user wants to change the Maximum Transfer Unit</span>
+<span style="color: #ff7f24;"> *      of a device. If not defined, any request to change MTU will</span>
+<span style="color: #ff7f24;"> *      will return an error.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * void (*ndo_tx_timeout)(struct net_device *dev);</span>
+<span style="color: #ff7f24;"> *      Callback uses when the transmitter has not made any progress</span>
+<span style="color: #ff7f24;"> *      for dev-&gt;watchdog ticks.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * struct net_device_stats* (*ndo_get_stats)(struct net_device *dev);</span>
+<span style="color: #ff7f24;"> *      Called when a user wants to get the network device usage</span>
+<span style="color: #ff7f24;"> *      statistics. If not defined, the counters in dev-&gt;stats will</span>
+<span style="color: #ff7f24;"> *      be used.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * void (*ndo_vlan_rx_register)(struct net_device *dev, struct vlan_group *grp);</span>
+<span style="color: #ff7f24;"> *      If device support VLAN receive accleration</span>
+<span style="color: #ff7f24;"> *      (ie. dev-&gt;features &amp; NETIF_F_HW_VLAN_RX), then this function is called</span>
+<span style="color: #ff7f24;"> *      when vlan groups for the device changes.  Note: grp is NULL</span>
+<span style="color: #ff7f24;"> *      if no vlan's groups are being used.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * void (*ndo_vlan_rx_add_vid)(struct net_device *dev, unsigned short vid);</span>
+<span style="color: #ff7f24;"> *      If device support VLAN filtering (dev-&gt;features &amp; NETIF_F_HW_VLAN_FILTER)</span>
+<span style="color: #ff7f24;"> *      this function is called when a VLAN id is registered.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * void (*ndo_vlan_rx_kill_vid)(struct net_device *dev, unsigned short vid);</span>
+<span style="color: #ff7f24;"> *      If device support VLAN filtering (dev-&gt;features &amp; NETIF_F_HW_VLAN_FILTER)</span>
+<span style="color: #ff7f24;"> *      this function is called when a VLAN id is unregistered.</span>
+<span style="color: #ff7f24;"> *</span>
+<span style="color: #ff7f24;"> * void (*ndo_poll_controller)(struct net_device *dev);</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_NET_DEVICE_OPS</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device_ops</span> {
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_init</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+        <span style="color: #98fb98;">void</span>                    (*<span style="color: #87cefa;">ndo_uninit</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_open</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_stop</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+        <span style="color: #98fb98;">netdev_tx_t</span>             (*<span style="color: #87cefa;">ndo_start_xmit</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>,
+                                                   <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+        u16                     (*ndo_select_queue)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>);
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_CHANGE_RX_FLAGS</span>
+        <span style="color: #98fb98;">void</span>                    (*<span style="color: #87cefa;">ndo_change_rx_flags</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                       <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flags</span>);
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_SET_RX_MODE</span>
+        <span style="color: #98fb98;">void</span>                    (*<span style="color: #87cefa;">ndo_set_rx_mode</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_MULTICAST</span>
+        <span style="color: #98fb98;">void</span>                    (*<span style="color: #87cefa;">ndo_set_multicast_list</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_SET_MAC_ADDR</span>
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_set_mac_address</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                       <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">addr</span>);
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_VALIDATE_ADDR</span>
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_validate_addr</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_PRIVATE_IOCTL</span>
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_do_ioctl</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">ifreq</span> *<span style="color: #eedd82;">ifr</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">cmd</span>);
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_SET_CONFIG</span>
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_set_config</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">ifmap</span> *<span style="color: #eedd82;">map</span>);
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_CHANGE_MTU</span>
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_change_mtu</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">new_mtu</span>);
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_neigh_setup</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                   <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">neigh_parms</span> *);
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_TX_TIMEOUT</span>
+        <span style="color: #98fb98;">void</span>                    (*<span style="color: #87cefa;">ndo_tx_timeout</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device_stats</span>* (*<span style="color: #87cefa;">ndo_get_stats</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+
+        <span style="color: #98fb98;">void</span>                    (*<span style="color: #87cefa;">ndo_vlan_rx_register</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">vlan_group</span> *<span style="color: #eedd82;">grp</span>);
+        <span style="color: #98fb98;">void</span>                    (*<span style="color: #87cefa;">ndo_vlan_rx_add_vid</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                       <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span> <span style="color: #eedd82;">vid</span>);
+        <span style="color: #98fb98;">void</span>                    (*<span style="color: #87cefa;">ndo_vlan_rx_kill_vid</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span> <span style="color: #eedd82;">vid</span>);
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_NET_POLL_CONTROLLER
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_NETDEV_POLL</span>
+        <span style="color: #98fb98;">void</span>                    (*<span style="color: #87cefa;">ndo_poll_controller</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+<span style="color: #b0c4de;">#endif</span>
+<span style="color: #b0c4de;">#if</span> <span style="color: #b0c4de;">defined</span>(CONFIG_FCOE) || <span style="color: #b0c4de;">defined</span>(CONFIG_FCOE_MODULE)
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_fcoe_enable</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_fcoe_disable</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>);
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_fcoe_ddp_setup</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                      <span style="color: #98fb98;">u16</span> <span style="color: #eedd82;">xid</span>,
+                                                      <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">scatterlist</span> *<span style="color: #eedd82;">sgl</span>,
+                                                      <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">sgc</span>);
+        <span style="color: #98fb98;">int</span>                     (*<span style="color: #87cefa;">ndo_fcoe_ddp_done</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                                     <span style="color: #98fb98;">u16</span> <span style="color: #eedd82;">xid</span>);
+<span style="color: #b0c4de;">#endif</span>
+};
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2"><code>header_ops</code></h3>
+<div class="outline-text-3" id="text-4-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">header_ops</span> {
+        <span style="color: #98fb98;">int</span>     (*<span style="color: #87cefa;">create</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                           <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span> <span style="color: #eedd82;">type</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">daddr</span>,
+                           <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">saddr</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">len</span>);
+        <span style="color: #98fb98;">int</span>     (*<span style="color: #87cefa;">parse</span>)(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">haddr</span>);
+        <span style="color: #98fb98;">int</span>     (*<span style="color: #87cefa;">rebuild</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>);
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">HAVE_HEADER_CACHE</span>
+        <span style="color: #98fb98;">int</span>     (*<span style="color: #87cefa;">cache</span>)(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">neighbour</span> *<span style="color: #eedd82;">neigh</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hh_cache</span> *<span style="color: #eedd82;">hh</span>);
+        <span style="color: #98fb98;">void</span>    (*<span style="color: #87cefa;">cache_update</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">hh_cache</span> *<span style="color: #eedd82;">hh</span>,
+                                <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">haddr</span>);
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3"><code>athr_gmac_init</code></h3>
+<div class="outline-text-3" id="text-4-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">__init</span>
+athr_gmac_init(<span style="color: #98fb98;">void</span>)
+{
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>;
+    <span style="color: #98fb98;">athr_gmac_t</span>      *<span style="color: #eedd82;">mac</span>;
+    <span style="color: #98fb98;">uint32_t</span> <span style="color: #eedd82;">mask</span> = 0;
+    <span style="color: #00ffff;">if</span> (0 == tx_len_per_ds)
+        tx_len_per_ds = CONFIG_ATHR_GMAC_LEN_PER_TX_DS;
+
+    athr_gmac_vet_tx_len_per_pkt( &amp;tx_len_per_ds);
+
+    printk(MODULE_NAME <span style="color: #ffa07a;">": Length per segment %d\n"</span>, tx_len_per_ds);
+
+    <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">    * Compute the number of descriptors for an MTU</span>
+<span style="color: #ff7f24;">    </span><span style="color: #ff7f24;">*/</span>
+    tx_max_desc_per_ds_pkt =1;
+
+
+    <span style="color: #ff7f24;">/* </span>
+<span style="color: #ff7f24;">    ** Do the rest of the initializations </span>
+<span style="color: #ff7f24;">    </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #00ffff;">for</span>(i = 0; i &lt; ATHR_GMAC_NMACS; i++)
+    {
+
+        dev = alloc_etherdev(ATHR_MAC_ETHERDEV_SZ);
+        <span style="color: #00ffff;">if</span> (!dev)
+        {
+            printk(MODULE_NAME <span style="color: #ffa07a;">": unable to allocate mac\n"</span>);
+            <span style="color: #00ffff;">return</span> 1;
+        }
+        ATHR_MAC_NETPRIV(mac,dev);
+        memset(mac, 0, <span style="color: #00ffff;">sizeof</span>(athr_gmac_t));
+
+        mac-&gt;mac_dev       = dev;
+        mac-&gt;mac_unit      = i;
+        mac-&gt;mac_base      = athr_gmac_base(i);
+        mac-&gt;mac_irq       = athr_gmac_irq(i);
+        mac-&gt;mac_noacs     = 1;
+        mac-&gt;num_tx_desc   = athr_tx_desc_num[i];
+<span style="color: #b0c4de;">#if</span> !CONFIG_GMAC_RXTIMER
+        mac-&gt;num_rx_desc   = athr_rx_desc_num[i];
+<span style="color: #b0c4de;">#else</span>
+        mac-&gt;num_rx_desc   = rx_pkt_cnt;
+<span style="color: #b0c4de;">#endif</span>
+        mac-&gt;reap_thresh   = athr_tx_desc_num[i] / 2;
+        mac-&gt;qstart_thresh = 4 * tx_max_desc_per_ds_pkt;
+        mac-&gt;mac_speed     = ATHR_PHY_SPEED_UNKNOWN;
+        mac-&gt;no_of_macs    = ATHR_GMAC_NMACS;
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Assign MII typs and PHY associated.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (i) {
+            <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">For MAC1</span>
+            mac-&gt;mii_intf      = CFG_ATHR_GMAC1_MII; 
+            mac-&gt;mii_phy       = CFG_ATHR_GMAC1_MII_PHY;
+        } <span style="color: #00ffff;">else</span> {
+            <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">For MAC0</span>
+            mac-&gt;mii_intf      = CFG_ATHR_GMAC0_MII; 
+            mac-&gt;mii_phy       = CFG_ATHR_GMAC0_MII_PHY;
+        }
+        athr_gmacs[i]  = mac;
+        athr_gmac_attach(mac);
+        <span style="color: #00ffff;">if</span>(!mac-&gt;ops) {
+           printk(MODULE_NAME <span style="color: #ffa07a;">"ERROR: No MAC found !!!\n"</span>);
+           assert(0);
+           <span style="color: #00ffff;">return</span> 1;
+        }
+        mac-&gt;ops-&gt;set_caps(mac);
+        <span style="color: #00ffff;">if</span> (mac_has_flag(mac, ETH_SWONLY_MODE))
+        {
+            <span style="color: #00ffff;">if</span> (mac-&gt;mac_unit == 0)
+                <span style="color: #00ffff;">continue</span>;
+        }
+        athr_gmac_phy_attach(mac, mac-&gt;mac_unit);
+        spin_lock_init(&amp;mac-&gt;mac_lock);
+       <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">        * out of memory timer</span>
+<span style="color: #ff7f24;">        </span><span style="color: #ff7f24;">*/</span>
+        init_timer(&amp;mac-&gt;mac_oom_timer);
+        mac-&gt;mac_oom_timer.data     = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>)mac;
+        mac-&gt;mac_oom_timer.function = (<span style="color: #98fb98;">void</span> *)athr_gmac_oom_timer;
+
+        ATHR_MAC_INIT_WORK(mac, athr_gmac_tx_timeout_task);
+
+        <span style="color: #00ffff;">if</span> (mac-&gt;mii_intf == ATHR_SGMII &amp;&amp; mac_has_flag(mac, ETH_LINK_INTERRUPT) &amp;&amp; !(is_qca956x() &amp;&amp; is_s17())) {
+
+            ATHR_MAC_INIT_SGMII_INT(mac, athr_gmac_sgmii_intr);
+
+        }
+       <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">        * watchdog task</span>
+<span style="color: #ff7f24;">        </span><span style="color: #ff7f24;">*/</span>
+        ATHR_MAC_SET_DEV_NET_OPS(dev, mac,
+                                 athr_gmac_get_stats,
+                                 athr_gmac_open,
+                                 athr_gmac_stop,
+                                 athr_gmac_hard_start,
+                                 athr_gmac_do_ioctl,
+                                 athr_gmac_poll,
+                                 athr_gmac_tx_timeout,
+                                 ATHR_GMAC_NAPI_WEIGHT,
+                                 ATH_GMAC_TXQUEUELEN);
+
+        ATH_INIT_RX_TASK();
+        ATH_INIT_TX_TASK();
+
+        <span style="color: #00ffff;">if</span> (mac_has_flag(mac,ATHR_RX_TASK))
+            printk(MODULE_NAME <span style="color: #ffa07a;">": RX TASKLET - Pkts per Intr:%d\n"</span>, rx_quota);
+        athr_gmac_get_default_macaddr(mac, dev-&gt;dev_addr);
+        athr_register_hwaccels(mac);
+
+        <span style="color: #00ffff;">if</span> (register_netdev(dev))
+        {
+            printk(MODULE_NAME <span style="color: #ffa07a;">": register netdev failed\n"</span>);
+            <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">failed</span>;
+        }
+
+        netif_carrier_off(dev);
+
+        athr_register_qos(mac);
+        athr_register_vlan_igmp(mac);
+
+        <span style="color: #00ffff;">if</span>(!mac-&gt;phy)
+            printk(<span style="color: #ffa07a;">"MAC:%d Warning: Phy not found!!!\n"</span>,mac-&gt;mac_unit);
+        athr_gmac_trc_init();
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Initialize timers.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (mac_has_flag(mac,CHECK_DMA_STATUS)) {
+            mac-&gt;dma_chk_ts = jiffies;
+        }
+        <span style="color: #00ffff;">if</span> (mac_has_flag(mac,ETH_SOFT_LED)) {
+            mac-&gt;led_blink_ts = jiffies;
+        }
+        <span style="color: #00ffff;">if</span> (mac_has_flag(mac,ETH_LINK_POLL)) {
+            mac-&gt;link_ts = jiffies;
+        }
+        <span style="color: #ff7f24;">/* </span>
+<span style="color: #ff7f24;">         * When flowmac is enabled by default, all registrations must happen</span>
+<span style="color: #ff7f24;">         * by default. Wireless driver comes with default state and would be</span>
+<span style="color: #ff7f24;">         * enabled on fly</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        athr_gmac_flowmac_register(dev);
+    }
+
+    <span style="color: #00ffff;">if</span> (athr_gmacs[0]-&gt;mii_intf == ATHR_SGMII ||
+        ( (ATHR_GMAC_NMACS &gt; 1) &amp;&amp; athr_gmacs[1]-&gt;mii_intf == ATHR_SGMII)) {
+        serdes_pll_lock_detect_st();
+    }
+   <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">    * MDIO init for slave scorpion if connected !!</span>
+<span style="color: #ff7f24;">    </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #00ffff;">if</span> (mac_has_flag(mac, SLAVE_SCO_CONNECTED)) {
+        printk (MODULE_NAME <span style="color: #ffa07a;">": Initializing the mdio's for slave\n"</span>);
+        mdio_init_device();
+    }
+
+    <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">     * Do the resets.</span>
+<span style="color: #ff7f24;">     </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #00ffff;">for</span> (i = 0; i &lt; ATHR_GMAC_NMACS; i++) {
+        athr_gmac_reg_rmw_set(athr_gmacs[i], MAC_CONFIGURATION_1_ADDRESS, 
+                ( MAC_CONFIGURATION_1_SOFT_RESET_SET(1)   |
+                  MAC_CONFIGURATION_1_RESET_RX_MAC_SET(1) | 
+                  MAC_CONFIGURATION_1_RESET_TX_MAC_SET(1)));
+
+        udelay(20);
+        <span style="color: #00ffff;">if</span> (i) 
+            mask = (RST_RESET_GE1_MDIO_RESET_SET(1) | RST_RESET_GE1_MAC_RESET_SET(1));
+        <span style="color: #00ffff;">else</span> 
+            mask = (RST_RESET_GE0_MDIO_RESET_SET(1) | RST_RESET_GE0_MAC_RESET_SET(1));
+
+       <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">        * put into reset, hold, pull out.</span>
+<span style="color: #ff7f24;">        </span><span style="color: #ff7f24;">*/</span>
+        athr_reg_rmw_set(RST_RESET_ADDRESS, mask);
+        mdelay(100);
+        athr_reg_rmw_clear(RST_RESET_ADDRESS, mask);
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Increase the delay for MDIO and MAC reset to settle down.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        mdelay(200);
+        athr_gmac_reg_rmw_clear(athr_gmacs[i], MAC_CONFIGURATION_1_ADDRESS, 
+                                     MAC_CONFIGURATION_1_SOFT_RESET_SET(1));
+    }
+
+    athr_register_hwaccels_notifiers(athr_gmacs[0]);
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Register Push button notification handler</span>
+    <span style="color: #00ffff;">if</span> (is_push_button() &amp;&amp; athr_gmacs[0]) {
+        mac = athr_gmacs[0];
+        dev = mac-&gt;mac_dev;
+        register_simple_config_callback (dev-&gt;name, (<span style="color: #98fb98;">void</span> *) pushbutton_intr, (<span style="color: #98fb98;">void</span> *) dev,
+                                         (<span style="color: #98fb98;">void</span> *)&amp;mac-&gt;push_dur);
+    }
+   <span style="color: #00ffff;">return</span> 0;
+
+<span style="color: #7fffd4;">failed</span>:
+
+    <span style="color: #00ffff;">for</span>(i = 0; i &lt; ATHR_GMAC_NMACS; i++)
+    {
+        <span style="color: #00ffff;">if</span> (!athr_gmacs[i])
+            <span style="color: #00ffff;">continue</span>;
+
+        <span style="color: #00ffff;">if</span> (athr_gmacs[i]-&gt;mac_dev)  {
+        <span style="color: #00ffff;">if</span> (mac_has_flag(athr_gmacs[i],ETH_LINK_INTERRUPT) &amp;&amp; (i == ATHR_GMAC_NMACS))
+            printk(<span style="color: #ffa07a;">"%s Freeing at 0x%lx\n"</span>,__func__,(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>) athr_gmacs[i]);
+            free_netdev(athr_gmacs[i]-&gt;mac_dev);
+        }
+
+    }
+    <span style="color: #00ffff;">return</span> 1;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">cc</h2>
+<div class="outline-text-2" id="text-5">
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
 </div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-10 Mon 22:06</p>
+<p class="date">Created: 2014-11-11 Tue 20:40</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

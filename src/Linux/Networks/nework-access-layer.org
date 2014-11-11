@@ -1,18 +1,558 @@
 #+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
-#+TITLE: Network access layer
+#+TITLE: Linux network and Network access layer
 #+OPTIONS: num:nil H:2
 
+* Layer Model of Network
+TCP/IP 与 ISO/OSI分层对比如下:
+
+[[./Files/tcp-ip-reference-model.jpeg]]
+
+而在Linux kernel中实现的分层模型如下:
+
+[[./Files/implementation-layer-model-kernel.jpeg]]
+
+整个代码分层结构实现,每层都有不同的数据结构去封装好,代码流程中充满了各
+种函数指针而不是直接的函数调用.这也是不可避免的,因为层与层的组成有很多
+方式,这也导致不是那么容易和清晰去追踪代码流程.
+
+针对Linux Network的实现分析也分层来解析:
++ 这篇主要介绍[[http://wiki.dreamrunner.org/public_html/Linux/Networks/nework-access-layer.html][linux network整体结果与Network access层]].
++ [[http://wiki.dreamrunner.org/public_html/Linux/Networks/sk_buff-structure-analysis.html][socket buffer结构解析]].
++ [[http://wiki.dreamrunner.org/public_html/Linux/Networks/network-layer.html][Network layer]].
++ [[http://wiki.dreamrunner.org/public_html/Linux/Networks/transport-layer.html][Transport layer]].
++ [[http://wiki.dreamrunner.org/public_html/Linux/Networks/netfilter.html][Linux Netfilter]].
++ [[http://wiki.dreamrunner.org/public_html/Linux/Networks/application-layer.html][Application Layer]].
+
+* Networking Namespaces
+从2.6开始,kernel采用namespaces管理networking subsystem.
+
+一个集中式的结构来管理所有可用的namesapce,如下:
+#+begin_src c
+  // include/net/net_namespace.h
+    struct net {
+      atomic_t count; /* To decided when the network
+                     ,* namespace should be freed.
+                     ,*/
+      ...
+      struct list_head list; /* list of network namespaces */
+      ...
+      struct proc_dir_entry *proc_net;
+      struct proc_dir_entry *proc_net_stat;
+      struct proc_dir_entry *proc_net_root;
+      struct net_device *loopback_dev; /* The loopback */
+      struct list_head dev_base_head;
+      struct hlist_head *dev_name_head;
+      struct hlist_head *dev_index_head;
+    };
+#+end_src
+
++ =count=: 使用计数.
++ =list=: 所有namespaces用一个以 =net_namespace_list= 为头的doubly
+  linked list来维护. =copy_net_ns= 函数把新的namespace加入list中去.
++ =proc_net= 表示 =/proc/net= , =proc_net_stat= 表示
+  =/proct/net/stats= ,而 =proc_net_root= 表示 =/proc= .
++ Network devices由数据结果 =struct net_device= 表示.在一个namespace中
+  的所有设备通过以 =dev_base_head= 为头的doubly linked list来存储.并且
+  存储在另外两个hash表中: 使用device name为key的 =dev_name_head=, 和使
+  用interface index为key的 =dev_index_head=. 
+
+  devices和interfaces的概念有点不同.devices表示提供物理传输能力的硬件
+  设备.而interfaces可以是虚拟的点.可能基于实际设备上实现.比如一个网卡
+  可以提供两个interfaces.
+
+每个network namespace包换许多元件,所以当一个新的network namespace被创
+建,这些元件必须被初始化.同样,当它被删除时,需要做必要的清理工作.Kernel
+引入了如下结构来维护所有需要做的 initialization/cleanup 工作:
+#+begin_src c
+  // include/net/net_namespace.h
+  struct pernet_operations {
+    struct list_head list;
+    int (*init)(struct net *net);
+    void (*exit)(struct net *net);
+  };
+#+end_src
+
+当一个新的network namespace被创建, kernel遍历 =pernet_operations= 的
+list,并调用其init函数.
+
+* Network access layer
+Network access layer主要负责在设备与网卡驱动互传数据.
+
+** Representation of Network Devices
+在kernel中,每个网络设备都用 =net_device= 结构体实例来表示.一旦一个结构
+体实例被分配和初始化,它必须在kernel中注册,使用 =net/core/dev.c= 里的
+=register_netdev= .这个函数做一些初始化工作,并同普通设备一样注册这个设
+备.它同时创建一个 =sysfs= 点 =/sys/class/net/<device>= . 如:
+
+#+begin_src c
+felix@felix-altai:~/Desktop$ ls -l /sys/class/net
+total 0
+lrwxrwxrwx 1 root root 0 Nov  5 16:19 eth0 -> ../../devices/pci0000:00/0000:00:19.0/net/eth0
+lrwxrwxrwx 1 root root 0 Nov 11 10:10 lo -> ../../devices/virtual/net/lo
+#+end_src
+
+在分析 =struct net_device= 前,先搞清楚kernel如何维护可用的network
+devices,并如何寻找特定的network device.在net namespace的net中:
++ 所有设备以 =dev_base_head= 为头的doubly linked list来存储. 可以通过
+  =for_each_netdev= 来遍历所有net下的设备.
++ 通过device name的hash. =dev_get_by_name(struct net *net, const char
+  *name)= 函数在此hash上找寻特定设备.
++ 通过interface index的hash. =dev_get_by_index(struct net *net, int
+  ifindex)= 函数在此hash上找寻特定设备.
+
+=net_device= 结构包含device能想到的所有信息.整个结构非常的大.基本的结
+果如下:
+#+begin_src c
+  // /include/linux/netdevice.h
+  struct net_device
+  {
+    char name[IFNAMSIZ];
+    /* device name hash chain */
+    struct hlist_node name_hlist;
+    /* I/O specific fields */
+    unsigned long mem_end; /* shared mem end */
+    unsigned long mem_start; /* shared mem start */
+    unsigned long base_addr; /* device I/O address */
+    unsigned int irq; /* device IRQ number */
+    unsigned long state;
+    struct list_head dev_list;
+    /* Interface index. Unique device identifier        */
+    int                     ifindex;
+    struct net_device_stats     stats;
+      /* Management operations */
+    const struct net_device_ops *netdev_ops;
+    const struct ethtool_ops *ethtool_ops;
+    /* Hardware header description */
+    const struct header_ops *header_ops;
+    unsigned int            flags;  /* interface flags (a la BSD)   */
+    unsigned short          gflags;
+    unsigned short          priv_flags; /* Like 'flags' but invisible to userspace. */
+    unsigned short          padded; /* How much padding added by alloc_netdev() */
+    
+    unsigned char           operstate; /* RFC2863 operstate */
+    unsigned char           link_mode; /* mapping policy to operstate */
+    
+    unsigned                mtu;    /* interface MTU value          */
+    unsigned short          type;   /* interface hardware type      */
+    unsigned short          hard_header_len;        /* hardware hdr length  */
+    struct net          *nd_net;
+    /* class/net/name entry */
+    struct device           dev;
+...
+#+end_src
+
++ =name= and =ifindex= : =dev_get_by_name= 和 =dev_get_by_index= 查找
+  的key.
++ =type=: 设备使用的硬件类型,来自 =<if_arp.h>=.比如 =ARPHRD_ETHER= 和
+  =ARPHDR_IEEE802= 代表10 Mbit and 802.2 Ethernet.
++ =dev_addr=: 存储设备硬件地址.(比如Ethernet卡的MAC address).
+  =addr_len= 指定地址长度. =broadcast= 是广播地址.
++ =ip_ptr=, =ip6_ptr= 之类是指向特定协议数据的指针.
+  #+begin_html
+  <p class="info">这些指针中一些会非null值,因为一个网络设备可以同时被不同网络协议使用.</p>
+  #+end_html
++ =struct net_device_stats stats=: 设备的各种统计信息在此结构中.
++ =struct net_device_ops *netdev_ops;= 和 =struct header_ops
+  *header_ops;=: 相较于前面的kernel版本,把操作类函数封装到结构体中.
+
+
+
+** Example
+
+** Receiving Packets
+
+** Sending Packets
+
+* Reference
+** =net_device_ops=
+#+begin_src c
+/*
+ * This structure defines the management hooks for network devices.
+ * The following hooks can be defined; unless noted otherwise, they are
+ * optional and can be filled with a null pointer.
+ *
+ * int (*ndo_init)(struct net_device *dev);
+ *     This function is called once when network device is registered.
+ *     The network device can use this to any late stage initializaton
+ *     or semantic validattion. It can fail with an error code which will
+ *     be propogated back to register_netdev
+ *
+ * void (*ndo_uninit)(struct net_device *dev);
+ *     This function is called when device is unregistered or when registration
+ *     fails. It is not called if init fails.
+ *
+ * int (*ndo_open)(struct net_device *dev);
+ *     This function is called when network device transistions to the up
+ *     state.
+ *
+ * int (*ndo_stop)(struct net_device *dev);
+ *     This function is called when network device transistions to the down
+ *     state.
+ *
+ * netdev_tx_t (*ndo_start_xmit)(struct sk_buff *skb,
+ *                               struct net_device *dev);
+ *	Called when a packet needs to be transmitted.
+ *	Must return NETDEV_TX_OK , NETDEV_TX_BUSY.
+ *        (can also return NETDEV_TX_LOCKED iff NETIF_F_LLTX)
+ *	Required can not be NULL.
+ *
+ * u16 (*ndo_select_queue)(struct net_device *dev, struct sk_buff *skb);
+ *	Called to decide which queue to when device supports multiple
+ *	transmit queues.
+ *
+ * void (*ndo_change_rx_flags)(struct net_device *dev, int flags);
+ *	This function is called to allow device receiver to make
+ *	changes to configuration when multicast or promiscious is enabled.
+ *
+ * void (*ndo_set_rx_mode)(struct net_device *dev);
+ *	This function is called device changes address list filtering.
+ *
+ * void (*ndo_set_multicast_list)(struct net_device *dev);
+ *	This function is called when the multicast address list changes.
+ *
+ * int (*ndo_set_mac_address)(struct net_device *dev, void *addr);
+ *	This function  is called when the Media Access Control address
+ *	needs to be changed. If this interface is not defined, the
+ *	mac address can not be changed.
+ *
+ * int (*ndo_validate_addr)(struct net_device *dev);
+ *	Test if Media Access Control address is valid for the device.
+ *
+ * int (*ndo_do_ioctl)(struct net_device *dev, struct ifreq *ifr, int cmd);
+ *	Called when a user request an ioctl which can't be handled by
+ *	the generic interface code. If not defined ioctl's return
+ *	not supported error code.
+ *
+ * int (*ndo_set_config)(struct net_device *dev, struct ifmap *map);
+ *	Used to set network devices bus interface parameters. This interface
+ *	is retained for legacy reason, new devices should use the bus
+ *	interface (PCI) for low level management.
+ *
+ * int (*ndo_change_mtu)(struct net_device *dev, int new_mtu);
+ *	Called when a user wants to change the Maximum Transfer Unit
+ *	of a device. If not defined, any request to change MTU will
+ *	will return an error.
+ *
+ * void (*ndo_tx_timeout)(struct net_device *dev);
+ *	Callback uses when the transmitter has not made any progress
+ *	for dev->watchdog ticks.
+ *
+ * struct net_device_stats* (*ndo_get_stats)(struct net_device *dev);
+ *	Called when a user wants to get the network device usage
+ *	statistics. If not defined, the counters in dev->stats will
+ *	be used.
+ *
+ * void (*ndo_vlan_rx_register)(struct net_device *dev, struct vlan_group *grp);
+ *	If device support VLAN receive accleration
+ *	(ie. dev->features & NETIF_F_HW_VLAN_RX), then this function is called
+ *	when vlan groups for the device changes.  Note: grp is NULL
+ *	if no vlan's groups are being used.
+ *
+ * void (*ndo_vlan_rx_add_vid)(struct net_device *dev, unsigned short vid);
+ *	If device support VLAN filtering (dev->features & NETIF_F_HW_VLAN_FILTER)
+ *	this function is called when a VLAN id is registered.
+ *
+ * void (*ndo_vlan_rx_kill_vid)(struct net_device *dev, unsigned short vid);
+ *	If device support VLAN filtering (dev->features & NETIF_F_HW_VLAN_FILTER)
+ *	this function is called when a VLAN id is unregistered.
+ *
+ * void (*ndo_poll_controller)(struct net_device *dev);
+ */
+#define HAVE_NET_DEVICE_OPS
+struct net_device_ops {
+	int			(*ndo_init)(struct net_device *dev);
+	void			(*ndo_uninit)(struct net_device *dev);
+	int			(*ndo_open)(struct net_device *dev);
+	int			(*ndo_stop)(struct net_device *dev);
+	netdev_tx_t		(*ndo_start_xmit) (struct sk_buff *skb,
+						   struct net_device *dev);
+	u16			(*ndo_select_queue)(struct net_device *dev,
+						    struct sk_buff *skb);
+#define HAVE_CHANGE_RX_FLAGS
+	void			(*ndo_change_rx_flags)(struct net_device *dev,
+						       int flags);
+#define HAVE_SET_RX_MODE
+	void			(*ndo_set_rx_mode)(struct net_device *dev);
+#define HAVE_MULTICAST
+	void			(*ndo_set_multicast_list)(struct net_device *dev);
+#define HAVE_SET_MAC_ADDR
+	int			(*ndo_set_mac_address)(struct net_device *dev,
+						       void *addr);
+#define HAVE_VALIDATE_ADDR
+	int			(*ndo_validate_addr)(struct net_device *dev);
+#define HAVE_PRIVATE_IOCTL
+	int			(*ndo_do_ioctl)(struct net_device *dev,
+					        struct ifreq *ifr, int cmd);
+#define HAVE_SET_CONFIG
+	int			(*ndo_set_config)(struct net_device *dev,
+					          struct ifmap *map);
+#define HAVE_CHANGE_MTU
+	int			(*ndo_change_mtu)(struct net_device *dev,
+						  int new_mtu);
+	int			(*ndo_neigh_setup)(struct net_device *dev,
+						   struct neigh_parms *);
+#define HAVE_TX_TIMEOUT
+	void			(*ndo_tx_timeout) (struct net_device *dev);
+
+	struct net_device_stats* (*ndo_get_stats)(struct net_device *dev);
+
+	void			(*ndo_vlan_rx_register)(struct net_device *dev,
+						        struct vlan_group *grp);
+	void			(*ndo_vlan_rx_add_vid)(struct net_device *dev,
+						       unsigned short vid);
+	void			(*ndo_vlan_rx_kill_vid)(struct net_device *dev,
+						        unsigned short vid);
+#ifdef CONFIG_NET_POLL_CONTROLLER
+#define HAVE_NETDEV_POLL
+	void                    (*ndo_poll_controller)(struct net_device *dev);
+#endif
+#if defined(CONFIG_FCOE) || defined(CONFIG_FCOE_MODULE)
+	int			(*ndo_fcoe_enable)(struct net_device *dev);
+	int			(*ndo_fcoe_disable)(struct net_device *dev);
+	int			(*ndo_fcoe_ddp_setup)(struct net_device *dev,
+						      u16 xid,
+						      struct scatterlist *sgl,
+						      unsigned int sgc);
+	int			(*ndo_fcoe_ddp_done)(struct net_device *dev,
+						     u16 xid);
+#endif
+};
+#+end_src
+
+** =header_ops=
+#+begin_src c
+struct header_ops {
+	int	(*create) (struct sk_buff *skb, struct net_device *dev,
+			   unsigned short type, const void *daddr,
+			   const void *saddr, unsigned len);
+	int	(*parse)(const struct sk_buff *skb, unsigned char *haddr);
+	int	(*rebuild)(struct sk_buff *skb);
+#define HAVE_HEADER_CACHE
+	int	(*cache)(const struct neighbour *neigh, struct hh_cache *hh);
+	void	(*cache_update)(struct hh_cache *hh,
+				const struct net_device *dev,
+				const unsigned char *haddr);
+};
+#+end_src
+** =athr_gmac_init=
+#+begin_src c
+static int __init
+athr_gmac_init(void)
+{
+    int i;
+    struct net_device *dev;
+    athr_gmac_t      *mac;
+    uint32_t mask = 0;
+    if (0 == tx_len_per_ds)
+        tx_len_per_ds = CONFIG_ATHR_GMAC_LEN_PER_TX_DS;
+
+    athr_gmac_vet_tx_len_per_pkt( &tx_len_per_ds);
+
+    printk(MODULE_NAME ": Length per segment %d\n", tx_len_per_ds);
+
+    /*
+    * Compute the number of descriptors for an MTU
+    */
+    tx_max_desc_per_ds_pkt =1;
+
+
+    /* 
+    ** Do the rest of the initializations 
+    */
+    for(i = 0; i < ATHR_GMAC_NMACS; i++)
+    {
+
+        dev = alloc_etherdev(ATHR_MAC_ETHERDEV_SZ);
+        if (!dev)
+        {
+            printk(MODULE_NAME ": unable to allocate mac\n");
+            return 1;
+        }
+        ATHR_MAC_NETPRIV(mac,dev);
+        memset(mac, 0, sizeof(athr_gmac_t));
+
+        mac->mac_dev       = dev;
+        mac->mac_unit      = i;
+        mac->mac_base      = athr_gmac_base(i);
+        mac->mac_irq       = athr_gmac_irq(i);
+        mac->mac_noacs     = 1;
+        mac->num_tx_desc   = athr_tx_desc_num[i];
+#if !CONFIG_GMAC_RXTIMER
+        mac->num_rx_desc   = athr_rx_desc_num[i];
+#else
+        mac->num_rx_desc   = rx_pkt_cnt;
+#endif
+        mac->reap_thresh   = athr_tx_desc_num[i] / 2;
+        mac->qstart_thresh = 4 * tx_max_desc_per_ds_pkt;
+        mac->mac_speed     = ATHR_PHY_SPEED_UNKNOWN;
+        mac->no_of_macs    = ATHR_GMAC_NMACS;
+        /*
+         * Assign MII typs and PHY associated.
+         */
+        if (i) {
+            //For MAC1
+            mac->mii_intf      = CFG_ATHR_GMAC1_MII; 
+            mac->mii_phy       = CFG_ATHR_GMAC1_MII_PHY;
+        } else {
+            //For MAC0
+            mac->mii_intf      = CFG_ATHR_GMAC0_MII; 
+            mac->mii_phy       = CFG_ATHR_GMAC0_MII_PHY;
+        }
+        athr_gmacs[i]  = mac;
+        athr_gmac_attach(mac);
+	if(!mac->ops) {
+           printk(MODULE_NAME "ERROR: No MAC found !!!\n");
+	   assert(0);
+           return 1;
+        }
+        mac->ops->set_caps(mac);
+        if (mac_has_flag(mac, ETH_SWONLY_MODE))
+        {
+            if (mac->mac_unit == 0)
+                continue;
+        }
+        athr_gmac_phy_attach(mac, mac->mac_unit);
+        spin_lock_init(&mac->mac_lock);
+       /*
+        * out of memory timer
+        */
+        init_timer(&mac->mac_oom_timer);
+        mac->mac_oom_timer.data     = (unsigned long)mac;
+        mac->mac_oom_timer.function = (void *)athr_gmac_oom_timer;
+
+        ATHR_MAC_INIT_WORK(mac, athr_gmac_tx_timeout_task);
+
+        if (mac->mii_intf == ATHR_SGMII && mac_has_flag(mac, ETH_LINK_INTERRUPT) && !(is_qca956x() && is_s17())) {
+
+            ATHR_MAC_INIT_SGMII_INT(mac, athr_gmac_sgmii_intr);
+
+        }
+       /*
+        * watchdog task
+        */
+        ATHR_MAC_SET_DEV_NET_OPS(dev, mac,
+                                 athr_gmac_get_stats,
+                                 athr_gmac_open,
+                                 athr_gmac_stop,
+                                 athr_gmac_hard_start,
+                                 athr_gmac_do_ioctl,
+                                 athr_gmac_poll,
+                                 athr_gmac_tx_timeout,
+                                 ATHR_GMAC_NAPI_WEIGHT,
+                                 ATH_GMAC_TXQUEUELEN);
+
+        ATH_INIT_RX_TASK();
+        ATH_INIT_TX_TASK();
+
+        if (mac_has_flag(mac,ATHR_RX_TASK))
+	    printk(MODULE_NAME ": RX TASKLET - Pkts per Intr:%d\n", rx_quota);
+        athr_gmac_get_default_macaddr(mac, dev->dev_addr);
+        athr_register_hwaccels(mac);
+
+        if (register_netdev(dev))
+        {
+            printk(MODULE_NAME ": register netdev failed\n");
+            goto failed;
+        }
+
+        netif_carrier_off(dev);
+
+        athr_register_qos(mac);
+        athr_register_vlan_igmp(mac);
+
+	if(!mac->phy)
+            printk("MAC:%d Warning: Phy not found!!!\n",mac->mac_unit);
+        athr_gmac_trc_init();
+	/*
+         * Initialize timers.
+         */
+        if (mac_has_flag(mac,CHECK_DMA_STATUS)) {
+            mac->dma_chk_ts = jiffies;
+        }
+        if (mac_has_flag(mac,ETH_SOFT_LED)) {
+            mac->led_blink_ts = jiffies;
+        }
+        if (mac_has_flag(mac,ETH_LINK_POLL)) {
+            mac->link_ts = jiffies;
+        }
+        /* 
+         * When flowmac is enabled by default, all registrations must happen
+         * by default. Wireless driver comes with default state and would be
+         * enabled on fly
+         */
+        athr_gmac_flowmac_register(dev);
+    }
+
+    if (athr_gmacs[0]->mii_intf == ATHR_SGMII ||
+        ( (ATHR_GMAC_NMACS > 1) && athr_gmacs[1]->mii_intf == ATHR_SGMII)) {
+        serdes_pll_lock_detect_st();
+    }
+   /*
+    * MDIO init for slave scorpion if connected !!
+    */
+    if (mac_has_flag(mac, SLAVE_SCO_CONNECTED)) {
+        printk (MODULE_NAME ": Initializing the mdio's for slave\n");
+        mdio_init_device();
+    }
+    
+    /*
+     * Do the resets.
+     */
+    for (i = 0; i < ATHR_GMAC_NMACS; i++) {
+        athr_gmac_reg_rmw_set(athr_gmacs[i], MAC_CONFIGURATION_1_ADDRESS, 
+                ( MAC_CONFIGURATION_1_SOFT_RESET_SET(1)   |
+                  MAC_CONFIGURATION_1_RESET_RX_MAC_SET(1) | 
+                  MAC_CONFIGURATION_1_RESET_TX_MAC_SET(1)));
+
+        udelay(20);
+        if (i) 
+            mask = (RST_RESET_GE1_MDIO_RESET_SET(1) | RST_RESET_GE1_MAC_RESET_SET(1));
+        else 
+            mask = (RST_RESET_GE0_MDIO_RESET_SET(1) | RST_RESET_GE0_MAC_RESET_SET(1));
+
+       /*
+        * put into reset, hold, pull out.
+        */
+        athr_reg_rmw_set(RST_RESET_ADDRESS, mask);
+        mdelay(100);
+        athr_reg_rmw_clear(RST_RESET_ADDRESS, mask);
+        /*
+         * Increase the delay for MDIO and MAC reset to settle down.
+         */
+        mdelay(200);
+        athr_gmac_reg_rmw_clear(athr_gmacs[i], MAC_CONFIGURATION_1_ADDRESS, 
+                                     MAC_CONFIGURATION_1_SOFT_RESET_SET(1));
+    }
+
+    athr_register_hwaccels_notifiers(athr_gmacs[0]);
+    // Register Push button notification handler
+    if (is_push_button() && athr_gmacs[0]) {
+        mac = athr_gmacs[0];
+        dev = mac->mac_dev;
+        register_simple_config_callback (dev->name, (void *) pushbutton_intr, (void *) dev,
+                                         (void *)&mac->push_dur);
+    }
+   return 0;
+
+failed:
+
+    for(i = 0; i < ATHR_GMAC_NMACS; i++)
+    {
+        if (!athr_gmacs[i])
+            continue;
+
+        if (athr_gmacs[i]->mac_dev)  {
+        if (mac_has_flag(athr_gmacs[i],ETH_LINK_INTERRUPT) && (i == ATHR_GMAC_NMACS))
+            printk("%s Freeing at 0x%lx\n",__func__,(unsigned long) athr_gmacs[i]);
+            free_netdev(athr_gmacs[i]->mac_dev);
+        }
+
+    }
+    return 1;
+}
+#+end_src
 
 * cc
-#+begin_src python
-
-#+end_src
-
-#+begin_src c++
-
-#+end_src
-
-
-#+begin_src sh
+#+begin_src c
 
 #+end_src
