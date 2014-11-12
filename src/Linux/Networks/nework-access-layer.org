@@ -1,4 +1,4 @@
-#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+v#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
 #+TITLE: Linux network and Network access layer
 #+OPTIONS: num:nil H:2
 
@@ -77,7 +77,6 @@ list,并调用其init函数.
 
 * Network access layer
 Network access layer主要负责在设备与网卡驱动互传数据.
-
 ** Representation of Network Devices
 在kernel中,每个网络设备都用 =net_device= 结构体实例来表示.一旦一个结构
 体实例被分配和初始化,它必须在kernel中注册,使用 =net/core/dev.c= 里的
@@ -155,16 +154,153 @@ devices,并如何寻找特定的network device.在net namespace的net中:
 + =struct net_device_ops *netdev_ops;= 和 =struct header_ops
   *header_ops;=: 相较于前面的kernel版本,把操作类函数封装到结构体中.
 
+*** =header_ops=
+对于Ethernet卡来说, =struct header_ops= 由 =net/ethernet/net.c= 赋值:
 
+#+begin_src c
+const struct header_ops eth_header_ops ____cacheline_aligned = {
+	.create		= eth_header,
+	.parse		= eth_header_parse,
+	.rebuild	= eth_rebuild_header,
+	.cache		= eth_header_cache,
+	.cache_update	= eth_header_cache_update,
+};
+#+end_src
+
++ =eth_header=: create the Ethernet header.
++ =eth_header_parse=: extract hardware address from packet.
++ =eth_rebuild_header=:  rebuild the Ethernet MAC header.
++ =eth_header_cache=: fill cache entry from neighbour.
+*** =net_device_ops=
+这个结构定义了对network devices的管理函数指针.[[net_device_ops][具体代码这里]].
+
++ =ndo_open= 和 =ndo_stop= 初始化和关闭network cards.通常有 =ifconfig=
+  命令触发.
++ =ndo_start_xmit= 用来从等待队列移除包并发送.
++ =ndo_get_stats= 返回统计信息.
++ =ndo_tx_timeout= 当发送包超时,调用这个函数.
+** Allocating and registering network devices
+注册network device一般分为2步:
++ =alloc_netdev_mq= 分配新的 =struct net_device= 实例. 针对不同的协议,
+  传入不同的setup函数.比如对于Ethernet设备,使用 =ether_setup=.
++ 一旦 =struct net_device= 被参数填完整后,它需要使用 =register_netdev=
+  或 =register_netdevice= 来注册.两者的区别是, =register_netdev= 允许
+  一定格式的interface名字.比如Ethernet设备指定名字 =eth%d= , 它会依次
+  把它命名为eth0, eth1... 然后它调用 =register_netdevice=.
+*** =alloc_netdev_mq=
+基本流程如下:
+
+#+attr_html: :width 250px
+[[./Files/alloc_netdev.png]]
+
+以Ethernet设备为例:
+#+begin_src c
+  #define alloc_etherdev(sizeof_priv) alloc_etherdev_mq(sizeof_priv, 1)
+  struct net_device *alloc_etherdev_mq(int sizeof_priv, unsigned int queue_count)
+  {
+    return alloc_netdev_mq(sizeof_priv, "eth%d", ether_setup, queue_count);
+  }
+#+end_src
+*** =register_netdevice=
+基本流程如下:
+
+[[./Files/register_netdevice.jpeg]]
+
++ 有 =dev->netdev_ops->ndo_init=,先调用它初始化.
++ =dev_new_index= 产生唯一的编号,赋值给 =dev->ifindex=.
++ =netdev_register_kobject= 把它加入到普通kernel对象模型中.同时创建上
+  面提到的sysfs点.
++ 加入到特定namesapce的hash表中.
 
 ** Example
-
+以 atheros 的一个网卡初始化为例:
+#+begin_src c
+  struct net_device *dev;
+  athr_gmac_t      *mac;
+  dev = alloc_etherdev(ATHR_MAC_ETHERDEV_SZ);
+  if (!dev)
+  {
+    printk(MODULE_NAME ": unable to allocate mac\n");
+    return 1;
+  }
+  ATHR_MAC_NETPRIV(mac,dev);
+  memset(mac, 0, sizeof(athr_gmac_t));
+  mac->mac_dev       = dev;
+  mac->mac_unit      = i;
+  mac->mac_base      = athr_gmac_base(i);
+  ...
+  static struct net_device_ops athr_gmac_net_ops;
+  athr_gmac_net_ops.ndo_open      = athr_gmac_open;
+  athr_gmac_net_ops.ndo_stop      = athr_gmac_stop;
+  athr_gmac_net_ops.ndo_start_xmit= athr_gmac_hard_start;
+  ...
+  if (register_netdev(dev))
+  {
+    printk(MODULE_NAME ": register netdev failed\n");
+    goto failed;
+  }
+#+end_src
 ** Receiving Packets
+包在不定时到达kernel. 设备驱动基本使用中断来通知kernel包的到达.
+*** Traditional Method
+现在kernel支持两种包接受的框架.一种一直在kernel中,被称为 /traditional
+method/. 这种 API 对于非常高速的网络适配器有问题,所以新的 API (一般被
+成为NAPI, new API)被设计出来.先分析易于理解的传统方法,之后在分析NAPI.
+
+如下图显示,一个包到达网络适配器后如何从kernel到达network层函数的路径.
+
+[[./Files/incoming-packet.jpeg]]
+
+因为包的接受在中断处理中,这个处理只处理必要的工作,让系统不致于延迟太久
+去进行其他活动.
+
+以 =/drivers/net/isa-skeleton.c= 为例(因为涉及到具体网卡的驱动):
+1. =net_interrupt= 是驱动程序所安装的中断程序.如果判断是接受包,传递到
+   =net_rx=.
+2. =net_rx= 函数先创建一个新的socket buffer. 然后根据协议对它进行相应
+   的初始化.之后把这个skb丢给 =netif_rx=.
+3. =netif_rx= 不在是驱动相关函数,它在 =net/core/dev.c=. 它负责特定网卡
+   与通用network层的通信.
+   它的主要目的是把接收到的包放到特定CPU的等待队列中,并退出中断处理程
+   序.
+
+kernel使用全局的 =softnet_data= 数组来管理等待队列.为了加速多核处理器,
+等待队列为每个CPU创建来支持并行处理包.这里只关注数据包头:
+#+begin_src c
+  // <netdevice.h>
+  struct softnet_data
+  {
+    ...
+    struct sk_buff_head input_pkt_queue;
+    ...
+  };
+#+end_src
+
+最后 =netif_rx= 触发[[http://wiki.dreamrunner.org/public_html/Embedded-System/kernel/kernel-activities.html][软中断]] =NET_RX_SOFTIRQ=
+(=__raise_softirq_irqoff(NET_RX_SOFTIRQ);=) 在结束前.
+
+=net_rx_action= 是 =NET_RX_SOFTIRQ= 软中断的处理函数.它的简化版流程图
+如下,它的完整流程在之后高速网络适配器中分析.
+
+[[./Files/net-rx-action.jpeg]]
+
+在做一些准备工作后,进入函数 =process_backlog= (如下).它进行如下的循环:
+#+begin_src c
+// init
+queue->backlog.poll = process_backlog;
+// net_rx_action
+work = n->poll(n, weight);
+#+end_src
+
+1. 
+*** Support for High-Speed Interfaces
+
 
 ** Sending Packets
 
 * Reference
 ** =net_device_ops=
+<<net_device_ops>>
 #+begin_src c
 /*
  * This structure defines the management hooks for network devices.
@@ -333,6 +469,83 @@ struct header_ops {
 				const struct net_device *dev,
 				const unsigned char *haddr);
 };
+#+end_src
+** =alloc_netdev_mq=
+#+begin_src c
+/**
+ *	alloc_netdev_mq - allocate network device
+ *	@sizeof_priv:	size of private data to allocate space for
+ *	@name:		device name format string
+ *	@setup:		callback to initialize device
+ *	@queue_count:	the number of subqueues to allocate
+ *
+ *	Allocates a struct net_device with private data area for driver use
+ *	and performs basic initialization.  Also allocates subquue structs
+ *	for each queue on the device at the end of the netdevice.
+ */
+struct net_device *alloc_netdev_mq(int sizeof_priv, const char *name,
+		void (*setup)(struct net_device *), unsigned int queue_count)
+{
+	struct netdev_queue *tx;
+	struct net_device *dev;
+	size_t alloc_size;
+	struct net_device *p;
+
+	BUG_ON(strlen(name) >= sizeof(dev->name));
+
+	alloc_size = sizeof(struct net_device);
+	if (sizeof_priv) {
+		/* ensure 32-byte alignment of private area */
+		alloc_size = ALIGN(alloc_size, NETDEV_ALIGN);
+		alloc_size += sizeof_priv;
+	}
+	/* ensure 32-byte alignment of whole construct */
+	alloc_size += NETDEV_ALIGN - 1;
+
+	p = kzalloc(alloc_size, GFP_KERNEL);
+	if (!p) {
+		printk(KERN_ERR "alloc_netdev: Unable to allocate device.\n");
+		return NULL;
+	}
+
+	tx = kcalloc(queue_count, sizeof(struct netdev_queue), GFP_KERNEL);
+	if (!tx) {
+		printk(KERN_ERR "alloc_netdev: Unable to allocate "
+		       "tx qdiscs.\n");
+		goto free_p;
+	}
+
+	dev = PTR_ALIGN(p, NETDEV_ALIGN);
+	dev->padded = (char *)dev - (char *)p;
+
+	if (dev_addr_init(dev))
+		goto free_tx;
+
+	dev_unicast_init(dev);
+
+	dev_net_set(dev, &init_net);
+
+	dev->_tx = tx;
+	dev->num_tx_queues = queue_count;
+	dev->real_num_tx_queues = queue_count;
+
+	dev->gso_max_size = GSO_MAX_SIZE;
+
+	netdev_init_queues(dev);
+
+	INIT_LIST_HEAD(&dev->napi_list);
+	dev->priv_flags = IFF_XMIT_DST_RELEASE;
+	setup(dev);
+	strcpy(dev->name, name);
+	return dev;
+
+free_tx:
+	kfree(tx);
+
+free_p:
+	kfree(p);
+	return NULL;
+}
 #+end_src
 ** =athr_gmac_init=
 #+begin_src c
@@ -551,7 +764,150 @@ failed:
     return 1;
 }
 #+end_src
+** =netif_rx=
+#+begin_src c
+/**
+ *	netif_rx	-	post buffer to the network code
+ *	@skb: buffer to post
+ *
+ *	This function receives a packet from a device driver and queues it for
+ *	the upper (protocol) levels to process.  It always succeeds. The buffer
+ *	may be dropped during processing for congestion control or by the
+ *	protocol layers.
+ *
+ *	return values:
+ *	NET_RX_SUCCESS	(no congestion)
+ *	NET_RX_DROP     (packet was dropped)
+ *
+ */
 
+int netif_rx(struct sk_buff *skb)
+{
+	struct softnet_data *queue;
+	unsigned long flags;
+
+	/* if netpoll wants it, pretend we never saw it */
+	if (netpoll_rx(skb))
+		return NET_RX_DROP;
+
+	if (!skb->tstamp.tv64)
+		net_timestamp(skb);
+
+	/*
+	 * The code is rearranged so that the path is the most
+	 * short when CPU is congested, but is still operating.
+	 */
+	local_irq_save(flags);
+	queue = &__get_cpu_var(softnet_data);
+
+	__get_cpu_var(netdev_rx_stat).total++;
+	if (queue->input_pkt_queue.qlen <= netdev_max_backlog) {
+		if (queue->input_pkt_queue.qlen) {
+enqueue:
+			__skb_queue_tail(&queue->input_pkt_queue, skb);
+			local_irq_restore(flags);
+			return NET_RX_SUCCESS;
+		}
+
+		napi_schedule(&queue->backlog);
+		goto enqueue;
+	}
+
+	__get_cpu_var(netdev_rx_stat).dropped++;
+	local_irq_restore(flags);
+
+	kfree_skb(skb);
+	return NET_RX_DROP;
+}
+#+end_src
+** =net_rx_action=
+#+begin_src c
+static void net_rx_action(struct softirq_action *h)
+{
+	struct list_head *list = &__get_cpu_var(softnet_data).poll_list;
+	unsigned long time_limit = jiffies + 2;
+	int budget = netdev_budget;
+	void *have;
+
+	local_irq_disable();
+
+	while (!list_empty(list)) {
+		struct napi_struct *n;
+		int work, weight;
+
+		/* If softirq window is exhuasted then punt.
+		 * Allow this to run for 2 jiffies since which will allow
+		 * an average latency of 1.5/HZ.
+		 */
+		if (unlikely(budget <= 0 || time_after(jiffies, time_limit)))
+			goto softnet_break;
+
+		local_irq_enable();
+
+		/* Even though interrupts have been re-enabled, this
+		 * access is safe because interrupts can only add new
+		 * entries to the tail of this list, and only ->poll()
+		 * calls can remove this head entry from the list.
+		 */
+		n = list_entry(list->next, struct napi_struct, poll_list);
+
+		have = netpoll_poll_lock(n);
+
+		weight = n->weight;
+
+		/* This NAPI_STATE_SCHED test is for avoiding a race
+		 * with netpoll's poll_napi().  Only the entity which
+		 * obtains the lock and sees NAPI_STATE_SCHED set will
+		 * actually make the ->poll() call.  Therefore we avoid
+		 * accidently calling ->poll() when NAPI is not scheduled.
+		 */
+		work = 0;
+		if (test_bit(NAPI_STATE_SCHED, &n->state)) {
+			work = n->poll(n, weight);
+			trace_napi_poll(n);
+		}
+
+		WARN_ON_ONCE(work > weight);
+
+		budget -= work;
+
+		local_irq_disable();
+
+		/* Drivers must not modify the NAPI state if they
+		 * consume the entire weight.  In such cases this code
+		 * still "owns" the NAPI instance and therefore can
+		 * move the instance around on the list at-will.
+		 */
+		if (unlikely(work == weight)) {
+			if (unlikely(napi_disable_pending(n))) {
+				local_irq_enable();
+				napi_complete(n);
+				local_irq_disable();
+			} else
+				list_move_tail(&n->poll_list, list);
+		}
+
+		netpoll_poll_unlock(have);
+	}
+out:
+	local_irq_enable();
+
+#ifdef CONFIG_NET_DMA
+	/*
+	 * There may not be any more sk_buffs coming right now, so push
+	 * any pending DMA copies to hardware
+	 */
+	dma_issue_pending_all();
+#endif
+
+	return;
+
+softnet_break:
+	__get_cpu_var(netdev_rx_stat).time_squeeze++;
+	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
+	goto out;
+}
+#+end_src
 * cc
 #+begin_src c
 

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Linux network and Network access layer</title>
-<!-- 2014-11-11 Tue 20:40 -->
+<!-- 2014-11-12 Wed 22:08 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -88,7 +88,7 @@
     { background-color: #ffff00; color: #000000; font-weight: bold; }
   /*]]>*/-->
 </style>
-<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<link rel="stylesheet" href="./assets/stylesheet.css" type="text/css"/>
 <script type="text/javascript">
 /*
 @licstart  The following is the entire license notice for the
@@ -148,22 +148,29 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3">Network access layer</a>
 <ul>
 <li><a href="#sec-3-1">Representation of Network Devices</a></li>
-<li><a href="#sec-3-2">Example</a></li>
-<li><a href="#sec-3-3">Receiving Packets</a></li>
-<li><a href="#sec-3-4">Sending Packets</a></li>
+<li><a href="#sec-3-2">Allocating and registering network devices</a></li>
+<li><a href="#sec-3-3">Example</a></li>
+<li><a href="#sec-3-4">Receiving Packets</a></li>
+<li><a href="#sec-3-5">Sending Packets</a></li>
 </ul>
 </li>
 <li><a href="#sec-4">Reference</a>
 <ul>
 <li><a href="#sec-4-1"><code>net_device_ops</code></a></li>
 <li><a href="#sec-4-2"><code>header_ops</code></a></li>
-<li><a href="#sec-4-3"><code>athr_gmac_init</code></a></li>
+<li><a href="#sec-4-3"><code>alloc_netdev_mq</code></a></li>
+<li><a href="#sec-4-4"><code>athr_gmac_init</code></a></li>
+<li><a href="#sec-4-5"><code>netif_rx</code></a></li>
+<li><a href="#sec-4-6"><code>net_rx_action</code></a></li>
 </ul>
 </li>
 <li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
 </div>
+<p>
+v#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+</p>
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">Layer Model of Network</h2>
@@ -289,7 +296,6 @@ list,并调用其init函数.
 Network access layer主要负责在设备与网卡驱动互传数据.
 </p>
 </div>
-
 <div id="outline-container-sec-3-1" class="outline-3">
 <h3 id="sec-3-1">Representation of Network Devices</h3>
 <div class="outline-text-3" id="text-3-1">
@@ -386,20 +392,251 @@ devices,并如何寻找特定的network device.在net namespace的net中:
 </li>
 </ul>
 </div>
+
+<ul class="org-ul"><li><a id="sec-3-1-1" name="sec-3-1-1"></a><code>header_ops</code><br  /><div class="outline-text-4" id="text-3-1-1">
+<p>
+对于Ethernet卡来说, <code>struct header_ops</code> 由 <code>net/ethernet/net.c</code> 赋值:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">header_ops</span> <span style="color: #eedd82;">eth_header_ops</span> ____cacheline_aligned = {
+        .create         = eth_header,
+        .parse          = eth_header_parse,
+        .rebuild        = eth_rebuild_header,
+        .cache          = eth_header_cache,
+        .cache_update   = eth_header_cache_update,
+};
+</pre>
 </div>
 
+<ul class="org-ul">
+<li><code>eth_header</code>: create the Ethernet header.
+</li>
+<li><code>eth_header_parse</code>: extract hardware address from packet.
+</li>
+<li><code>eth_rebuild_header</code>:  rebuild the Ethernet MAC header.
+</li>
+<li><code>eth_header_cache</code>: fill cache entry from neighbour.
+</li>
+</ul>
+</div>
+</li>
+<li><a id="sec-3-1-2" name="sec-3-1-2"></a><code>net_device_ops</code><br  /><div class="outline-text-4" id="text-3-1-2">
+<p>
+这个结构定义了对network devices的管理函数指针.<a href="#net_device_ops">具体代码这里</a>.
+</p>
 
-
+<ul class="org-ul">
+<li><code>ndo_open</code> 和 <code>ndo_stop</code> 初始化和关闭network cards.通常有 <code>ifconfig</code>
+  命令触发.
+</li>
+<li><code>ndo_start_xmit</code> 用来从等待队列移除包并发送.
+</li>
+<li><code>ndo_get_stats</code> 返回统计信息.
+</li>
+<li><code>ndo_tx_timeout</code> 当发送包超时,调用这个函数.
+</li>
+</ul>
+</div>
+</li></ul>
+</div>
 <div id="outline-container-sec-3-2" class="outline-3">
-<h3 id="sec-3-2">Example</h3>
+<h3 id="sec-3-2">Allocating and registering network devices</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+注册network device一般分为2步:
+</p>
+<ul class="org-ul">
+<li><code>alloc_netdev_mq</code> 分配新的 <code>struct net_device</code> 实例. 针对不同的协议,
+传入不同的setup函数.比如对于Ethernet设备,使用 <code>ether_setup</code>.
+</li>
+<li>一旦 <code>struct net_device</code> 被参数填完整后,它需要使用 <code>register_netdev</code>
+或 <code>register_netdevice</code> 来注册.两者的区别是, <code>register_netdev</code> 允许一定格式的interface名字.比如Ethernet设备指定名字 <code>eth%d</code> , 它会依次把它命名为eth0, eth1&#x2026; 然后它调用 <code>register_netdevice</code>.
+</li>
+</ul>
+</div>
+<ul class="org-ul"><li><a id="sec-3-2-1" name="sec-3-2-1"></a><code>alloc_netdev_mq</code><br  /><div class="outline-text-4" id="text-3-2-1">
+<p>
+基本流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/alloc_netdev.png" alt="alloc_netdev.png" width="250px" />
+</p>
+</div>
+
+<p>
+以Ethernet设备为例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">alloc_etherdev</span>(<span style="color: #eedd82;">sizeof_priv</span>) alloc_etherdev_mq(sizeof_priv, 1)
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #87cefa;">alloc_etherdev_mq</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">sizeof_priv</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">queue_count</span>)
+{
+  <span style="color: #00ffff;">return</span> alloc_netdev_mq(sizeof_priv, <span style="color: #ffa07a;">"eth%d"</span>, ether_setup, queue_count);
+}
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-3-2-2" name="sec-3-2-2"></a><code>register_netdevice</code><br  /><div class="outline-text-4" id="text-3-2-2">
+<p>
+基本流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/register_netdevice.jpeg" alt="register_netdevice.jpeg" />
+</p>
+</div>
+
+<ul class="org-ul">
+<li>有 <code>dev-&gt;netdev_ops-&gt;ndo_init</code>,先调用它初始化.
+</li>
+<li><code>dev_new_index</code> 产生唯一的编号,赋值给 <code>dev-&gt;ifindex</code>.
+</li>
+<li><code>netdev_register_kobject</code> 把它加入到普通kernel对象模型中.同时创建上面提到的sysfs点.
+</li>
+<li>加入到特定namesapce的hash表中.
+</li>
+</ul>
+</div>
+</li></ul>
 </div>
 
 <div id="outline-container-sec-3-3" class="outline-3">
-<h3 id="sec-3-3">Receiving Packets</h3>
+<h3 id="sec-3-3">Example</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+以 atheros 的一个网卡初始化为例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>;
+<span style="color: #98fb98;">athr_gmac_t</span>      *<span style="color: #eedd82;">mac</span>;
+dev = alloc_etherdev(ATHR_MAC_ETHERDEV_SZ);
+<span style="color: #00ffff;">if</span> (!dev)
+{
+  printk(MODULE_NAME <span style="color: #ffa07a;">": unable to allocate mac\n"</span>);
+  <span style="color: #00ffff;">return</span> 1;
+}
+ATHR_MAC_NETPRIV(mac,dev);
+memset(mac, 0, <span style="color: #00ffff;">sizeof</span>(athr_gmac_t));
+mac-&gt;mac_dev       = dev;
+mac-&gt;mac_unit      = i;
+mac-&gt;mac_base      = athr_gmac_base(i);
+...
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device_ops</span> athr_gmac_net_ops;
+athr_gmac_net_ops.ndo_open      = athr_gmac_open;
+athr_gmac_net_ops.ndo_stop      = athr_gmac_stop;
+athr_gmac_net_ops.ndo_start_xmit= athr_gmac_hard_start;
+...
+<span style="color: #00ffff;">if</span> (register_netdev(dev))
+{
+  printk(MODULE_NAME <span style="color: #ffa07a;">": register netdev failed\n"</span>);
+  <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">failed</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">Receiving Packets</h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+包在不定时到达kernel. 设备驱动基本使用中断来通知kernel包的到达.
+</p>
+</div>
+<ul class="org-ul"><li><a id="sec-3-4-1" name="sec-3-4-1"></a>Traditional Method<br  /><div class="outline-text-4" id="text-3-4-1">
+<p>
+现在kernel支持两种包接受的框架.一种一直在kernel中,被称为 <i>traditional
+method</i>. 这种 API 对于非常高速的网络适配器有问题,所以新的 API (一般被成为NAPI, new API)被设计出来.先分析易于理解的传统方法,之后在分析NAPI.
+</p>
+
+<p>
+如下图显示,一个包到达网络适配器后如何从kernel到达network层函数的路径.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/incoming-packet.jpeg" alt="incoming-packet.jpeg" />
+</p>
 </div>
 
-<div id="outline-container-sec-3-4" class="outline-3">
-<h3 id="sec-3-4">Sending Packets</h3>
+<p>
+因为包的接受在中断处理中,这个处理只处理必要的工作,让系统不致于延迟太久去进行其他活动.
+</p>
+
+<p>
+以 <code>/drivers/net/isa-skeleton.c</code> 为例(因为涉及到具体网卡的驱动):
+</p>
+<ol class="org-ol">
+<li><code>net_interrupt</code> 是驱动程序所安装的中断程序.如果判断是接受包,传递到
+<code>net_rx</code>.
+</li>
+<li><code>net_rx</code> 函数先创建一个新的socket buffer. 然后根据协议对它进行相应的初始化.之后把这个skb丢给 <code>netif_rx</code>.
+</li>
+<li><code>netif_rx</code> 不在是驱动相关函数,它在 <code>net/core/dev.c</code>. 它负责特定网卡与通用network层的通信.
+它的主要目的是把接收到的包放到特定CPU的等待队列中,并退出中断处理程序.
+</li>
+</ol>
+
+<p>
+kernel使用全局的 <code>softnet_data</code> 数组来管理等待队列.为了加速多核处理器,
+等待队列为每个CPU创建来支持并行处理包.这里只关注数据包头:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;netdevice.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softnet_data</span>
+{
+  ...
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff_head</span> input_pkt_queue;
+  ...
+};
+</pre>
+</div>
+
+<p>
+最后 <code>netif_rx</code> 触发<a href="http://wiki.dreamrunner.org/public_html/Embedded-System/kernel/kernel-activities.html">软中断</a> <code>NET_RX_SOFTIRQ</code>
+(<code>__raise_softirq_irqoff(NET_RX_SOFTIRQ);</code>) 在结束前.
+</p>
+
+<p>
+<code>net_rx_action</code> 是 <code>NET_RX_SOFTIRQ</code> 软中断的处理函数.它的简化版流程图如下,它的完整流程在之后高速网络适配器中分析.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/net-rx-action.jpeg" alt="net-rx-action.jpeg" />
+</p>
+</div>
+
+<p>
+在做一些准备工作后,进入函数 <code>process_backlog</code> (如下).它进行如下的循环:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">init</span>
+queue-&gt;backlog.poll = process_backlog;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">net_rx_action</span>
+work = n-&gt;poll(n, weight);
+</pre>
+</div>
+
+<ol class="org-ol">
+<li></li>
+</ol>
+</div>
+</li>
+<li><a id="sec-3-4-2" name="sec-3-4-2"></a>Support for High-Speed Interfaces<br  /></li></ul>
+</div>
+
+
+<div id="outline-container-sec-3-5" class="outline-3">
+<h3 id="sec-3-5">Sending Packets</h3>
 </div>
 </div>
 
@@ -409,6 +646,9 @@ devices,并如何寻找特定的network device.在net namespace的net中:
 </div><div id="outline-container-sec-4-1" class="outline-3">
 <h3 id="sec-4-1"><code>net_device_ops</code></h3>
 <div class="outline-text-3" id="text-4-1">
+<p>
+<a id="net_device_ops" name="net_device_ops"></a>
+</p>
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #ff7f24;">/*</span>
@@ -589,8 +829,91 @@ devices,并如何寻找特定的network device.在net namespace的net中:
 </div>
 </div>
 <div id="outline-container-sec-4-3" class="outline-3">
-<h3 id="sec-4-3"><code>athr_gmac_init</code></h3>
+<h3 id="sec-4-3"><code>alloc_netdev_mq</code></h3>
 <div class="outline-text-3" id="text-4-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> *      alloc_netdev_mq - allocate network device</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@sizeof_priv</span><span style="color: #ffa07a;">:   size of private data to allocate space for</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@name</span><span style="color: #ffa07a;">:          device name format string</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@setup</span><span style="color: #ffa07a;">:         callback to initialize device</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@queue_count</span><span style="color: #ffa07a;">:   the number of subqueues to allocate</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> *      Allocates a struct net_device with private data area for driver use</span>
+<span style="color: #ffa07a;"> *      and performs basic initialization.  Also allocates subquue structs</span>
+<span style="color: #ffa07a;"> *      for each queue on the device at the end of the netdevice.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #87cefa;">alloc_netdev_mq</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">sizeof_priv</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>,
+                <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">setup</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *), <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">queue_count</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">netdev_queue</span> *<span style="color: #eedd82;">tx</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>;
+        <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">alloc_size</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">p</span>;
+
+        BUG_ON(strlen(name) &gt;= <span style="color: #00ffff;">sizeof</span>(dev-&gt;name));
+
+        alloc_size = <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span>);
+        <span style="color: #00ffff;">if</span> (sizeof_priv) {
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ensure 32-byte alignment of private area </span><span style="color: #ff7f24;">*/</span>
+                alloc_size = ALIGN(alloc_size, NETDEV_ALIGN);
+                alloc_size += sizeof_priv;
+        }
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ensure 32-byte alignment of whole construct </span><span style="color: #ff7f24;">*/</span>
+        alloc_size += NETDEV_ALIGN - 1;
+
+        p = kzalloc(alloc_size, GFP_KERNEL);
+        <span style="color: #00ffff;">if</span> (!p) {
+                printk(KERN_ERR <span style="color: #ffa07a;">"alloc_netdev: Unable to allocate device.\n"</span>);
+                <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+        }
+
+        tx = kcalloc(queue_count, <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">netdev_queue</span>), GFP_KERNEL);
+        <span style="color: #00ffff;">if</span> (!tx) {
+                printk(KERN_ERR <span style="color: #ffa07a;">"alloc_netdev: Unable to allocate "</span>
+                       <span style="color: #ffa07a;">"tx qdiscs.\n"</span>);
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">free_p</span>;
+        }
+
+        dev = PTR_ALIGN(p, NETDEV_ALIGN);
+        dev-&gt;padded = (<span style="color: #98fb98;">char</span> *)dev - (<span style="color: #98fb98;">char</span> *)p;
+
+        <span style="color: #00ffff;">if</span> (dev_addr_init(dev))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">free_tx</span>;
+
+        dev_unicast_init(dev);
+
+        dev_net_set(dev, &amp;init_net);
+
+        dev-&gt;_tx = tx;
+        dev-&gt;num_tx_queues = queue_count;
+        dev-&gt;real_num_tx_queues = queue_count;
+
+        dev-&gt;gso_max_size = GSO_MAX_SIZE;
+
+        netdev_init_queues(dev);
+
+        INIT_LIST_HEAD(&amp;dev-&gt;napi_list);
+        dev-&gt;priv_flags = IFF_XMIT_DST_RELEASE;
+        setup(dev);
+        strcpy(dev-&gt;name, name);
+        <span style="color: #00ffff;">return</span> dev;
+
+<span style="color: #7fffd4;">free_tx</span>:
+        kfree(tx);
+
+<span style="color: #7fffd4;">free_p</span>:
+        kfree(p);
+        <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4"><code>athr_gmac_init</code></h3>
+<div class="outline-text-3" id="text-4-4">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">__init</span>
@@ -811,8 +1134,163 @@ athr_gmac_init(<span style="color: #98fb98;">void</span>)
 </div>
 </div>
 </div>
-</div>
+<div id="outline-container-sec-4-5" class="outline-3">
+<h3 id="sec-4-5"><code>netif_rx</code></h3>
+<div class="outline-text-3" id="text-4-5">
+<div class="org-src-container">
 
+<pre class="src src-c"><span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> *      netif_rx        -       post buffer to the network code</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@skb</span><span style="color: #ffa07a;">: buffer to post</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> *      This function receives a packet from a device driver and queues it for</span>
+<span style="color: #ffa07a;"> *      the upper (protocol) levels to process.  It always succeeds. The buffer</span>
+<span style="color: #ffa07a;"> *      may be dropped during processing for congestion control or by the</span>
+<span style="color: #ffa07a;"> *      protocol layers.</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> *      return values:</span>
+<span style="color: #ffa07a;"> *      NET_RX_SUCCESS  (no congestion)</span>
+<span style="color: #ffa07a;"> *      NET_RX_DROP     (packet was dropped)</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> */</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">netif_rx</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softnet_data</span> *<span style="color: #eedd82;">queue</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">flags</span>;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">if netpoll wants it, pretend we never saw it </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (netpoll_rx(skb))
+                <span style="color: #00ffff;">return</span> NET_RX_DROP;
+
+        <span style="color: #00ffff;">if</span> (!skb-&gt;tstamp.tv64)
+                net_timestamp(skb);
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * The code is rearranged so that the path is the most</span>
+<span style="color: #ff7f24;">         * short when CPU is congested, but is still operating.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        local_irq_save(flags);
+        queue = &amp;__get_cpu_var(softnet_data);
+
+        __get_cpu_var(netdev_rx_stat).total++;
+        <span style="color: #00ffff;">if</span> (queue-&gt;input_pkt_queue.qlen &lt;= netdev_max_backlog) {
+                <span style="color: #00ffff;">if</span> (queue-&gt;input_pkt_queue.qlen) {
+<span style="color: #7fffd4;">enqueue</span>:
+                        __skb_queue_tail(&amp;queue-&gt;input_pkt_queue, skb);
+                        local_irq_restore(flags);
+                        <span style="color: #00ffff;">return</span> NET_RX_SUCCESS;
+                }
+
+                napi_schedule(&amp;queue-&gt;backlog);
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">enqueue</span>;
+        }
+
+        __get_cpu_var(netdev_rx_stat).dropped++;
+        local_irq_restore(flags);
+
+        kfree_skb(skb);
+        <span style="color: #00ffff;">return</span> NET_RX_DROP;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-6" class="outline-3">
+<h3 id="sec-4-6"><code>net_rx_action</code></h3>
+<div class="outline-text-3" id="text-4-6">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">net_rx_action</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span> *<span style="color: #eedd82;">h</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> *<span style="color: #eedd82;">list</span> = &amp;__get_cpu_var(softnet_data).poll_list;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">time_limit</span> = jiffies + 2;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">budget</span> = netdev_budget;
+        <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">have</span>;
+
+        local_irq_disable();
+
+        <span style="color: #00ffff;">while</span> (!list_empty(list)) {
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">napi_struct</span> *<span style="color: #eedd82;">n</span>;
+                <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">work</span>, <span style="color: #eedd82;">weight</span>;
+
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">If softirq window is exhuasted then punt.</span>
+<span style="color: #ff7f24;">                 * Allow this to run for 2 jiffies since which will allow</span>
+<span style="color: #ff7f24;">                 * an average latency of 1.5/HZ.</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+                <span style="color: #00ffff;">if</span> (unlikely(budget &lt;= 0 || time_after(jiffies, time_limit)))
+                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">softnet_break</span>;
+
+                local_irq_enable();
+
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Even though interrupts have been re-enabled, this</span>
+<span style="color: #ff7f24;">                 * access is safe because interrupts can only add new</span>
+<span style="color: #ff7f24;">                 * entries to the tail of this list, and only -&gt;poll()</span>
+<span style="color: #ff7f24;">                 * calls can remove this head entry from the list.</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+                n = list_entry(list-&gt;next, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">napi_struct</span>, poll_list);
+
+                have = netpoll_poll_lock(n);
+
+                weight = n-&gt;weight;
+
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">This NAPI_STATE_SCHED test is for avoiding a race</span>
+<span style="color: #ff7f24;">                 * with netpoll's poll_napi().  Only the entity which</span>
+<span style="color: #ff7f24;">                 * obtains the lock and sees NAPI_STATE_SCHED set will</span>
+<span style="color: #ff7f24;">                 * actually make the -&gt;poll() call.  Therefore we avoid</span>
+<span style="color: #ff7f24;">                 * accidently calling -&gt;poll() when NAPI is not scheduled.</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+                work = 0;
+                <span style="color: #00ffff;">if</span> (test_bit(NAPI_STATE_SCHED, &amp;n-&gt;state)) {
+                        work = n-&gt;poll(n, weight);
+                        trace_napi_poll(n);
+                }
+
+                WARN_ON_ONCE(work &gt; weight);
+
+                budget -= work;
+
+                local_irq_disable();
+
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Drivers must not modify the NAPI state if they</span>
+<span style="color: #ff7f24;">                 * consume the entire weight.  In such cases this code</span>
+<span style="color: #ff7f24;">                 * still "owns" the NAPI instance and therefore can</span>
+<span style="color: #ff7f24;">                 * move the instance around on the list at-will.</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+                <span style="color: #00ffff;">if</span> (unlikely(work == weight)) {
+                        <span style="color: #00ffff;">if</span> (unlikely(napi_disable_pending(n))) {
+                                local_irq_enable();
+                                napi_complete(n);
+                                local_irq_disable();
+                        } <span style="color: #00ffff;">else</span>
+                                list_move_tail(&amp;n-&gt;poll_list, list);
+                }
+
+                netpoll_poll_unlock(have);
+        }
+<span style="color: #7fffd4;">out</span>:
+        local_irq_enable();
+
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_NET_DMA
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * There may not be any more sk_buffs coming right now, so push</span>
+<span style="color: #ff7f24;">         * any pending DMA copies to hardware</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        dma_issue_pending_all();
+<span style="color: #b0c4de;">#endif</span>
+
+        <span style="color: #00ffff;">return</span>;
+
+<span style="color: #7fffd4;">softnet_break</span>:
+        __get_cpu_var(netdev_rx_stat).time_squeeze++;
+        __raise_softirq_irqoff(NET_RX_SOFTIRQ);
+        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">cc</h2>
 <div class="outline-text-2" id="text-5">
@@ -825,7 +1303,7 @@ athr_gmac_init(<span style="color: #98fb98;">void</span>)
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-11 Tue 20:40</p>
+<p class="date">Created: 2014-11-12 Wed 22:08</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
