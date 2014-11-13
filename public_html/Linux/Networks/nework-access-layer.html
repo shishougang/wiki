@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Linux network and Network access layer</title>
-<!-- 2014-11-12 Wed 22:08 -->
+<!-- 2014-11-13 Thu 20:19 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -162,6 +162,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4-4"><code>athr_gmac_init</code></a></li>
 <li><a href="#sec-4-5"><code>netif_rx</code></a></li>
 <li><a href="#sec-4-6"><code>net_rx_action</code></a></li>
+<li><a href="#sec-4-7"><code>netif_napi_add</code></a></li>
 </ul>
 </li>
 <li><a href="#sec-5">cc</a></li>
@@ -627,11 +628,127 @@ work = n-&gt;poll(n, weight);
 </div>
 
 <ol class="org-ol">
-<li></li>
+<li><code>__skb_dequeue</code> 从等待队列移除要处理的socket buffer.
+</li>
+<li><code>netif_receive_skb</code> 分析包的类型,处理Vlan,bridging之类,若往上层传,
+查找相应协议的处理函数,传入 <code>deliver_skb</code> 由它调用相应的上层network
+layer的函数继续处理,
+</li>
 </ol>
+
+<p>
+所有network layer用来接收低层network access layer的函数注册在全局的
+hash表 <code>ptype_base</code> 和 <code>ptype_all</code> .
+</p>
+
+<p>
+新的协议通过 <code>dev_add_pack</code> 加入到hash表中.hash中节点类型是
+<code>packet_type</code> 如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;netdevice.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">packet_type</span> {
+  <span style="color: #98fb98;">__be16</span> <span style="color: #eedd82;">type</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">This is really htons(ether_type). </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">NULL is wildcarded here </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">func</span>) (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *,
+               <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *,
+               <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">packet_type</span> *,
+               <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *);
+  ...
+  <span style="color: #98fb98;">void</span> *af_packet_priv;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">list</span>;
+};
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>type</code> 指定处理的协议标识.
+</li>
+<li><code>func</code> 是这个结构的重点元素.指向network layer的函数,用来处理从低层传上来阿包.比如 <code>ip_rcv</code> 用来处理IPv4协议的包.
+</li>
+</ul>
+
+<p>
+<code>netif_receive_skb</code> 为socket buffer找到合适的处理结构,调用它的 <code>func</code>
+函数,然后把处理包的任务交给network layer,也就是上层网络实现.
+</p>
 </div>
 </li>
-<li><a id="sec-3-4-2" name="sec-3-4-2"></a>Support for High-Speed Interfaces<br  /></li></ul>
+
+<li><a id="sec-3-4-2" name="sec-3-4-2"></a>Support for High-Speed Interfaces<br  /><div class="outline-text-4" id="text-3-4-2">
+<p>
+对于慢速设备,服务 IRQ 通常在下一个包到达前完成.因为下一个包也将发送
+IRQ 信号, 不满足这条件&#x2013;时常就是快速设备导致问题.如果Ethernet卡工作在
+10,000 MBit/s,那么它将触发超多中断如果使用旧的方法.当包仍然在等待被处理,新的 IRQ 传递给kernel是没有意义, 因为它正在处理包.为了解决这个问题,NAPI 结合使用 IRQs 和 polling.
+</p>
+
+<p>
+NAPI 机制的基本流程是:
+</p>
+<ol class="org-ol">
+<li>第一个包触使network适配器触发IRQ.为了防止之后的包产生更多的IRQs,驱动关闭这个适配器Rx IRQs.并且,这个适配器被放到poll list中.
+</li>
+<li>kernel 去poll在poll list中的设备,直到没有包在适配器中等待.
+</li>
+<li>Rx 中断再次被打开.
+</li>
+</ol>
+
+<p>
+虽然polling在设备驱动中经常是不好的技术,但在这里没有什么缺点:Polling将停止当没有包需要被处理时,设备再次回到正常的IRQ模式的操作.不会有不必要的时间浪费去poll空的接收队列.
+</p>
+
+<p>
+NAPI 的另外一个优势是包能有效率的被丢弃.如果kernel能确认处理更多的新包超过了它的负荷,包能直接在network适配器中丢弃而不用拷贝到kernel中去.
+</p>
+
+<p>
+只有设备满足一下2个条件才能实现NAPI方法:
+</p>
+<ol class="org-ol">
+<li>设备必须能保存多个收到的包,比如在DMA ring缓冲中.
+</li>
+<li>必须可以关闭接收包的IRQs.并且发送包与其他一些通过IRQs工作的管理函数必须能保持打开.
+</li>
+</ol>
+
+<p>
+如果多于一个设备在系统中会如何? Round robin 方法被引入来poll设备.基本流程如下图:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/napi-mechanism.jpeg" alt="napi-mechanism.jpeg" />
+</p>
+</div>
+
+<p>
+kernel处理list上的设备以round robin 方式:
+</p>
+<ol class="org-ol">
+<li>一个设备接着一个设备的poll, 当一定的时间花费在处理一个设备,另外个设备被选中来处理.
+</li>
+<li>每个设备都有一个相对的权值来表示与poll list上的其他设备的重要性.更大的权值被更快的设备使用.因为权值指定多少个包被处理在一次polling
+round中,这保证了更快的设备得到更多的关注相对慢的.
+</li>
+</ol>
+
+<p>
+现在NAPI的基本概念清晰了,继续分析细节实现.与旧API比,关键区别是网络设备提供一个 <code>poll</code> 的函数. 在初始化网络设备,使用 <code>netif_napi_add</code> 指定设备相关的此方法.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;netdevice.h&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">netif_napi_add</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>,
+                                  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">napi_struct</span> *<span style="color: #eedd82;">napi</span>,
+                                  <span style="color: #98fb98;">int</span> (*<span style="color: #eedd82;">poll</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">napi_struct</span> *, <span style="color: #98fb98;">int</span>),
+                                  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">weight</span>);
+</pre>
+</div>
+</div>
+</li></ul>
 </div>
 
 
@@ -1290,6 +1407,32 @@ athr_gmac_init(<span style="color: #98fb98;">void</span>)
 </div>
 </div>
 </div>
+<div id="outline-container-sec-4-7" class="outline-3">
+<h3 id="sec-4-7"><code>netif_napi_add</code></h3>
+<div class="outline-text-3" id="text-4-7">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">netif_napi_add</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">napi_struct</span> *<span style="color: #eedd82;">napi</span>,
+                    <span style="color: #98fb98;">int</span> (*<span style="color: #eedd82;">poll</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">napi_struct</span> *, <span style="color: #98fb98;">int</span>), <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">weight</span>)
+{
+        INIT_LIST_HEAD(&amp;napi-&gt;poll_list);
+        napi-&gt;gro_count = 0;
+        napi-&gt;gro_list = <span style="color: #7fffd4;">NULL</span>;
+        napi-&gt;skb = <span style="color: #7fffd4;">NULL</span>;
+        napi-&gt;poll = poll;
+        napi-&gt;weight = weight;
+        list_add(&amp;napi-&gt;dev_list, &amp;dev-&gt;napi_list);
+        napi-&gt;dev = dev;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_NETPOLL
+        spin_lock_init(&amp;napi-&gt;poll_lock);
+        napi-&gt;poll_owner = -1;
+<span style="color: #b0c4de;">#endif</span>
+        set_bit(NAPI_STATE_SCHED, &amp;napi-&gt;state);
+}
+</pre>
+</div>
+</div>
+</div>
 </div>
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">cc</h2>
@@ -1303,7 +1446,7 @@ athr_gmac_init(<span style="color: #98fb98;">void</span>)
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-12 Wed 22:08</p>
+<p class="date">Created: 2014-11-13 Thu 20:19</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

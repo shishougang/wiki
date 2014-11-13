@@ -292,8 +292,86 @@ queue->backlog.poll = process_backlog;
 work = n->poll(n, weight);
 #+end_src
 
-1. 
+1. =__skb_dequeue= 从等待队列移除要处理的socket buffer.
+2. =netif_receive_skb= 分析包的类型,处理Vlan,bridging之类,若往上层传,
+   查找相应协议的处理函数,传入 =deliver_skb= 由它调用相应的上层network
+   layer的函数继续处理,
+
+所有network layer用来接收低层network access layer的函数注册在全局的
+hash表 =ptype_base= 和 =ptype_all= .
+
+新的协议通过 =dev_add_pack= 加入到hash表中.hash中节点类型是
+=packet_type= 如下:
+#+begin_src c
+  // <netdevice.h>
+  struct packet_type {
+    __be16 type; /* This is really htons(ether_type). */
+    struct net_device *dev; /* NULL is wildcarded here */
+    int (*func) (struct sk_buff *,
+                 struct net_device *,
+                 struct packet_type *,
+                 struct net_device *);
+    ...
+    void *af_packet_priv;
+    struct list_head list;
+  };
+#+end_src
+
++ =type= 指定处理的协议标识.
++ =func= 是这个结构的重点元素.指向network layer的函数,用来处理从低层传
+  上来阿包.比如 =ip_rcv= 用来处理IPv4协议的包.
+
+=netif_receive_skb= 为socket buffer找到合适的处理结构,调用它的 =func=
+函数,然后把处理包的任务交给network layer,也就是上层网络实现.
+
 *** Support for High-Speed Interfaces
+对于慢速设备,服务 IRQ 通常在下一个包到达前完成.因为下一个包也将发送
+IRQ 信号, 不满足这条件--时常就是快速设备导致问题.如果Ethernet卡工作在
+10,000 MBit/s,那么它将触发超多中断如果使用旧的方法.当包仍然在等待被处
+理,新的 IRQ 传递给kernel是没有意义, 因为它正在处理包.为了解决这个问
+题,NAPI 结合使用 IRQs 和 polling.
+
+NAPI 机制的基本流程是:
+1. 第一个包触使network适配器触发IRQ.为了防止之后的包产生更多的IRQs,驱
+   动关闭这个适配器Rx IRQs.并且,这个适配器被放到poll list中.
+2. kernel 去poll在poll list中的设备,直到没有包在适配器中等待.
+3. Rx 中断再次被打开.
+
+虽然polling在设备驱动中经常是不好的技术,但在这里没有什么缺点:Polling将
+停止当没有包需要被处理时,设备再次回到正常的IRQ模式的操作.不会有不必要
+的时间浪费去poll空的接收队列.
+
+NAPI 的另外一个优势是包能有效率的被丢弃.如果kernel能确认处理更多的新包
+超过了它的负荷,包能直接在network适配器中丢弃而不用拷贝到kernel中去.
+
+只有设备满足一下2个条件才能实现NAPI方法:
+1. 设备必须能保存多个收到的包,比如在DMA ring缓冲中.
+2. 必须可以关闭接收包的IRQs.并且发送包与其他一些通过IRQs工作的管理函数
+   必须能保持打开.
+
+如果多于一个设备在系统中会如何? Round robin 方法被引入来poll设备.基本
+流程如下图:
+
+[[./Files/napi-mechanism.jpeg]]
+
+kernel处理list上的设备以round robin 方式:
+1. 一个设备接着一个设备的poll, 当一定的时间花费在处理一个设备,另外个设
+   备被选中来处理.
+2. 每个设备都有一个相对的权值来表示与poll list上的其他设备的重要性.更
+   大的权值被更快的设备使用.因为权值指定多少个包被处理在一次polling
+   round中,这保证了更快的设备得到更多的关注相对慢的.
+
+现在NAPI的基本概念清晰了,继续分析细节实现.与旧API比,关键区别是网络设备
+提供一个 =poll= 的函数. 在初始化网络设备,使用 =netif_napi_add= 指定设
+备相关的此方法.
+
+#+begin_src c
+  // <netdevice.h>
+  static inline void netif_napi_add(struct net_device *dev,
+                                    struct napi_struct *napi,
+                                    int (*poll)(struct napi_struct *, int),
+                                    int weight);
+#+end_src
 
 
 ** Sending Packets
@@ -906,6 +984,26 @@ softnet_break:
 	__get_cpu_var(netdev_rx_stat).time_squeeze++;
 	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
 	goto out;
+}
+#+end_src
+** =netif_napi_add=
+#+begin_src c
+void netif_napi_add(struct net_device *dev, struct napi_struct *napi,
+		    int (*poll)(struct napi_struct *, int), int weight)
+{
+	INIT_LIST_HEAD(&napi->poll_list);
+	napi->gro_count = 0;
+	napi->gro_list = NULL;
+	napi->skb = NULL;
+	napi->poll = poll;
+	napi->weight = weight;
+	list_add(&napi->dev_list, &dev->napi_list);
+	napi->dev = dev;
+#ifdef CONFIG_NETPOLL
+	spin_lock_init(&napi->poll_lock);
+	napi->poll_owner = -1;
+#endif
+	set_bit(NAPI_STATE_SCHED, &napi->state);
 }
 #+end_src
 * cc
