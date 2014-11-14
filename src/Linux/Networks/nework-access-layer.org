@@ -373,9 +373,107 @@ kernel处理list上的设备以round robin 方式:
                                     int weight);
 #+end_src
 
+=poll= 指定哪个函数被使用当IRQs关闭时, =weight= 就是上面提到的设备权值.权
+值不能超过设备Rx缓冲能存储的最大包个数.
+
+=struct napi_struct= 用来管理poll list上的设备.它定义如下:
+
+#+begin_src c
+  // <netdevice.h>
+  struct napi_struct {
+    struct list_head poll_list;
+    unsigned long state;
+    int weight;
+    int (*poll)(struct napi_struct *, int);
+  };
+#+end_src
+
+poll list是以标准双向kernel链表所实现, =poll_list= 正是这个元素.
+=weight= 和 =poll= 和上面意义一样. =state= 可以是 =NAPI_STATE_SCHED=,
+当设备下次被poll, =NAPI_STATE_DISABLE= 一旦poll完成并且没有更多的等待
+包需要处理.
+
+**** Implementing Poll Functions
+poll函数有两个参数,一个指向 =napi_struct= 实例的指针和一个整数指定
+budget,也就是kernel能处理的包的个数.这里分析一个虚拟的函数,而不是特定
+某个网卡:
+
+#+begin_src c
+  static int hyper_card_poll(struct napi_struct *napi, int budget)
+  {
+    struct nic *nic = container_of(napi, struct nic, napi);
+    struct net_device *netdev = nic->netdev;
+    int work_done;
+    work_done = hyper_do_poll(nic, budget);  //call netif_receive_skb
+    if (work_done < budget) {
+      netif_rx_complete(netdev, napi);
+      hcard_reenable_irq(nic);
+    }
+    return work_done;
+  }
+#+end_src
+
+通过 =napi_struct= 获得设备相关的信息,然后硬件特定的poll方法
+=hyper_do_poll= 被调用来进行必要的底层操作来从网络适配器获取包,并使用
+=netif_receive_skb= 把它们传送到更高的网络层.
+
+=hyper_do_poll= 允许处理budget个包.函数返回实际处理了多少个包.有2中情
+况:
++ 处理包个数小于budget,说明没有更多可处理的包,也就是Rx buffer空了,否则
+  剩下包会将被处理.因为, =netif_rx_complete= 把此情况通知给
+  kernel,kernel将把设备从poll list中移除.同时,驱动重新打开IRQs.
++ 尽管budget被完全使用完,但是更多的包仍然等待着被处理.设备留在poll
+  list中,中断不会再次打开.
+
+**** Implementing IRQ Handlers
+NAPI 同时要求网络设备的IRQ处理有所改变.分析一个简单构造的函数:
+
+#+begin_src c
+  static irqreturn_t e100_intr(int irq, void *dev_id)
+  {
+    struct net_device *netdev = dev_id;
+    struct nic *nic = netdev_priv(netdev);
+    if(likely(netif_rx_schedule_prep(netdev, &nic->napi))) {
+      hcard_disable_irq(nic);
+      __netif_rx_schedule(netdev, &nic->napi);
+    }
+    return IRQ_HANDLED;
+  }
+#+end_src
+
+设备相关的信息包含在 =net_device->private=, 大部分网卡驱动都使用这个方
+法.kernel需要得到通知有新的包要处理.一个分2步的方法需要:
+1. =netif_rx_schedule_prep= 准备设备放入poll list中.关键就是设置
+   =napi_struct->flags= 为 =NAPI_STATE_SCHED=.
+2. 如果设置成功,驱动必须关闭IRQs. 调用 =__netif_rx_schedule= 把设备的
+   =napi_struct= 加入到poll list中并且触发 =NET_RX_SOFTIRQ= 的
+   softIRQ.这通知kernel开始poll在函数 =net_rx_action=.
+
+**** Handling the Rx SoftIRQ
+=net_rx_action= 是 softIRQ =NET_RX_SOFTIRQ= 的处理函数,之前分析了它的
+简化版本,现在分析整个的细节.它基本的流程如下:
+
+[[./Files/net-rx-action-napi.jpeg]]
+
+核心概念就是kernel处理在poll list的所有设备通过调用设备特定的poll方法.然
+后并且需要保证不是花了太多时间在此softIRQ处理中. 处理将推出在以下两中
+情况:
+1. 超过1 jiffie花费在处理上.
+2. 总共处理的包的个数超过一个总的由 =netdev_budget= 指定的budget.通常
+   这个值设为300, 但是可以通过 =/proc/sys/net/core/netdev_budget= 修改.
+
+**** Implementation of the Old API on Top of NAPI
+那么旧API如何在NAPI上实现呢.kernel的正常收包行为由一个默认的拥有
+softnet queue 的网络设备, =process_backlog(net/core/dev.c)= 是这个设备
+的poll方法.如果没有网络设备把它们加入到poll list中,那么它只包含这个默
+认的适配器,那么 =net_rx_action= 的处理仅仅是调用一个 =process_backlog=
+,无论队列中的包来自任何设备.
 
 ** Sending Packets
-
+当上层完成数据包的整个头,并且计算好checksums.由函数
+=dev_queue_xmit(net/core/dev.c)= 把它放到发送队列中,并发送到特定网络设
+备.最终由dev的操作结构 =struct net_device_ops= 的函数 =ndo_start_xmit=
+完成特定设备发送包.
 * Reference
 ** =net_device_ops=
 <<net_device_ops>>
@@ -1006,7 +1104,108 @@ void netif_napi_add(struct net_device *dev, struct napi_struct *napi,
 	set_bit(NAPI_STATE_SCHED, &napi->state);
 }
 #+end_src
-* cc
+** =dev_queue_xmit=
 #+begin_src c
+int dev_queue_xmit(struct sk_buff *skb)
+{
+	struct net_device *dev = skb->dev;
+	struct netdev_queue *txq;
+	struct Qdisc *q;
+	int rc = -ENOMEM;
 
+	/* GSO will handle the following emulations directly. */
+	if (netif_needs_gso(dev, skb))
+		goto gso;
+
+	if (skb_has_frags(skb) &&
+	    !(dev->features & NETIF_F_FRAGLIST) &&
+	    __skb_linearize(skb))
+		goto out_kfree_skb;
+
+	/* Fragmented skb is linearized if device does not support SG,
+	 * or if at least one of fragments is in highmem and device
+	 * does not support DMA from it.
+	 */
+	if (skb_shinfo(skb)->nr_frags &&
+	    (!(dev->features & NETIF_F_SG) || illegal_highdma(dev, skb)) &&
+	    __skb_linearize(skb))
+		goto out_kfree_skb;
+
+	/* If packet is not checksummed and device does not support
+	 * checksumming for this protocol, complete checksumming here.
+	 */
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
+		skb_set_transport_header(skb, skb->csum_start -
+					      skb_headroom(skb));
+		if (!dev_can_checksum(dev, skb) && skb_checksum_help(skb))
+			goto out_kfree_skb;
+	}
+
+gso:
+	/* Disable soft irqs for various locks below. Also
+	 * stops preemption for RCU.
+	 */
+	rcu_read_lock_bh();
+
+	txq = dev_pick_tx(dev, skb);
+	q = rcu_dereference(txq->qdisc);
+
+#ifdef CONFIG_NET_CLS_ACT
+	skb->tc_verd = SET_TC_AT(skb->tc_verd, AT_EGRESS);
+#endif
+	if (q->enqueue) {
+		rc = __dev_xmit_skb(skb, q, dev, txq);
+		goto out;
+	}
+
+	/* The device has no queue. Common case for software devices:
+	   loopback, all the sorts of tunnels...
+
+	   Really, it is unlikely that netif_tx_lock protection is necessary
+	   here.  (f.e. loopback and IP tunnels are clean ignoring statistics
+	   counters.)
+	   However, it is possible, that they rely on protection
+	   made by us here.
+
+	   Check this and shot the lock. It is not prone from deadlocks.
+	   Either shot noqueue qdisc, it is even simpler 8)
+	 */
+	if (dev->flags & IFF_UP) {
+		int cpu = smp_processor_id(); /* ok because BHs are off */
+
+		if (txq->xmit_lock_owner != cpu) {
+
+			HARD_TX_LOCK(dev, txq, cpu);
+
+			if (!netif_tx_queue_stopped(txq)) {
+				rc = NET_XMIT_SUCCESS;
+				if (!dev_hard_start_xmit(skb, dev, txq)) {
+					HARD_TX_UNLOCK(dev, txq);
+					goto out;
+				}
+			}
+			HARD_TX_UNLOCK(dev, txq);
+			if (net_ratelimit())
+				printk(KERN_CRIT "Virtual device %s asks to "
+				       "queue packet!\n", dev->name);
+		} else {
+			/* Recursion is detected! It is possible,
+			 * unfortunately */
+			if (net_ratelimit())
+				printk(KERN_CRIT "Dead loop on virtual device "
+				       "%s, fix it urgently!\n", dev->name);
+		}
+	}
+
+	rc = -ENETDOWN;
+	rcu_read_unlock_bh();
+
+out_kfree_skb:
+	kfree_skb(skb);
+	return rc;
+out:
+	rcu_read_unlock_bh();
+	return rc;
+}
 #+end_src
+

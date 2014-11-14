@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Linux network and Network access layer</title>
-<!-- 2014-11-13 Thu 20:19 -->
+<!-- 2014-11-14 Fri 22:56 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -163,9 +163,9 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4-5"><code>netif_rx</code></a></li>
 <li><a href="#sec-4-6"><code>net_rx_action</code></a></li>
 <li><a href="#sec-4-7"><code>netif_napi_add</code></a></li>
+<li><a href="#sec-4-8"><code>dev_queue_xmit</code></a></li>
 </ul>
 </li>
-<li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
 </div>
@@ -747,16 +747,157 @@ round中,这保证了更快的设备得到更多的关注相对慢的.
                                   <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">weight</span>);
 </pre>
 </div>
+
+<p>
+<code>poll</code> 指定哪个函数被使用当IRQs关闭时, <code>weight</code> 就是上面提到的设备权值.权值不能超过设备Rx缓冲能存储的最大包个数.
+</p>
+
+<p>
+<code>struct napi_struct</code> 用来管理poll list上的设备.它定义如下:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;netdevice.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">napi_struct</span> {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">poll_list</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">state</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">weight</span>;
+  <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">poll</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">napi_struct</span> *, <span style="color: #98fb98;">int</span>);
+};
+</pre>
 </div>
+
+<p>
+poll list是以标准双向kernel链表所实现, <code>poll_list</code> 正是这个元素.
+<code>weight</code> 和 <code>poll</code> 和上面意义一样. <code>state</code> 可以是 <code>NAPI_STATE_SCHED</code>,
+当设备下次被poll, <code>NAPI_STATE_DISABLE</code> 一旦poll完成并且没有更多的等待包需要处理.
+</p>
+</div>
+
+<ul class="org-ul"><li><a id="sec-3-4-2-1" name="sec-3-4-2-1"></a>Implementing Poll Functions<br  /><div class="outline-text-5" id="text-3-4-2-1">
+<p>
+poll函数有两个参数,一个指向 <code>napi_struct</code> 实例的指针和一个整数指定
+budget,也就是kernel能处理的包的个数.这里分析一个虚拟的函数,而不是特定某个网卡:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">hyper_card_poll</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">napi_struct</span> *<span style="color: #eedd82;">napi</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">budget</span>)
+{
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">nic</span> *<span style="color: #eedd82;">nic</span> = container_of(napi, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">nic</span>, napi);
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">netdev</span> = nic-&gt;netdev;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">work_done</span>;
+  work_done = hyper_do_poll(nic, budget);  <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">call netif_receive_skb</span>
+  <span style="color: #00ffff;">if</span> (work_done &lt; budget) {
+    netif_rx_complete(netdev, napi);
+    hcard_reenable_irq(nic);
+  }
+  <span style="color: #00ffff;">return</span> work_done;
+}
+</pre>
+</div>
+
+<p>
+通过 <code>napi_struct</code> 获得设备相关的信息,然后硬件特定的poll方法
+<code>hyper_do_poll</code> 被调用来进行必要的底层操作来从网络适配器获取包,并使用
+<code>netif_receive_skb</code> 把它们传送到更高的网络层.
+</p>
+
+<p>
+<code>hyper_do_poll</code> 允许处理budget个包.函数返回实际处理了多少个包.有2中情况:
+</p>
+<ul class="org-ul">
+<li>处理包个数小于budget,说明没有更多可处理的包,也就是Rx buffer空了,否则剩下包会将被处理.因为, <code>netif_rx_complete</code> 把此情况通知给
+kernel,kernel将把设备从poll list中移除.同时,驱动重新打开IRQs.
+</li>
+<li>尽管budget被完全使用完,但是更多的包仍然等待着被处理.设备留在poll
+list中,中断不会再次打开.
+</li>
+</ul>
+</div>
+</li>
+
+<li><a id="sec-3-4-2-2" name="sec-3-4-2-2"></a>Implementing IRQ Handlers<br  /><div class="outline-text-5" id="text-3-4-2-2">
+<p>
+NAPI 同时要求网络设备的IRQ处理有所改变.分析一个简单构造的函数:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">irqreturn_t</span> <span style="color: #87cefa;">e100_intr</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">dev_id</span>)
+{
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">netdev</span> = dev_id;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">nic</span> *<span style="color: #eedd82;">nic</span> = netdev_priv(netdev);
+  <span style="color: #00ffff;">if</span>(likely(netif_rx_schedule_prep(netdev, &amp;nic-&gt;napi))) {
+    hcard_disable_irq(nic);
+    __netif_rx_schedule(netdev, &amp;nic-&gt;napi);
+  }
+  <span style="color: #00ffff;">return</span> IRQ_HANDLED;
+}
+</pre>
+</div>
+
+<p>
+设备相关的信息包含在 <code>net_device-&gt;private</code>, 大部分网卡驱动都使用这个方法.kernel需要得到通知有新的包要处理.一个分2步的方法需要:
+</p>
+<ol class="org-ol">
+<li><code>netif_rx_schedule_prep</code> 准备设备放入poll list中.关键就是设置
+<code>napi_struct-&gt;flags</code> 为 <code>NAPI_STATE_SCHED</code>.
+</li>
+<li>如果设置成功,驱动必须关闭IRQs. 调用 <code>__netif_rx_schedule</code> 把设备的
+<code>napi_struct</code> 加入到poll list中并且触发 <code>NET_RX_SOFTIRQ</code> 的
+softIRQ.这通知kernel开始poll在函数 <code>net_rx_action</code>.
+</li>
+</ol>
+</div>
+</li>
+
+<li><a id="sec-3-4-2-3" name="sec-3-4-2-3"></a>Handling the Rx SoftIRQ<br  /><div class="outline-text-5" id="text-3-4-2-3">
+<p>
+<code>net_rx_action</code> 是 softIRQ <code>NET_RX_SOFTIRQ</code> 的处理函数,之前分析了它的简化版本,现在分析整个的细节.它基本的流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/net-rx-action-napi.jpeg" alt="net-rx-action-napi.jpeg" />
+</p>
+</div>
+
+<p>
+核心概念就是kernel处理在poll list的所有设备通过调用设备特定的poll方法.然后并且需要保证不是花了太多时间在此softIRQ处理中. 处理将推出在以下两中情况:
+</p>
+<ol class="org-ol">
+<li>超过1 jiffie花费在处理上.
+</li>
+<li>总共处理的包的个数超过一个总的由 <code>netdev_budget</code> 指定的budget.通常这个值设为300, 但是可以通过 <code>/proc/sys/net/core/netdev_budget</code> 修改.
+</li>
+</ol>
+</div>
+</li>
+
+<li><a id="sec-3-4-2-4" name="sec-3-4-2-4"></a>Implementation of the Old API on Top of NAPI<br  /><div class="outline-text-5" id="text-3-4-2-4">
+<p>
+那么旧API如何在NAPI上实现呢.kernel的正常收包行为由一个默认的拥有
+softnet queue 的网络设备, <code>process_backlog(net/core/dev.c)</code> 是这个设备的poll方法.如果没有网络设备把它们加入到poll list中,那么它只包含这个默认的适配器,那么 <code>net_rx_action</code> 的处理仅仅是调用一个 <code>process_backlog</code>
+,无论队列中的包来自任何设备.
+</p>
+</div>
+</li></ul>
 </li></ul>
 </div>
 
-
 <div id="outline-container-sec-3-5" class="outline-3">
 <h3 id="sec-3-5">Sending Packets</h3>
+<div class="outline-text-3" id="text-3-5">
+<p>
+当上层完成数据包的整个头,并且计算好checksums.由函数
+<code>dev_queue_xmit(net/core/dev.c)</code> 把它放到发送队列中,并发送到特定网络设备.最终由dev的操作结构 <code>struct net_device_ops</code> 的函数 <code>ndo_start_xmit</code>
+完成特定设备发送包.
+</p>
 </div>
 </div>
-
+</div>
 <div id="outline-container-sec-4" class="outline-2">
 <h2 id="sec-4">Reference</h2>
 <div class="outline-text-2" id="text-4">
@@ -1433,20 +1574,121 @@ athr_gmac_init(<span style="color: #98fb98;">void</span>)
 </div>
 </div>
 </div>
-</div>
-<div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">cc</h2>
-<div class="outline-text-2" id="text-5">
+<div id="outline-container-sec-4-8" class="outline-3">
+<h3 id="sec-4-8"><code>dev_queue_xmit</code></h3>
+<div class="outline-text-3" id="text-4-8">
 <div class="org-src-container">
 
-<pre class="src src-c"></pre>
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">dev_queue_xmit</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device</span> *<span style="color: #eedd82;">dev</span> = skb-&gt;dev;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">netdev_queue</span> *<span style="color: #eedd82;">txq</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Qdisc</span> *<span style="color: #eedd82;">q</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rc</span> = -ENOMEM;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">GSO will handle the following emulations directly. </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (netif_needs_gso(dev, skb))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">gso</span>;
+
+        <span style="color: #00ffff;">if</span> (skb_has_frags(skb) &amp;&amp;
+            !(dev-&gt;features &amp; NETIF_F_FRAGLIST) &amp;&amp;
+            __skb_linearize(skb))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out_kfree_skb</span>;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Fragmented skb is linearized if device does not support SG,</span>
+<span style="color: #ff7f24;">         * or if at least one of fragments is in highmem and device</span>
+<span style="color: #ff7f24;">         * does not support DMA from it.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (skb_shinfo(skb)-&gt;nr_frags &amp;&amp;
+            (!(dev-&gt;features &amp; NETIF_F_SG) || illegal_highdma(dev, skb)) &amp;&amp;
+            __skb_linearize(skb))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out_kfree_skb</span>;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">If packet is not checksummed and device does not support</span>
+<span style="color: #ff7f24;">         * checksumming for this protocol, complete checksumming here.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (skb-&gt;ip_summed == CHECKSUM_PARTIAL) {
+                skb_set_transport_header(skb, skb-&gt;csum_start -
+                                              skb_headroom(skb));
+                <span style="color: #00ffff;">if</span> (!dev_can_checksum(dev, skb) &amp;&amp; skb_checksum_help(skb))
+                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out_kfree_skb</span>;
+        }
+
+<span style="color: #7fffd4;">gso</span>:
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Disable soft irqs for various locks below. Also</span>
+<span style="color: #ff7f24;">         * stops preemption for RCU.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        rcu_read_lock_bh();
+
+        txq = dev_pick_tx(dev, skb);
+        q = rcu_dereference(txq-&gt;qdisc);
+
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_NET_CLS_ACT
+        skb-&gt;tc_verd = SET_TC_AT(skb-&gt;tc_verd, AT_EGRESS);
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #00ffff;">if</span> (q-&gt;enqueue) {
+                rc = __dev_xmit_skb(skb, q, dev, txq);
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+        }
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">The device has no queue. Common case for software devices:</span>
+<span style="color: #ff7f24;">           loopback, all the sorts of tunnels...</span>
+
+<span style="color: #ff7f24;">           Really, it is unlikely that netif_tx_lock protection is necessary</span>
+<span style="color: #ff7f24;">           here.  (f.e. loopback and IP tunnels are clean ignoring statistics</span>
+<span style="color: #ff7f24;">           counters.)</span>
+<span style="color: #ff7f24;">           However, it is possible, that they rely on protection</span>
+<span style="color: #ff7f24;">           made by us here.</span>
+
+<span style="color: #ff7f24;">           Check this and shot the lock. It is not prone from deadlocks.</span>
+<span style="color: #ff7f24;">           Either shot noqueue qdisc, it is even simpler 8)</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (dev-&gt;flags &amp; IFF_UP) {
+                <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">cpu</span> = smp_processor_id(); <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ok because BHs are off </span><span style="color: #ff7f24;">*/</span>
+
+                <span style="color: #00ffff;">if</span> (txq-&gt;xmit_lock_owner != cpu) {
+
+                        HARD_TX_LOCK(dev, txq, cpu);
+
+                        <span style="color: #00ffff;">if</span> (!netif_tx_queue_stopped(txq)) {
+                                rc = NET_XMIT_SUCCESS;
+                                <span style="color: #00ffff;">if</span> (!dev_hard_start_xmit(skb, dev, txq)) {
+                                        HARD_TX_UNLOCK(dev, txq);
+                                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+                                }
+                        }
+                        HARD_TX_UNLOCK(dev, txq);
+                        <span style="color: #00ffff;">if</span> (net_ratelimit())
+                                printk(KERN_CRIT <span style="color: #ffa07a;">"Virtual device %s asks to "</span>
+                                       <span style="color: #ffa07a;">"queue packet!\n"</span>, dev-&gt;name);
+                } <span style="color: #00ffff;">else</span> {
+                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Recursion is detected! It is possible,</span>
+<span style="color: #ff7f24;">                         * unfortunately </span><span style="color: #ff7f24;">*/</span>
+                        <span style="color: #00ffff;">if</span> (net_ratelimit())
+                                printk(KERN_CRIT <span style="color: #ffa07a;">"Dead loop on virtual device "</span>
+                                       <span style="color: #ffa07a;">"%s, fix it urgently!\n"</span>, dev-&gt;name);
+                }
+        }
+
+        rc = -ENETDOWN;
+        rcu_read_unlock_bh();
+
+<span style="color: #7fffd4;">out_kfree_skb</span>:
+        kfree_skb(skb);
+        <span style="color: #00ffff;">return</span> rc;
+<span style="color: #7fffd4;">out</span>:
+        rcu_read_unlock_bh();
+        <span style="color: #00ffff;">return</span> rc;
+}
+</pre>
+</div>
 </div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-13 Thu 20:19</p>
+<p class="date">Created: 2014-11-14 Fri 22:56</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
