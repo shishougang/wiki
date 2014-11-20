@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Transport layer</title>
-<!-- 2014-11-19 Wed 20:20 -->
+<!-- 2014-11-20 Thu 20:34 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -152,9 +152,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2-4">Passive Connection Establishment</a></li>
 <li><a href="#sec-2-5">Active Connection Establishment</a></li>
 <li><a href="#sec-2-6">Transmission of Data Packets</a></li>
-<li><a href="#sec-2-7">Receiving Packets</a></li>
-<li><a href="#sec-2-8">Sending Packets</a></li>
-<li><a href="#sec-2-9">Connection Termination</a></li>
+<li><a href="#sec-2-7">Connection Termination</a></li>
 </ul>
 </li>
 <li><a href="#sec-3">file</a></li>
@@ -162,7 +160,8 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-4-1"><code>__udp4_lib_rcv</code></a></li>
 <li><a href="#sec-4-2"><code>sock_queue_rcv_skb</code></a></li>
-<li><a href="#sec-4-3">=</a></li>
+<li><a href="#sec-4-3"><code>tcp_v4_connect</code></a></li>
+<li><a href="#sec-4-4"><code>tcp_connect</code></a></li>
 </ul>
 </li>
 </ul>
@@ -278,64 +277,290 @@ kernel内部的socket.当有侦听进程接受此包,代码使用hash方法从�
 这里主要分析TCP协议的3个主要部分:连接建立,传送/发送包和连接终止.
 </p>
 
-
-<div class="figure">
-<p><img src="./Files/tcp-state-transition.jpeg" alt="tcp-state-transition.jpeg" />
+<p>
+TCP连接处于一个定义好的状态.所有状态和它们之间转换的规则如下:
 </p>
-</div>
+
+<p>
+<a id="tcp-transition" name="tcp-transition"></a>
+<img src="./Files/tcp-state-transition.jpeg" alt="tcp-state-transition.jpeg" />
+</p>
 </div>
 
 <div id="outline-container-sec-2-1" class="outline-3">
 <h3 id="sec-2-1">TCP Headers</h3>
-</div>
+<div class="outline-text-3" id="text-2-1">
+<p>
+TCP的头部如下图:
+<i>
+./Files/tcp-packet.jpeg</i>
+</p>
 
+<ul class="org-ul">
+<li>source和dest指定使用的端口号.
+</li>
+<li>seq是序列号.指定TCP包在数据流中所处位置.
+</li>
+<li>ack<sub>seq是确认序列号</sub>.
+</li>
+<li>doff是data offset的缩小,指定TCP头结构的长度.
+</li>
+<li>urg(urgent), ack(acknowledgment), psh(push), rst(reset),
+syn(synchronize), 和fin是控制标识来检查,建立和终止连接.
+</li>
+<li>window告诉连接同伴在接收缓冲将满前它能发送多少字节.
+</li>
+<li>options是长度的其他附加选项.
+</li>
+<li>数据起始点是一个32-bit的位置.
+</li>
+</ul>
+
+<p>
+头部以 <code>tcphadr</code> 结构实现,如下:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;tcp.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tcphdr</span> {
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">source</span>;
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">dest</span>;
+        <span style="color: #98fb98;">__be32</span>  <span style="color: #eedd82;">seq</span>;
+        <span style="color: #98fb98;">__be32</span>  <span style="color: #eedd82;">ack_seq</span>;
+<span style="color: #b0c4de;">#if</span> <span style="color: #b0c4de;">defined</span>(__LITTLE_ENDIAN_BITFIELD)
+        <span style="color: #98fb98;">__u16</span>   <span style="color: #eedd82;">res1</span>:4,
+                <span style="color: #eedd82;">doff</span>:4,
+                <span style="color: #eedd82;">fin</span>:1,
+                <span style="color: #eedd82;">syn</span>:1,
+                <span style="color: #eedd82;">rst</span>:1,
+                <span style="color: #eedd82;">psh</span>:1,
+                <span style="color: #eedd82;">ack</span>:1,
+                <span style="color: #eedd82;">urg</span>:1,
+                <span style="color: #eedd82;">ece</span>:1,
+                <span style="color: #eedd82;">cwr</span>:1;
+<span style="color: #b0c4de;">#elif</span> <span style="color: #b0c4de;">defined</span>(__BIG_ENDIAN_BITFIELD)
+        <span style="color: #98fb98;">__u16</span>   <span style="color: #eedd82;">doff</span>:4,
+                <span style="color: #eedd82;">res1</span>:4,
+                <span style="color: #eedd82;">cwr</span>:1,
+                <span style="color: #eedd82;">ece</span>:1,
+                <span style="color: #eedd82;">urg</span>:1,
+                <span style="color: #eedd82;">ack</span>:1,
+                <span style="color: #eedd82;">psh</span>:1,
+                <span style="color: #eedd82;">rst</span>:1,
+                <span style="color: #eedd82;">syn</span>:1,
+                <span style="color: #eedd82;">fin</span>:1;
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #b0c4de;">#error</span>  <span style="color: #ffa07a;">"Adjust your &lt;asm/byteorder.h&gt; defines"</span>
+<span style="color: #b0c4de;">#endif</span>  
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">window</span>;
+        <span style="color: #98fb98;">__sum16</span> <span style="color: #eedd82;">check</span>;
+        <span style="color: #98fb98;">__be16</span>  <span style="color: #eedd82;">urg_ptr</span>;
+}
+</pre>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-2-2" class="outline-3">
 <h3 id="sec-2-2">Receiving TCP Data</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+所有TCP行为(连接建立,关闭和数据传输)都通过发送拥有特定属性和不同标识的数据包.在讨论状态转换前,先分析TCP数据如何传递到transport layer和头部在那裏被分析.
+</p>
+
+<p>
+<code>tcp_v4_rcv</code> 是被IP层处理完的包传入到TCP层的入口点.流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/tcp-v4-rcv.jpeg" alt="tcp-v4-rcv.jpeg" />
+</p>
+</div>
+
+<p>
+每个TCP socket在以下3个hash表之一中:
+</p>
+<ul class="org-ul">
+<li>完全连接的Sockets.
+</li>
+<li>等待连接(listen状态)的Sockets.
+</li>
+<li>正在建立连接(3次握手)的Sockets.
+</li>
+</ul>
+
+<p>
+做做完对数据包的一些检查,并拷贝一些头信息到控制模块后,kernel找寻正在等待处理此包的socket通过函数 <code>__inet_lookup</code> .这个函数进一步调用两个函数来检查不同的hash表. <code>__inet_lookup_established</code> 试图返回一个连接好的
+socket. 如果没有找到, <code>__inet_lookup_listener</code> 被调用来检查所有侦听中的sockets.
+</p>
+
+<p>
+两个函数都把连接的不同元素和起来计算hash值来找到对应的sock.当搜索侦听
+socket时,一个score的方法被使用来找到最合适的候选sockets.
+</p>
+
+<p>
+与UDP不同,当合适的sock结构找到工作并不完结.依赖于所处连接状态,有必要做如上图的状态转换. <code>tcp_v4_do_rcv</code> 好比一个分路器,把代码路径基于socket
+站柜台分成不同的分支.
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-2-3" class="outline-3">
 <h3 id="sec-2-3">Three-Way Handshake</h3>
-</div>
+<div class="outline-text-3" id="text-2-3">
+<p>
+在TCP链路能被使用前,client和host之间必须建立连接.有两种不同的连接建立方式: active和passive.
+</p>
 
+<p>
+在建立连接前,client的socket处于CLOSED状态,而server的socket处理LISTEN状态.
+</p>
+
+<p>
+TCP 连接的建立过程通过交互3个TCP包完成,所以被熟知为"3次握手".如
+<a href="#tcp-transition">TCP状态图</a>所示,如下的行为进行:
+</p>
+<ol class="org-ol">
+<li>client发送SYN包给server告诉连接请求.client的socket状态从CLOSED转换到SYN<sub>SENT</sub>.
+</li>
+<li>server在侦听中的socket收到连接请求,然后返回SYN和ACK的包. server的
+socket状态从LISTEN转换到SYN<sub>REC</sub>.
+</li>
+<li>client的socket收到SYN/ACK包并转换到ESTABLISHED状态,表明连接已经建立.一个ACK包发给server.
+</li>
+<li>server收到ACK包并转换到ESTABLISHED状态.两端的连接创建好,数据交互可以开始.
+</li>
+</ol>
+
+<p>
+每个发送包都被赋予一个序列号,并且每个包的收到必须由接收方确认.如下一个连接请求的例子:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">1 192.168.0.143 192.168.1.10 TCP 1025 &gt; http [SYN] <span style="color: #eedd82;">Seq</span>=2895263889 <span style="color: #eedd82;">Ack</span>=0
+2 192.168.1.10 192.168.0.143 TCP http &gt; 1025 [SYN, ACK] <span style="color: #eedd82;">Seq</span>=2882478813 <span style="color: #eedd82;">Ack</span>=289526
+3 192.168.0.143 192.168.1.10 TCP 1025 &gt; http [ACK] <span style="color: #eedd82;">Seq</span>=2895263890 <span style="color: #eedd82;">Ack</span>=2882478814
+</pre>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-2-4" class="outline-3">
 <h3 id="sec-2-4">Passive Connection Establishment</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+主动建立连接不是由kernel自己发出,而是通过收到连接请求的SYN包所触发.因此起始点是接收函数 <code>tcp_v4_rcv</code> ,如上节所述,此函数找到侦听socket并调用
+<code>tcp_v4_do_rcv</code>, 它的代码流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/tcp-v4-rcv-passive.jpeg" alt="tcp-v4-rcv-passive.jpeg" />
+</p>
 </div>
 
+<p>
+<code>tcp_v4_hnd_req</code> 被调用来进行网络层创建新连接所需要的一些初始化工作.实际的状态转换在 <code>tcp_rcv_state_process</code> ,其中包含一长串case语句区分可能的socket状态,并触发合适的转换函数.
+</p>
+
+<p>
+socket状态定义如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">include/net/tcp_states.h</span>
+<span style="color: #00ffff;">enum</span> {
+  <span style="color: #eedd82;">TCP_ESTABLISHED</span> = 1,
+  <span style="color: #98fb98;">TCP_SYN_SENT</span>,
+  <span style="color: #98fb98;">TCP_SYN_RECV</span>,
+  <span style="color: #98fb98;">TCP_FIN_WAIT1</span>,
+  <span style="color: #98fb98;">TCP_FIN_WAIT2</span>,
+  <span style="color: #98fb98;">TCP_TIME_WAIT</span>,
+  <span style="color: #98fb98;">TCP_CLOSE</span>,
+  <span style="color: #98fb98;">TCP_CLOSE_WAIT</span>,
+  <span style="color: #98fb98;">TCP_LAST_ACK</span>,
+  <span style="color: #98fb98;">TCP_LISTEN</span>,
+  <span style="color: #98fb98;">TCP_CLOSING</span>, <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Now a valid state </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #eedd82;">TCP_MAX_STATES</span> <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Leave at the end! </span><span style="color: #ff7f24;">*/</span>
+};
+</pre>
+</div>
+
+<p>
+如果socket状态处于 <code>TCP_LISTEN</code> 时, 调用
+<code>icsk-&gt;icsk_af_ops-&gt;conn_request(sk, skb)</code> , IPv4时指向
+<code>tcp_v4_conn_request</code> 而IPv6时指向 <code>tcp_v6_conn_request</code> .不进一步分析这个函数,重要的是在此函数最后确认包被发送.第一次握手成功.
+</p>
+
+<p>
+之后client接收到这个ACK包从通常路径 <code>tcp_rcv_state_process</code> , socket此时状态是 <code>TCP_SYN_RECV</code> ,此时kernel主要任务是转换socket状态到
+<code>TCP_ESTABLISHED</code>.
+</p>
+</div>
+</div>
 <div id="outline-container-sec-2-5" class="outline-3">
 <h3 id="sec-2-5">Active Connection Establishment</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+主动建立连接由用户空间应用调用库函数 <code>connect</code> ,然后通过 <code>socketcall</code>
+的系统调用到达kernel函数 <code>tcp_v4_connec</code>, 它的代码流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/tcp-active-connection-establish.jpeg" alt="tcp-active-connection-establish.jpeg" />
+</p>
+</div>
+
+<p>
+函数开始于寻找到目的host的IP路由通过kernel提供的路由功能,当TCP头部被创建并设置相应的值在socket buffer中后, <code>tcp_set_state(sk,
+TCP_SYN_SENT);</code> ,socket状态从 <code>CLOSED</code> 转换到 <code>SYN_SENT</code>. 然后
+<code>tcp_connect</code> 发送 SYN包到IP层从而到达client( <code>tcp_transmit_skb(sk,
+buff, 1, sk-&gt;sk_allocation);</code> ). 并且 <code>inet_csk_reset_xmit_timer</code> 创建一个计时器确保能重发包如果在一段时间内没有收到确认包.
+</p>
+
+<p>
+现在client必须等到server确认SYN包的收到和确认连接请求的SYN包. 与通常的
+TCP接收路径一样,之后到达 <code>tcp_rcv_state_process</code> 分状态处理,这里到
+<code>tcp_rcv_synsent_state_process</code> 去处理. socket状态设置为 <code>ESTABLISHED</code>
+,并且 <code>tcp_send_ack</code> 发送另外ACK包给server完成建立连接.
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-2-6" class="outline-3">
 <h3 id="sec-2-6">Transmission of Data Packets</h3>
+<div class="outline-text-3" id="text-2-6">
+</div><ul class="org-ul"><li><a id="sec-2-6-1" name="sec-2-6-1"></a>Receiving Packets<br  /><div class="outline-text-4" id="text-2-6-1">
+
+<div class="figure">
+<p><img src="./Files/tcp-v4-rcv-connection.jpeg" alt="tcp-v4-rcv-connection.jpeg" />
+</p>
 </div>
+</div>
+</li>
+
+<li><a id="sec-2-6-2" name="sec-2-6-2"></a>Sending Packets<br  /><div class="outline-text-4" id="text-2-6-2">
+
+<div class="figure">
+<p><img src="./Files/tcp-sendmsg.jpeg" alt="tcp-sendmsg.jpeg" />
+</p>
+</div>
+</div>
+</li></ul>
+</div>
+
 
 <div id="outline-container-sec-2-7" class="outline-3">
-<h3 id="sec-2-7">Receiving Packets</h3>
-</div>
-
-<div id="outline-container-sec-2-8" class="outline-3">
-<h3 id="sec-2-8">Sending Packets</h3>
-</div>
-
-<div id="outline-container-sec-2-9" class="outline-3">
-<h3 id="sec-2-9">Connection Termination</h3>
+<h3 id="sec-2-7">Connection Termination</h3>
 </div>
 </div>
 
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">file</h2>
 <div class="outline-text-2" id="text-3">
-<p>
-[[./Files/tcp-active-connection-establish.jpeg
-[[./Files/tcp-sendmsg.jpeg
-[[./Files/tcp-v4-rcv-connection.jpeg
-[[./Files/tcp-v4-rcv-passive.jpeg
-</p>
-
-<p>
-[[./Files/
-</p>
-
 <div class="org-src-container">
 
 <pre class="src src-c"></pre>
@@ -504,13 +729,190 @@ kernel内部的socket.当有侦听进程接受此包,代码使用hash方法从�
 </div>
 </div>
 <div id="outline-container-sec-4-3" class="outline-3">
-<h3 id="sec-4-3">=</h3>
+<h3 id="sec-4-3"><code>tcp_v4_connect</code></h3>
+<div class="outline-text-3" id="text-4-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">tcp_v4_connect</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> *<span style="color: #eedd82;">sk</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr</span> *<span style="color: #eedd82;">uaddr</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">addr_len</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inet_sock</span> *<span style="color: #eedd82;">inet</span> = inet_sk(sk);
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tcp_sock</span> *<span style="color: #eedd82;">tp</span> = tcp_sk(sk);
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr_in</span> *<span style="color: #eedd82;">usin</span> = (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr_in</span> *)uaddr;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rtable</span> *<span style="color: #eedd82;">rt</span>;
+        <span style="color: #98fb98;">__be32</span> <span style="color: #eedd82;">daddr</span>, <span style="color: #eedd82;">nexthop</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">tmp</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">err</span>;
+
+        <span style="color: #00ffff;">if</span> (addr_len &lt; <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr_in</span>))
+                <span style="color: #00ffff;">return</span> -EINVAL;
+
+        <span style="color: #00ffff;">if</span> (usin-&gt;sin_family != AF_INET)
+                <span style="color: #00ffff;">return</span> -EAFNOSUPPORT;
+
+        nexthop = daddr = usin-&gt;sin_addr.s_addr;
+        <span style="color: #00ffff;">if</span> (inet-&gt;opt &amp;&amp; inet-&gt;opt-&gt;srr) {
+                <span style="color: #00ffff;">if</span> (!daddr)
+                        <span style="color: #00ffff;">return</span> -EINVAL;
+                nexthop = inet-&gt;opt-&gt;faddr;
+        }
+
+        tmp = ip_route_connect(&amp;rt, nexthop, inet-&gt;saddr,
+                               RT_CONN_FLAGS(sk), sk-&gt;sk_bound_dev_if,
+                               IPPROTO_TCP,
+                               inet-&gt;sport, usin-&gt;sin_port, sk, 1);
+        <span style="color: #00ffff;">if</span> (tmp &lt; 0) {
+                <span style="color: #00ffff;">if</span> (tmp == -ENETUNREACH)
+                        IP_INC_STATS_BH(sock_net(sk), IPSTATS_MIB_OUTNOROUTES);
+                <span style="color: #00ffff;">return</span> tmp;
+        }
+
+        <span style="color: #00ffff;">if</span> (rt-&gt;rt_flags &amp; (RTCF_MULTICAST | RTCF_BROADCAST)) {
+                ip_rt_put(rt);
+                <span style="color: #00ffff;">return</span> -ENETUNREACH;
+        }
+
+        <span style="color: #00ffff;">if</span> (!inet-&gt;opt || !inet-&gt;opt-&gt;srr)
+                daddr = rt-&gt;rt_dst;
+
+        <span style="color: #00ffff;">if</span> (!inet-&gt;saddr)
+                inet-&gt;saddr = rt-&gt;rt_src;
+        inet-&gt;rcv_saddr = inet-&gt;saddr;
+
+        <span style="color: #00ffff;">if</span> (tp-&gt;rx_opt.ts_recent_stamp &amp;&amp; inet-&gt;daddr != daddr) {
+                <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Reset inherited state </span><span style="color: #ff7f24;">*/</span>
+                tp-&gt;rx_opt.ts_recent       = 0;
+                tp-&gt;rx_opt.ts_recent_stamp = 0;
+                tp-&gt;write_seq              = 0;
+        }
+
+        <span style="color: #00ffff;">if</span> (tcp_death_row.sysctl_tw_recycle &amp;&amp;
+            !tp-&gt;rx_opt.ts_recent_stamp &amp;&amp; rt-&gt;rt_dst == daddr) {
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inet_peer</span> *<span style="color: #eedd82;">peer</span> = rt_get_peer(rt);
+                <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">                 * VJ's idea. We save last timestamp seen from</span>
+<span style="color: #ff7f24;">                 * the destination in peer table, when entering state</span>
+<span style="color: #ff7f24;">                 * TIME-WAIT * and initialize rx_opt.ts_recent from it,</span>
+<span style="color: #ff7f24;">                 * when trying new connection.</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+                <span style="color: #00ffff;">if</span> (peer != <span style="color: #7fffd4;">NULL</span> &amp;&amp;
+                    peer-&gt;tcp_ts_stamp + TCP_PAWS_MSL &gt;= get_seconds()) {
+                        tp-&gt;rx_opt.ts_recent_stamp = peer-&gt;tcp_ts_stamp;
+                        tp-&gt;rx_opt.ts_recent = peer-&gt;tcp_ts;
+                }
+        }
+
+        inet-&gt;dport = usin-&gt;sin_port;
+        inet-&gt;daddr = daddr;
+
+        inet_csk(sk)-&gt;icsk_ext_hdr_len = 0;
+        <span style="color: #00ffff;">if</span> (inet-&gt;opt)
+                inet_csk(sk)-&gt;icsk_ext_hdr_len = inet-&gt;opt-&gt;optlen;
+
+        tp-&gt;rx_opt.mss_clamp = 536;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Socket identity is still unknown (sport may be zero).</span>
+<span style="color: #ff7f24;">         * However we set state to SYN-SENT and not releasing socket</span>
+<span style="color: #ff7f24;">         * lock select source port, enter ourselves into the hash tables and</span>
+<span style="color: #ff7f24;">         * complete initialization after this.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        tcp_set_state(sk, TCP_SYN_SENT);
+        err = inet_hash_connect(&amp;tcp_death_row, sk);
+        <span style="color: #00ffff;">if</span> (err)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">failure</span>;
+
+        err = ip_route_newports(&amp;rt, IPPROTO_TCP,
+                                inet-&gt;sport, inet-&gt;dport, sk);
+        <span style="color: #00ffff;">if</span> (err)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">failure</span>;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">OK, now commit destination to socket.  </span><span style="color: #ff7f24;">*/</span>
+        sk-&gt;sk_gso_type = SKB_GSO_TCPV4;
+        sk_setup_caps(sk, &amp;rt-&gt;u.dst);
+
+        <span style="color: #00ffff;">if</span> (!tp-&gt;write_seq)
+                tp-&gt;write_seq = secure_tcp_sequence_number(inet-&gt;saddr,
+                                                           inet-&gt;daddr,
+                                                           inet-&gt;sport,
+                                                           usin-&gt;sin_port);
+
+        inet-&gt;id = tp-&gt;write_seq ^ jiffies;
+
+        err = tcp_connect(sk);
+        rt = <span style="color: #7fffd4;">NULL</span>;
+        <span style="color: #00ffff;">if</span> (err)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">failure</span>;
+
+        <span style="color: #00ffff;">return</span> 0;
+
+<span style="color: #7fffd4;">failure</span>:
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * This unhashes the socket and releases the local port,</span>
+<span style="color: #ff7f24;">         * if necessary.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        tcp_set_state(sk, TCP_CLOSE);
+        ip_rt_put(rt);
+        sk-&gt;sk_route_caps = 0;
+        inet-&gt;dport = 0;
+        <span style="color: #00ffff;">return</span> err;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4"><code>tcp_connect</code></h3>
+<div class="outline-text-3" id="text-4-4">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">tcp_connect</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sock</span> *<span style="color: #eedd82;">sk</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tcp_sock</span> *<span style="color: #eedd82;">tp</span> = tcp_sk(sk);
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">buff</span>;
+
+        tcp_connect_init(sk);
+
+        buff = alloc_skb_fclone(MAX_TCP_HEADER + 15, sk-&gt;sk_allocation);
+        <span style="color: #00ffff;">if</span> (unlikely(buff == <span style="color: #7fffd4;">NULL</span>))
+                <span style="color: #00ffff;">return</span> -ENOBUFS;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Reserve space for headers. </span><span style="color: #ff7f24;">*/</span>
+        skb_reserve(buff, MAX_TCP_HEADER);
+
+        tp-&gt;snd_nxt = tp-&gt;write_seq;
+        tcp_init_nondata_skb(buff, tp-&gt;write_seq++, TCPCB_FLAG_SYN);
+        TCP_ECN_send_syn(sk, buff);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Send it off. </span><span style="color: #ff7f24;">*/</span>
+        TCP_SKB_CB(buff)-&gt;when = tcp_time_stamp;
+        tp-&gt;retrans_stamp = TCP_SKB_CB(buff)-&gt;when;
+        skb_header_release(buff);
+        __tcp_add_write_queue_tail(sk, buff);
+        sk-&gt;sk_wmem_queued += buff-&gt;truesize;
+        sk_mem_charge(sk, buff-&gt;truesize);
+        tp-&gt;packets_out += tcp_skb_pcount(buff);
+        tcp_transmit_skb(sk, buff, 1, sk-&gt;sk_allocation);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">We change tp-&gt;snd_nxt after the tcp_transmit_skb() call</span>
+<span style="color: #ff7f24;">         * in order to make this packet get counted in tcpOutSegs.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        tp-&gt;snd_nxt = tp-&gt;write_seq;
+        tp-&gt;pushed_seq = tp-&gt;write_seq;
+        TCP_INC_STATS(sock_net(sk), TCP_MIB_ACTIVEOPENS);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Timer for repeating the SYN until an answer. </span><span style="color: #ff7f24;">*/</span>
+        inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
+                                  inet_csk(sk)-&gt;icsk_rto, TCP_RTO_MAX);
+        <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-19 Wed 20:20</p>
+<p class="date">Created: 2014-11-20 Thu 20:34</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
