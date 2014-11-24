@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Transport layer</title>
-<!-- 2014-11-22 Sat 11:10 -->
+<!-- 2014-11-24 Mon 20:35 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -584,12 +584,43 @@ socket.
 包必须满足如下条件之一才能被分类为容易解析:
 </p>
 <ul class="org-ul">
-<li></li>
+<li>包只包含对上次发送数据的确认信息. <i>make package/atheros-9.2/{clean,prepare,compile,install} V=99</i> 
+</li>
+<li>数据必须包含下次希望收到的数据.
+</li>
 </ul>
+<p>
+并且,如下标示都不能被设置: SYN, URG, RST, 或 FIN.因为大部分包属于此类,
+所以分为快速和慢速路径是有意义的.
+</p>
+
+
+<p>
+快速路径的主要操作:
+</p>
+<ol class="org-ol">
+<li>对包做一些检查,如果属于复杂包,那就把它们放入慢速路径.
+</li>
+<li>通过包的长度判断是确认包还是数据包.不难判断,因为确认包不包含数据,长度正好是TCP包头长度.
+</li>
+<li>把确认包由 <code>tcp_ack</code> 处理,这个函数先过滤掉不正确的包.最重要的任务不是分析信息,而是从重传队列中删除确认过的数据包.
+</li>
+<li>快速路径直接处理与之前分片连续的收到数据,这个数据包能被确认通过发送
+ACK包给发送者,并不需要进一步的再检查.最后 <code>sk_data_read</code> 函数通知用户层有新数据要处理.
+</li>
+</ol>
+
+<p>
+快速和慢速路径的区别呢?因为TCP有许多的选项,慢速路径的代码更具广泛性.在慢速路径中,数据不能直接发给socket,因为复杂的包选项检查需要进行,然后这些可能引起TCP子系统进一步处理.以乱序到达的数据包将被放在一个特殊的等待队列中,直到一个完整的包完成.
+</p>
 </div>
 </li>
 
 <li><a id="sec-2-6-2" name="sec-2-6-2"></a>Sending Packets<br  /><div class="outline-text-4" id="text-2-6-2">
+<p>
+TCP包发送以函数 <code>tcp_sendmsg</code> 开始,相应的代码流程如下图:
+</p>
+
 
 <div class="figure">
 <p><img src="./Files/tcp-sendmsg.jpeg" alt="tcp-sendmsg.jpeg" />
@@ -959,7 +990,7 @@ socket.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-22 Sat 11:10</p>
+<p class="date">Created: 2014-11-24 Mon 20:35</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
