@@ -305,14 +305,68 @@ TCP包发送以函数 =tcp_sendmsg= 开始,相应的代码流程如下图:
 
 [[./Files/tcp-sendmsg.jpeg]]
 
+socket的状态在数据发送开始前必然是 =TCP_ESTABLISHED= , 如果不是,
+kernel等待直到连接被建立.然后,数据从用户空间拷贝过来构建TCP包.然而发送
+TCP包不仅仅如UDP一般简单的构建包头然后传递到IP层.它同时必须考虑如下要
+求:
++ 接收端的等待队列有足够的空间容纳此数据.
++ ECN机制必须实现来防止连接拥塞.
++ TCP slow-start机制要求慢慢增加包大小从通信开始.
++ 发送但为确认的包必须重传在一定的时间后,直到它们最终被接收端确认.
+
+重发队列是TCP连接稳定数据发送的关键.稍微分析一下它.包被组装好后,kernel
+到达函数 =tcp_push_one=, 它主要完成如下3个任务:
++ 先做一些congestion window之类的检查,确认当前能发送此包.
++ =tcp_transmit_skb= 把包发往IP层使用协议特定的函数指针
+  =icsk->icsk_af_ops->queue_xmit= .(IPv4使用 =ip_queue_xmit= )
++ =tcp_event_new_data_sent= 充值重传计时器.
+
+与特定socket相关联的sock实例为每个发送的包维护一组重传计数器.kernel使
+用的超时函数是 =tcp_write_timer=, 它调用 =tcp_retransmit_timer= 如果
+ACK没有收到. 
+
+当重传时,如下需要注意:
++ 连接可能已经被关闭.存储的包和计数器从kernel内存中移除.
++ 当重传次数超过 =sysctl_tcp_retries2=,重传被剔除.
 
 ** Connection Termination
+同连接建立一样,TCP的关闭也是通过多此交换包,如图[[tcp-transition][TCP状态转换图]].一个连接
+可以如下两种方式关闭:
+1. 以其中之一系统的明示请求来终止连接.
+2. 终止或打断被更高的协议(比如程序崩溃等).
 
-* file
-#+begin_src c
+这里分析第一中情况.TCP参与者必须交换4个包来得体的关闭连接.步骤如下:
+1. 在设备A调用库函数 =close= 来发送一个TCP包,其中设置FIN标志位在头部.A
+   的socket转换到 =FIN_WAIT_1= 状态.
+2. 设备B收到FIN包并返回ACK包.它的socket状态从 =ESTABLISHED= 转换到
+   =CLOSE_WAIT=.
+3. 收到ACK包后,设备A的socket状态从 =FIN_WAIT_1= 转换到 =FIN_WAIT_2=.
+4. 设备B的socket也执行 =close= 来发送FIN包到A.设备B的socket状态转换到
+   =LAST_ACK=.
+5. 设备A发送ACK包确认收到FIN包,先到 =TIME_WAIT= 状态,并过段时间自动转
+   换到 =CLOSED= 状态.
+6. 设备B收到ACK包,触使它socket状态转换到 =CLOSED= 状态.
 
-#+end_src
+当调用库函数 =close= 来关闭连接, =tcp_close= 函数被调用.如果socket的状
+态是 =LISTEN=,那么很简单,把状态设置为 =CLOSED=. 因为外部没有设备需要被
+通知连接的结束.
 
+如果不是 =LISTEN= 状态, =tcp_send_fin= 发送一个FIN给对方,并通过调用
+=tcp_close_state= 和 =tcp_set_state= 来把状态设置为 =FIN_WAIT_1=.
+
+从 =FIN_WAIT_1= 到 =FIN_WAIT_2= 的转换由中心分流函数
+=tcp_rcv_state_process= 完成. 当收到ACK包同过调用 =tcp_set_state= 来转
+换状态到 =FIN_WAIT_2= .只要在收到对方的FIN包,它就转到 =TIME_WAIT=,并过
+段时间自动到 =CLOSED= 状态.
+
+收到FIN包的对方设备已类似流程关闭.当它处于 =ESTABLISHED= 时收到第一个
+FIN包,在 =tcp_rcv_established= 中的慢速路径得到处理,发送ACK包,并转换
+socket状态到 =CLOSE_WAIT=. 
+
+之后状态转换到 =LAST_ACK= 通过调用 =close= 库函数来触发kernel中的
+=tcp_close_state= 函数.只要进一步的一个来自对方的ACK包来关闭连接.这个
+ACK包通过 =tcp_rcv_state_process= 函数处理,把socket状态转到 =CLOSED=
+通过 =tcp_done=.
 * reference
 ** =__udp4_lib_rcv=
 #+begin_src c
@@ -625,5 +679,389 @@ int tcp_connect(struct sock *sk)
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
 				  inet_csk(sk)->icsk_rto, TCP_RTO_MAX);
 	return 0;
+}
+#+end_src
+** =tcp_sendmsg=
+#+begin_src c
+int tcp_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
+		size_t size)
+{
+	struct sock *sk = sock->sk;
+	struct iovec *iov;
+	struct tcp_sock *tp = tcp_sk(sk);
+	struct sk_buff *skb;
+	int iovlen, flags;
+	int mss_now, size_goal;
+	int err, copied;
+	long timeo;
+
+	lock_sock(sk);
+	TCP_CHECK_TIMER(sk);
+
+	flags = msg->msg_flags;
+	timeo = sock_sndtimeo(sk, flags & MSG_DONTWAIT);
+
+	/* Wait for a connection to finish. */
+	if ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT))
+		if ((err = sk_stream_wait_connect(sk, &timeo)) != 0)
+			goto out_err;
+
+	/* This should be in poll */
+	clear_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
+
+	mss_now = tcp_send_mss(sk, &size_goal, flags);
+
+	/* Ok commence sending. */
+	iovlen = msg->msg_iovlen;
+	iov = msg->msg_iov;
+	copied = 0;
+
+	err = -EPIPE;
+	if (sk->sk_err || (sk->sk_shutdown & SEND_SHUTDOWN))
+		goto out_err;
+
+	while (--iovlen >= 0) {
+		size_t seglen = iov->iov_len;
+		unsigned char __user *from = iov->iov_base;
+
+		iov++;
+
+		while (seglen > 0) {
+			int copy = 0;
+			int max = size_goal;
+
+			skb = tcp_write_queue_tail(sk);
+			if (tcp_send_head(sk)) {
+				if (skb->ip_summed == CHECKSUM_NONE)
+					max = mss_now;
+				copy = max - skb->len;
+			}
+
+			if (copy <= 0) {
+new_segment:
+				/* Allocate new segment. If the interface is SG,
+				 * allocate skb fitting to single page.
+				 */
+				if (!sk_stream_memory_free(sk))
+					goto wait_for_sndbuf;
+
+				skb = sk_stream_alloc_skb(sk, select_size(sk),
+						sk->sk_allocation);
+				if (!skb)
+					goto wait_for_memory;
+
+				/*
+				 * Check whether we can use HW checksum.
+				 */
+				if (sk->sk_route_caps & NETIF_F_ALL_CSUM)
+					skb->ip_summed = CHECKSUM_PARTIAL;
+
+				skb_entail(sk, skb);
+				copy = size_goal;
+				max = size_goal;
+			}
+
+			/* Try to append data to the end of skb. */
+			if (copy > seglen)
+				copy = seglen;
+
+			/* Where to copy to? */
+			if (skb_tailroom(skb) > 0) {
+				/* We have some space in skb head. Superb! */
+				if (copy > skb_tailroom(skb))
+					copy = skb_tailroom(skb);
+				if ((err = skb_add_data(skb, from, copy)) != 0)
+					goto do_fault;
+			} else {
+				int merge = 0;
+				int i = skb_shinfo(skb)->nr_frags;
+				struct page *page = TCP_PAGE(sk);
+				int off = TCP_OFF(sk);
+
+				if (skb_can_coalesce(skb, i, page, off) &&
+				    off != PAGE_SIZE) {
+					/* We can extend the last page
+					 * fragment. */
+					merge = 1;
+				} else if (i == MAX_SKB_FRAGS ||
+					   (!i &&
+					   !(sk->sk_route_caps & NETIF_F_SG))) {
+					/* Need to add new fragment and cannot
+					 * do this because interface is non-SG,
+					 * or because all the page slots are
+					 * busy. */
+					tcp_mark_push(tp, skb);
+					goto new_segment;
+				} else if (page) {
+					if (off == PAGE_SIZE) {
+						put_page(page);
+						TCP_PAGE(sk) = page = NULL;
+						off = 0;
+					}
+				} else
+					off = 0;
+
+				if (copy > PAGE_SIZE - off)
+					copy = PAGE_SIZE - off;
+
+				if (!sk_wmem_schedule(sk, copy))
+					goto wait_for_memory;
+
+				if (!page) {
+					/* Allocate new cache page. */
+					if (!(page = sk_stream_alloc_page(sk)))
+						goto wait_for_memory;
+				}
+
+				/* Time to copy data. We are close to
+				 * the end! */
+				err = skb_copy_to_page(sk, from, skb, page,
+						       off, copy);
+				if (err) {
+					/* If this page was new, give it to the
+					 * socket so it does not get leaked.
+					 */
+					if (!TCP_PAGE(sk)) {
+						TCP_PAGE(sk) = page;
+						TCP_OFF(sk) = 0;
+					}
+					goto do_error;
+				}
+
+				/* Update the skb. */
+				if (merge) {
+					skb_shinfo(skb)->frags[i - 1].size +=
+									copy;
+				} else {
+					skb_fill_page_desc(skb, i, page, off, copy);
+					if (TCP_PAGE(sk)) {
+						get_page(page);
+					} else if (off + copy < PAGE_SIZE) {
+						get_page(page);
+						TCP_PAGE(sk) = page;
+					}
+				}
+
+				TCP_OFF(sk) = off + copy;
+			}
+
+			if (!copied)
+				TCP_SKB_CB(skb)->flags &= ~TCPCB_FLAG_PSH;
+
+			tp->write_seq += copy;
+			TCP_SKB_CB(skb)->end_seq += copy;
+			skb_shinfo(skb)->gso_segs = 0;
+
+			from += copy;
+			copied += copy;
+			if ((seglen -= copy) == 0 && iovlen == 0)
+				goto out;
+
+			if (skb->len < max || (flags & MSG_OOB))
+				continue;
+
+			if (forced_push(tp)) {
+				tcp_mark_push(tp, skb);
+				__tcp_push_pending_frames(sk, mss_now, TCP_NAGLE_PUSH);
+			} else if (skb == tcp_send_head(sk))
+				tcp_push_one(sk, mss_now);
+			continue;
+
+wait_for_sndbuf:
+			set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
+wait_for_memory:
+			if (copied)
+				tcp_push(sk, flags & ~MSG_MORE, mss_now, TCP_NAGLE_PUSH);
+
+			if ((err = sk_stream_wait_memory(sk, &timeo)) != 0)
+				goto do_error;
+
+			mss_now = tcp_send_mss(sk, &size_goal, flags);
+		}
+	}
+
+out:
+	if (copied)
+		tcp_push(sk, flags, mss_now, tp->nonagle);
+	TCP_CHECK_TIMER(sk);
+	release_sock(sk);
+	return copied;
+
+do_fault:
+	if (!skb->len) {
+		tcp_unlink_write_queue(skb, sk);
+		/* It is the one place in all of TCP, except connection
+		 * reset, where we can be unlinking the send_head.
+		 */
+		tcp_check_send_head(sk, skb);
+		sk_wmem_free_skb(sk, skb);
+	}
+
+do_error:
+	if (copied)
+		goto out;
+out_err:
+	err = sk_stream_error(sk, flags, err);
+	TCP_CHECK_TIMER(sk);
+	release_sock(sk);
+	return err;
+}
+#+end_src
+** =tcp_close=
+#+begin_src c
+void tcp_close(struct sock *sk, long timeout)
+{
+	struct sk_buff *skb;
+	int data_was_unread = 0;
+	int state;
+
+	lock_sock(sk);
+	sk->sk_shutdown = SHUTDOWN_MASK;
+
+	if (sk->sk_state == TCP_LISTEN) {
+		tcp_set_state(sk, TCP_CLOSE);
+
+		/* Special case. */
+		inet_csk_listen_stop(sk);
+
+		goto adjudge_to_death;
+	}
+
+	/*  We need to flush the recv. buffs.  We do this only on the
+	 *  descriptor close, not protocol-sourced closes, because the
+	 *  reader process may not have drained the data yet!
+	 */
+	while ((skb = __skb_dequeue(&sk->sk_receive_queue)) != NULL) {
+		u32 len = TCP_SKB_CB(skb)->end_seq - TCP_SKB_CB(skb)->seq -
+			  tcp_hdr(skb)->fin;
+		data_was_unread += len;
+		__kfree_skb(skb);
+	}
+
+	sk_mem_reclaim(sk);
+
+	/* As outlined in RFC 2525, section 2.17, we send a RST here because
+	 * data was lost. To witness the awful effects of the old behavior of
+	 * always doing a FIN, run an older 2.1.x kernel or 2.0.x, start a bulk
+	 * GET in an FTP client, suspend the process, wait for the client to
+	 * advertise a zero window, then kill -9 the FTP client, wheee...
+	 * Note: timeout is always zero in such a case.
+	 */
+	if (data_was_unread) {
+		/* Unread data was tossed, zap the connection. */
+		NET_INC_STATS_USER(sock_net(sk), LINUX_MIB_TCPABORTONCLOSE);
+		tcp_set_state(sk, TCP_CLOSE);
+		tcp_send_active_reset(sk, sk->sk_allocation);
+	} else if (sock_flag(sk, SOCK_LINGER) && !sk->sk_lingertime) {
+		/* Check zero linger _after_ checking for unread data. */
+		sk->sk_prot->disconnect(sk, 0);
+		NET_INC_STATS_USER(sock_net(sk), LINUX_MIB_TCPABORTONDATA);
+	} else if (tcp_close_state(sk)) {
+		/* We FIN if the application ate all the data before
+		 * zapping the connection.
+		 */
+
+		/* RED-PEN. Formally speaking, we have broken TCP state
+		 * machine. State transitions:
+		 *
+		 * TCP_ESTABLISHED -> TCP_FIN_WAIT1
+		 * TCP_SYN_RECV	-> TCP_FIN_WAIT1 (forget it, it's impossible)
+		 * TCP_CLOSE_WAIT -> TCP_LAST_ACK
+		 *
+		 * are legal only when FIN has been sent (i.e. in window),
+		 * rather than queued out of window. Purists blame.
+		 *
+		 * F.e. "RFC state" is ESTABLISHED,
+		 * if Linux state is FIN-WAIT-1, but FIN is still not sent.
+		 *
+		 * The visible declinations are that sometimes
+		 * we enter time-wait state, when it is not required really
+		 * (harmless), do not send active resets, when they are
+		 * required by specs (TCP_ESTABLISHED, TCP_CLOSE_WAIT, when
+		 * they look as CLOSING or LAST_ACK for Linux)
+		 * Probably, I missed some more holelets.
+		 * 						--ANK
+		 */
+		tcp_send_fin(sk);
+	}
+
+	sk_stream_wait_close(sk, timeout);
+
+adjudge_to_death:
+	state = sk->sk_state;
+	sock_hold(sk);
+	sock_orphan(sk);
+
+	/* It is the last release_sock in its life. It will remove backlog. */
+	release_sock(sk);
+
+
+	/* Now socket is owned by kernel and we acquire BH lock
+	   to finish close. No need to check for user refs.
+	 */
+	local_bh_disable();
+	bh_lock_sock(sk);
+	WARN_ON(sock_owned_by_user(sk));
+
+	percpu_counter_inc(sk->sk_prot->orphan_count);
+
+	/* Have we already been destroyed by a softirq or backlog? */
+	if (state != TCP_CLOSE && sk->sk_state == TCP_CLOSE)
+		goto out;
+
+	/*	This is a (useful) BSD violating of the RFC. There is a
+	 *	problem with TCP as specified in that the other end could
+	 *	keep a socket open forever with no application left this end.
+	 *	We use a 3 minute timeout (about the same as BSD) then kill
+	 *	our end. If they send after that then tough - BUT: long enough
+	 *	that we won't make the old 4*rto = almost no time - whoops
+	 *	reset mistake.
+	 *
+	 *	Nope, it was not mistake. It is really desired behaviour
+	 *	f.e. on http servers, when such sockets are useless, but
+	 *	consume significant resources. Let's do it with special
+	 *	linger2	option.					--ANK
+	 */
+
+	if (sk->sk_state == TCP_FIN_WAIT2) {
+		struct tcp_sock *tp = tcp_sk(sk);
+		if (tp->linger2 < 0) {
+			tcp_set_state(sk, TCP_CLOSE);
+			tcp_send_active_reset(sk, GFP_ATOMIC);
+			NET_INC_STATS_BH(sock_net(sk),
+					LINUX_MIB_TCPABORTONLINGER);
+		} else {
+			const int tmo = tcp_fin_time(sk);
+
+			if (tmo > TCP_TIMEWAIT_LEN) {
+				inet_csk_reset_keepalive_timer(sk,
+						tmo - TCP_TIMEWAIT_LEN);
+			} else {
+				tcp_time_wait(sk, TCP_FIN_WAIT2, tmo);
+				goto out;
+			}
+		}
+	}
+	if (sk->sk_state != TCP_CLOSE) {
+		sk_mem_reclaim(sk);
+		if (tcp_too_many_orphans(sk, 0)) {
+			if (net_ratelimit())
+				printk(KERN_INFO "TCP: too many of orphaned "
+				       "sockets\n");
+			tcp_set_state(sk, TCP_CLOSE);
+			tcp_send_active_reset(sk, GFP_ATOMIC);
+			NET_INC_STATS_BH(sock_net(sk),
+					LINUX_MIB_TCPABORTONMEMORY);
+		}
+	}
+
+	if (sk->sk_state == TCP_CLOSE)
+		inet_csk_destroy_sock(sk);
+	/* Otherwise, socket is reprieved until protocol close. */
+
+out:
+	bh_unlock_sock(sk);
+	local_bh_enable();
+	sock_put(sk);
 }
 #+end_src
