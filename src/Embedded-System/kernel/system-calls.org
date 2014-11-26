@@ -2,17 +2,270 @@
 #+TITLE: System calls
 #+OPTIONS: num:nil H:2
 
+用户程序看来,kernel是一个透明的系统层,它一直在那却不被注意.进程不知道
+kernel是否运行.然而,进程一直与kernel交互着请求系统资源,访问外围设备,与
+其他进程通信,读文件等等.为达到这写目的,它们使用标准库函数来调用内核函
+数.
+
+系统调用(system calls)被用来调用内核函数从用户应用.这里主要分析一下
+system call如何与标准库相关,运行机制,如何实现等.
+
+* Basics of System Programming
+随着编程语言趋于更高层的抽象化,系统编程的真正意义慢慢被腐蚀.为什么要麻
+烦去理解系统细节呢.拥有千兆字节或兆兆字节数据的数据库需要知道底层操作
+系统使用什么机制读取它们的文件和原始数据,以至修改数据库代码达到最大化
+的执行.
+** Tracing System Calls
+如下例子来看system calls如何被封装在标准库中然后被调用:
+#+begin_src c
+  #include<stdio.h>
+  #include<fcntl.h>
+  #include<unistd.h>
+  #include<malloc.h>
+  int main() {
+    int handle, bytes;
+    void* ptr;
+    handle = open("/tmp/test.txt", O_RDONLY);
+    ptr = (void*)malloc(150);
+    bytes = read(handle, ptr, 150);
+    printf("%s", ptr);
+    close(handle);
+    return 0;
+  }
+#+end_src
+
+多少个系统调用被这个程序所使用呢?初看有 =open=, =read=, =close=.
+
+使用工具 =strace= 可以记录应用使用的所有系统调用.如下对上面的 =test=
+做记录:
+#+begin_src sh
+$ strace -o log.txt ./test 
+#+end_src
+
+=log.txt= 的内容如下:
+#+begin_src sh
+execve("./test", ["./test"], [/* 47 vars */]) = 0
+brk(0)                                  = 0x9111000
+access("/etc/ld.so.nohwcap", F_OK)      = -1 ENOENT (No such file or directory)
+mmap2(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7729000
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
+open("/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+fstat64(3, {st_mode=S_IFREG|0644, st_size=100251, ...}) = 0
+mmap2(NULL, 100251, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7710000
+close(3)                                = 0
+access("/etc/ld.so.nohwcap", F_OK)      = -1 ENOENT (No such file or directory)
+open("/lib/i386-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+read(3, "\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0000\226\1\0004\0\0\0"..., 512) = 512
+fstat64(3, {st_mode=S_IFREG|0755, st_size=1734120, ...}) = 0
+mmap2(NULL, 1743580, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7566000
+mmap2(0xb770a000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1a4) = 0xb770a000
+mmap2(0xb770d000, 10972, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0xb770d000
+close(3)                                = 0
+mmap2(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7565000
+set_thread_area({entry_number:-1 -> 6, base_addr:0xb7565900, limit:1048575, seg_32bit:1, contents:0, read_exec_only:0, limit_in_pages:1, seg_not_present:0, useable:1}) = 0
+mprotect(0xb770a000, 8192, PROT_READ)   = 0
+mprotect(0x8049000, 4096, PROT_READ)    = 0
+mprotect(0xb774c000, 4096, PROT_READ)   = 0
+munmap(0xb7710000, 100251)              = 0
+open("/tmp/test.txt", O_RDONLY)         = -1 ENOENT (No such file or directory)
+brk(0)                                  = 0x9111000
+brk(0x9132000)                          = 0x9132000
+read(-1, 0x9111008, 150)                = -1 EBADF (Bad file descriptor)
+close(-1)                               = -1 EBADF (Bad file descriptor)
+exit_group(0)                           = ?
+#+end_src
+
+trace log显示这个应用程序使用了一大堆不是明显在源代码中的系统调用.所以
+两者有着强烈的依赖关系.
+
+** Supported Standards
+在Unix类的系统中,system calls是比较重要地位的.她们的范围和速度,实现的
+效率在系统执行中占有很多的重要角色.Unix的分支众多,不同的标准提出来规范
+它们系统调用的接口.
+
+POSIX标准(Portable Operating System Interface forUnix)成为主要的标
+准.Linux和C标准库都极力与它兼容.
+
+除了POSIX,在UNIX历史中,2大主要发展线路: System V(来自于初始AT&T代码)
+和BSD(Berkeley Software Distribution由University of California开发,现
+在以NetBSD, FreeBSD, OpenBSD, BSDI 和 MacOS X为代表).
+
+Linux形成它自己独立的system calls从如上所有三者.比如,如下3个有名的
+system calls源自于这3大阵营:
++ =flock= 锁文件防止多个进程并行访问.来自POSIX标准.
++ BSD UNIX提供 =truncate= 调用来节短一个文件.Linux也以同样名字实现这个
+  函数.
++ =sysfs= 收集文件系统的信息由System V Release 4引入.Linux也采用这个
+  system call.
+
+一些system calls被三个标准同时要求.比如 =time=, =gettimeofday= 等.
+
+同样,一些system calls只在Linux特定开发,不存在其他标准中.
+
+** Restarting System Calls
+当system calls与signals发生冲突时,有趣的问题就产生了.当一个system call
+正在被执行,同时一个紧急的signal被发送到这个进程,那么两者的优先执行怎么
+处理?是signal等待直到system call终结,还是调用被中断以致signal能尽快被
+传递?第一种选择明显触发极少问题,并且是更简单的方法.不幸的是,它仅仅适用
+当所有system calls快速的终结并且不让进程等待太长时间.但这并不总是如
+此.System calls不仅需要一定的时间来执行,而且在最差的情况下,它们也会进
+入睡眠.这样的情况必须被防止.
+
+如果执行中的system call被中断,kernel返回什么值给应用呢?在正常情况,只有
+2中情况:调用不是成功就是失败.在中断情况中,第三种情况产生:应用被告知
+system call在执行中被signal中断.在此情况下, =-EINTR= 被使用.
+
+此种过程的缺点也是明显的.尽管它容易被实现,但它强制要求用户应用编程者明
+显的检查所有被中断system call的返回值是否是 =-EINTR=. 如果是这个值的话,就
+重新不断重启这个call直到不被signal中断.System calls以这种情况重启被称
+为 restartable system calls.
+
+这种行为由System V Unix引入和采用,也是Linux默认的方式.但BSD不采用此方
+法,当此情况发生,call不返回值而是kernel自动重启这个call当signal处理终
+结.Linux通过 =SA_RESTART= 标示来支持BSD这种方式.
+
+看如下例子看两者的区别:
+#+begin_src c
+    #include <signal.h>
+    #include <stdio.h>
+    #include <unistd.h>
+    volatile int signaled = 0;
+    void handler (int signum) {
+      printf("signaled called\n");
+      signaled = 1;
+    }
+    int main() {
+      char ch;
+      struct sigaction sigact;
+      sigact.sa_handler = handler;
+      sigact.sa_flags = SA_RESTART;
+      sigaction(SIGINT, &sigact, NULL);
+      while (read(STDIN_FILENO, &ch, 1) != 1 && !signaled);
+    }
+#+END_SRC
+
+有个while循环,满足如下条件之一程序完成:
++ read到一个字节.
++ 变量signaled被设置为1.
+
+先注释掉 =sigact.sa_flags = SA_RESTART;= ,看System V下如何,运行程
+序,CTRL-C去中断它,signaled被设置,程序退出.
+
+BSD下,运行程序,CTRL-C去中断它,signal处理得到调用并打印,BSD机制重启read
+操作,并且!signaled没有被有效,程序不能在被SIGNIT signal终结.
+
+* Available System Calls
+每个system call有符号定植表示,它们的平台依赖定义在
+=<asm-arch/unistd.h>=,大约到达200个.最后把system calls按照功能分类使得
+编程者更容易使用.如下提取主要的system calls分类:
+
+** Process Management
++ fork and vfork split an existing process into two new processes as.
+  clone is an enhanced version offorkthat supports, among other
+  things, the generation of threads.
++ exit ends a process and frees its resources.
++ A whole host of system calls exist to query (and set) process
+  properties such as PID, UID, and so on.; most of these calls simply
+  read or modify a field in the task structure. The following can be
+  read: PID, GID, PPID, SID, UID, EUID, PGID, EGID, and PGRP. The
+  following can be set: UID, GID, REUID, REGID, SID, SUID, and FSGID.
+  System calls are named in accordance with a logical scheme that uses
+  designations such as setgid,setuid,and geteuid.
++ personality defines the execution environment of an application and
+  is used, for instance, in the implementation of binary emulations.
++ ptrace enables system call tracing and is the platform on which the
+  above strace tool builds.
++ nice sets the priority of normal processes by assigning a number
+  between −20 and 19 in descending order of importance. Only root
+  processes (or processes with theCAP_SYS_NICE permission) are allowed
+  to specify negative values.
++ setrlimitis used to set certain resource limits, for example, CPU
+  time or the maximum permitted number of child
+  processes.getrlimitqueries the current limits (i.e., maximum
+  permitted values), and getrusage queries current resource usage to
+  check whether the process is still within the defined resource
+  limits.
+** Time Operations
++ adjtimex reads and sets time-based kernel variables to control
+  kernel time behavior.
++ alarm and setitimer set up alarms and interval timers to defer
+  actions to a later time. getitimer reads settings.
++ gettimeofday and settimeofday get and set the current system time,
+  respectively. Unlike times, they also take account of the current
+  time zone and daylight saving time.
++ sleep and nanosleep suspend process execution for a defined
+  interval;nanosleepdefines high-precision intervals.
++ time returns the number of seconds since midnight on January 1, 1970
+  (this date is the classic time base for Unix systems).stimesets this
+  value and therefore changes the current system date.
+** Signal Handling
++ signal installs signal handler functions.sigaction is a modern,
+  enhanced version that supports additional options and provides
+  greater flexibility.
++ sigpending checks whether signals are pending for the process but
+  are currently blocked.
++ sigsuspend places the process on the wait queue until a specific
+  signal (from a set of signals) arrives.
++ setmask enables signal blocking, whilegetmaskreturns a list of all
+  currently blocked signals.
++ killis used to send any signals to a process.
++ The same system calls are available to handle real-time signals.
+  However, their function names are prefixed with =rt_=. For example,
+  =rt_sigaction= installs a real-time signal handler,
+  and =rt_sigsuspend= puts the process in a wait state until a specific
+  signal (from a set of signals) arrives.
+** Scheduling
++ setpriority and getpriority set and get the priority of a process
+  and are therefore key system calls for scheduling purposes.
++ =sched_setscheduler= and =sched_getscheduler= set and query
+  scheduling classes. =sched_setparam= and =sched_getparam= set and
+  query additional scheduling parameters of processes (currently, only
+  the parameter for real-time priority is used).
++ =sched_yield= voluntarily relinquishes control even when CPU time is
+  still available to the process.
+** Modules
++ =init_module= adds a new module.
++ =delete_module= removes a module from the kernel.
+** Filesystem
++ Some system calls are used as a direct basis for userspace utilities
+  of the same name that create and modify the directory
+  structure:chdir, mkdir,rmdir,rename,symlink,getcwd,
+  chroot,umask,andmknod.
++ File and directory attributes can be modified using chown and chmod.
++ The following utilities for processing file contents are implemented
+  in the standard library and have the same names as the system
+  calls:open, close, readandreadv, writeand writev,truncate and llseek.
++ readdir and getdents read directory structures.
++ link,symlink,and unlink create and delete links (or files if they
+  are the last element in a hard link);readlink reads the contents of
+  a link.
++ mount and umount are used to attach and detach filesystems.
++ poll and select are used to wait for some event.
++ execve loads a new process in place of an old process. It starts new
+  programs when used in conjunction with fork.
+** Memory Management
+
+
+* Implementation of System Calls
+
+** Structure of System Calls
+
+*** Implementation of Handler Functions
+
+*** Dispatching and Parameter Passing
+
+*** Return to User Mode
+
+** Access to Userspace
+
+** System Call Tracing
 
 * cc
-#+begin_src python
+#+begin_src c
 
 #+end_src
 
-#+begin_src c++
+[[./Files/sequence-system-call.jpeg
 
-#+end_src
-
-
-#+begin_src sh
-
-#+end_src
+[[./Files/sys-ptrace.jpeg
+* reference

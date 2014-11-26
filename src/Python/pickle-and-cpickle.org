@@ -1,19 +1,198 @@
-#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
 #+TITLE: pickle and cPickle
 #+OPTIONS: num:nil H:2
 
 
-* cc
-http://pymotw.com/2/pickle/index.html
+The pickle module implements an algorithm for turning an arbitrary
+Python object into a series of bytes. 
+
+The cPickle module implements the same algorithm, in C instead of
+Python. It is many times faster than the Python implementation, but
+*does not allow* the user to *subclass* from Pickle.
+
+* Importing
 #+begin_src python
-
+try:
+   import cPickle as pickle
+except:
+   import pickle
 #+end_src
 
-#+begin_src c++
+* Encoding and Decoding Data in strings
+#+begin_src python
+try:
+    import cPickle as pickle
+except:
+    import pickle
+import pprint
 
+data1 = [{'a':'A', 'b':2, 'c':3.0}]
+print 'BEFORE:'
+pprint.pprint(data1)
+
+data1_string = pickle.dumps(data1)
+
+print 'PICKLE:'
+print data1_string
+
+data2 = pickle.loads(data1_string)
+print 'AFTER:'
+pprint.pprint(data2)
 #+end_src
 
+output:
 
 #+begin_src sh
-
+$ python ./pickle_unpickle.py
+BEFORE:
+[{'a': 'A', 'b': 2, 'c': 3.0}]
+PICKLE:
+(lp1
+(dp2
+S'a'
+S'A'
+sS'c'
+F3
+sS'b'
+I2
+sa.
+AFTER:
+[{'a': 'A', 'b': 2, 'c': 3.0}]
 #+end_src
+* in files
+#+begin_src python
+try:
+    import cPickle as pickle
+except:
+    import pickle
+import pprint
+import sys
+
+data1 = [{'a':'A', 'b':2, 'c':3.0}]
+print 'BEFORE:'
+pprint.pprint(data1)
+
+try:
+    filename = sys.argv[1]
+except IndexError:
+    raise RuntimeError('Please specify a \
+filename as an argument to %s' % sys.argv[0])
+
+with open(filename, 'wb') as out_s:
+    pickle.dump(data1, out_s)
+
+print 'AFTER:'
+with open(filename, 'rb') as in_s:
+    while True:
+        try:
+            data2 = pickle.load(in_s)
+        except EOFError:
+            break
+        else:
+            pprint.pprint(data2)
+#+end_src
+
+#+begin_src sh
+$ python pickle_unpickle_in_files.py test.dat
+BEFORE:
+[{'a': 'A', 'b': 2, 'c': 3.0}]
+AFTER:
+[{'a': 'A', 'b': 2, 'c': 3.0}]
+#+end_src
+* Circular References[fn:1]
+The pickle protocol automatically handles circular references between
+objects
+
+[[./Files/circular-graph.png]]
+
+#+begin_src python
+import pickle
+
+class Node(object):
+    """A simple digraph where each node knows about the other nodes
+    it leads to.
+    """
+    def __init__(self, name):
+        self.name = name
+        self.connections = []
+        return
+
+    def add_edge(self, node):
+        "Create an edge between this node and the other."
+        self.connections.append(node)
+        return
+
+    def __iter__(self):
+        return iter(self.connections)
+
+def preorder_traversal(root, seen=None, parent=None):
+    """Generator function to yield the edges via a preorder traversal."""
+    if seen is None:
+        seen = set()
+    yield (parent, root)
+    if root in seen:
+        return
+    seen.add(root)
+    for node in root:
+        for (parent, subnode) in preorder_traversal(node, seen, root):
+            yield (parent, subnode)
+    return
+    
+def show_edges(root):
+    "Print all of the edges in the graph."
+    for parent, child in preorder_traversal(root):
+        if not parent:
+            continue
+        print '%5s -> %2s (%s)' % (parent.name, child.name, id(child))
+
+# Set up the nodes.
+root = Node('root')
+a = Node('a')
+b = Node('b')
+c = Node('c')
+
+# Add edges between them.
+root.add_edge(a)
+root.add_edge(b)
+a.add_edge(b)
+b.add_edge(a)
+b.add_edge(c)
+a.add_edge(a)
+
+print 'ORIGINAL GRAPH:'
+show_edges(root)
+
+# Pickle and unpickle the graph to create
+# a new set of nodes.
+dumped = pickle.dumps(root)
+reloaded = pickle.loads(dumped)
+
+print
+print 'RELOADED GRAPH:'
+show_edges(reloaded)
+#+end_src
+
+#+begin_src sh
+$ python pickle_cycle.py
+
+ORIGINAL GRAPH:
+ root ->  a (4299721744)
+    a ->  b (4299721808)
+    b ->  a (4299721744)
+    b ->  c (4299721872)
+    a ->  a (4299721744)
+ root ->  b (4299721808)
+
+RELOADED GRAPH:
+ root ->  a (4299722000)
+    a ->  b (4299722064)
+    b ->  a (4299722000)
+    b ->  c (4299722128)
+    a ->  a (4299722000)
+ root ->  b (4299722064)
+#+end_src
+
+* Footnotes
+
+[fn:1] http://pymotw.com/2/pickle/index.html#module-cPickle
+

@@ -2,7 +2,6 @@
 #+TITLE: Application Layer
 #+OPTIONS: num:nil H:2
 
-
 * Application Layer
 Sockets同样贯彻Unix的所有都是文件的理念到网络连接中.在kernel与用户层
 socket间的接口通过在C标准库使用socketcall的系统调用.
@@ -347,18 +346,26 @@ struct net_proto_family {
 
 [[./Files/sys-recvfrom.jpeg]]
 
-一个文件描述符
+与socket相关的一个文件描述符被传入system call.因此,首要任务是找到相应
+的socket.先, =fget_light= 参阅这个描述 [[fget_light]] 符表获得相应 =file=
+实例. =sock_from_file= 找出相应的socket.
+
+一些准备工作后, =sock_recvmsg= 调用协议特定的接收路径
+=sock->ops->recvmsg= . 比如,TCP使用 =tcp_recvmsg=,而UDP是
+=udp_recvmsg= .
+
+=move_addr_to_use= 使用 =copy_to_user= 函数把数据从kernel空间拷贝到用
+户空间.
 
 * Sending Data
+用户层可以使用系统调用 =sendto= 和 =send= 或文件层的函数 =write= 和
+=writev= .最后都汇聚到系统调用函数 =sys_sendto=, 它的代码流程如下:
 
 [[./Files/sys-sendto.jpeg]]
 
-
-* cc
-#+begin_src c
-
-#+end_src
-
+=fget_light= 和 =sock_from_file= 找到相应的socket通过参数文件描述符.数
+据从用户层拷贝到kernel层通过 =move_addr_to_kernel=, 之后
+=sock_sendmsg= 调用协议特定的发送函数 =sock->ops->sendmsg=.
 
 * reference
 ** =SOCKET_I= and =SOCK_INODE=

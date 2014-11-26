@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>System calls</title>
-<!-- 2014-11-10 Mon 22:06 -->
+<!-- 2014-11-26 Wed 20:17 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -143,36 +143,455 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">cc</a></li>
+<li><a href="#sec-1">Basics of System Programming</a>
+<ul>
+<li><a href="#sec-1-1">Tracing System Calls</a></li>
+<li><a href="#sec-1-2">Supported Standards</a></li>
+<li><a href="#sec-1-3">Restarting System Calls</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">Available System Calls</a>
+<ul>
+<li><a href="#sec-2-1">Process Management</a></li>
+<li><a href="#sec-2-2">Time Operations</a></li>
+<li><a href="#sec-2-3">Signal Handling</a></li>
+<li><a href="#sec-2-4">Scheduling</a></li>
+<li><a href="#sec-2-5">Modules</a></li>
+<li><a href="#sec-2-6">Filesystem</a></li>
+<li><a href="#sec-2-7">Memory Management</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">Implementation of System Calls</a>
+<ul>
+<li><a href="#sec-3-1">Structure of System Calls</a></li>
+<li><a href="#sec-3-2">Access to Userspace</a></li>
+<li><a href="#sec-3-3">System Call Tracing</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">cc</a></li>
+<li><a href="#sec-5">reference</a></li>
 </ul>
 </div>
 </div>
+<p>
+用户程序看来,kernel是一个透明的系统层,它一直在那却不被注意.进程不知道
+kernel是否运行.然而,进程一直与kernel交互着请求系统资源,访问外围设备,与其他进程通信,读文件等等.为达到这写目的,它们使用标准库函数来调用内核函数.
+</p>
 
+<p>
+系统调用(system calls)被用来调用内核函数从用户应用.这里主要分析一下
+system call如何与标准库相关,运行机制,如何实现等.
+</p>
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">cc</h2>
+<h2 id="sec-1">Basics of System Programming</h2>
 <div class="outline-text-2" id="text-1">
+<p>
+随着编程语言趋于更高层的抽象化,系统编程的真正意义慢慢被腐蚀.为什么要麻烦去理解系统细节呢.拥有千兆字节或兆兆字节数据的数据库需要知道底层操作系统使用什么机制读取它们的文件和原始数据,以至修改数据库代码达到最大化的执行.
+</p>
+</div>
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">Tracing System Calls</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+如下例子来看system calls如何被封装在标准库中然后被调用:
+</p>
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;fcntl.h&gt;</span>
+<span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;unistd.h&gt;</span>
+<span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;malloc.h&gt;</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">handle</span>, <span style="color: #eedd82;">bytes</span>;
+  <span style="color: #98fb98;">void</span>* <span style="color: #eedd82;">ptr</span>;
+  handle = open(<span style="color: #ffa07a;">"/tmp/test.txt"</span>, O_RDONLY);
+  ptr = (<span style="color: #98fb98;">void</span>*)malloc(150);
+  bytes = read(handle, ptr, 150);
+  printf(<span style="color: #ffa07a;">"%s"</span>, ptr);
+  close(handle);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
 
+<p>
+多少个系统调用被这个程序所使用呢?初看有 <code>open</code>, <code>read</code>, <code>close</code>.
+</p>
+
+<p>
+使用工具 <code>strace</code> 可以记录应用使用的所有系统调用.如下对上面的 <code>test</code>
+做记录:
+</p>
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-sh">$ strace -o log.txt ./test
+</pre>
 </div>
 
-
+<p>
+<code>log.txt</code> 的内容如下:
+</p>
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-sh"><span style="color: #87cefa;">execve</span>(<span style="color: #ffa07a;">"./test"</span>, [<span style="color: #ffa07a;">"./test"</span>], [/* 47 vars */]) = 0
+<span style="color: #87cefa;">brk</span>(0)                                  = 0x9111000
+<span style="color: #87cefa;">access</span>(<span style="color: #ffa07a;">"/etc/ld.so.nohwcap"</span>, F_OK)      = -1 ENOENT (No such file or directory)
+<span style="color: #87cefa;">mmap2</span>(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7729000
+<span style="color: #87cefa;">access</span>(<span style="color: #ffa07a;">"/etc/ld.so.preload"</span>, R_OK)      = -1 ENOENT (No such file or directory)
+<span style="color: #87cefa;">open</span>(<span style="color: #ffa07a;">"/etc/ld.so.cache"</span>, O_RDONLY|O_CLOEXEC) = 3
+<span style="color: #87cefa;">fstat64</span>(3, {<span style="color: #eedd82;">st_mode</span>=S_IFREG|0644, <span style="color: #eedd82;">st_size</span>=100251, ...}) = 0
+<span style="color: #87cefa;">mmap2</span>(NULL, 100251, PROT_READ, MAP_PRIVATE, 3, 0) = 0xb7710000
+<span style="color: #87cefa;">close</span>(3)                                = 0
+<span style="color: #87cefa;">access</span>(<span style="color: #ffa07a;">"/etc/ld.so.nohwcap"</span>, F_OK)      = -1 ENOENT (No such file or directory)
+<span style="color: #87cefa;">open</span>(<span style="color: #ffa07a;">"/lib/i386-linux-gnu/libc.so.6"</span>, O_RDONLY|O_CLOEXEC) = 3
+<span style="color: #b0c4de;">read</span>(3, <span style="color: #ffa07a;">"\177ELF\1\1\1\0\0\0\0\0\0\0\0\0\3\0\3\0\1\0\0\0000\226\1\0004\0\0\0"</span>..., 512) = 512
+<span style="color: #87cefa;">fstat64</span>(3, {<span style="color: #eedd82;">st_mode</span>=S_IFREG|0755, <span style="color: #eedd82;">st_size</span>=1734120, ...}) = 0
+<span style="color: #87cefa;">mmap2</span>(NULL, 1743580, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0xb7566000
+<span style="color: #87cefa;">mmap2</span>(0xb770a000, 12288, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1a4) = 0xb770a000
+<span style="color: #87cefa;">mmap2</span>(0xb770d000, 10972, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0xb770d000
+<span style="color: #87cefa;">close</span>(3)                                = 0
+<span style="color: #87cefa;">mmap2</span>(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0xb7565000
+<span style="color: #87cefa;">set_thread_area</span>({entry_number:-1 -&gt; 6, base_addr:0xb7565900, limit:1048575, seg_32bit:1, contents:0, read_exec_only:0, limit_in_pages:1, seg_not_present:0, useable:1}) = 0
+<span style="color: #87cefa;">mprotect</span>(0xb770a000, 8192, PROT_READ)   = 0
+<span style="color: #87cefa;">mprotect</span>(0x8049000, 4096, PROT_READ)    = 0
+<span style="color: #87cefa;">mprotect</span>(0xb774c000, 4096, PROT_READ)   = 0
+<span style="color: #87cefa;">munmap</span>(0xb7710000, 100251)              = 0
+<span style="color: #87cefa;">open</span>(<span style="color: #ffa07a;">"/tmp/test.txt"</span>, O_RDONLY)         = -1 ENOENT (No such file or directory)
+<span style="color: #87cefa;">brk</span>(0)                                  = 0x9111000
+<span style="color: #87cefa;">brk</span>(0x9132000)                          = 0x9132000
+<span style="color: #b0c4de;">read</span>(-1, 0x9111008, 150)                = -1 EBADF (Bad file descriptor)
+<span style="color: #87cefa;">close</span>(-1)                               = -1 EBADF (Bad file descriptor)
+<span style="color: #87cefa;">exit_group</span>(0)                           = ?
+</pre>
+</div>
+
+<p>
+trace log显示这个应用程序使用了一大堆不是明显在源代码中的系统调用.所以两者有着强烈的依赖关系.
+</p>
 </div>
 </div>
+
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2">Supported Standards</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+在Unix类的系统中,system calls是比较重要地位的.她们的范围和速度,实现的效率在系统执行中占有很多的重要角色.Unix的分支众多,不同的标准提出来规范它们系统调用的接口.
+</p>
+
+<p>
+POSIX标准(Portable Operating System Interface forUnix)成为主要的标准.Linux和C标准库都极力与它兼容.
+</p>
+
+<p>
+除了POSIX,在UNIX历史中,2大主要发展线路: System V(来自于初始AT&amp;T代码)
+和BSD(Berkeley Software Distribution由University of California开发,现在以NetBSD, FreeBSD, OpenBSD, BSDI 和 MacOS X为代表).
+</p>
+
+<p>
+Linux形成它自己独立的system calls从如上所有三者.比如,如下3个有名的
+system calls源自于这3大阵营:
+</p>
+<ul class="org-ul">
+<li><code>flock</code> 锁文件防止多个进程并行访问.来自POSIX标准.
+</li>
+<li>BSD UNIX提供 <code>truncate</code> 调用来节短一个文件.Linux也以同样名字实现这个函数.
+</li>
+<li><code>sysfs</code> 收集文件系统的信息由System V Release 4引入.Linux也采用这个
+system call.
+</li>
+</ul>
+
+<p>
+一些system calls被三个标准同时要求.比如 <code>time</code>, <code>gettimeofday</code> 等.
+</p>
+
+<p>
+同样,一些system calls只在Linux特定开发,不存在其他标准中.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-3" class="outline-3">
+<h3 id="sec-1-3">Restarting System Calls</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+当system calls与signals发生冲突时,有趣的问题就产生了.当一个system call
+正在被执行,同时一个紧急的signal被发送到这个进程,那么两者的优先执行怎么处理?是signal等待直到system call终结,还是调用被中断以致signal能尽快被传递?第一种选择明显触发极少问题,并且是更简单的方法.不幸的是,它仅仅适用当所有system calls快速的终结并且不让进程等待太长时间.但这并不总是如此.System calls不仅需要一定的时间来执行,而且在最差的情况下,它们也会进入睡眠.这样的情况必须被防止.
+</p>
+
+<p>
+如果执行中的system call被中断,kernel返回什么值给应用呢?在正常情况,只有
+2中情况:调用不是成功就是失败.在中断情况中,第三种情况产生:应用被告知
+system call在执行中被signal中断.在此情况下, <code>-EINTR</code> 被使用.
+</p>
+
+<p>
+此种过程的缺点也是明显的.尽管它容易被实现,但它强制要求用户应用编程者明显的检查所有被中断system call的返回值是否是 <code>-EINTR</code>. 如果是这个值的话,就重新不断重启这个call直到不被signal中断.System calls以这种情况重启被称为 restartable system calls.
+</p>
+
+<p>
+这种行为由System V Unix引入和采用,也是Linux默认的方式.但BSD不采用此方法,当此情况发生,call不返回值而是kernel自动重启这个call当signal处理终结.Linux通过 <code>SA_RESTART</code> 标示来支持BSD这种方式.
+</p>
+
+<p>
+看如下例子看两者的区别:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;signal.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;unistd.h&gt;</span>
+<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">signaled</span> = 0;
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">handler</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">signum</span>) {
+  printf(<span style="color: #ffa07a;">"signaled called\n"</span>);
+  signaled = 1;
+}
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">ch</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sigaction</span> <span style="color: #eedd82;">sigact</span>;
+  sigact.sa_handler = handler;
+  sigact.sa_flags = SA_RESTART;
+  sigaction(SIGINT, &amp;sigact, <span style="color: #7fffd4;">NULL</span>);
+  <span style="color: #00ffff;">while</span> (read(STDIN_FILENO, &amp;ch, 1) != 1 &amp;&amp; !signaled);
+}
+</pre>
+</div>
+
+<p>
+有个while循环,满足如下条件之一程序完成:
+</p>
+<ul class="org-ul">
+<li>read到一个字节.
+</li>
+<li>变量signaled被设置为1.
+</li>
+</ul>
+
+<p>
+先注释掉 <code>sigact.sa_flags = SA_RESTART;</code> ,看System V下如何,运行程序,CTRL-C去中断它,signaled被设置,程序退出.
+</p>
+
+<p>
+BSD下,运行程序,CTRL-C去中断它,signal处理得到调用并打印,BSD机制重启read
+操作,并且!signaled没有被有效,程序不能在被SIGNIT signal终结.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Available System Calls</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+每个system call有符号定植表示,它们的平台依赖定义在
+<code>&lt;asm-arch/unistd.h&gt;</code>,大约到达200个.最后把system calls按照功能分类使得编程者更容易使用.如下提取主要的system calls分类:
+</p>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Process Management</h3>
+<div class="outline-text-3" id="text-2-1">
+<ul class="org-ul">
+<li>fork and vfork split an existing process into two new processes as.
+clone is an enhanced version offorkthat supports, among other
+things, the generation of threads.
+</li>
+<li>exit ends a process and frees its resources.
+</li>
+<li>A whole host of system calls exist to query (and set) process
+properties such as PID, UID, and so on.; most of these calls simply
+read or modify a field in the task structure. The following can be
+read: PID, GID, PPID, SID, UID, EUID, PGID, EGID, and PGRP. The
+following can be set: UID, GID, REUID, REGID, SID, SUID, and FSGID.
+System calls are named in accordance with a logical scheme that uses
+designations such as setgid,setuid,and geteuid.
+</li>
+<li>personality defines the execution environment of an application and
+is used, for instance, in the implementation of binary emulations.
+</li>
+<li>ptrace enables system call tracing and is the platform on which the
+above strace tool builds.
+</li>
+<li>nice sets the priority of normal processes by assigning a number
+between −20 and 19 in descending order of importance. Only root
+processes (or processes with theCAP<sub>SYS</sub><sub>NICE</sub> permission) are allowed
+to specify negative values.
+</li>
+<li>setrlimitis used to set certain resource limits, for example, CPU
+time or the maximum permitted number of child
+processes.getrlimitqueries the current limits (i.e., maximum
+permitted values), and getrusage queries current resource usage to
+check whether the process is still within the defined resource
+limits.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">Time Operations</h3>
+<div class="outline-text-3" id="text-2-2">
+<ul class="org-ul">
+<li>adjtimex reads and sets time-based kernel variables to control
+kernel time behavior.
+</li>
+<li>alarm and setitimer set up alarms and interval timers to defer
+actions to a later time. getitimer reads settings.
+</li>
+<li>gettimeofday and settimeofday get and set the current system time,
+respectively. Unlike times, they also take account of the current
+time zone and daylight saving time.
+</li>
+<li>sleep and nanosleep suspend process execution for a defined
+interval;nanosleepdefines high-precision intervals.
+</li>
+<li>time returns the number of seconds since midnight on January 1, 1970
+(this date is the classic time base for Unix systems).stimesets this
+value and therefore changes the current system date.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">Signal Handling</h3>
+<div class="outline-text-3" id="text-2-3">
+<ul class="org-ul">
+<li>signal installs signal handler functions.sigaction is a modern,
+enhanced version that supports additional options and provides
+greater flexibility.
+</li>
+<li>sigpending checks whether signals are pending for the process but
+are currently blocked.
+</li>
+<li>sigsuspend places the process on the wait queue until a specific
+signal (from a set of signals) arrives.
+</li>
+<li>setmask enables signal blocking, whilegetmaskreturns a list of all
+currently blocked signals.
+</li>
+<li>killis used to send any signals to a process.
+</li>
+<li>The same system calls are available to handle real-time signals.
+However, their function names are prefixed with <code>rt_</code>. For example,
+<code>rt_sigaction</code> installs a real-time signal handler,
+and <code>rt_sigsuspend</code> puts the process in a wait state until a specific
+signal (from a set of signals) arrives.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">Scheduling</h3>
+<div class="outline-text-3" id="text-2-4">
+<ul class="org-ul">
+<li>setpriority and getpriority set and get the priority of a process
+and are therefore key system calls for scheduling purposes.
+</li>
+<li><code>sched_setscheduler</code> and <code>sched_getscheduler</code> set and query
+scheduling classes. <code>sched_setparam</code> and <code>sched_getparam</code> set and
+query additional scheduling parameters of processes (currently, only
+the parameter for real-time priority is used).
+</li>
+<li><code>sched_yield</code> voluntarily relinquishes control even when CPU time is
+still available to the process.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5">Modules</h3>
+<div class="outline-text-3" id="text-2-5">
+<ul class="org-ul">
+<li><code>init_module</code> adds a new module.
+</li>
+<li><code>delete_module</code> removes a module from the kernel.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-6" class="outline-3">
+<h3 id="sec-2-6">Filesystem</h3>
+<div class="outline-text-3" id="text-2-6">
+<ul class="org-ul">
+<li>Some system calls are used as a direct basis for userspace utilities
+of the same name that create and modify the directory
+structure:chdir, mkdir,rmdir,rename,symlink,getcwd,
+chroot,umask,andmknod.
+</li>
+<li>File and directory attributes can be modified using chown and chmod.
+</li>
+<li>The following utilities for processing file contents are implemented
+in the standard library and have the same names as the system
+calls:open, close, readandreadv, writeand writev,truncate and llseek.
+</li>
+<li>readdir and getdents read directory structures.
+</li>
+<li>link,symlink,and unlink create and delete links (or files if they
+are the last element in a hard link);readlink reads the contents of
+a link.
+</li>
+<li>mount and umount are used to attach and detach filesystems.
+</li>
+<li>poll and select are used to wait for some event.
+</li>
+<li>execve loads a new process in place of an old process. It starts new
+programs when used in conjunction with fork.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-7" class="outline-3">
+<h3 id="sec-2-7">Memory Management</h3>
+</div>
+</div>
+
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Implementation of System Calls</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">Structure of System Calls</h3>
+<div class="outline-text-3" id="text-3-1">
+</div><ul class="org-ul"><li><a id="sec-3-1-1" name="sec-3-1-1"></a>Implementation of Handler Functions<br  /></li>
+
+<li><a id="sec-3-1-2" name="sec-3-1-2"></a>Dispatching and Parameter Passing<br  /></li>
+
+<li><a id="sec-3-1-3" name="sec-3-1-3"></a>Return to User Mode<br  /></li></ul>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">Access to Userspace</h3>
+</div>
+
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">System Call Tracing</h3>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">cc</h2>
+<div class="outline-text-2" id="text-4">
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
+</div>
+
+<p>
+[[./Files/sequence-system-call.jpeg
+</p>
+
+<p>
+[[./Files/sys-ptrace.jpeg
+</p>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">reference</h2>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-10 Mon 22:06</p>
+<p class="date">Created: 2014-11-26 Wed 20:17</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
