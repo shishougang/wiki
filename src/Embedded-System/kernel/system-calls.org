@@ -244,28 +244,170 @@ BSD下,运行程序,CTRL-C去中断它,signal处理得到调用并打印,BSD机�
 + execve loads a new process in place of an old process. It starts new
   programs when used in conjunction with fork.
 ** Memory Management
-
-
++ In terms of dynamic memory management, the most important call
+  is =brk=, which modifies the size of the process data segment. Programs
+  that invokemallocor similar functions (almost all nontrivial code)
+  make frequent use of this system call.
++ mmap, mmap2, munmap,and mremap perform mapping, unmapping, and
+  remapping operations, while mprotect and madvise control access to and
+  give advice about specific regions of virtual memory.
++ swapon and swapoff enable and disable (additional) swap space on
+  external storage devices.
+** Interprocess Communication and Network Functions
++ socketcall deals with network questions and is used to implement
+  socket abstraction.
++ ipc is the counterpart to socketcall and is used for process
+  connections local to the computer and not for connections
+  established via networks.
+** System Information and Settings
++ syslog writes messages to the system logs and permits the assignment
+  of different priorities.
++ sysinfo returns information on the state of the system, particularly
+  statistics on memory usage.
++ sysctlis used to ‘‘fine-tune‘‘ kernel parameters. 
+** System Security and Capabilities
++ capset and capgetare responsible for setting and querying process
+  capabilities.
++ securityis a system call multiplexer for implementing LSM.
 * Implementation of System Calls
-
 ** Structure of System Calls
-
+实现system calls的代码分为2部分.system call调用的任务是以C实现的,与其
+他kernel代码一样.但其中是对平台特定的特性和对许多细节处理的封装,最终以
+汇编代码实现.
 *** Implementation of Handler Functions
+这些函数分布在kernel中,因为它们是嵌入code sections中的,所以它们以它们
+目的文件紧密相连.比如,文件相关的system calls在 =fs/= kernel子目录中,因
+为它们与虚拟系统交互.同样所有内存管理调用在 =mm/= 子目录中.
 
+用来实现system calls的处理函数共享一些格式:
++ 每个函数以 =sys_= 为前缀表明函数是system call.
++ 所有处理函数最多接受5个参数.
++ 所有system calls执行在kernel模式下.
+
+在kernel与user模式之间转换有平台特定的代码实现,而处理函数 =handler= 基
+本以平台不相关代码实现,这样就把处理函数与平台特定的代码独立开来,实现它
+与其他内核代码类似.system call的基本调用流程如下:
+
+[[./Files/sequence-system-call.jpeg]]
+
+一些system calls比较简单,一些比较复杂,一些作为多路器.如下简单的和作为
+多路器的例子:
+#+begin_src c
+    // kernel/timer.c
+    asmlinkage long sys_getuid(void)
+    {
+      /* Only we change this so SMP safe */
+      return current->uid;
+    }
+  
+  // net/socket.c
+  asmlinkage long sys_socketcall(int call, unsigned long __user *args)
+  {
+    unsigned long a[6];
+    unsigned long a0,a1;
+    int err;
+    //  ...
+    switch(call)
+    {
+      case SYS_SOCKET:
+        err = sys_socket(a0,a1,a[2]);
+        break;
+      case SYS_BIND:
+        err = sys_bind(a0,(struct sockaddr __user *)a1, a[2]);
+        break;
+      case SYS_CONNECT:
+        err = sys_connect(a0, (struct sockaddr __user *)a1, a[2]);
+        break;
+        
+        //  ...
+      default:
+        err = -EINVAL;
+        break;
+    }
+    return err;
+  }
+#+end_src
+
+每个函数声明都有一个 =asmlinkage= 标识,不是标准C的语法. =asmlinkage=
+是一个汇编宏,定义在 =<linkage.h>= .
 *** Dispatching and Parameter Passing
+System calls唯一的以一个数字来标识.所有的calls由一个中心代码处理,使用
+这个数字去调用特定函数通过查询一个静态表.参数传递也由这个中心代码处理,
+所以代码传递的实现与system call是独立的.
+
+从user转到kernel模式,参数的传递以汇编代码实现来适应特定的平台特性. 参
+数传递直接在寄存器中在所有平台上.更多一个寄存器需要来存储system call的
+数字被使用来之后查找到相应的处理函数.
+
+IA-32为例, 指令 =int $0x80= 转到kernel模式, system call数字在寄存器
+=eax= ,其他参数在 ebx, ecx, edx,esi,和edi.
+
+=sys_call_table= 的表格维护一组指向处理函数的函数指针,并在所有平台上.因
+为这个表格由汇编代码生成,所有在平台见不一样.但理念是一样的,通过system
+call的数字标识,kernel在表中找到相应位置的处理函数.比如ARM定义的如下表
+格:
+
+#+begin_src c
+// arch/arm/kernel/calls.S
+/* 0 */		CALL(sys_restart_syscall)
+		CALL(sys_exit)
+		CALL(sys_fork_wrapper)
+		CALL(sys_read)
+		CALL(sys_write)
+/* 5 */		CALL(sys_open)
+		CALL(sys_close)
+		CALL(sys_ni_syscall)		/* was sys_waitpid */
+		CALL(sys_creat)
+		CALL(sys_link)
+//...
+#+end_src
 
 *** Return to User Mode
+返回负值表示错误,正值和0说明成功.程序和kernel都不是对纯数字操作,而是使
+用符号定值,它们被定义在 =include/asm-generic/errno-base.h= 和
+=include/asm-generic/errno.h= . 错误码直到并包括511被用来作为普通的错
+误, kernel特定的值使用512以上的.
+
+如下的错误码:
+#+begin_src c
+// <asm-generic/errno-base.h>
+#define EPERM 1 /* Operation not permitted */
+#define ENOENT 2 /* No such file or directory */
+#define ESRCH 3 /* No such process */
+#define EINTR 4 /* Interrupted system call */
+#define EIO 5 /* I/O error */
+#define ENXIO 6 /* No such device or address */
+#define E2BIG 7 /* Argument list too long */
+#define ENOEXEC 8 /* Exec format error */
+// ...
+// <asm-generic/errno.h>
+#define EDEADLK 35 /* Resource deadlock would occur */
+#define ENAMETOOLONG 36 /* File name too long */
+#define ENOLCK 37 /* No record locks available */
+#define ENOSYS 38 /* Function not implemented */
+#+end_src
+
+在这里所有的码是正值,所以返回时在它们之前加负号.比如,返回 =-ENOPERM=
+来表示-1.
+
+Linux使用 =long= 类型发送结果从kernle到用户空间.
 
 ** Access to Userspace
+尽管kernel代码已经尽最大努力分离kernel和用户空间,但还是有情况,kernel代
+码需要访问用户应用的虚拟内存.当如下两种情况:
++ system call需要超过6个不同的参数,可以传入一个指向结构的指针.
++ system call运行产生一大堆数据不能通过正常的返回机制返回给用户程序.这
+  个数据需要交换到提前定义好的用户内存空间.
+借助于特殊函数 =copy_to_user= 和 =copy_from_user= 来处理这个问题.
 
 ** System Call Tracing
+
+
+[[./Files/sys-ptrace.jpeg]]
 
 * cc
 #+begin_src c
 
 #+end_src
 
-[[./Files/sequence-system-call.jpeg
-
-[[./Files/sys-ptrace.jpeg
 * reference

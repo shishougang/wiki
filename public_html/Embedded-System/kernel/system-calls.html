@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>System calls</title>
-<!-- 2014-11-26 Wed 20:17 -->
+<!-- 2014-11-27 Thu 23:14 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -159,6 +159,9 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2-5">Modules</a></li>
 <li><a href="#sec-2-6">Filesystem</a></li>
 <li><a href="#sec-2-7">Memory Management</a></li>
+<li><a href="#sec-2-8">Interprocess Communication and Network Functions</a></li>
+<li><a href="#sec-2-9">System Information and Settings</a></li>
+<li><a href="#sec-2-10">System Security and Capabilities</a></li>
 </ul>
 </li>
 <li><a href="#sec-3">Implementation of System Calls</a>
@@ -542,29 +545,256 @@ programs when used in conjunction with fork.
 </div>
 <div id="outline-container-sec-2-7" class="outline-3">
 <h3 id="sec-2-7">Memory Management</h3>
+<div class="outline-text-3" id="text-2-7">
+<ul class="org-ul">
+<li>In terms of dynamic memory management, the most important call
+is <code>brk</code>, which modifies the size of the process data segment. Programs
+that invokemallocor similar functions (almost all nontrivial code)
+make frequent use of this system call.
+</li>
+<li>mmap, mmap2, munmap,and mremap perform mapping, unmapping, and
+remapping operations, while mprotect and madvise control access to and
+give advice about specific regions of virtual memory.
+</li>
+<li>swapon and swapoff enable and disable (additional) swap space on
+external storage devices.
+</li>
+</ul>
 </div>
 </div>
-
-
+<div id="outline-container-sec-2-8" class="outline-3">
+<h3 id="sec-2-8">Interprocess Communication and Network Functions</h3>
+<div class="outline-text-3" id="text-2-8">
+<ul class="org-ul">
+<li>socketcall deals with network questions and is used to implement
+socket abstraction.
+</li>
+<li>ipc is the counterpart to socketcall and is used for process
+connections local to the computer and not for connections
+established via networks.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-9" class="outline-3">
+<h3 id="sec-2-9">System Information and Settings</h3>
+<div class="outline-text-3" id="text-2-9">
+<ul class="org-ul">
+<li>syslog writes messages to the system logs and permits the assignment
+of different priorities.
+</li>
+<li>sysinfo returns information on the state of the system, particularly
+statistics on memory usage.
+</li>
+<li>sysctlis used to ‘‘fine-tune‘‘ kernel parameters. 
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-10" class="outline-3">
+<h3 id="sec-2-10">System Security and Capabilities</h3>
+<div class="outline-text-3" id="text-2-10">
+<ul class="org-ul">
+<li>capset and capgetare responsible for setting and querying process
+capabilities.
+</li>
+<li>securityis a system call multiplexer for implementing LSM.
+</li>
+</ul>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">Implementation of System Calls</h2>
 <div class="outline-text-2" id="text-3">
 </div><div id="outline-container-sec-3-1" class="outline-3">
 <h3 id="sec-3-1">Structure of System Calls</h3>
 <div class="outline-text-3" id="text-3-1">
-</div><ul class="org-ul"><li><a id="sec-3-1-1" name="sec-3-1-1"></a>Implementation of Handler Functions<br  /></li>
+<p>
+实现system calls的代码分为2部分.system call调用的任务是以C实现的,与其他kernel代码一样.但其中是对平台特定的特性和对许多细节处理的封装,最终以汇编代码实现.
+</p>
+</div>
+<ul class="org-ul"><li><a id="sec-3-1-1" name="sec-3-1-1"></a>Implementation of Handler Functions<br  /><div class="outline-text-4" id="text-3-1-1">
+<p>
+这些函数分布在kernel中,因为它们是嵌入code sections中的,所以它们以它们目的文件紧密相连.比如,文件相关的system calls在 <code>fs/</code> kernel子目录中,因为它们与虚拟系统交互.同样所有内存管理调用在 <code>mm/</code> 子目录中.
+</p>
 
-<li><a id="sec-3-1-2" name="sec-3-1-2"></a>Dispatching and Parameter Passing<br  /></li>
+<p>
+用来实现system calls的处理函数共享一些格式:
+</p>
+<ul class="org-ul">
+<li>每个函数以 <code>sys_</code> 为前缀表明函数是system call.
+</li>
+<li>所有处理函数最多接受5个参数.
+</li>
+<li>所有system calls执行在kernel模式下.
+</li>
+</ul>
 
-<li><a id="sec-3-1-3" name="sec-3-1-3"></a>Return to User Mode<br  /></li></ul>
+<p>
+在kernel与user模式之间转换有平台特定的代码实现,而处理函数 <code>handler</code> 基本以平台不相关代码实现,这样就把处理函数与平台特定的代码独立开来,实现它与其他内核代码类似.system call的基本调用流程如下:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/sequence-system-call.jpeg" alt="sequence-system-call.jpeg" />
+</p>
+</div>
+
+<p>
+一些system calls比较简单,一些比较复杂,一些作为多路器.如下简单的和作为多路器的例子:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/timer.c</span>
+  asmlinkage <span style="color: #98fb98;">long</span> <span style="color: #87cefa;">sys_getuid</span>(<span style="color: #98fb98;">void</span>)
+  {
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Only we change this so SMP safe </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #00ffff;">return</span> current-&gt;uid;
+  }
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">net/socket.c</span>
+asmlinkage <span style="color: #98fb98;">long</span> <span style="color: #87cefa;">sys_socketcall</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">call</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">__user</span> *<span style="color: #eedd82;">args</span>)
+{
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">a</span>[6];
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">a0</span>,<span style="color: #eedd82;">a1</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">err</span>;
+  <span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">...</span>
+  <span style="color: #00ffff;">switch</span>(call)
+  {
+    <span style="color: #00ffff;">case</span> SYS_SOCKET:
+      err = sys_socket(a0,a1,a[2]);
+      <span style="color: #00ffff;">break</span>;
+    <span style="color: #00ffff;">case</span> SYS_BIND:
+      err = sys_bind(a0,(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr</span> <span style="color: #98fb98;">__user</span> *)a1, a[2]);
+      <span style="color: #00ffff;">break</span>;
+    <span style="color: #00ffff;">case</span> SYS_CONNECT:
+      err = sys_connect(a0, (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sockaddr</span> <span style="color: #98fb98;">__user</span> *)a1, a[2]);
+      <span style="color: #00ffff;">break</span>;
+
+      <span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">...</span>
+    <span style="color: #00ffff;">default</span>:
+      err = -EINVAL;
+      <span style="color: #00ffff;">break</span>;
+  }
+  <span style="color: #00ffff;">return</span> err;
+}
+</pre>
+</div>
+
+<p>
+每个函数声明都有一个 <code>asmlinkage</code> 标识,不是标准C的语法. <code>asmlinkage</code>
+是一个汇编宏,定义在 <code>&lt;linkage.h&gt;</code> .
+</p>
+</div>
+</li>
+<li><a id="sec-3-1-2" name="sec-3-1-2"></a>Dispatching and Parameter Passing<br  /><div class="outline-text-4" id="text-3-1-2">
+<p>
+System calls唯一的以一个数字来标识.所有的calls由一个中心代码处理,使用这个数字去调用特定函数通过查询一个静态表.参数传递也由这个中心代码处理,
+所以代码传递的实现与system call是独立的.
+</p>
+
+<p>
+从user转到kernel模式,参数的传递以汇编代码实现来适应特定的平台特性. 参数传递直接在寄存器中在所有平台上.更多一个寄存器需要来存储system call的数字被使用来之后查找到相应的处理函数.
+</p>
+
+<p>
+IA-32为例, 指令 <code>int $0x80</code> 转到kernel模式, system call数字在寄存器
+<code>eax</code> ,其他参数在 ebx, ecx, edx,esi,和edi.
+</p>
+
+<p>
+<code>sys_call_table</code> 的表格维护一组指向处理函数的函数指针,并在所有平台上.因为这个表格由汇编代码生成,所有在平台见不一样.但理念是一样的,通过system
+call的数字标识,kernel在表中找到相应位置的处理函数.比如ARM定义的如下表格:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">arch/arm/kernel/calls.S</span>
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">0 </span><span style="color: #ff7f24;">*/</span>         CALL(sys_restart_syscall)
+                CALL(sys_exit)
+                CALL(sys_fork_wrapper)
+                CALL(sys_read)
+                CALL(sys_write)
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">5 </span><span style="color: #ff7f24;">*/</span>         CALL(sys_open)
+                CALL(sys_close)
+                CALL(sys_ni_syscall)            <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">was sys_waitpid </span><span style="color: #ff7f24;">*/</span>
+                CALL(sys_creat)
+                CALL(sys_link)
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">...</span>
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="sec-3-1-3" name="sec-3-1-3"></a>Return to User Mode<br  /><div class="outline-text-4" id="text-3-1-3">
+<p>
+返回负值表示错误,正值和0说明成功.程序和kernel都不是对纯数字操作,而是使用符号定值,它们被定义在 <code>include/asm-generic/errno-base.h</code> 和
+<code>include/asm-generic/errno.h</code> . 错误码直到并包括511被用来作为普通的错误, kernel特定的值使用512以上的.
+</p>
+
+<p>
+如下的错误码:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;asm-generic/errno-base.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">EPERM</span> 1 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Operation not permitted </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ENOENT</span> 2 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">No such file or directory </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ESRCH</span> 3 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">No such process </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">EINTR</span> 4 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Interrupted system call </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">EIO</span> 5 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">I/O error </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ENXIO</span> 6 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">No such device or address </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">E2BIG</span> 7 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Argument list too long </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ENOEXEC</span> 8 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Exec format error </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;asm-generic/errno.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">EDEADLK</span> 35 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Resource deadlock would occur </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ENAMETOOLONG</span> 36 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">File name too long </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ENOLCK</span> 37 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">No record locks available </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ENOSYS</span> 38 <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Function not implemented </span><span style="color: #ff7f24;">*/</span>
+</pre>
+</div>
+
+<p>
+在这里所有的码是正值,所以返回时在它们之前加负号.比如,返回 <code>-ENOPERM</code>
+来表示-1.
+</p>
+
+<p>
+Linux使用 <code>long</code> 类型发送结果从kernle到用户空间.
+</p>
+</div>
+</li></ul>
 </div>
 
 <div id="outline-container-sec-3-2" class="outline-3">
 <h3 id="sec-3-2">Access to Userspace</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+尽管kernel代码已经尽最大努力分离kernel和用户空间,但还是有情况,kernel代码需要访问用户应用的虚拟内存.当如下两种情况:
+</p>
+<ul class="org-ul">
+<li>system call需要超过6个不同的参数,可以传入一个指向结构的指针.
+</li>
+<li>system call运行产生一大堆数据不能通过正常的返回机制返回给用户程序.这个数据需要交换到提前定义好的用户内存空间.
+</li>
+</ul>
+<p>
+借助于特殊函数 <code>copy_to_user</code> 和 <code>copy_from_user</code> 来处理这个问题.
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-3-3" class="outline-3">
 <h3 id="sec-3-3">System Call Tracing</h3>
+<div class="outline-text-3" id="text-3-3">
+
+<div class="figure">
+<p><img src="./Files/sys-ptrace.jpeg" alt="sys-ptrace.jpeg" />
+</p>
+</div>
+</div>
 </div>
 </div>
 
@@ -575,23 +805,16 @@ programs when used in conjunction with fork.
 
 <pre class="src src-c"></pre>
 </div>
-
-<p>
-[[./Files/sequence-system-call.jpeg
-</p>
-
-<p>
-[[./Files/sys-ptrace.jpeg
-</p>
 </div>
 </div>
+
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">reference</h2>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-26 Wed 20:17</p>
+<p class="date">Created: 2014-11-27 Thu 23:14</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
