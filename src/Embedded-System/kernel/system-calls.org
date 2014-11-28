@@ -401,13 +401,139 @@ Linux使用 =long= 类型发送结果从kernle到用户空间.
 借助于特殊函数 =copy_to_user= 和 =copy_from_user= 来处理这个问题.
 
 ** System Call Tracing
-
+ptrace的system call是 =sys_ptrace= .架构独立部分在 =kernel/ptrace.c=.
+架构相关部分的函数 =arch_ptrace= ,在 =arch/arch/kernel/ptrace.c= .基本
+代码流程如下:
 
 [[./Files/sys-ptrace.jpeg]]
 
-* cc
-#+begin_src c
+ptrace的system call由参数 =request= 所决定. 一开始必要的工作, 获取传入
+PID的 =task_struct= 通过 =ptrace_get_task_struct= . 内部使用
+=find_task_by_vpid= 来找出要求的 =task_struct=,并且防止追踪 =init= 进
+程.
 
+*** Starting Tracing
+进程task结构中包含一些ptrace特定的元素:
+#+begin_src c
+  <sched.h>
+  struct task_struct {
+  ...
+  unsigned int ptrace;
+  ...
+  /* ptrace_list/ptrace_children forms the list of my children
+     ,* that were stolen by a ptracer. */
+  struct list_head ptrace_children;
+  struct list_head ptrace_list;
+  ...
+  struct task_struct *real_parent; /* real parent process (when being debugged) */
+  ...
+  };
 #+end_src
 
+如果 =PTRACE_ATTACH= 设置, =ptrace_attach= 在追踪进程和目标进程建议一
+条链路.当它完成:
++ 目标进程的元素 =ptrace= 设置到 =PT_TRACED= .
++ 追踪进程成为目标进程的父进程.(真的父进程在 =real_parent=).
++ 被追踪进程被加入追踪的 =ptrace_children= list中通过 =ptrace_list=.
++ STOP信号被发送往被追踪进程.
+
+如果不同于 =PTRACE_ATTACH= 的行为被要求, =ptrace_check_attach= 先检测
+追踪器是否附加到此进程上.然后由 =arch_ptrace= 进一步处理.
+
+进一步追踪行为由signal处理代码进行.当信号被传递,kernel检查进程
+=task_struct= 的 =ptrace= 是否被设置 =PT_TRACED= 标识,如果是, 进程的状
+态被设置为 =TASK_STOPPED= 来中断执行. =notify_parent= 使用 =CHLD= 信号
+来通知追踪进程.然后追踪进程进行对目标进程需要的检查.
+** Stopping Tracing
+追踪关闭使用 =PTRACE_DETACH= ,使得ptrace把任务交给在 =kernel/ptrace.c=
+中的 =ptrace_detach= , 主要完成如下步骤:
+1. 架构相关的 =ptrace_disable= 做一些底层操作来停止追踪.
+2. =TIF_SYSCALL_TRACE= 标识被从子进程中移除.
+3. 进程 =task_struct= 的元素 =ptrace= 被重置为0, 目标进程从最终进程的
+   =ptrace_children= list中移除.
+4. 父进程重置通过设置 =task_struct->parent= 为 =real_parent=.
 * reference
+** =ptrace_attach=
+#+begin_src c
+int ptrace_attach(struct task_struct *task)
+{
+	int retval;
+
+	audit_ptrace(task);
+
+	retval = -EPERM;
+	if (unlikely(task->flags & PF_KTHREAD))
+		goto out;
+	if (same_thread_group(task, current))
+		goto out;
+
+	/*
+	 * Protect exec's credential calculations against our interference;
+	 * interference; SUID, SGID and LSM creds get determined differently
+	 * under ptrace.
+	 */
+	retval = -ERESTARTNOINTR;
+	if (mutex_lock_interruptible(&task->cred_guard_mutex))
+		goto out;
+
+	task_lock(task);
+	retval = __ptrace_may_access(task, PTRACE_MODE_ATTACH);
+	task_unlock(task);
+	if (retval)
+		goto unlock_creds;
+
+	write_lock_irq(&tasklist_lock);
+	retval = -EPERM;
+	if (unlikely(task->exit_state))
+		goto unlock_tasklist;
+	if (task->ptrace)
+		goto unlock_tasklist;
+
+	task->ptrace = PT_PTRACED;
+	if (capable(CAP_SYS_PTRACE))
+		task->ptrace |= PT_PTRACE_CAP;
+
+	__ptrace_link(task, current);
+	send_sig_info(SIGSTOP, SEND_SIG_FORCED, task);
+
+	retval = 0;
+unlock_tasklist:
+	write_unlock_irq(&tasklist_lock);
+unlock_creds:
+	mutex_unlock(&task->cred_guard_mutex);
+out:
+	return retval;
+}
+#+end_src
+** =ptrace_detach=
+#+begin_src c
+int ptrace_detach(struct task_struct *child, unsigned int data)
+{
+	bool dead = false;
+
+	if (!valid_signal(data))
+		return -EIO;
+
+	/* Architecture-specific hardware disable .. */
+	ptrace_disable(child);
+	clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
+
+	write_lock_irq(&tasklist_lock);
+	/*
+	 * This child can be already killed. Make sure de_thread() or
+	 * our sub-thread doing do_wait() didn't do release_task() yet.
+	 */
+	if (child->ptrace) {
+		child->exit_code = data;
+		dead = __ptrace_detach(current, child);
+		if (!child->exit_state)
+			wake_up_process(child);
+	}
+	write_unlock_irq(&tasklist_lock);
+
+	if (unlikely(dead))
+		release_task(child);
+
+	return 0;
+}
+#+end_src

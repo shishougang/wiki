@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Hardware/Software IRQs, tasklets and wait queues</title>
-<!-- 2014-11-11 Tue 20:40 -->
+<!-- 2014-11-28 Fri 22:31 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -143,11 +143,43 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">Interrupts</a></li>
-<li><a href="#sec-2">Software interrupts</a></li>
-<li><a href="#sec-3">Tasklets</a></li>
-<li><a href="#sec-4">Wait queues and completions</a></li>
-<li><a href="#sec-5">cc</a></li>
+<li><a href="#sec-1">Interrupts</a>
+<ul>
+<li><a href="#sec-1-1">Interrupt Types</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">Hardware IRQs</a>
+<ul>
+<li><a href="#sec-2-1">Processing Interrupts</a></li>
+<li><a href="#sec-2-2">Data Structures</a></li>
+<li><a href="#sec-2-3">Interrupt Flow Handling</a></li>
+<li><a href="#sec-2-4">Initializing and Reserving IRQs</a></li>
+<li><a href="#sec-2-5">Servicing IRQs</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">Software interrupts</a>
+<ul>
+<li><a href="#sec-3-1">Starting SoftIRQ Processing</a></li>
+<li><a href="#sec-3-2">The SoftIRQ Daemon</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">Tasklets</a>
+<ul>
+<li><a href="#sec-4-1">Generating Tasklets</a></li>
+<li><a href="#sec-4-2">Registering Tasklets</a></li>
+<li><a href="#sec-4-3">Executing Tasklets</a></li>
+<li><a href="#sec-4-4">Example</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">Wait queues and completions</a>
+<ul>
+<li><a href="#sec-5-1">Wait Queues</a></li>
+<li><a href="#sec-5-2">Completions</a></li>
+<li><a href="#sec-5-3">Work Queues</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">cc</a></li>
+<li><a href="#sec-7">reference</a></li>
 </ul>
 </div>
 </div>
@@ -155,44 +187,211 @@ for the JavaScript code in this tag.
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">Interrupts</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Linux中2种不同的中断:
+</p>
+<ul class="org-ul">
+<li>Hardware Interrupts: 又系统和连接的外围设备做产生.
+</li>
+<li>SoftIRQs: 在kernel本身被用来有效实现延迟的活动.
+</li>
+</ul>
+</div>
+
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">Interrupt Types</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+总的来说,中断类型可以被分为2类:
+</p>
+<ul class="org-ul">
+<li>Synchronous Interrupts 和 Exceptions: 由CPU自身产生,并用户当前运行的程序.Exceptions 由许多原因触发:在运行时产生程序错误(经典例子是除
+0).或异常情况发生,处理器需要外部的帮助解决它.
+</li>
+<li>Asynchronous interrupts: 是由外围设备产生的经典中断,可以在任何时候发生.与synchronous interrupts不同, asynchronous interrupts不和特定进程相关.它能在任何时候发生(中断打开情况下),无论当前系统运行什么活动.
+</li>
+</ul>
+
+<p>
+如果CPU当前没有在kernel模式下,它会从用户模式跳转到内核模式.然后它执行一个特定的程序叫做 interrupt service routine(ISR) 或 interrupt
+handler.
+</p>
+</div>
+</div>
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">Software interrupts</h2>
+<h2 id="sec-2">Hardware IRQs</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+中断其实不能直接被处理器外部设备触发,而它被请求是在一个叫interrupt controller
+的标准元件的帮助下.所以外部设备只能请求中断通过此元件,这样的请求被熟知为IRQs或interrupt requests.
+</p>
+</div>
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Processing Interrupts</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+一旦CPU被通知有中断,它需要转到相应的软件程序去进一步处理.因为每个
+interrupt和每个exception有为一个编号,kernel使用一张表来包含指向处理函数的指针.如下图:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/interrupt handlers.jpeg" alt="interrupt handlers.jpeg" />
+</p>
+</div>
+</div>
+
+<ul class="org-ul"><li><a id="sec-2-1-1" name="sec-2-1-1"></a>Entry and Exit Tasks<br  /><div class="outline-text-4" id="text-2-1-1">
+<p>
+如下图,interrupt处理被分为3部分.首先,适合处理函数能运行的环境被设置好;
+然后处理函数本身被调用;最后系统恢复到interrupt前的状态.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/handing-an-interrupt.jpeg" alt="handing-an-interrupt.jpeg" />
+</p>
+</div>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">Data Structures</h3>
+<div class="outline-text-3" id="text-2-2">
+
+<div class="figure">
+<p><img src="./Files/various-interrupt-handlers.jpeg" alt="various-interrupt-handlers.jpeg" />
+</p>
+</div>
+
+
+
+<div class="figure">
+<p><img src="./Files/irq-management.jpeg" alt="irq-management.jpeg" />
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">Interrupt Flow Handling</h3>
+<div class="outline-text-3" id="text-2-3">
+
+<div class="figure">
+<p><img src="./Files/handle-edge-irq.jpeg" alt="handle-edge-irq.jpeg" />
+</p>
+</div>
+
+
+<div class="figure">
+<p><img src="./Files/handle-level-irq.jpeg" alt="handle-level-irq.jpeg" />
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">Initializing and Reserving IRQs</h3>
+<div class="outline-text-3" id="text-2-4">
+
+<div class="figure">
+<p><img src="./Files/request-irq.jpeg" alt="request-irq.jpeg" />
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5">Servicing IRQs</h3>
+<div class="outline-text-3" id="text-2-5">
+
+<div class="figure">
+<p><img src="./Files/stack-layout-after-entry.jpeg" alt="stack-layout-after-entry.jpeg" />
+</p>
+</div>
+
+
+<div class="figure">
+<p><img src="./Files/do-irq.jpeg" alt="do-irq.jpeg" />
+</p>
+</div>
+</div>
+</div>
 </div>
 
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">Tasklets</h2>
+<h2 id="sec-3">Software interrupts</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">Starting SoftIRQ Processing</h3>
+<div class="outline-text-3" id="text-3-1">
+
+<div class="figure">
+<p><img src="./Files/do-softirq.jpeg" alt="do-softirq.jpeg" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">The SoftIRQ Daemon</h3>
+</div>
 </div>
 
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">Wait queues and completions</h2>
+<h2 id="sec-4">Tasklets</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">Generating Tasklets</h3>
 </div>
 
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">Registering Tasklets</h3>
+</div>
+
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3">Executing Tasklets</h3>
+</div>
+
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4">Example</h3>
+</div>
+</div>
 <div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">cc</h2>
+<h2 id="sec-5">Wait queues and completions</h2>
 <div class="outline-text-2" id="text-5">
+</div><div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Wait Queues</h3>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">Completions</h3>
+</div>
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3">Work Queues</h3>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">cc</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+[[./Files/
+</p>
+
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
-</div>
-
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
-
-
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
+<pre class="src src-c"></pre>
 </div>
 </div>
+</div>
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">reference</h2>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-11 Tue 20:40</p>
+<p class="date">Created: 2014-11-28 Fri 22:31</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

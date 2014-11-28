@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>System calls</title>
-<!-- 2014-11-27 Thu 23:14 -->
+<!-- 2014-11-28 Fri 22:31 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -169,10 +169,15 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3-1">Structure of System Calls</a></li>
 <li><a href="#sec-3-2">Access to Userspace</a></li>
 <li><a href="#sec-3-3">System Call Tracing</a></li>
+<li><a href="#sec-3-4">Stopping Tracing</a></li>
 </ul>
 </li>
-<li><a href="#sec-4">cc</a></li>
-<li><a href="#sec-5">reference</a></li>
+<li><a href="#sec-4">reference</a>
+<ul>
+<li><a href="#sec-4-1"><code>ptrace_attach</code></a></li>
+<li><a href="#sec-4-2"><code>ptrace_detach</code></a></li>
+</ul>
+</li>
 </ul>
 </div>
 </div>
@@ -789,32 +794,196 @@ Linux使用 <code>long</code> 类型发送结果从kernle到用户空间.
 <div id="outline-container-sec-3-3" class="outline-3">
 <h3 id="sec-3-3">System Call Tracing</h3>
 <div class="outline-text-3" id="text-3-3">
+<p>
+ptrace的system call是 <code>sys_ptrace</code> .架构独立部分在 <code>kernel/ptrace.c</code>.
+架构相关部分的函数 <code>arch_ptrace</code> ,在 <code>arch/arch/kernel/ptrace.c</code> .基本代码流程如下:
+</p>
+
 
 <div class="figure">
 <p><img src="./Files/sys-ptrace.jpeg" alt="sys-ptrace.jpeg" />
 </p>
 </div>
-</div>
-</div>
+
+<p>
+ptrace的system call由参数 <code>request</code> 所决定. 一开始必要的工作, 获取传入
+PID的 <code>task_struct</code> 通过 <code>ptrace_get_task_struct</code> . 内部使用
+<code>find_task_by_vpid</code> 来找出要求的 <code>task_struct</code>,并且防止追踪 <code>init</code> 进程.
+</p>
 </div>
 
-<div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">cc</h2>
-<div class="outline-text-2" id="text-4">
+<ul class="org-ul"><li><a id="sec-3-3-1" name="sec-3-3-1"></a>Starting Tracing<br  /><div class="outline-text-4" id="text-3-3-1">
+<p>
+进程task结构中包含一些ptrace特定的元素:
+</p>
 <div class="org-src-container">
 
-<pre class="src src-c"></pre>
-</div>
-</div>
+<pre class="src src-c">&lt;sched.h&gt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">task_struct</span> {
+...
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> ptrace;
+...
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ptrace_list/ptrace_children forms the list of my children</span>
+<span style="color: #ff7f24;">   * that were stolen by a ptracer. </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> ptrace_children;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">ptrace_list</span>;
+...
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">task_struct</span> *real_parent; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">real parent process (when being debugged) </span><span style="color: #ff7f24;">*/</span>
+...
+};
+</pre>
 </div>
 
-<div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">reference</h2>
+<p>
+如果 <code>PTRACE_ATTACH</code> 设置, <code>ptrace_attach</code> 在追踪进程和目标进程建议一条链路.当它完成:
+</p>
+<ul class="org-ul">
+<li>目标进程的元素 <code>ptrace</code> 设置到 <code>PT_TRACED</code> .
+</li>
+<li>追踪进程成为目标进程的父进程.(真的父进程在 <code>real_parent</code>).
+</li>
+<li>被追踪进程被加入追踪的 <code>ptrace_children</code> list中通过 <code>ptrace_list</code>.
+</li>
+<li>STOP信号被发送往被追踪进程.
+</li>
+</ul>
+
+<p>
+如果不同于 <code>PTRACE_ATTACH</code> 的行为被要求, <code>ptrace_check_attach</code> 先检测追踪器是否附加到此进程上.然后由 <code>arch_ptrace</code> 进一步处理.
+</p>
+
+<p>
+进一步追踪行为由signal处理代码进行.当信号被传递,kernel检查进程
+<code>task_struct</code> 的 <code>ptrace</code> 是否被设置 <code>PT_TRACED</code> 标识,如果是, 进程的状态被设置为 <code>TASK_STOPPED</code> 来中断执行. <code>notify_parent</code> 使用 <code>CHLD</code> 信号来通知追踪进程.然后追踪进程进行对目标进程需要的检查.
+</p>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">Stopping Tracing</h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+追踪关闭使用 <code>PTRACE_DETACH</code> ,使得ptrace把任务交给在 <code>kernel/ptrace.c</code>
+中的 <code>ptrace_detach</code> , 主要完成如下步骤:
+</p>
+<ol class="org-ol">
+<li>架构相关的 <code>ptrace_disable</code> 做一些底层操作来停止追踪.
+</li>
+<li><code>TIF_SYSCALL_TRACE</code> 标识被从子进程中移除.
+</li>
+<li>进程 <code>task_struct</code> 的元素 <code>ptrace</code> 被重置为0, 目标进程从最终进程的
+<code>ptrace_children</code> list中移除.
+</li>
+<li>父进程重置通过设置 <code>task_struct-&gt;parent</code> 为 <code>real_parent</code>.
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">reference</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1"><code>ptrace_attach</code></h3>
+<div class="outline-text-3" id="text-4-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ptrace_attach</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">task_struct</span> *<span style="color: #eedd82;">task</span>)
+{
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">retval</span>;
+
+        audit_ptrace(task);
+
+        retval = -EPERM;
+        <span style="color: #00ffff;">if</span> (unlikely(task-&gt;flags &amp; PF_KTHREAD))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+        <span style="color: #00ffff;">if</span> (same_thread_group(task, current))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Protect exec's credential calculations against our interference;</span>
+<span style="color: #ff7f24;">         * interference; SUID, SGID and LSM creds get determined differently</span>
+<span style="color: #ff7f24;">         * under ptrace.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        retval = -ERESTARTNOINTR;
+        <span style="color: #00ffff;">if</span> (mutex_lock_interruptible(&amp;task-&gt;cred_guard_mutex))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out</span>;
+
+        task_lock(task);
+        retval = __ptrace_may_access(task, PTRACE_MODE_ATTACH);
+        task_unlock(task);
+        <span style="color: #00ffff;">if</span> (retval)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">unlock_creds</span>;
+
+        write_lock_irq(&amp;tasklist_lock);
+        retval = -EPERM;
+        <span style="color: #00ffff;">if</span> (unlikely(task-&gt;exit_state))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">unlock_tasklist</span>;
+        <span style="color: #00ffff;">if</span> (task-&gt;ptrace)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">unlock_tasklist</span>;
+
+        task-&gt;ptrace = PT_PTRACED;
+        <span style="color: #00ffff;">if</span> (capable(CAP_SYS_PTRACE))
+                task-&gt;ptrace |= PT_PTRACE_CAP;
+
+        __ptrace_link(task, current);
+        send_sig_info(SIGSTOP, SEND_SIG_FORCED, task);
+
+        retval = 0;
+<span style="color: #7fffd4;">unlock_tasklist</span>:
+        write_unlock_irq(&amp;tasklist_lock);
+<span style="color: #7fffd4;">unlock_creds</span>:
+        mutex_unlock(&amp;task-&gt;cred_guard_mutex);
+<span style="color: #7fffd4;">out</span>:
+        <span style="color: #00ffff;">return</span> retval;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2"><code>ptrace_detach</code></h3>
+<div class="outline-text-3" id="text-4-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ptrace_detach</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">task_struct</span> *<span style="color: #eedd82;">child</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">data</span>)
+{
+        <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">dead</span> = <span style="color: #7fffd4;">false</span>;
+
+        <span style="color: #00ffff;">if</span> (!valid_signal(data))
+                <span style="color: #00ffff;">return</span> -EIO;
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Architecture-specific hardware disable .. </span><span style="color: #ff7f24;">*/</span>
+        ptrace_disable(child);
+        clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
+
+        write_lock_irq(&amp;tasklist_lock);
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * This child can be already killed. Make sure de_thread() or</span>
+<span style="color: #ff7f24;">         * our sub-thread doing do_wait() didn't do release_task() yet.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (child-&gt;ptrace) {
+                child-&gt;exit_code = data;
+                dead = __ptrace_detach(current, child);
+                <span style="color: #00ffff;">if</span> (!child-&gt;exit_state)
+                        wake_up_process(child);
+        }
+        write_unlock_irq(&amp;tasklist_lock);
+
+        <span style="color: #00ffff;">if</span> (unlikely(dead))
+                release_task(child);
+
+        <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-27 Thu 23:14</p>
+<p class="date">Created: 2014-11-28 Fri 22:31</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
