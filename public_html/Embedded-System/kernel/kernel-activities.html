@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Hardware/Software IRQs, tasklets and wait queues</title>
-<!-- 2014-11-28 Fri 22:31 -->
+<!-- 2014-12-03 Wed 20:41 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -255,17 +255,77 @@ interrupt和每个exception有为一个编号,kernel使用一张表来包含指�
 <p><img src="./Files/handing-an-interrupt.jpeg" alt="handing-an-interrupt.jpeg" />
 </p>
 </div>
+
+<p>
+进入和离开中断处理程序确保处理器从用户模式转到kernel模式.进入代码中关键部分是从用户模式的stack转化到kernel模式的stack,离开代码相反.所以必须保存当前寄存器的值,平台相关的寄存器list结构 <code>pt_regs</code> 中列出了所有在
+kernel模式下会改变的寄存器.
+</p>
+
+<p>
+离开代码中kernel检查是否:
+</p>
+<ul class="org-ul">
+<li>调度器需要选择一个新的进程来取代旧的进程.
+</li>
+<li>有需要传递给进程的信号.
+</li>
+</ul>
+
+<p>
+因为C和汇编语言的交互需要,特别两者数据交换,这些处理代码在
+<code>arch/arch/kernel/entry.S</code> 中.
+</p>
 </div>
 </li></ul>
 </div>
+
 <div id="outline-container-sec-2-2" class="outline-3">
 <h3 id="sec-2-2">Data Structures</h3>
 <div class="outline-text-3" id="text-2-2">
+<p>
+管理IRQs中心是一张每个条目就是一个IRQ的全局的数组.因为数组位置和中断编号是一致的.所以很容易通过特定IRQ确定条目位置: IRQ 0的位置是0如此.数组定义如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/irq/handle.c</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_desc</span> <span style="color: #eedd82;">irq_desc</span>[NR_IRQS] __cacheline_aligned_in_smp = {
+  [0 ... NR_IRQS-1] = {
+    .status = IRQ_DISABLED,
+    .chip = &amp;no_irq_chip,
+    .handle_irq = handle_bad_irq,
+    .depth = 1,
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+  }
+};
+</pre>
+</div>
+
+<p>
+尽管使用架构不相关的数据类型,但是最大支持IRQs个数由平台特定定值
+<code>NR_IRQS</code> 决定.对于大多数架构来说,这个定值被定义在处理器特定的头文件
+<code>include/asm-arch/irq.h</code> 中.初始,所有中断条目没有安装指定的处理函数,使用 <code>handle_bad_irq</code> 作为处理函数,它仅仅确认终端.
+</p>
+
+<p>
+Kernel的IRQ处理子系统包含3个抽象层,如下图:
+</p>
+
 
 <div class="figure">
 <p><img src="./Files/various-interrupt-handlers.jpeg" alt="various-interrupt-handlers.jpeg" />
 </p>
 </div>
+
+<ol class="org-ol">
+<li><b>High-Level Interrupt Service Routines (ISRs)</b>: 
+</li>
+<li><b>Interrupt Flow Handling</b>:
+</li>
+<li><b>Chip-Level Hardware Encapsulation</b>:
+</li>
+</ol>
+
+
 
 
 
@@ -391,7 +451,7 @@ interrupt和每个exception有为一个编号,kernel使用一张表来包含指�
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-11-28 Fri 22:31</p>
+<p class="date">Created: 2014-12-03 Wed 20:41</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
