@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Hardware/Software IRQs, tasklets and wait queues</title>
-<!-- 2014-12-03 Wed 20:41 -->
+<!-- 2014-12-04 Thu 20:46 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -317,22 +317,90 @@ Kernel的IRQ处理子系统包含3个抽象层,如下图:
 </div>
 
 <ol class="org-ol">
-<li><b>High-Level Interrupt Service Routines (ISRs)</b>: 
+<li><b>High-Level Interrupt Service Routines (ISRs)</b>: 进行由设备驱动中断引发的必要工作.
 </li>
-<li><b>Interrupt Flow Handling</b>:
+<li><b>Interrupt Flow Handling</b>: 处理中断不同类型如边缘和电平触发间的差异.
 </li>
-<li><b>Chip-Level Hardware Encapsulation</b>:
+<li><b>Chip-Level Hardware Encapsulation</b>: 直接与底层产生中断的硬件交互.
 </li>
 </ol>
 
-
-
-
-
-<div class="figure">
-<p><img src="./Files/irq-management.jpeg" alt="irq-management.jpeg" />
+<p>
+继续分析代码,表示IRQ描述符的结构定义如下:
 </p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;irq.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_desc</span> {
+  <span style="color: #98fb98;">irq_flow_handler_t</span> <span style="color: #eedd82;">handle_irq</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> *<span style="color: #eedd82;">chip</span>;
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">handler_data</span>;
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">chip_data</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> *<span style="color: #eedd82;">action</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">IRQ action list </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">status</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">IRQ status </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">depth</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">nested irq disables </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq_count</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">For detecting broken IRQs </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irqs_unhandled</span>;
+  ...
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *name;
+} <span style="color: #eedd82;">____cacheline_internodealigned_in_smp</span>;
+</pre>
 </div>
+
+<ul class="org-ul">
+<li>flow层的IRQ处理函数由 <code>handle_irq</code> 提供. <code>handler_data</code> 可以指向处理特定的数据. <code>handle_irq</code> 被调用当中断发生时.这个函数并负责使用
+<code>chip</code> 提供的控制特定方法来完成必要的底层操作来进行中断处理.
+</li>
+<li><code>action</code> 提供一串当中断发生时需要被执行的动作.
+</li>
+<li>芯片特定的处理封装在 <code>chip</code> 中.一个特殊的数据结构被引入, <code>chip_data</code>
+  指向相应使用的数据.
+</li>
+<li><code>name</code> 指定 <code>/proc/interrupts</code> 中显示的名字.
+</li>
+</ul>
+
+<p>
+其中 <code>depth</code> 有2个功能,用来指示IRQ线是否打开或关闭,并且记录被关闭的次数. 一个正数表示被关闭.而0表示被打开.为什么正数被使用来关闭IRQs?因为每次有代码关闭中断, <code>depth</code> 作为计数加1, 每次中断被再次打开, 计数减1.
+</p>
+
+<p>
+IRQ能改变它的状态不仅在初始化时,而且可以在运行时. <code>status</code> 描述当前状态. <code>&lt;irq.h&gt;</code> 定义了许多定值来描述当前IRQ线的状态.
+</p>
+
+<ul class="org-ul">
+<li><code>IRQ_DISABLED</code> is used for an IRQ line disabled by a device driver.
+It instructs the kernel not to enter the handler.
+</li>
+<li>During execution of an IRQ handler the state is set to
+<code>IRQ_INPROGRESS</code>.As with <code>IRQ_DISABLED</code>, this prohibits the
+remaining kernel code from executing the handler.
+</li>
+<li><code>IRQ_PENDING</code> is active when the CPU has noticed an interrupt but has
+not yet executed the corresponding handler.
+</li>
+<li><code>IRQ_MASKED</code> is required to properly handle interrupts that occur
+during interrupt processing;
+</li>
+<li><code>IRQ_PER_CPU</code> is set when an IRQ can occur on a single CPU only. (On
+SMP systems this renders several protection mechanisms against
+concurrent accesses superfluous.)
+</li>
+<li>IRQ<sub>LEVELis</sub> used on Alpha and PowerPC to differentiate level-triggered and edge-triggered
+</li>
+</ul>
+<p>
+IRQs.
+❑ IRQ<sub>REPLAYmeans</sub> that the IRQ has been disabled but a previous interrupt has not yet been
+acknowledged.
+❑ IRQ<sub>AUTODETECTandIRQ</sub><sub>WAITINGare</sub> used for the automatic detection and configuration of
+IRQs. I will not discuss this in more detail, but mention that the respective code is located in
+kernel/irq/autoprobe.c.
+❑ IRQ<sub>NOREQUESTis</sub> set if the IRQ can be shared between devices and must thus not be exclusively
+requested by a single device.
+<img src="./Files/irq-management.jpeg" alt="irq-management.jpeg" />
+</p>
 </div>
 </div>
 <div id="outline-container-sec-2-3" class="outline-3">
@@ -451,7 +519,7 @@ Kernel的IRQ处理子系统包含3个抽象层,如下图:
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-12-03 Wed 20:41</p>
+<p class="date">Created: 2014-12-04 Thu 20:46</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

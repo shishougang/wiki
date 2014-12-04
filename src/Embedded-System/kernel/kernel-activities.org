@@ -76,13 +76,66 @@ Kernel的IRQ处理子系统包含3个抽象层,如下图:
 
 [[./Files/various-interrupt-handlers.jpeg]]
 
-1. *High-Level Interrupt Service Routines (ISRs)*: 
-2. *Interrupt Flow Handling*:
-3. *Chip-Level Hardware Encapsulation*:
+1. *High-Level Interrupt Service Routines (ISRs)*: 进行由设备驱动中断
+   引发的必要工作.
+2. *Interrupt Flow Handling*: 处理中断不同类型如边缘和电平触发间的差异.
+3. *Chip-Level Hardware Encapsulation*: 直接与底层产生中断的硬件交互.
 
+继续分析代码,表示IRQ描述符的结构定义如下:
 
+#+begin_src c
+  // <irq.h>
+  struct irq_desc {
+    irq_flow_handler_t handle_irq;
+    struct irq_chip *chip;
+    void *handler_data;
+    void *chip_data;
+    struct irqaction *action; /* IRQ action list */
+    unsigned int status; /* IRQ status */
+    unsigned int depth; /* nested irq disables */
+    unsigned int irq_count; /* For detecting broken IRQs */
+    unsigned int irqs_unhandled;
+    ...
+    const char *name;
+  } ____cacheline_internodealigned_in_smp;
+#+end_src
 
++ flow层的IRQ处理函数由 =handle_irq= 提供. =handler_data= 可以指向处理
+  特定的数据. =handle_irq= 被调用当中断发生时.这个函数并负责使用
+  =chip= 提供的控制特定方法来完成必要的底层操作来进行中断处理.
++ =action= 提供一串当中断发生时需要被执行的动作.
++ 芯片特定的处理封装在 =chip= 中.一个特殊的数据结构被引入, =chip_data=
+  指向相应使用的数据.
++ =name= 指定 =/proc/interrupts= 中显示的名字.
 
+其中 =depth= 有2个功能,用来指示IRQ线是否打开或关闭,并且记录被关闭的次
+数. 一个正数表示被关闭.而0表示被打开.为什么正数被使用来关闭IRQs?因为每
+次有代码关闭中断, =depth= 作为计数加1, 每次中断被再次打开, 计数减1.
+
+IRQ能改变它的状态不仅在初始化时,而且可以在运行时. =status= 描述当前状
+态. =<irq.h>= 定义了许多定值来描述当前IRQ线的状态.
+
++ =IRQ_DISABLED= is used for an IRQ line disabled by a device driver.
+  It instructs the kernel not to enter the handler.
++ During execution of an IRQ handler the state is set to
+  =IRQ_INPROGRESS=.As with =IRQ_DISABLED=, this prohibits the
+  remaining kernel code from executing the handler.
++ =IRQ_PENDING= is active when the CPU has noticed an interrupt but has
+  not yet executed the corresponding handler.
++ =IRQ_MASKED= is required to properly handle interrupts that occur
+  during interrupt processing;
++ =IRQ_PER_CPU= is set when an IRQ can occur on a single CPU only. (On
+  SMP systems this renders several protection mechanisms against
+  concurrent accesses superfluous.)
++ IRQ_LEVELis used on Alpha and PowerPC to differentiate level-triggered and edge-triggered
+IRQs.
+❑ IRQ_REPLAYmeans that the IRQ has been disabled but a previous interrupt has not yet been
+acknowledged.
+❑ IRQ_AUTODETECTandIRQ_WAITINGare used for the automatic detection and configuration of
+IRQs. I will not discuss this in more detail, but mention that the respective code is located in
+kernel/irq/autoprobe.c.
+❑ IRQ_NOREQUESTis set if the IRQ can be shared between devices and must thus not be exclusively
+requested by a single device.
 [[./Files/irq-management.jpeg]]
 ** Interrupt Flow Handling
 
