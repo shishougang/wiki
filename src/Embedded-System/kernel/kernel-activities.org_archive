@@ -1,0 +1,56 @@
+#    -*- mode: org -*-
+
+
+Archived entries from file /home/felix/Dropbox/Blog/wiki/src/Embedded-System/kernel/kernel-activities.org
+
+
+* IRQ Controller Abstraction
+  :PROPERTIES:
+  :ARCHIVE_TIME: 2014-12-05 Fri 11:10
+  :ARCHIVE_FILE: ~/Dropbox/Blog/wiki/src/Embedded-System/kernel/kernel-activities.org
+  :ARCHIVE_OLPATH: Hardware IRQs/Data Structures
+  :ARCHIVE_CATEGORY: kernel-activities
+  :END:
+芯片特性的控制被封装在结构 =struct irq_chip= 中,基本如下:
+#+begin_src c
+  // <irq.h>
+  struct irq_chip {
+    const char *name;
+    unsigned int (*startup)(unsigned int irq);
+    void (*shutdown)(unsigned int irq);
+    void (*enable)(unsigned int irq);
+    void (*disable)(unsigned int irq);
+    void (*ack)(unsigned int irq);
+    void (*mask)(unsigned int irq);
+    void (*mask_ack)(unsigned int irq);
+    void (*unmask)(unsigned int irq);
+    void (*eoi)(unsigned int irq);
+    // ...
+    int (*set_type)(unsigned int irq, unsigned int flow_type);
+  };
+#+end_src
+
+这个结构需要考虑到不同IRQ实现的特性.
+
+=name= 维护一个硬件控制器的标识.IA-32系统可能的值是‘‘XTPIC‘‘ 和 ‘‘IO-APIC,’’.
+
+其他函数指针有如下意思:
++ =startup= 指向用来第一次初始化IRQ的函数.
++ =enable= 使能IRQ.
++ =disable= 是IRQ无效化,而 =shutdown= 彻底关闭中断源.
++ =ack= 与中断控制的硬件紧密相连.在一些模式下,IRQ请求的到达必须得到确
+  认以至之后的请求才能被服务.
++ =end= 被调用来标志中断处理的结束.
++ 在多核系统中, =set_affinity= 可以被用来声明特定IRQs由某个CPU处理.
++ =set_type= 用来设置IRQ flow类型.
+
+以IO-APIC为例子:
+
+
+
+
+
+
+
+
+[[./Files/irq-management.jpeg]]

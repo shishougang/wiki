@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Hardware/Software IRQs, tasklets and wait queues</title>
-<!-- 2014-12-04 Thu 20:46 -->
+<!-- 2014-12-05 Fri 22:53 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -179,7 +179,12 @@ for the JavaScript code in this tag.
 </ul>
 </li>
 <li><a href="#sec-6">cc</a></li>
-<li><a href="#sec-7">reference</a></li>
+<li><a href="#sec-7">reference</a>
+<ul>
+<li><a href="#sec-7-1"><code>struct irq_desc</code></a></li>
+<li><a href="#sec-7-2"><code>set_irq_chip</code></a></li>
+</ul>
+</li>
 </ul>
 </div>
 </div>
@@ -387,25 +392,220 @@ during interrupt processing;
 SMP systems this renders several protection mechanisms against
 concurrent accesses superfluous.)
 </li>
-<li>IRQ<sub>LEVELis</sub> used on Alpha and PowerPC to differentiate level-triggered and edge-triggered
+<li><code>IRQ_LEVEL</code> is used on Alpha and PowerPC to differentiate
+level-triggered and edge-triggered IRQs.
+</li>
+<li><code>IRQ_REPLAY</code> means that the IRQ has been disabled but a previous
+interrupt has not yet been acknowledged.
+</li>
+<li><code>IRQ_AUTODETECT</code> and <code>IRQ_WAITING</code> are used for the automatic
+detection and configuration of IRQs. I will not discuss this in more
+detail, but mention that the respective code is located in <code>kernel/irq/autoprobe.c</code>.
+</li>
+<li><code>IRQ_NOREQUEST</code> is set if the IRQ can be shared between devices and
+must thus not be exclusively requested by a single device.
 </li>
 </ul>
+
 <p>
-IRQs.
-❑ IRQ<sub>REPLAYmeans</sub> that the IRQ has been disabled but a previous interrupt has not yet been
-acknowledged.
-❑ IRQ<sub>AUTODETECTandIRQ</sub><sub>WAITINGare</sub> used for the automatic detection and configuration of
-IRQs. I will not discuss this in more detail, but mention that the respective code is located in
-kernel/irq/autoprobe.c.
-❑ IRQ<sub>NOREQUESTis</sub> set if the IRQ can be shared between devices and must thus not be exclusively
-requested by a single device.
-<img src="./Files/irq-management.jpeg" alt="irq-management.jpeg" />
+使用 <code>status</code> 的当前内容,很容易让kernel查询特定IRQ的状态而不用知道硬件特定的底层实现.但仅仅设置相应的标识不能产生任何效果,底层的硬件必须被告知状态的改变.
 </p>
 </div>
+
+<ul class="org-ul"><li><a id="sec-2-2-1" name="sec-2-2-1"></a>IRQ Controller Abstraction<br  /><div class="outline-text-4" id="text-2-2-1">
+<p>
+芯片特性的控制被封装在结构 <code>struct irq_chip</code> 中,基本如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;irq.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> {
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">startup</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">shutdown</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">enable</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">disable</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">ack</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">mask</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">mask_ack</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">unmask</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">eoi</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+  <span style="color: #98fb98;">int</span> (*<span style="color: #87cefa;">set_type</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flow_type</span>);
+};
+</pre>
+</div>
+
+<p>
+这个结构需要考虑到不同IRQ实现的特性.
+</p>
+
+<p>
+<code>name</code> 维护一个硬件控制器的标识.IA-32系统可能的值是‘‘XTPIC‘‘ 和 ‘‘IO-APIC,’’.
+</p>
+
+<p>
+其他函数指针有如下意思:
+</p>
+<ul class="org-ul">
+<li><code>startup</code> 指向用来第一次初始化IRQ的函数.
+</li>
+<li><code>enable</code> 使能IRQ.
+</li>
+<li><code>disable</code> 是IRQ无效化,而 <code>shutdown</code> 彻底关闭中断源.
+</li>
+<li><code>ack</code> 与中断控制的硬件紧密相连.在一些模式下,IRQ请求的到达必须得到确认以至之后的请求才能被服务.
+</li>
+<li><code>end</code> 被调用来标志中断处理的结束.
+</li>
+<li>在多核系统中, <code>set_affinity</code> 可以被用来声明特定IRQs由某个CPU处理.
+</li>
+<li><code>set_type</code> 用来设置IRQ flow类型.
+</li>
+</ul>
+
+<p>
+以IO-APIC为例子:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">arch/x86/kernel/apic/io_apic.c</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> <span style="color: #98fb98;">ioapic_chip</span> <span style="color: #eedd82;">__read_mostly</span> = {
+        .name           = <span style="color: #ffa07a;">"IO-APIC"</span>,
+        .startup        = startup_ioapic_irq,
+        .mask           = mask_IO_APIC_irq,
+        .unmask         = unmask_IO_APIC_irq,
+        .ack            = ack_apic_edge,
+        .eoi            = ack_apic_level,
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_SMP
+        .set_affinity   = set_ioapic_affinity_irq,
+<span style="color: #b0c4de;">#endif</span>
+        .retrigger      = ioapic_retrigger_irq,
+};
+</pre>
+</div>
+
+<p>
+在系统中查看中断统计信息:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">$ cat /proc/interrupts 
+           CPU0       CPU1       CPU2       CPU3       CPU4       CPU5       CPU6       CPU7       
+  0:         41          0          0   31487034          0          0          0          0   IO-APIC-edge      timer
+  1:          1          0          0          2          0          0          0          0   IO-APIC-edge      i8042
+  4:          0          0          0          8          0          0          0          0   IO-APIC-edge    
+  8:          0          0          0          1          0          0          0          0   IO-APIC-edge      rtc0
+  9:          0          0          0          0          0          0          0          0   IO-APIC-fasteoi   acpi
+ 12:          0          0          0          4          0          0          0          0   IO-APIC-edge      i8042
+ 16:         10          0          0          0          0          0         40          0   IO-APIC-fasteoi   ehci_hcd:usb1
+ 17:         91          0          0          0          0          0          0        148   IO-APIC-fasteoi   snd_hda_intel
+ 23:    6420912          0          0          0          0          0        141          0   IO-APIC-fasteoi   ehci_hcd:usb2
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="sec-2-2-2" name="sec-2-2-2"></a>Handler Function Representation<br  /><div class="outline-text-4" id="text-2-2-2">
+<p>
+其中有 <code>irqaction</code> 结构如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> {
+  <span style="color: #98fb98;">irq_handler_t</span> <span style="color: #eedd82;">handler</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">flags</span>;
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>;
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">dev_id</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> *<span style="color: #eedd82;">next</span>;
+}
+</pre>
+</div>
+
+<p>
+其中最重要的元素是处理函数 <code>irq_handler_t handler</code> , 当设备请求系统中断时,这个处理函数被调用. <code>flag</code> 描述IRQ的一些特性,如下被定义在
+<code>&lt;interrupt.h&gt;</code> :
+</p>
+
+<ul class="org-ul">
+<li><code>IRQF_SHARED</code> is set forshared IRQsand signals that more than one
+device is using an IRQ line.
+</li>
+<li><code>IRQF_SAMPLE_RANDO</code> is set when the IRQ contributes to the kernel
+entropy pool.
+</li>
+<li><code>IRQF_DISABLED</code> indicates that the IRQ handler must be executed with
+interrupts disabled.
+</li>
+<li><code>IRQF_TIMER</code> denotes a timer interrupt.
+</li>
+</ul>
+
+<p>
+next被使用来实现共享IRQ处理.一些 <code>irqaction</code> 实例被分组成一个链表.同一个链表的所有元素必须处理同一个IRQ编号.如下图描述它们如何相连:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/irq-management.jpeg" alt="irq-management.jpeg" />
+</p>
+</div>
+</div>
+</li></ul>
 </div>
 <div id="outline-container-sec-2-3" class="outline-3">
 <h3 id="sec-2-3">Interrupt Flow Handling</h3>
 <div class="outline-text-3" id="text-2-3">
+</div><ul class="org-ul"><li><a id="sec-2-3-1" name="sec-2-3-1"></a>Setting Controller Hardware<br  /><div class="outline-text-4" id="text-2-3-1">
+<p>
+kernel提供的注册 <code>irq_chip</code> 和设置flow处理的函数:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;irq.h&gt;</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">set_irq_chip</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> *<span style="color: #eedd82;">chip</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_irq_handler</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #98fb98;">irq_flow_handler_t</span> <span style="color: #eedd82;">handle</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_irq_chained_handler</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #98fb98;">irq_flow_handler_t</span> <span style="color: #eedd82;">handle</span>)
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_irq_chip_and_handler</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> *<span style="color: #eedd82;">chip</span>,
+                              <span style="color: #98fb98;">irq_flow_handler_t</span> <span style="color: #eedd82;">handle</span>);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">set_irq_chip_and_handler_name</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> *<span style="color: #eedd82;">chip</span>,
+                                   <span style="color: #98fb98;">irq_flow_handler_t</span> <span style="color: #eedd82;">handle</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">name</span>);
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>set_irq_chip</code> 把IRQ芯片以 <code>irq_chip</code> 实例附加到特定中断上. 如果是
+NULL,那么使用通用值 <code>no_irq_chip</code>.
+</li>
+<li><code>set_irq_handler</code> 和 <code>set_irq_chained_handler</code> 设置flow处理函数给特定IRQ编号.
+</li>
+<li><code>set_chip_and_handler</code> 同时设置两者.
+</li>
+</ul>
+</div>
+</li>
+<li><a id="sec-2-3-2" name="sec-2-3-2"></a>Flow Handling<br  /><div class="outline-text-4" id="text-2-3-2">
+<p>
+在分析flow处理实现前,先看怎么定义自己的类型. <code>irq_flow_handler_t</code> 指定
+IRQ flow处理函数:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;irq.h&gt;</span>
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">void</span> <span style="color: #98fb98;">fastcall</span> (*irq_flow_handler_t)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>,
+                                            <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_desc</span> *<span style="color: #eedd82;">desc</span>);
+</pre>
+</div>
+
+<p>
+Flow处理函数获取IRQ的编号和对此中断负责的 <code>irq_desc</code> 实例.
+</p>
+
 
 <div class="figure">
 <p><img src="./Files/handle-edge-irq.jpeg" alt="handle-edge-irq.jpeg" />
@@ -413,11 +613,18 @@ requested by a single device.
 </div>
 
 
+
 <div class="figure">
 <p><img src="./Files/handle-level-irq.jpeg" alt="handle-level-irq.jpeg" />
 </p>
 </div>
+
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
 </div>
+</div>
+</li></ul>
 </div>
 <div id="outline-container-sec-2-4" class="outline-3">
 <h3 id="sec-2-4">Initializing and Reserving IRQs</h3>
@@ -515,11 +722,118 @@ requested by a single device.
 
 <div id="outline-container-sec-7" class="outline-2">
 <h2 id="sec-7">reference</h2>
+<div class="outline-text-2" id="text-7">
+</div><div id="outline-container-sec-7-1" class="outline-3">
+<h3 id="sec-7-1"><code>struct irq_desc</code></h3>
+<div class="outline-text-3" id="text-7-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * struct irq_desc - interrupt descriptor</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@irq</span><span style="color: #ffa07a;">:                interrupt number for this descriptor</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@timer_rand_state</span><span style="color: #ffa07a;">:   pointer to timer rand state struct</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@kstat_irqs</span><span style="color: #ffa07a;">:         irq stats per cpu</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@irq_2_iommu</span><span style="color: #ffa07a;">:        iommu with this irq</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@handle_irq</span><span style="color: #ffa07a;">:         highlevel irq-events handler [if NULL, </span><span style="color: #7fffd4;">__do_IRQ()</span><span style="color: #ffa07a;">]</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@chip</span><span style="color: #ffa07a;">:               low level interrupt hardware access</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@msi_desc</span><span style="color: #ffa07a;">:           MSI descriptor</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@handler_data</span><span style="color: #ffa07a;">:       per-IRQ data for the irq_chip methods</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@chip_data</span><span style="color: #ffa07a;">:          platform-specific per-chip private data for the chip</span>
+<span style="color: #ffa07a;"> *                      methods, to allow shared chip implementations</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@action</span><span style="color: #ffa07a;">:             the irq action chain</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@status</span><span style="color: #ffa07a;">:             status information</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@depth</span><span style="color: #ffa07a;">:              disable-depth, for nested </span><span style="color: #7fffd4;">irq_disable()</span><span style="color: #ffa07a;"> calls</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@wake_depth</span><span style="color: #ffa07a;">:         enable depth, for multiple </span><span style="color: #7fffd4;">set_irq_wake()</span><span style="color: #ffa07a;"> callers</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@irq_count</span><span style="color: #ffa07a;">:          stats field to detect stalled irqs</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@last_unhandled</span><span style="color: #ffa07a;">:     aging timer for unhandled count</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@irqs_unhandled</span><span style="color: #ffa07a;">:     stats field for spurious unhandled interrupts</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@lock</span><span style="color: #ffa07a;">:               locking for SMP</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@affinity</span><span style="color: #ffa07a;">:           IRQ affinity on SMP</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@node</span><span style="color: #ffa07a;">:               node index useful for balancing</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@pending_mask</span><span style="color: #ffa07a;">:       pending rebalanced interrupts</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@threads_active</span><span style="color: #ffa07a;">:     number of irqaction threads currently running</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@wait_for_threads</span><span style="color: #ffa07a;">:   wait queue for sync_irq to wait for threaded handlers</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@dir</span><span style="color: #ffa07a;">:                /proc/irq/ procfs entry</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@name</span><span style="color: #ffa07a;">:               flow handler name for /proc/interrupts output</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_desc</span> {
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">irq</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timer_rand_state</span> *<span style="color: #eedd82;">timer_rand_state</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            *<span style="color: #eedd82;">kstat_irqs</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_INTR_REMAP
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_2_iommu</span>      *<span style="color: #eedd82;">irq_2_iommu</span>;
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #98fb98;">irq_flow_handler_t</span>      <span style="color: #eedd82;">handle_irq</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span>         *<span style="color: #eedd82;">chip</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">msi_desc</span>         *<span style="color: #eedd82;">msi_desc</span>;
+        <span style="color: #98fb98;">void</span>                    *<span style="color: #eedd82;">handler_data</span>;
+        <span style="color: #98fb98;">void</span>                    *<span style="color: #eedd82;">chip_data</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span>        *<span style="color: #eedd82;">action</span>;        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">IRQ action list </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">status</span>;         <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">IRQ status </span><span style="color: #ff7f24;">*/</span>
+
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">depth</span>;          <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">nested irq disables </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">wake_depth</span>;     <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">nested wake enables </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">irq_count</span>;      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">For detecting broken IRQs </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>           <span style="color: #eedd82;">last_unhandled</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Aging timer for unhandled count </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">irqs_unhandled</span>;
+        <span style="color: #98fb98;">spinlock_t</span>              <span style="color: #eedd82;">lock</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_SMP
+        <span style="color: #98fb98;">cpumask_var_t</span>           <span style="color: #eedd82;">affinity</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>            <span style="color: #eedd82;">node</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_GENERIC_PENDING_IRQ
+        <span style="color: #98fb98;">cpumask_var_t</span>           <span style="color: #eedd82;">pending_mask</span>;
+<span style="color: #b0c4de;">#endif</span>
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #98fb98;">atomic_t</span>                <span style="color: #eedd82;">threads_active</span>;
+        <span style="color: #98fb98;">wait_queue_head_t</span>       <span style="color: #eedd82;">wait_for_threads</span>;
+<span style="color: #b0c4de;">#ifdef</span> CONFIG_PROC_FS
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">proc_dir_entry</span>   *<span style="color: #eedd82;">dir</span>;
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span>              *<span style="color: #eedd82;">name</span>;
+} <span style="color: #eedd82;">____cacheline_internodealigned_in_s</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7-2" class="outline-3">
+<h3 id="sec-7-2"><code>set_irq_chip</code></h3>
+<div class="outline-text-3" id="text-7-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> *      set_irq_chip - set the irq chip for an irq</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@irq</span><span style="color: #ffa07a;">:   irq number</span>
+<span style="color: #ffa07a;"> *      </span><span style="color: #7fffd4;">@chip</span><span style="color: #ffa07a;">:  pointer to irq chip description structure</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">set_irq_chip</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_chip</span> *<span style="color: #eedd82;">chip</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_desc</span> *<span style="color: #eedd82;">desc</span> = irq_to_desc(irq);
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">flags</span>;
+
+        <span style="color: #00ffff;">if</span> (!desc) {
+                WARN(1, KERN_ERR <span style="color: #ffa07a;">"Trying to install chip for IRQ%d\n"</span>, irq);
+                <span style="color: #00ffff;">return</span> -EINVAL;
+        }
+
+        <span style="color: #00ffff;">if</span> (!chip)
+                chip = &amp;no_irq_chip;
+
+        spin_lock_irqsave(&amp;desc-&gt;lock, flags);
+        irq_chip_set_defaults(chip);
+        desc-&gt;chip = chip;
+        spin_unlock_irqrestore(&amp;desc-&gt;lock, flags);
+
+        <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-12-04 Thu 20:46</p>
+<p class="date">Created: 2014-12-05 Fri 22:53</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

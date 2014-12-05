@@ -127,21 +127,157 @@ IRQ能改变它的状态不仅在初始化时,而且可以在运行时. =status=
 + =IRQ_PER_CPU= is set when an IRQ can occur on a single CPU only. (On
   SMP systems this renders several protection mechanisms against
   concurrent accesses superfluous.)
-+ IRQ_LEVELis used on Alpha and PowerPC to differentiate level-triggered and edge-triggered
-IRQs.
-❑ IRQ_REPLAYmeans that the IRQ has been disabled but a previous interrupt has not yet been
-acknowledged.
-❑ IRQ_AUTODETECTandIRQ_WAITINGare used for the automatic detection and configuration of
-IRQs. I will not discuss this in more detail, but mention that the respective code is located in
-kernel/irq/autoprobe.c.
-❑ IRQ_NOREQUESTis set if the IRQ can be shared between devices and must thus not be exclusively
-requested by a single device.
++ =IRQ_LEVEL= is used on Alpha and PowerPC to differentiate
+  level-triggered and edge-triggered IRQs.
++ =IRQ_REPLAY= means that the IRQ has been disabled but a previous
+  interrupt has not yet been acknowledged.
++ =IRQ_AUTODETECT= and =IRQ_WAITING= are used for the automatic
+  detection and configuration of IRQs. I will not discuss this in more
+  detail, but mention that the respective code is located in =kernel/irq/autoprobe.c=.
++ =IRQ_NOREQUEST= is set if the IRQ can be shared between devices and
+  must thus not be exclusively requested by a single device.
+
+使用 =status= 的当前内容,很容易让kernel查询特定IRQ的状态而不用知道硬件
+特定的底层实现.但仅仅设置相应的标识不能产生任何效果,底层的硬件必须被告
+知状态的改变.
+
+*** IRQ Controller Abstraction
+芯片特性的控制被封装在结构 =struct irq_chip= 中,基本如下:
+#+begin_src c
+  // <irq.h>
+  struct irq_chip {
+    const char *name;
+    unsigned int (*startup)(unsigned int irq);
+    void (*shutdown)(unsigned int irq);
+    void (*enable)(unsigned int irq);
+    void (*disable)(unsigned int irq);
+    void (*ack)(unsigned int irq);
+    void (*mask)(unsigned int irq);
+    void (*mask_ack)(unsigned int irq);
+    void (*unmask)(unsigned int irq);
+    void (*eoi)(unsigned int irq);
+    // ...
+    int (*set_type)(unsigned int irq, unsigned int flow_type);
+  };
+#+end_src
+
+这个结构需要考虑到不同IRQ实现的特性.
+
+=name= 维护一个硬件控制器的标识.IA-32系统可能的值是‘‘XTPIC‘‘ 和 ‘‘IO-APIC,’’.
+
+其他函数指针有如下意思:
++ =startup= 指向用来第一次初始化IRQ的函数.
++ =enable= 使能IRQ.
++ =disable= 是IRQ无效化,而 =shutdown= 彻底关闭中断源.
++ =ack= 与中断控制的硬件紧密相连.在一些模式下,IRQ请求的到达必须得到确
+  认以至之后的请求才能被服务.
++ =end= 被调用来标志中断处理的结束.
++ 在多核系统中, =set_affinity= 可以被用来声明特定IRQs由某个CPU处理.
++ =set_type= 用来设置IRQ flow类型.
+
+以IO-APIC为例子:
+
+#+begin_src c
+// arch/x86/kernel/apic/io_apic.c
+static struct irq_chip ioapic_chip __read_mostly = {
+	.name		= "IO-APIC",
+	.startup	= startup_ioapic_irq,
+	.mask		= mask_IO_APIC_irq,
+	.unmask		= unmask_IO_APIC_irq,
+	.ack		= ack_apic_edge,
+	.eoi		= ack_apic_level,
+#ifdef CONFIG_SMP
+	.set_affinity	= set_ioapic_affinity_irq,
+#endif
+	.retrigger	= ioapic_retrigger_irq,
+};
+#+end_src
+
+在系统中查看中断统计信息:
+
+#+begin_src sh
+$ cat /proc/interrupts 
+           CPU0       CPU1       CPU2       CPU3       CPU4       CPU5       CPU6       CPU7       
+  0:         41          0          0   31487034          0          0          0          0   IO-APIC-edge      timer
+  1:          1          0          0          2          0          0          0          0   IO-APIC-edge      i8042
+  4:          0          0          0          8          0          0          0          0   IO-APIC-edge    
+  8:          0          0          0          1          0          0          0          0   IO-APIC-edge      rtc0
+  9:          0          0          0          0          0          0          0          0   IO-APIC-fasteoi   acpi
+ 12:          0          0          0          4          0          0          0          0   IO-APIC-edge      i8042
+ 16:         10          0          0          0          0          0         40          0   IO-APIC-fasteoi   ehci_hcd:usb1
+ 17:         91          0          0          0          0          0          0        148   IO-APIC-fasteoi   snd_hda_intel
+ 23:    6420912          0          0          0          0          0        141          0   IO-APIC-fasteoi   ehci_hcd:usb2
+#+end_src
+
+*** Handler Function Representation
+其中有 =irqaction= 结构如下:
+#+begin_src c
+  // <interrupt.h>
+  struct irqaction {
+    irq_handler_t handler;
+    unsigned long flags;
+    const char *name;
+    void *dev_id;
+    struct irqaction *next;
+  }
+#+end_src
+
+其中最重要的元素是处理函数 =irq_handler_t handler= , 当设备请求系统中
+断时,这个处理函数被调用. =flag= 描述IRQ的一些特性,如下被定义在
+=<interrupt.h>= :
+
++ =IRQF_SHARED= is set forshared IRQsand signals that more than one
+  device is using an IRQ line.
++ =IRQF_SAMPLE_RANDO= is set when the IRQ contributes to the kernel
+  entropy pool.
++ =IRQF_DISABLED= indicates that the IRQ handler must be executed with
+  interrupts disabled.
++ =IRQF_TIMER= denotes a timer interrupt.
+
+next被使用来实现共享IRQ处理.一些 =irqaction= 实例被分组成一个链表.同一
+个链表的所有元素必须处理同一个IRQ编号.如下图描述它们如何相连:
+
 [[./Files/irq-management.jpeg]]
 ** Interrupt Flow Handling
+*** Setting Controller Hardware
+kernel提供的注册 =irq_chip= 和设置flow处理的函数:
+
+#+begin_src c
+  // <irq.h>
+  int set_irq_chip(unsigned int irq, struct irq_chip *chip);
+  void set_irq_handler(unsigned int irq, irq_flow_handler_t handle);
+  void set_irq_chained_handler(unsigned int irq, irq_flow_handler_t handle)
+  void set_irq_chip_and_handler(unsigned int irq, struct irq_chip *chip,
+                                irq_flow_handler_t handle);
+  void set_irq_chip_and_handler_name(unsigned int irq, struct irq_chip *chip,
+                                     irq_flow_handler_t handle, const char *name);
+#+end_src
+
++ =set_irq_chip= 把IRQ芯片以 =irq_chip= 实例附加到特定中断上. 如果是
+  NULL,那么使用通用值 =no_irq_chip=.
++ =set_irq_handler= 和 =set_irq_chained_handler= 设置flow处理函数给特
+  定IRQ编号.
++ =set_chip_and_handler= 同时设置两者.
+*** Flow Handling
+在分析flow处理实现前,先看怎么定义自己的类型. =irq_flow_handler_t= 指定
+IRQ flow处理函数:
+
+#+begin_src c
+  // <irq.h>
+  typedef void fastcall (*irq_flow_handler_t)(unsigned int irq,
+                                              struct irq_desc *desc);
+#+end_src
+
+Flow处理函数获取IRQ的编号和对此中断负责的 =irq_desc= 实例.
 
 [[./Files/handle-edge-irq.jpeg]]
 
+
 [[./Files/handle-level-irq.jpeg]]
+
+#+begin_src c
+
+#+end_src
 ** Initializing and Reserving IRQs
 
 [[./Files/request-irq.jpeg]]
@@ -180,3 +316,98 @@ requested by a single device.
 #+end_src
 
 * reference
+** =struct irq_desc=
+#+begin_src c
+/**
+ * struct irq_desc - interrupt descriptor
+ * @irq:		interrupt number for this descriptor
+ * @timer_rand_state:	pointer to timer rand state struct
+ * @kstat_irqs:		irq stats per cpu
+ * @irq_2_iommu:	iommu with this irq
+ * @handle_irq:		highlevel irq-events handler [if NULL, __do_IRQ()]
+ * @chip:		low level interrupt hardware access
+ * @msi_desc:		MSI descriptor
+ * @handler_data:	per-IRQ data for the irq_chip methods
+ * @chip_data:		platform-specific per-chip private data for the chip
+ *			methods, to allow shared chip implementations
+ * @action:		the irq action chain
+ * @status:		status information
+ * @depth:		disable-depth, for nested irq_disable() calls
+ * @wake_depth:		enable depth, for multiple set_irq_wake() callers
+ * @irq_count:		stats field to detect stalled irqs
+ * @last_unhandled:	aging timer for unhandled count
+ * @irqs_unhandled:	stats field for spurious unhandled interrupts
+ * @lock:		locking for SMP
+ * @affinity:		IRQ affinity on SMP
+ * @node:		node index useful for balancing
+ * @pending_mask:	pending rebalanced interrupts
+ * @threads_active:	number of irqaction threads currently running
+ * @wait_for_threads:	wait queue for sync_irq to wait for threaded handlers
+ * @dir:		/proc/irq/ procfs entry
+ * @name:		flow handler name for /proc/interrupts output
+ */
+struct irq_desc {
+	unsigned int		irq;
+	struct timer_rand_state *timer_rand_state;
+	unsigned int            *kstat_irqs;
+#ifdef CONFIG_INTR_REMAP
+	struct irq_2_iommu      *irq_2_iommu;
+#endif
+	irq_flow_handler_t	handle_irq;
+	struct irq_chip		*chip;
+	struct msi_desc		*msi_desc;
+	void			*handler_data;
+	void			*chip_data;
+	struct irqaction	*action;	/* IRQ action list */
+	unsigned int		status;		/* IRQ status */
+
+	unsigned int		depth;		/* nested irq disables */
+	unsigned int		wake_depth;	/* nested wake enables */
+	unsigned int		irq_count;	/* For detecting broken IRQs */
+	unsigned long		last_unhandled;	/* Aging timer for unhandled count */
+	unsigned int		irqs_unhandled;
+	spinlock_t		lock;
+#ifdef CONFIG_SMP
+	cpumask_var_t		affinity;
+	unsigned int		node;
+#ifdef CONFIG_GENERIC_PENDING_IRQ
+	cpumask_var_t		pending_mask;
+#endif
+#endif
+	atomic_t		threads_active;
+	wait_queue_head_t       wait_for_threads;
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry	*dir;
+#endif
+	const char		*name;
+} ____cacheline_internodealigned_in_s
+#+end_src
+** =set_irq_chip=
+#+begin_src c
+/**
+ *	set_irq_chip - set the irq chip for an irq
+ *	@irq:	irq number
+ *	@chip:	pointer to irq chip description structure
+ */
+int set_irq_chip(unsigned int irq, struct irq_chip *chip)
+{
+	struct irq_desc *desc = irq_to_desc(irq);
+	unsigned long flags;
+
+	if (!desc) {
+		WARN(1, KERN_ERR "Trying to install chip for IRQ%d\n", irq);
+		return -EINVAL;
+	}
+
+	if (!chip)
+		chip = &no_irq_chip;
+
+	spin_lock_irqsave(&desc->lock, flags);
+	irq_chip_set_defaults(chip);
+	desc->chip = chip;
+	spin_unlock_irqrestore(&desc->lock, flags);
+
+	return 0;
+}
+#+end_src
+
