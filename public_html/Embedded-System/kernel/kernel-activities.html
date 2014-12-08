@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Hardware/Software IRQs, tasklets and wait queues</title>
-<!-- 2014-12-05 Fri 22:53 -->
+<!-- 2014-12-08 Mon 20:08 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -154,7 +154,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2-2">Data Structures</a></li>
 <li><a href="#sec-2-3">Interrupt Flow Handling</a></li>
 <li><a href="#sec-2-4">Initializing and Reserving IRQs</a></li>
-<li><a href="#sec-2-5">Servicing IRQs</a></li>
+<li><a href="#sec-2-5">Calling the High-level ISR</a></li>
 </ul>
 </li>
 <li><a href="#sec-3">Software interrupts</a>
@@ -183,6 +183,8 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-7-1"><code>struct irq_desc</code></a></li>
 <li><a href="#sec-7-2"><code>set_irq_chip</code></a></li>
+<li><a href="#sec-7-3"><code>handle_edge_irq</code></a></li>
+<li><a href="#sec-7-4"><code>handle_level_irq</code></a></li>
 </ul>
 </li>
 </ul>
@@ -603,7 +605,12 @@ IRQ flow处理函数:
 </div>
 
 <p>
-Flow处理函数获取IRQ的编号和对此中断负责的 <code>irq_desc</code> 实例.
+Flow处理函数获取IRQ的编号和对此中断负责的 <code>irq_desc</code> 实例.不同硬件需要不同的flow处理方法: 比如边沿(edge)和电平(levle)触发需要不同的处理方法.kernel提供一些默认的flow处理对不同类型.它们有一个共同点: 每个flow处理最后都会调用高层IRQs. <code>handle_IRQ_event</code> 负责调用上层处理.
+</p>
+</div>
+<ul class="org-ul"><li><a id="sec-2-3-2-1" name="sec-2-3-2-1"></a>Edge-Triggered Interrupts<br  /><div class="outline-text-5" id="text-2-3-2-1">
+<p>
+边沿触发的默认处理是 <code>handle_edge_irq</code> .代码流程如下:
 </p>
 
 
@@ -611,48 +618,102 @@ Flow处理函数获取IRQ的编号和对此中断负责的 <code>irq_desc</code>
 <p><img src="./Files/handle-edge-irq.jpeg" alt="handle-edge-irq.jpeg" />
 </p>
 </div>
-
-
-
-<div class="figure">
-<p><img src="./Files/handle-level-irq.jpeg" alt="handle-level-irq.jpeg" />
+</div>
+</li>
+<li><a id="sec-2-3-2-2" name="sec-2-3-2-2"></a>Level-Triggered Interrupts<br  /><div class="outline-text-5" id="text-2-3-2-2">
+<p>
+和边沿触发相比,电平触发处理相对简单点.代码流程如下:
+<img src="./Files/handle-level-irq.jpeg" alt="handle-level-irq.jpeg" />
 </p>
 </div>
-
-<div class="org-src-container">
-
-<pre class="src src-c"></pre>
+</li>
+<li><a id="sec-2-3-2-3" name="sec-2-3-2-3"></a>Other Types of Interrupts<br  /><div class="outline-text-5" id="text-2-3-2-3">
+<p>
+kernel还提供一些其他默认的flow处理:
+</p>
+<ul class="org-ul">
+<li>在IRQ处理完后,只有一个芯片特定的函数需要被调用: <code>chip-&gt;eoi</code>.默认的函数是 <code>handle_fasteoi_irq</code>.
+</li>
+<li>没有flow控制的简单中断由 <code>handle_simple_irq</code> 处理.
+</li>
+<li>对于每个CPU的IRQs,IRQs只能在多核系统中某个特定的CPU处理由
+<code>handle_percpu_irq</code> 完成.
+</li>
+</ul>
 </div>
-</div>
+</li></ul>
 </li></ul>
 </div>
 <div id="outline-container-sec-2-4" class="outline-3">
 <h3 id="sec-2-4">Initializing and Reserving IRQs</h3>
 <div class="outline-text-3" id="text-2-4">
+</div><ul class="org-ul"><li><a id="sec-2-4-1" name="sec-2-4-1"></a>Registering IRQs<br  /><div class="outline-text-4" id="text-2-4-1">
+<p>
+设备驱动动态的注册IRQ可以通过如下函数:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/irq/manage.c</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">request_irq</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>,
+                <span style="color: #98fb98;">irqreturn_t</span> <span style="color: #eedd82;">handler</span>,
+                <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">irqflags</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">devname</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">dev_id</span>)
+</pre>
+</div>
+
+<p>
+如下是它的代码流程:
+</p>
+
 
 <div class="figure">
 <p><img src="./Files/request-irq.jpeg" alt="request-irq.jpeg" />
 </p>
 </div>
 </div>
+</li>
+<li><a id="sec-2-4-2" name="sec-2-4-2"></a>Freeing IRQs<br  /><div class="outline-text-4" id="text-2-4-2">
+<p>
+移除IRQ的函数 <code>remove_irq</code> 在 <code>kernel/irq/manage.c</code> 中,并通过调用函数
+<code>__free_irq</code> 完成.
+</p>
+
+<ol class="org-ol">
+<li>对于每个IRQ,可以有多个行为共享它,所以单单IRQ编号不能识别指定IRQ,同时需要 <code>dev_id</code>, 所以一开始扫描行为列表,找到相应IRQ条目.
+</li>
+<li>若硬件相关的 <code>chip-&gt;shutdown</code> 函数存在,调用它,若不存在,就调用
+<code>chip-&gt;disable</code>,
+</li>
+<li>释放与此IRQ相关的数据结构.
+</li>
+</ol>
 </div>
+</li>
+<li><a id="sec-2-4-3" name="sec-2-4-3"></a>Registering Interrupts<br  /><div class="outline-text-4" id="text-2-4-3">
+<p>
+上面分析的是由系统外围注册和产生中断的机制.但是kernel还必须处理来自它本身的进程或用户进程执行的软件所触发的中断.与IRQs相比,kernle不需要提供动态注册中断处理的接口.因为使用个数在初始化时就知道并且之后不会改变.注册中断,异常,和traps在kernel初始化时进行,并且它们的预留部分不再改变在运行时.
+</p>
+
+<p>
+当一个中断产生,相应的中断处理直接被自动进行.因为系统中断并不支持中断共享.总的来说,系统回应中断以如下2种方式:
+</p>
+<ul class="org-ul">
+<li>一个signal被告知给当前用户进程有错误发生.
+</li>
+<li>kernel隐式的纠正错误.比如page fault的产生,系统自动纠正它.
+</li>
+</ul>
+</div>
+</li></ul>
+</div>
+
 <div id="outline-container-sec-2-5" class="outline-3">
-<h3 id="sec-2-5">Servicing IRQs</h3>
-<div class="outline-text-3" id="text-2-5">
-
-<div class="figure">
-<p><img src="./Files/stack-layout-after-entry.jpeg" alt="stack-layout-after-entry.jpeg" />
-</p>
+<h3 id="sec-2-5">Calling the High-level ISR</h3>
+</div>
 </div>
 
 
-<div class="figure">
-<p><img src="./Files/do-irq.jpeg" alt="do-irq.jpeg" />
-</p>
-</div>
-</div>
-</div>
-</div>
+
 
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">Software interrupts</h2>
@@ -829,11 +890,129 @@ Flow处理函数获取IRQ的编号和对此中断负责的 <code>irq_desc</code>
 </div>
 </div>
 </div>
+<div id="outline-container-sec-7-3" class="outline-3">
+<h3 id="sec-7-3"><code>handle_edge_irq</code></h3>
+<div class="outline-text-3" id="text-7-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span>
+<span style="color: #87cefa;">handle_edge_irq</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_desc</span> *<span style="color: #eedd82;">desc</span>)
+{
+        spin_lock(&amp;desc-&gt;lock);
+
+        desc-&gt;status &amp;= ~(IRQ_REPLAY | IRQ_WAITING);
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * If we're currently running this IRQ, or its disabled,</span>
+<span style="color: #ff7f24;">         * we shouldn't process the IRQ. Mark it pending, handle</span>
+<span style="color: #ff7f24;">         * the necessary masking and go out</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (unlikely((desc-&gt;status &amp; (IRQ_INPROGRESS | IRQ_DISABLED)) ||
+                    !desc-&gt;action)) {
+                desc-&gt;status |= (IRQ_PENDING | IRQ_MASKED);
+                mask_ack_irq(desc, irq);
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out_unlock</span>;
+        }
+        kstat_incr_irqs_this_cpu(irq, desc);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Start handling the irq </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (desc-&gt;chip-&gt;ack)
+                desc-&gt;chip-&gt;ack(irq);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Mark the IRQ currently in progress.</span><span style="color: #ff7f24;">*/</span>
+        desc-&gt;status |= IRQ_INPROGRESS;
+
+        <span style="color: #00ffff;">do</span> {
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> *<span style="color: #eedd82;">action</span> = desc-&gt;action;
+                <span style="color: #98fb98;">irqreturn_t</span> <span style="color: #eedd82;">action_ret</span>;
+
+                <span style="color: #00ffff;">if</span> (unlikely(!action)) {
+                        desc-&gt;chip-&gt;mask(irq);
+                        <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out_unlock</span>;
+                }
+
+                <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">                 * When another irq arrived while we were handling</span>
+<span style="color: #ff7f24;">                 * one, we could have masked the irq.</span>
+<span style="color: #ff7f24;">                 * Renable it, if it was not disabled in meantime.</span>
+<span style="color: #ff7f24;">                 </span><span style="color: #ff7f24;">*/</span>
+                <span style="color: #00ffff;">if</span> (unlikely((desc-&gt;status &amp;
+                               (IRQ_PENDING | IRQ_MASKED | IRQ_DISABLED)) ==
+                              (IRQ_PENDING | IRQ_MASKED))) {
+                        desc-&gt;chip-&gt;unmask(irq);
+                        desc-&gt;status &amp;= ~IRQ_MASKED;
+                }
+
+                desc-&gt;status &amp;= ~IRQ_PENDING;
+                spin_unlock(&amp;desc-&gt;lock);
+                action_ret = handle_IRQ_event(irq, action);
+                <span style="color: #00ffff;">if</span> (!noirqdebug)
+                        note_interrupt(irq, desc, action_ret);
+                spin_lock(&amp;desc-&gt;lock);
+
+        } <span style="color: #00ffff;">while</span> ((desc-&gt;status &amp; (IRQ_PENDING | IRQ_DISABLED)) == IRQ_PENDING);
+
+        desc-&gt;status &amp;= ~IRQ_INPROGRESS;
+<span style="color: #7fffd4;">out_unlock</span>:
+        spin_unlock(&amp;desc-&gt;lock);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7-4" class="outline-3">
+<h3 id="sec-7-4"><code>handle_level_irq</code></h3>
+<div class="outline-text-3" id="text-7-4">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span>
+<span style="color: #87cefa;">handle_level_irq</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irq_desc</span> *<span style="color: #eedd82;">desc</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> *<span style="color: #eedd82;">action</span>;
+        <span style="color: #98fb98;">irqreturn_t</span> <span style="color: #eedd82;">action_ret</span>;
+
+        spin_lock(&amp;desc-&gt;lock);
+        mask_ack_irq(desc, irq);
+
+        <span style="color: #00ffff;">if</span> (unlikely(desc-&gt;status &amp; IRQ_INPROGRESS))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out_unlock</span>;
+        desc-&gt;status &amp;= ~(IRQ_REPLAY | IRQ_WAITING);
+        kstat_incr_irqs_this_cpu(irq, desc);
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * If its disabled or no action available</span>
+<span style="color: #ff7f24;">         * keep it masked and get out of here</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        action = desc-&gt;action;
+        <span style="color: #00ffff;">if</span> (unlikely(!action || (desc-&gt;status &amp; IRQ_DISABLED)))
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">out_unlock</span>;
+
+        desc-&gt;status |= IRQ_INPROGRESS;
+        spin_unlock(&amp;desc-&gt;lock);
+
+        action_ret = handle_IRQ_event(irq, action);
+        <span style="color: #00ffff;">if</span> (!noirqdebug)
+                note_interrupt(irq, desc, action_ret);
+
+        spin_lock(&amp;desc-&gt;lock);
+        desc-&gt;status &amp;= ~IRQ_INPROGRESS;
+
+        <span style="color: #00ffff;">if</span> (unlikely(desc-&gt;status &amp; IRQ_ONESHOT))
+                desc-&gt;status |= IRQ_MASKED;
+        <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (!(desc-&gt;status &amp; IRQ_DISABLED) &amp;&amp; desc-&gt;chip-&gt;unmask)
+                desc-&gt;chip-&gt;unmask(irq);
+<span style="color: #7fffd4;">out_unlock</span>:
+        spin_unlock(&amp;desc-&gt;lock);
+}
+</pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-12-05 Fri 22:53</p>
+<p class="date">Created: 2014-12-08 Mon 20:08</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

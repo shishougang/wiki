@@ -268,24 +268,63 @@ IRQ flow处理函数:
                                               struct irq_desc *desc);
 #+end_src
 
-Flow处理函数获取IRQ的编号和对此中断负责的 =irq_desc= 实例.
+Flow处理函数获取IRQ的编号和对此中断负责的 =irq_desc= 实例.不同硬件需要
+不同的flow处理方法: 比如边沿(edge)和电平(levle)触发需要不同的处理方
+法.kernel提供一些默认的flow处理对不同类型.它们有一个共同点: 每个flow处
+理最后都会调用高层IRQs. =handle_IRQ_event= 负责调用上层处理.
+**** Edge-Triggered Interrupts
+边沿触发的默认处理是 =handle_edge_irq= .代码流程如下:
 
 [[./Files/handle-edge-irq.jpeg]]
-
-
+**** Level-Triggered Interrupts
+和边沿触发相比,电平触发处理相对简单点.代码流程如下:
 [[./Files/handle-level-irq.jpeg]]
+**** Other Types of Interrupts
+kernel还提供一些其他默认的flow处理:
++ 在IRQ处理完后,只有一个芯片特定的函数需要被调用: =chip->eoi=.默认的函
+  数是 =handle_fasteoi_irq=.
++ 没有flow控制的简单中断由 =handle_simple_irq= 处理.
++ 对于每个CPU的IRQs,IRQs只能在多核系统中某个特定的CPU处理由
+  =handle_percpu_irq= 完成.
+** Initializing and Reserving IRQs
+*** Registering IRQs
+设备驱动动态的注册IRQ可以通过如下函数:
 
 #+begin_src c
-
+  // kernel/irq/manage.c
+  int request_irq(unsigned int irq,
+                  irqreturn_t handler,
+                  unsigned long irqflags, const char *devname, void *dev_id)
 #+end_src
-** Initializing and Reserving IRQs
+
+如下是它的代码流程:
 
 [[./Files/request-irq.jpeg]]
-** Servicing IRQs
+*** Freeing IRQs
+移除IRQ的函数 =remove_irq= 在 =kernel/irq/manage.c= 中,并通过调用函数
+=__free_irq= 完成.
 
-[[./Files/stack-layout-after-entry.jpeg]]
+1. 对于每个IRQ,可以有多个行为共享它,所以单单IRQ编号不能识别指定IRQ,同
+   时需要 =dev_id=, 所以一开始扫描行为列表,找到相应IRQ条目.
+2. 若硬件相关的 =chip->shutdown= 函数存在,调用它,若不存在,就调用
+   =chip->disable=,
+3. 释放与此IRQ相关的数据结构.
+*** Registering Interrupts
+上面分析的是由系统外围注册和产生中断的机制.但是kernel还必须处理来自它
+本身的进程或用户进程执行的软件所触发的中断.与IRQs相比,kernle不需要提供
+动态注册中断处理的接口.因为使用个数在初始化时就知道并且之后不会改变.注
+册中断,异常,和traps在kernel初始化时进行,并且它们的预留部分不再改变在运
+行时.
 
-[[./Files/do-irq.jpeg]]
+当一个中断产生,相应的中断处理直接被自动进行.因为系统中断并不支持中断共
+享.总的来说,系统回应中断以如下2种方式:
++ 一个signal被告知给当前用户进程有错误发生.
++ kernel隐式的纠正错误.比如page fault的产生,系统自动纠正它.
+
+** Calling the High-level ISR
+
+
+
 
 * Software interrupts
 
@@ -410,4 +449,109 @@ int set_irq_chip(unsigned int irq, struct irq_chip *chip)
 	return 0;
 }
 #+end_src
+** =handle_edge_irq=
+#+begin_src c
+void
+handle_edge_irq(unsigned int irq, struct irq_desc *desc)
+{
+	spin_lock(&desc->lock);
 
+	desc->status &= ~(IRQ_REPLAY | IRQ_WAITING);
+
+	/*
+	 * If we're currently running this IRQ, or its disabled,
+	 * we shouldn't process the IRQ. Mark it pending, handle
+	 * the necessary masking and go out
+	 */
+	if (unlikely((desc->status & (IRQ_INPROGRESS | IRQ_DISABLED)) ||
+		    !desc->action)) {
+		desc->status |= (IRQ_PENDING | IRQ_MASKED);
+		mask_ack_irq(desc, irq);
+		goto out_unlock;
+	}
+	kstat_incr_irqs_this_cpu(irq, desc);
+
+	/* Start handling the irq */
+	if (desc->chip->ack)
+		desc->chip->ack(irq);
+
+	/* Mark the IRQ currently in progress.*/
+	desc->status |= IRQ_INPROGRESS;
+
+	do {
+		struct irqaction *action = desc->action;
+		irqreturn_t action_ret;
+
+		if (unlikely(!action)) {
+			desc->chip->mask(irq);
+			goto out_unlock;
+		}
+
+		/*
+		 * When another irq arrived while we were handling
+		 * one, we could have masked the irq.
+		 * Renable it, if it was not disabled in meantime.
+		 */
+		if (unlikely((desc->status &
+			       (IRQ_PENDING | IRQ_MASKED | IRQ_DISABLED)) ==
+			      (IRQ_PENDING | IRQ_MASKED))) {
+			desc->chip->unmask(irq);
+			desc->status &= ~IRQ_MASKED;
+		}
+
+		desc->status &= ~IRQ_PENDING;
+		spin_unlock(&desc->lock);
+		action_ret = handle_IRQ_event(irq, action);
+		if (!noirqdebug)
+			note_interrupt(irq, desc, action_ret);
+		spin_lock(&desc->lock);
+
+	} while ((desc->status & (IRQ_PENDING | IRQ_DISABLED)) == IRQ_PENDING);
+
+	desc->status &= ~IRQ_INPROGRESS;
+out_unlock:
+	spin_unlock(&desc->lock);
+}
+#+end_src
+** =handle_level_irq=
+#+begin_src c
+void
+handle_level_irq(unsigned int irq, struct irq_desc *desc)
+{
+	struct irqaction *action;
+	irqreturn_t action_ret;
+
+	spin_lock(&desc->lock);
+	mask_ack_irq(desc, irq);
+
+	if (unlikely(desc->status & IRQ_INPROGRESS))
+		goto out_unlock;
+	desc->status &= ~(IRQ_REPLAY | IRQ_WAITING);
+	kstat_incr_irqs_this_cpu(irq, desc);
+
+	/*
+	 * If its disabled or no action available
+	 * keep it masked and get out of here
+	 */
+	action = desc->action;
+	if (unlikely(!action || (desc->status & IRQ_DISABLED)))
+		goto out_unlock;
+
+	desc->status |= IRQ_INPROGRESS;
+	spin_unlock(&desc->lock);
+
+	action_ret = handle_IRQ_event(irq, action);
+	if (!noirqdebug)
+		note_interrupt(irq, desc, action_ret);
+
+	spin_lock(&desc->lock);
+	desc->status &= ~IRQ_INPROGRESS;
+
+	if (unlikely(desc->status & IRQ_ONESHOT))
+		desc->status |= IRQ_MASKED;
+	else if (!(desc->status & IRQ_DISABLED) && desc->chip->unmask)
+		desc->chip->unmask(irq);
+out_unlock:
+	spin_unlock(&desc->lock);
+}
+#+end_src
