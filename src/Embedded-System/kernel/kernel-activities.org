@@ -322,33 +322,282 @@ kernel还提供一些其他默认的flow处理:
 + kernel隐式的纠正错误.比如page fault的产生,系统自动纠正它.
 
 ** Calling the High-level ISR
+如上所述flow处理最后都会调用 =handle_IRQ_event= 来调用上层相关ISRs.这
+个函数需要IRQ编号和action链为参数:
+#+begin_src c
+// kernel/irq/handle.c
+irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action);
+#+end_src
 
+=handle_IRQ_event= 进行如下行为:
++ 如果 =IRQF_DISABLED= 在第一个处理函数中没有被设置,中断使能
+  =local_irq_enable_in_hardirq= ,也就是处理函数能被其他IRQs中断.
++ 注册IRQ的 =action= 函数一个接一个被调用.
++ 如果IRQ的 =IRQF_SAMPLE_RANDOM= 被设置, =add_interrupt_randomness= 被
+  调用来使用事件的时间添加为随机数产生源(如果中断随即发生,它们是理想的
+  随机源).
++ 最后调用 =local_irq_disable= 关闭中断.因为打开和关闭中断不用匹配,所
+  以无论一开始它被打开或关闭. =handle_IRQ_event= 被调用时,中断被关闭,
+  离开时再次关闭它.
 
+对于共享的IRQs,kernel没有办法知道哪个设备触发的请求.整个留给处理函数使
+用设备相关的寄存器或其他硬件特性来找出中断源头.如果中断不是相关处理函
+数,立刻返回.所以 =handle_IRQ_event= 无从知道这个中断是否对它请求,所以
+kernel执行所有处理函数,无论第一个还是最后一个成功.
 
-
+无论如何,kernel能检查是否有对此IRQ负责的处理. =irqreturn_t= 被定义作为
+处理函数的返回值.它的值是 =IRQ_NONE= 或 =IRQ_HANDLED=. 在进行所有处理
+函数时,kernel对所有处理的返回做或运算,得出IRQ是否被处理的结果.
 * Software interrupts
+软中断能使kernel延后执行任务.因为它们的行为与如上描述的中断类似,但是完
+全在软件实现,所以它们被称为软中断或softIRQs.
+
+softIRQ的中心元素是一张维护 =softirq_action= 类型的表, 如下:
+#+begin_src c
+  // <softirq.c>
+  static struct softirq_action softirq_vec[NR_SOFTIRQS] __cacheline_aligned_in_smp;
+  // <interrupt.h>
+  struct softirq_action
+  {
+    void (*action)(struct softirq_action *);
+  };
+#+end_src
+
+=action= 是指向当软中断发生,kernel执行的处理函数.在 =softirq_action=
+中没有封装data指针,每个处理函数的数据由各自维护,并在多核系统中,为每个
+核定义此变量使得多个软中断同时在多个不同核运行,以 =HI_SOFTIRQ= 软中断为例:
+#+begin_src c
+// define
+static DEFINE_PER_CPU(struct tasklet_head, tasklet_hi_vec);
+// use
+list = __get_cpu_var(tasklet_hi_vec).head;
+#+end_src
+
+软中断在kernel执行它们前,必须注册, =open_softirq= 函数提供此目的,注册
+新的softIRQ到表 =softirq_vec= 指定位置:
+#+begin_src c
+// kernel/softirq.c
+void open_softirq(int nr, void (*action)(struct softirq_action *))
+{
+	softirq_vec[nr].action = action;
+}
+#+end_src
+
+事实上,每个softIRQ都有一个唯一的编号,也表示softIRQs是相对稀缺的资源.只
+有中心kernel代码使用软中断,如下:
+#+begin_src c
+// <interrupt.h>
+enum
+{
+	HI_SOFTIRQ=0,
+	TIMER_SOFTIRQ,
+	NET_TX_SOFTIRQ,
+	NET_RX_SOFTIRQ,
+	BLOCK_SOFTIRQ,
+	BLOCK_IOPOLL_SOFTIRQ,
+	TASKLET_SOFTIRQ,
+	SCHED_SOFTIRQ,
+	HRTIMER_SOFTIRQ,
+	RCU_SOFTIRQ,	/* Preferable RCU should always be the last softirq */
+	NR_SOFTIRQS
+};
+#+end_src
+
++ 两个被用来是实现tasklets的是 =HI_SOFTIRQ= 和 =TASKLET_SOFTIRQ= .
++ 在网络实现中,用来接收和发送操作的 =NET_RX_SOFTIRQ= 和
+  =NET_TX_SOFTIRQ= .
++ 块设备实现异步请求的 =BLOCK_SOFTIRQ= 和 =BLOCK_IOPOLL_SOFTIRQ= .
++ 调度器实现在SMP系统上周期性负载平衡的 =BLOCK_IOPOLL_SOFTIRQ= .
++ 高精度时钟的实现使用 =HRTIMER_SOFTIRQ=.
+
+对softIRQs编号产生次序优先,不影响每个处理函数的执行频率或相对其他活动
+的优先权,它定义同时多个处理函数被激活或等待,依次执行的顺序.
+
+=raise_softirq(int nr)= 被用来触发一个软中断,目的软中断编号作为传入参
+数.这个函数在每个CPU变量
+=irq_stat[smp_processor_id].__softirq_pending= 设置相应比特位.这标志
+softIRQ要执行并延后执行.使用处理器特定的bitmap,kernel能在不同CPU上同时
+运行softIRQ.
 
 ** Starting SoftIRQ Processing
+有许多方法开始softIRQ的处理,但最后都调用 =do_softirq= 函数.如下图描述
+它的代码流程:
+
 [[./Files/do-softirq.jpeg]]
 
-** The SoftIRQ Daemon
+首先函数确保它不在中断中(也就是一个硬件中断).如果在,立即终止.因为软中
+断是用来执行ISRs中不重要的部分,所以代码本身不能在一个中断处理中调用.
 
+由函数 =local_softirq_pending= 得到当前CPU中被设置的所有软中断.如果有
+软中断等待被处理,然后调用 =__do_softirq= .
+
+在关闭中断情况下(防止其他进程同时修改),重置当前的bitmap为0,也就是所有
+等待的软中断标志位被删除.之后打开中断,执行软中断处理函数.此间,允许
+bitmap在任何时候被修改.
+
+在 =softirq_vec= 中的处理函数在循环中为每个等待softIRQ调用.
+
+一旦所有标志的软中断被服务完,kernel检查是否有新的软中断同时被置位.如果
+有等待的软中断,并且重执行次数没有超过 =MAX_SOFTIRQ_RESTART= (基本是
+10),那么再次重新执行一遍.
+
+如果仍有等待的软中断在 =MAX_SOFTIRQ_RESTART= 次重新执行后,
+=wakeup_softirqd= 被调用来唤醒软中断后台程序.
+
+** The SoftIRQ Daemon
+软中断的后台程序任务是异步的执行软中断.每个处理器被分配它们各自的后台
+程序 =ksoftirqd=.
+
+=wakeup_softirqd= 在kernel的2处被调用来唤醒次后台程序:
++ 在 =do_softirq= 中.
++ 在 =raise_softirq_irqoff= 最后. 这个函数被 =raise_softirq= 内部调用.
+
+软中断的后台程序在系统启动时的 =init= 后通过 =initcall= 机制被调用.初
+始化完后,每个后台程序执行如下循环:
+#+begin_src c
+  // kernel/softirq.c
+  static int ksoftirqd(void * __bind_cpu)
+  // ...
+      while (!kthread_should_stop()) {
+        if (!local_softirq_pending()) {
+          schedule();
+        }
+        __set_current_state(TASK_RUNNING);
+        while (local_softirq_pending()) {
+          do_softirq();
+          cond_resched();
+        }
+        set_current_state(TASK_INTERRUPTIBLE);
+      }
+  // ...
+  }
+#+end_src
+
+每次它被唤醒,先检查是否有标志的软中断在等待,没有的话,调度给另外进程.
+
+如果有等待的软中断,后台程序去服务它们.在while循环中,两个函数
+=do_softirq= 和 =cond_resched= 被不断调用直到没有等待的软中断.
+=cond_resched= 确保调度器得到调用如果 =TIF_NEED_RESCHED= 设置到当前进
+程.
 * Tasklets
+软中断由内核在静态表中固定使用,延迟机制相对复杂.因为软中断能同时和独立
+的在多个处理器上运行.这也是效率的关键所在,网络实现性能在多核系统显著的
+得到提高.但是,处理函数必须设计完全可重入并且线程安全.
+
+Tasklets和work queues是另外延迟执行任务的机制,它们的实现基于softIRQs,
+但是她们更容易使用,因此更适合设备驱动.
 
 ** Generating Tasklets
+中心数据结构是 =tasklet_struct= ,如下:
+#+begin_src c
+  // <interrupt.h>
+  struct tasklet_struct
+  {
+    struct tasklet_struct *next;
+    unsigned long state;
+    atomic_t count;
+    void (*func)(unsigned long);
+    unsigned long data;
+  };
+#+end_src
+
++ 从设备驱动程序来说,最重要的元素是 =func=.它指向需要延迟运行的函数.
+  =data= 是作为传递参数.
++ =next= 用来建立一个tasklet的链表.允许多个任务等待被执行.
++ =state= 表明当前task的状态.只有2种选项,并且表示不同的bit位,可以独立
+  设置和移除.
+  + =TASKLET_STATE_SCHED= 设置当tasklet被注册,并调度执行.
+  + =TASKLET_STATE_RUN= 表明tasklet正在执行.
++ =count= 被用来禁止已经调度过的tasklets.当它的值非0,相应的tasklet被忽
+  略.
 
 ** Registering Tasklets
+=tasklet_schedule= 在系统中注册一个tasklet:
+#+begin_src c
+// <interrupt.h>
+static inline void tasklet_schedule(struct tasklet_struct *t);
+#+end_src
+
+如果 =TASKLET_STATE_SCHED= 被置位,注册终止因为这个tasklet已经被注册.否
+则,这个tasklet被放入CPU特定的链表 =tasklet_vec= 头部.
 
 ** Executing Tasklets
+因为tasklet实现在softIRQ上,所以它们总是得到执行当软中断被处理时.
+Tasklets与软中断 =TASKLET_SOFTIRQ= 挂钩,所以调用
+=raise_softirq(TASKLET_SOFTIRQ)= 来执行当前处理器的tasklets在下次机会
+中.kernel使用 =tasklet_action= 作为tasklet软中断的执行函数.
+
+
+这个函数先获取要执行的CPU特定的list,把它从全局list中移除到本地.然后它
+们在如下循环中依次执行:
+#+begin_src c
+  // kernel/softirq.c
+  static void tasklet_action(struct softirq_action *a)
+  // ...
+      while (list) {
+        struct tasklet_struct *t = list;
+        list = list->next;
+        if (tasklet_trylock(t)) {
+          if (!atomic_read(&t->count)) {
+            if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
+              BUG();
+            t->func(t->data);
+            tasklet_unlock(t);
+            continue;
+          }
+          tasklet_unlock(t);
+        }
+        // ...
+      }
+  // ...
+  }
+#+end_src
+
+在while循环中执行tasklets机制同处理softIRQs类似.
+
+因为一个tasklet只能同时在一个处理器上执行,但是其他tasklet能并行运
+行,tasklet特定的锁需要. =state= 的状态被使用来作为锁变量. 在tasklet的
+处理函数执行前,kernel使用 =tasklet_trylock= 来检查tasklet的状态是否是
+=TASKLET_STATE_RUN= ,也就是它是否已经在其他处理器上运行.
+
+#+begin_src c
+  // <interrupt.h>
+  static inline int tasklet_trylock(struct tasklet_struct *t)
+  {
+    return !test_and_set_bit(TASKLET_STATE_RUN, &(t)->state);
+  }
+#+end_src
+
+如果元素 =count= 非0, tasklet被认为未激活,代码不被执行.
+
+一旦两个检查都通过,kernel执行tasklet的处理函数通过调用
+=t->func(t->data)= .最终tasklet的 =TASKLET_SCHED_RUN= 位删除通过
+=tasklet_unlock=.
+
+如果在执行tasklets中,新的tasklets在当前处理器中等待,软中断
+=TASKLET_SOFTIRQ= 被触发来尽快执行新的tasklets.
+
+除了普通的tasklets. kernel使用第二中高优先级tasklet.它的实现与普通的
+tasklets基本一致,除了以下一些改变:
++ =HI_SOFTIRQ= 取代 =TASKLET_SOFTIRQ= 作为softIRQ. 它相应的处理函数是
+  =tasklet_hi_action= .
++ 注册的tasklets队列如CPU特定的变量 =tasklet_hi_vec= 中,通过使用
+  =tasklet_hi_schedule= .
+
+高优先级意味着 =HI_SOFTIRQ= 的软中断执行在所有其他处理之前--特别在网络
+处理之前.现在,大多声卡驱动使用此机制,因为延后太长会影响音效质量.
 
 ** Example
 * Wait queues and completions
+Wait queues被使用来使得进程等待特定事件的发生而不用一直轮询.进程在等待
+时
 ** Wait Queues
+
 ** Completions
+
 ** Work Queues
 
 * cc
-[[./Files/
 
 #+begin_src c
 
@@ -553,5 +802,178 @@ handle_level_irq(unsigned int irq, struct irq_desc *desc)
 		desc->chip->unmask(irq);
 out_unlock:
 	spin_unlock(&desc->lock);
+}
+#+end_src
+** =handle_IRQ_event=
+#+begin_src c
+irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
+{
+	irqreturn_t ret, retval = IRQ_NONE;
+	unsigned int status = 0;
+
+	if (!(action->flags & IRQF_DISABLED))
+		local_irq_enable_in_hardirq();
+
+	do {
+		trace_irq_handler_entry(irq, action);
+		ret = action->handler(irq, action->dev_id);
+		trace_irq_handler_exit(irq, action, ret);
+
+		switch (ret) {
+		case IRQ_WAKE_THREAD:
+			/*
+			 * Set result to handled so the spurious check
+			 * does not trigger.
+			 */
+			ret = IRQ_HANDLED;
+			/*
+			 * Catch drivers which return WAKE_THREAD but
+			 * did not set up a thread function
+			 */
+			if (unlikely(!action->thread_fn)) {
+				warn_no_thread(irq, action);
+				break;
+			}
+			/*
+			 * Wake up the handler thread for this
+			 * action. In case the thread crashed and was
+			 * killed we just pretend that we handled the
+			 * interrupt. The hardirq handler above has
+			 * disabled the device interrupt, so no irq
+			 * storm is lurking.
+			 */
+			if (likely(!test_bit(IRQTF_DIED,
+					     &action->thread_flags))) {
+				set_bit(IRQTF_RUNTHREAD, &action->thread_flags);
+				wake_up_process(action->thread);
+			}
+			/* Fall through to add to randomness */
+		case IRQ_HANDLED:
+			status |= action->flags;
+			break;
+
+		default:
+			break;
+		}
+
+		retval |= ret;
+		action = action->next;
+	} while (action);
+
+	if (status & IRQF_SAMPLE_RANDOM)
+		add_interrupt_randomness(irq);
+	local_irq_disable();
+
+	return retval;
+}
+#+end_src
+** =__do_softirq=
+#+begin_src c
+#define MAX_SOFTIRQ_RESTART 10
+
+asmlinkage void __do_softirq(void)
+{
+	struct softirq_action *h;
+	__u32 pending;
+	int max_restart = MAX_SOFTIRQ_RESTART;
+	int cpu;
+
+	pending = local_softirq_pending();
+	account_system_vtime(current);
+
+	__local_bh_disable((unsigned long)__builtin_return_address(0));
+	lockdep_softirq_enter();
+
+	cpu = smp_processor_id();
+restart:
+	/* Reset the pending bitmask before enabling irqs */
+	set_softirq_pending(0);
+
+	local_irq_enable();
+
+	h = softirq_vec;
+
+	do {
+		if (pending & 1) {
+			int prev_count = preempt_count();
+			kstat_incr_softirqs_this_cpu(h - softirq_vec);
+
+			trace_softirq_entry(h, softirq_vec);
+			h->action(h);
+			trace_softirq_exit(h, softirq_vec);
+			if (unlikely(prev_count != preempt_count())) {
+				printk(KERN_ERR "huh, entered softirq %td %s %p"
+				       "with preempt_count %08x,"
+				       " exited with %08x?\n", h - softirq_vec,
+				       softirq_to_name[h - softirq_vec],
+				       h->action, prev_count, preempt_count());
+				preempt_count() = prev_count;
+			}
+
+			rcu_bh_qs(cpu);
+		}
+		h++;
+		pending >>= 1;
+	} while (pending);
+
+	local_irq_disable();
+
+	pending = local_softirq_pending();
+	if (pending && --max_restart)
+		goto restart;
+
+	if (pending)
+		wakeup_softirqd();
+
+	lockdep_softirq_exit();
+
+	account_system_vtime(current);
+	_local_bh_enable();
+}
+#+end_src
+** =ksoftirqd=
+#+begin_src c
+static int ksoftirqd(void * __bind_cpu)
+{
+	set_current_state(TASK_INTERRUPTIBLE);
+
+	while (!kthread_should_stop()) {
+		preempt_disable();
+		if (!local_softirq_pending()) {
+			preempt_enable_no_resched();
+			schedule();
+			preempt_disable();
+		}
+
+		__set_current_state(TASK_RUNNING);
+
+		while (local_softirq_pending()) {
+			/* Preempt disable stops cpu going offline.
+			   If already offline, we'll be on wrong CPU:
+			   don't process */
+			if (cpu_is_offline((long)__bind_cpu))
+				goto wait_to_die;
+			do_softirq();
+			preempt_enable_no_resched();
+			cond_resched();
+			preempt_disable();
+			rcu_sched_qs((long)__bind_cpu);
+		}
+		preempt_enable();
+		set_current_state(TASK_INTERRUPTIBLE);
+	}
+	__set_current_state(TASK_RUNNING);
+	return 0;
+
+wait_to_die:
+	preempt_enable();
+	/* Wait for kthread_stop */
+	set_current_state(TASK_INTERRUPTIBLE);
+	while (!kthread_should_stop()) {
+		schedule();
+		set_current_state(TASK_INTERRUPTIBLE);
+	}
+	__set_current_state(TASK_RUNNING);
+	return 0;
 }
 #+end_src

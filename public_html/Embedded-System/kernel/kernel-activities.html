@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Hardware/Software IRQs, tasklets and wait queues</title>
-<!-- 2014-12-08 Mon 20:08 -->
+<!-- 2014-12-09 Tue 20:20 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -185,6 +185,9 @@ for the JavaScript code in this tag.
 <li><a href="#sec-7-2"><code>set_irq_chip</code></a></li>
 <li><a href="#sec-7-3"><code>handle_edge_irq</code></a></li>
 <li><a href="#sec-7-4"><code>handle_level_irq</code></a></li>
+<li><a href="#sec-7-5"><code>handle_IRQ_event</code></a></li>
+<li><a href="#sec-7-6"><code>__do_softirq</code></a></li>
+<li><a href="#sec-7-7"><code>ksoftirqd</code></a></li>
 </ul>
 </li>
 </ul>
@@ -709,44 +712,396 @@ kernel还提供一些其他默认的flow处理:
 
 <div id="outline-container-sec-2-5" class="outline-3">
 <h3 id="sec-2-5">Calling the High-level ISR</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+如上所述flow处理最后都会调用 <code>handle_IRQ_event</code> 来调用上层相关ISRs.这个函数需要IRQ编号和action链为参数:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/irq/handle.c</span>
+<span style="color: #98fb98;">irqreturn_t</span> <span style="color: #87cefa;">handle_IRQ_event</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> *<span style="color: #eedd82;">action</span>);
+</pre>
+</div>
+
+<p>
+<code>handle_IRQ_event</code> 进行如下行为:
+</p>
+<ul class="org-ul">
+<li>如果 <code>IRQF_DISABLED</code> 在第一个处理函数中没有被设置,中断使能
+<code>local_irq_enable_in_hardirq</code> ,也就是处理函数能被其他IRQs中断.
+</li>
+<li>注册IRQ的 <code>action</code> 函数一个接一个被调用.
+</li>
+<li>如果IRQ的 <code>IRQF_SAMPLE_RANDOM</code> 被设置, <code>add_interrupt_randomness</code> 被调用来使用事件的时间添加为随机数产生源(如果中断随即发生,它们是理想的随机源).
+</li>
+<li>最后调用 <code>local_irq_disable</code> 关闭中断.因为打开和关闭中断不用匹配,所以无论一开始它被打开或关闭. <code>handle_IRQ_event</code> 被调用时,中断被关闭,
+离开时再次关闭它.
+</li>
+</ul>
+
+<p>
+对于共享的IRQs,kernel没有办法知道哪个设备触发的请求.整个留给处理函数使用设备相关的寄存器或其他硬件特性来找出中断源头.如果中断不是相关处理函数,立刻返回.所以 <code>handle_IRQ_event</code> 无从知道这个中断是否对它请求,所以
+kernel执行所有处理函数,无论第一个还是最后一个成功.
+</p>
+
+<p>
+无论如何,kernel能检查是否有对此IRQ负责的处理. <code>irqreturn_t</code> 被定义作为处理函数的返回值.它的值是 <code>IRQ_NONE</code> 或 <code>IRQ_HANDLED</code>. 在进行所有处理函数时,kernel对所有处理的返回做或运算,得出IRQ是否被处理的结果.
+</p>
 </div>
 </div>
-
-
-
-
+</div>
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">Software interrupts</h2>
 <div class="outline-text-2" id="text-3">
-</div><div id="outline-container-sec-3-1" class="outline-3">
+<p>
+软中断能使kernel延后执行任务.因为它们的行为与如上描述的中断类似,但是完全在软件实现,所以它们被称为软中断或softIRQs.
+</p>
+
+<p>
+softIRQ的中心元素是一张维护 <code>softirq_action</code> 类型的表, 如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;softirq.c&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span> <span style="color: #eedd82;">softirq_vec</span>[NR_SOFTIRQS] __cacheline_aligned_in_smp;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span>
+{
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">action</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span> *);
+};
+</pre>
+</div>
+
+<p>
+<code>action</code> 是指向当软中断发生,kernel执行的处理函数.在 <code>softirq_action</code>
+中没有封装data指针,每个处理函数的数据由各自维护,并在多核系统中,为每个核定义此变量使得多个软中断同时在多个不同核运行,以 <code>HI_SOFTIRQ</code> 软中断为例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">define</span>
+<span style="color: #00ffff;">static</span> <span style="color: #87cefa;">DEFINE_PER_CPU</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_head</span>, <span style="color: #98fb98;">tasklet_hi_vec</span>);
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">use</span>
+list = __get_cpu_var(tasklet_hi_vec).head;
+</pre>
+</div>
+
+<p>
+软中断在kernel执行它们前,必须注册, <code>open_softirq</code> 函数提供此目的,注册新的softIRQ到表 <code>softirq_vec</code> 指定位置:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/softirq.c</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">open_softirq</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nr</span>, <span style="color: #98fb98;">void</span> (*<span style="color: #eedd82;">action</span>)(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span> *))
+{
+        softirq_vec[nr].action = action;
+}
+</pre>
+</div>
+
+<p>
+事实上,每个softIRQ都有一个唯一的编号,也表示softIRQs是相对稀缺的资源.只有中心kernel代码使用软中断,如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">enum</span>
+{
+        <span style="color: #eedd82;">HI_SOFTIRQ</span>=0,
+        <span style="color: #98fb98;">TIMER_SOFTIRQ</span>,
+        <span style="color: #98fb98;">NET_TX_SOFTIRQ</span>,
+        <span style="color: #98fb98;">NET_RX_SOFTIRQ</span>,
+        <span style="color: #98fb98;">BLOCK_SOFTIRQ</span>,
+        <span style="color: #98fb98;">BLOCK_IOPOLL_SOFTIRQ</span>,
+        <span style="color: #98fb98;">TASKLET_SOFTIRQ</span>,
+        <span style="color: #98fb98;">SCHED_SOFTIRQ</span>,
+        <span style="color: #98fb98;">HRTIMER_SOFTIRQ</span>,
+        <span style="color: #98fb98;">RCU_SOFTIRQ</span>,    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Preferable RCU should always be the last softirq </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #eedd82;">NR_SOFTIRQS</span>
+};
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>两个被用来是实现tasklets的是 <code>HI_SOFTIRQ</code> 和 <code>TASKLET_SOFTIRQ</code> .
+</li>
+<li>在网络实现中,用来接收和发送操作的 <code>NET_RX_SOFTIRQ</code> 和
+<code>NET_TX_SOFTIRQ</code> .
+</li>
+<li>块设备实现异步请求的 <code>BLOCK_SOFTIRQ</code> 和 <code>BLOCK_IOPOLL_SOFTIRQ</code> .
+</li>
+<li>调度器实现在SMP系统上周期性负载平衡的 <code>BLOCK_IOPOLL_SOFTIRQ</code> .
+</li>
+<li>高精度时钟的实现使用 <code>HRTIMER_SOFTIRQ</code>.
+</li>
+</ul>
+
+<p>
+对softIRQs编号产生次序优先,不影响每个处理函数的执行频率或相对其他活动的优先权,它定义同时多个处理函数被激活或等待,依次执行的顺序.
+</p>
+
+<p>
+<code>raise_softirq(int nr)</code> 被用来触发一个软中断,目的软中断编号作为传入参数.这个函数在每个CPU变量
+<code>irq_stat[smp_processor_id].__softirq_pending</code> 设置相应比特位.这标志
+softIRQ要执行并延后执行.使用处理器特定的bitmap,kernel能在不同CPU上同时运行softIRQ.
+</p>
+</div>
+
+<div id="outline-container-sec-3-1" class="outline-3">
 <h3 id="sec-3-1">Starting SoftIRQ Processing</h3>
 <div class="outline-text-3" id="text-3-1">
+<p>
+有许多方法开始softIRQ的处理,但最后都调用 <code>do_softirq</code> 函数.如下图描述它的代码流程:
+</p>
+
 
 <div class="figure">
 <p><img src="./Files/do-softirq.jpeg" alt="do-softirq.jpeg" />
 </p>
 </div>
+
+<p>
+首先函数确保它不在中断中(也就是一个硬件中断).如果在,立即终止.因为软中断是用来执行ISRs中不重要的部分,所以代码本身不能在一个中断处理中调用.
+</p>
+
+<p>
+由函数 <code>local_softirq_pending</code> 得到当前CPU中被设置的所有软中断.如果有软中断等待被处理,然后调用 <code>__do_softirq</code> .
+</p>
+
+<p>
+在关闭中断情况下(防止其他进程同时修改),重置当前的bitmap为0,也就是所有等待的软中断标志位被删除.之后打开中断,执行软中断处理函数.此间,允许
+bitmap在任何时候被修改.
+</p>
+
+<p>
+在 <code>softirq_vec</code> 中的处理函数在循环中为每个等待softIRQ调用.
+</p>
+
+<p>
+一旦所有标志的软中断被服务完,kernel检查是否有新的软中断同时被置位.如果有等待的软中断,并且重执行次数没有超过 <code>MAX_SOFTIRQ_RESTART</code> (基本是
+10),那么再次重新执行一遍.
+</p>
+
+<p>
+如果仍有等待的软中断在 <code>MAX_SOFTIRQ_RESTART</code> 次重新执行后,
+<code>wakeup_softirqd</code> 被调用来唤醒软中断后台程序.
+</p>
 </div>
 </div>
 
 <div id="outline-container-sec-3-2" class="outline-3">
 <h3 id="sec-3-2">The SoftIRQ Daemon</h3>
-</div>
+<div class="outline-text-3" id="text-3-2">
+<p>
+软中断的后台程序任务是异步的执行软中断.每个处理器被分配它们各自的后台程序 <code>ksoftirqd</code>.
+</p>
+
+<p>
+<code>wakeup_softirqd</code> 在kernel的2处被调用来唤醒次后台程序:
+</p>
+<ul class="org-ul">
+<li>在 <code>do_softirq</code> 中.
+</li>
+<li>在 <code>raise_softirq_irqoff</code> 最后. 这个函数被 <code>raise_softirq</code> 内部调用.
+</li>
+</ul>
+
+<p>
+软中断的后台程序在系统启动时的 <code>init</code> 后通过 <code>initcall</code> 机制被调用.初始化完后,每个后台程序执行如下循环:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/softirq.c</span>
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ksoftirqd</span>(<span style="color: #98fb98;">void</span> * <span style="color: #eedd82;">__bind_cpu</span>)
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+    <span style="color: #00ffff;">while</span> (!kthread_should_stop()) {
+      <span style="color: #00ffff;">if</span> (!local_softirq_pending()) {
+        schedule();
+      }
+      __set_current_state(TASK_RUNNING);
+      <span style="color: #00ffff;">while</span> (local_softirq_pending()) {
+        do_softirq();
+        cond_resched();
+      }
+      set_current_state(TASK_INTERRUPTIBLE);
+    }
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+}
+</pre>
 </div>
 
+<p>
+每次它被唤醒,先检查是否有标志的软中断在等待,没有的话,调度给另外进程.
+</p>
+
+<p>
+如果有等待的软中断,后台程序去服务它们.在while循环中,两个函数
+<code>do_softirq</code> 和 <code>cond_resched</code> 被不断调用直到没有等待的软中断.
+<code>cond_resched</code> 确保调度器得到调用如果 <code>TIF_NEED_RESCHED</code> 设置到当前进程.
+</p>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-4" class="outline-2">
 <h2 id="sec-4">Tasklets</h2>
 <div class="outline-text-2" id="text-4">
-</div><div id="outline-container-sec-4-1" class="outline-3">
+<p>
+软中断由内核在静态表中固定使用,延迟机制相对复杂.因为软中断能同时和独立的在多个处理器上运行.这也是效率的关键所在,网络实现性能在多核系统显著的得到提高.但是,处理函数必须设计完全可重入并且线程安全.
+</p>
+
+<p>
+Tasklets和work queues是另外延迟执行任务的机制,它们的实现基于softIRQs,
+但是她们更容易使用,因此更适合设备驱动.
+</p>
+</div>
+
+<div id="outline-container-sec-4-1" class="outline-3">
 <h3 id="sec-4-1">Generating Tasklets</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+中心数据结构是 <code>tasklet_struct</code> ,如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span>
+{
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">next</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">state</span>;
+  <span style="color: #98fb98;">atomic_t</span> <span style="color: #eedd82;">count</span>;
+  <span style="color: #98fb98;">void</span> (*<span style="color: #87cefa;">func</span>)(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>);
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">data</span>;
+};
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>从设备驱动程序来说,最重要的元素是 <code>func</code>.它指向需要延迟运行的函数.
+<code>data</code> 是作为传递参数.
+</li>
+<li><code>next</code> 用来建立一个tasklet的链表.允许多个任务等待被执行.
+</li>
+<li><code>state</code> 表明当前task的状态.只有2种选项,并且表示不同的bit位,可以独立设置和移除.
+<ul class="org-ul">
+<li><code>TASKLET_STATE_SCHED</code> 设置当tasklet被注册,并调度执行.
+</li>
+<li><code>TASKLET_STATE_RUN</code> 表明tasklet正在执行.
+</li>
+</ul>
+</li>
+<li><code>count</code> 被用来禁止已经调度过的tasklets.当它的值非0,相应的tasklet被忽略.
+</li>
+</ul>
+</div>
 </div>
 
 <div id="outline-container-sec-4-2" class="outline-3">
 <h3 id="sec-4-2">Registering Tasklets</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+<code>tasklet_schedule</code> 在系统中注册一个tasklet:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tasklet_schedule</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>);
+</pre>
+</div>
+
+<p>
+如果 <code>TASKLET_STATE_SCHED</code> 被置位,注册终止因为这个tasklet已经被注册.否则,这个tasklet被放入CPU特定的链表 <code>tasklet_vec</code> 头部.
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-4-3" class="outline-3">
 <h3 id="sec-4-3">Executing Tasklets</h3>
+<div class="outline-text-3" id="text-4-3">
+<p>
+因为tasklet实现在softIRQ上,所以它们总是得到执行当软中断被处理时.
+Tasklets与软中断 <code>TASKLET_SOFTIRQ</code> 挂钩,所以调用
+<code>raise_softirq(TASKLET_SOFTIRQ)</code> 来执行当前处理器的tasklets在下次机会中.kernel使用 <code>tasklet_action</code> 作为tasklet软中断的执行函数.
+</p>
+
+
+<p>
+这个函数先获取要执行的CPU特定的list,把它从全局list中移除到本地.然后它们在如下循环中依次执行:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/softirq.c</span>
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tasklet_action</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span> *<span style="color: #eedd82;">a</span>)
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+    <span style="color: #00ffff;">while</span> (list) {
+      <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span> = list;
+      list = list-&gt;next;
+      <span style="color: #00ffff;">if</span> (tasklet_trylock(t)) {
+        <span style="color: #00ffff;">if</span> (!atomic_read(&amp;t-&gt;count)) {
+          <span style="color: #00ffff;">if</span> (!test_and_clear_bit(TASKLET_STATE_SCHED, &amp;t-&gt;state))
+            BUG();
+          t-&gt;func(t-&gt;data);
+          tasklet_unlock(t);
+          <span style="color: #00ffff;">continue</span>;
+        }
+        tasklet_unlock(t);
+      }
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+    }
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+}
+</pre>
+</div>
+
+<p>
+在while循环中执行tasklets机制同处理softIRQs类似.
+</p>
+
+<p>
+因为一个tasklet只能同时在一个处理器上执行,但是其他tasklet能并行运行,tasklet特定的锁需要. <code>state</code> 的状态被使用来作为锁变量. 在tasklet的处理函数执行前,kernel使用 <code>tasklet_trylock</code> 来检查tasklet的状态是否是
+<code>TASKLET_STATE_RUN</code> ,也就是它是否已经在其他处理器上运行.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;interrupt.h&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">tasklet_trylock</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tasklet_struct</span> *<span style="color: #eedd82;">t</span>)
+{
+  <span style="color: #00ffff;">return</span> !test_and_set_bit(TASKLET_STATE_RUN, &amp;(t)-&gt;state);
+}
+</pre>
+</div>
+
+<p>
+如果元素 <code>count</code> 非0, tasklet被认为未激活,代码不被执行.
+</p>
+
+<p>
+一旦两个检查都通过,kernel执行tasklet的处理函数通过调用
+<code>t-&gt;func(t-&gt;data)</code> .最终tasklet的 <code>TASKLET_SCHED_RUN</code> 位删除通过
+<code>tasklet_unlock</code>.
+</p>
+
+<p>
+如果在执行tasklets中,新的tasklets在当前处理器中等待,软中断
+<code>TASKLET_SOFTIRQ</code> 被触发来尽快执行新的tasklets.
+</p>
+
+<p>
+除了普通的tasklets. kernel使用第二中高优先级tasklet.它的实现与普通的
+tasklets基本一致,除了以下一些改变:
+</p>
+<ul class="org-ul">
+<li><code>HI_SOFTIRQ</code> 取代 <code>TASKLET_SOFTIRQ</code> 作为softIRQ. 它相应的处理函数是
+<code>tasklet_hi_action</code> .
+</li>
+<li>注册的tasklets队列如CPU特定的变量 <code>tasklet_hi_vec</code> 中,通过使用
+<code>tasklet_hi_schedule</code> .
+</li>
+</ul>
+
+<p>
+高优先级意味着 <code>HI_SOFTIRQ</code> 的软中断执行在所有其他处理之前&#x2013;特别在网络处理之前.现在,大多声卡驱动使用此机制,因为延后太长会影响音效质量.
+</p>
+</div>
 </div>
 
 <div id="outline-container-sec-4-4" class="outline-3">
@@ -756,12 +1111,18 @@ kernel还提供一些其他默认的flow处理:
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">Wait queues and completions</h2>
 <div class="outline-text-2" id="text-5">
-</div><div id="outline-container-sec-5-1" class="outline-3">
+<p>
+Wait queues被使用来使得进程等待特定事件的发生而不用一直轮询.进程在等待时
+</p>
+</div>
+<div id="outline-container-sec-5-1" class="outline-3">
 <h3 id="sec-5-1">Wait Queues</h3>
 </div>
+
 <div id="outline-container-sec-5-2" class="outline-3">
 <h3 id="sec-5-2">Completions</h3>
 </div>
+
 <div id="outline-container-sec-5-3" class="outline-3">
 <h3 id="sec-5-3">Work Queues</h3>
 </div>
@@ -770,10 +1131,6 @@ kernel还提供一些其他默认的flow处理:
 <div id="outline-container-sec-6" class="outline-2">
 <h2 id="sec-6">cc</h2>
 <div class="outline-text-2" id="text-6">
-<p>
-[[./Files/
-</p>
-
 <div class="org-src-container">
 
 <pre class="src src-c"></pre>
@@ -1008,11 +1365,202 @@ kernel还提供一些其他默认的flow处理:
 </div>
 </div>
 </div>
+<div id="outline-container-sec-7-5" class="outline-3">
+<h3 id="sec-7-5"><code>handle_IRQ_event</code></h3>
+<div class="outline-text-3" id="text-7-5">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">irqreturn_t</span> <span style="color: #87cefa;">handle_IRQ_event</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> *<span style="color: #eedd82;">action</span>)
+{
+        <span style="color: #98fb98;">irqreturn_t</span> <span style="color: #eedd82;">ret</span>, <span style="color: #eedd82;">retval</span> = IRQ_NONE;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">status</span> = 0;
+
+        <span style="color: #00ffff;">if</span> (!(action-&gt;flags &amp; IRQF_DISABLED))
+                local_irq_enable_in_hardirq();
+
+        <span style="color: #00ffff;">do</span> {
+                trace_irq_handler_entry(irq, action);
+                ret = action-&gt;handler(irq, action-&gt;dev_id);
+                trace_irq_handler_exit(irq, action, ret);
+
+                <span style="color: #00ffff;">switch</span> (ret) {
+                <span style="color: #00ffff;">case</span> IRQ_WAKE_THREAD:
+                        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">                         * Set result to handled so the spurious check</span>
+<span style="color: #ff7f24;">                         * does not trigger.</span>
+<span style="color: #ff7f24;">                         </span><span style="color: #ff7f24;">*/</span>
+                        ret = IRQ_HANDLED;
+                        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">                         * Catch drivers which return WAKE_THREAD but</span>
+<span style="color: #ff7f24;">                         * did not set up a thread function</span>
+<span style="color: #ff7f24;">                         </span><span style="color: #ff7f24;">*/</span>
+                        <span style="color: #00ffff;">if</span> (unlikely(!action-&gt;thread_fn)) {
+                                warn_no_thread(irq, action);
+                                <span style="color: #00ffff;">break</span>;
+                        }
+                        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">                         * Wake up the handler thread for this</span>
+<span style="color: #ff7f24;">                         * action. In case the thread crashed and was</span>
+<span style="color: #ff7f24;">                         * killed we just pretend that we handled the</span>
+<span style="color: #ff7f24;">                         * interrupt. The hardirq handler above has</span>
+<span style="color: #ff7f24;">                         * disabled the device interrupt, so no irq</span>
+<span style="color: #ff7f24;">                         * storm is lurking.</span>
+<span style="color: #ff7f24;">                         </span><span style="color: #ff7f24;">*/</span>
+                        <span style="color: #00ffff;">if</span> (likely(!test_bit(IRQTF_DIED,
+                                             &amp;action-&gt;thread_flags))) {
+                                set_bit(IRQTF_RUNTHREAD, &amp;action-&gt;thread_flags);
+                                wake_up_process(action-&gt;thread);
+                        }
+                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Fall through to add to randomness </span><span style="color: #ff7f24;">*/</span>
+                <span style="color: #00ffff;">case</span> IRQ_HANDLED:
+                        status |= action-&gt;flags;
+                        <span style="color: #00ffff;">break</span>;
+
+                <span style="color: #00ffff;">default</span>:
+                        <span style="color: #00ffff;">break</span>;
+                }
+
+                retval |= ret;
+                action = action-&gt;next;
+        } <span style="color: #00ffff;">while</span> (action);
+
+        <span style="color: #00ffff;">if</span> (status &amp; IRQF_SAMPLE_RANDOM)
+                add_interrupt_randomness(irq);
+        local_irq_disable();
+
+        <span style="color: #00ffff;">return</span> retval;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7-6" class="outline-3">
+<h3 id="sec-7-6"><code>__do_softirq</code></h3>
+<div class="outline-text-3" id="text-7-6">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">MAX_SOFTIRQ_RESTART</span> 10
+
+asmlinkage <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__do_softirq</span>(<span style="color: #98fb98;">void</span>)
+{
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">softirq_action</span> *<span style="color: #eedd82;">h</span>;
+        <span style="color: #98fb98;">__u32</span> <span style="color: #eedd82;">pending</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">max_restart</span> = MAX_SOFTIRQ_RESTART;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">cpu</span>;
+
+        pending = local_softirq_pending();
+        account_system_vtime(current);
+
+        __local_bh_disable((<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>)__builtin_return_address(0));
+        lockdep_softirq_enter();
+
+        cpu = smp_processor_id();
+<span style="color: #7fffd4;">restart</span>:
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Reset the pending bitmask before enabling irqs </span><span style="color: #ff7f24;">*/</span>
+        set_softirq_pending(0);
+
+        local_irq_enable();
+
+        h = softirq_vec;
+
+        <span style="color: #00ffff;">do</span> {
+                <span style="color: #00ffff;">if</span> (pending &amp; 1) {
+                        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">prev_count</span> = preempt_count();
+                        kstat_incr_softirqs_this_cpu(h - softirq_vec);
+
+                        trace_softirq_entry(h, softirq_vec);
+                        h-&gt;action(h);
+                        trace_softirq_exit(h, softirq_vec);
+                        <span style="color: #00ffff;">if</span> (unlikely(prev_count != preempt_count())) {
+                                printk(KERN_ERR <span style="color: #ffa07a;">"huh, entered softirq %td %s %p"</span>
+                                       <span style="color: #ffa07a;">"with preempt_count %08x,"</span>
+                                       <span style="color: #ffa07a;">" exited with %08x?\n"</span>, h - softirq_vec,
+                                       softirq_to_name[h - softirq_vec],
+                                       h-&gt;action, prev_count, preempt_count());
+                                preempt_count() = prev_count;
+                        }
+
+                        rcu_bh_qs(cpu);
+                }
+                h++;
+                pending &gt;&gt;= 1;
+        } <span style="color: #00ffff;">while</span> (pending);
+
+        local_irq_disable();
+
+        pending = local_softirq_pending();
+        <span style="color: #00ffff;">if</span> (pending &amp;&amp; --max_restart)
+                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">restart</span>;
+
+        <span style="color: #00ffff;">if</span> (pending)
+                wakeup_softirqd();
+
+        lockdep_softirq_exit();
+
+        account_system_vtime(current);
+        _local_bh_enable();
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7-7" class="outline-3">
+<h3 id="sec-7-7"><code>ksoftirqd</code></h3>
+<div class="outline-text-3" id="text-7-7">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ksoftirqd</span>(<span style="color: #98fb98;">void</span> * <span style="color: #eedd82;">__bind_cpu</span>)
+{
+        set_current_state(TASK_INTERRUPTIBLE);
+
+        <span style="color: #00ffff;">while</span> (!kthread_should_stop()) {
+                preempt_disable();
+                <span style="color: #00ffff;">if</span> (!local_softirq_pending()) {
+                        preempt_enable_no_resched();
+                        schedule();
+                        preempt_disable();
+                }
+
+                __set_current_state(TASK_RUNNING);
+
+                <span style="color: #00ffff;">while</span> (local_softirq_pending()) {
+                        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Preempt disable stops cpu going offline.</span>
+<span style="color: #ff7f24;">                           If already offline, we'll be on wrong CPU:</span>
+<span style="color: #ff7f24;">                           don't process </span><span style="color: #ff7f24;">*/</span>
+                        <span style="color: #00ffff;">if</span> (cpu_is_offline((<span style="color: #98fb98;">long</span>)__bind_cpu))
+                                <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">wait_to_die</span>;
+                        do_softirq();
+                        preempt_enable_no_resched();
+                        cond_resched();
+                        preempt_disable();
+                        rcu_sched_qs((<span style="color: #98fb98;">long</span>)__bind_cpu);
+                }
+                preempt_enable();
+                set_current_state(TASK_INTERRUPTIBLE);
+        }
+        __set_current_state(TASK_RUNNING);
+        <span style="color: #00ffff;">return</span> 0;
+
+<span style="color: #7fffd4;">wait_to_die</span>:
+        preempt_enable();
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Wait for kthread_stop </span><span style="color: #ff7f24;">*/</span>
+        set_current_state(TASK_INTERRUPTIBLE);
+        <span style="color: #00ffff;">while</span> (!kthread_should_stop()) {
+                schedule();
+                set_current_state(TASK_INTERRUPTIBLE);
+        }
+        __set_current_state(TASK_RUNNING);
+        <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-12-08 Mon 20:08</p>
+<p class="date">Created: 2014-12-09 Tue 20:20</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
