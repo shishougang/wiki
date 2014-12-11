@@ -1,0 +1,51 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Build linux modules
+#+OPTIONS: num:nil H:2
+
+[[./Files/hello-linux-module.tar.gz][Source codes download]].
+* Install kernel headers on Ubuntu
+#+begin_src sh
+$ sudo apt-get install linux-headers-$(uname -r)
+#+end_src
+
+* Hello world module
+#+begin_src c
+#include <linux/module.h>	
+#include <linux/kernel.h>	
+#include <linux/init.h>
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("\"Hello, world!\" minimal module");
+
+static int __init hello_init(void) {
+  printk(KERN_INFO "hello world called\n");
+  return 0;
+}
+
+static void __exit hello_exit(void) {
+  printk(KERN_INFO "goodbuy hello world\n");
+}
+module_init(hello_init);
+module_exit(hello_exit);
+#+end_src
+
+* Makefile
+#+begin_src sh
+obj-m += hello.o
+
+all:
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+
+clean:
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+#+end_src
+* make and install
+#+begin_src sh
+$make
+$sudo insmod ./hello.ko
+$dmesg | tail
+[10686.033039] hello world called
+$sudo rmmod hello
+$dmesg | tail
+goodbuy hello world
+#+end_src

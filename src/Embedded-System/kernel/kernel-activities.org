@@ -588,21 +588,365 @@ tasklets基本一致,除了以下一些改变:
 处理之前.现在,大多声卡驱动使用此机制,因为延后太长会影响音效质量.
 
 ** Example
+[[./Files/tasklet-examples.tar.gz][源码包下载]].
+#+begin_src c
+#include <linux/module.h>	
+#include <linux/kernel.h>	
+#include <linux/init.h>
+#include <linux/sched.h>
+#include <linux/interrupt.h>
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("tasklet examples");
+
+void tasklet_func(unsigned long arg) {
+  printk(KERN_INFO "tasklet function %lu", arg);
+}
+DECLARE_TASKLET(task_test1, tasklet_func, 1);
+DECLARE_TASKLET_DISABLED(task_test2, tasklet_func, 2);
+
+static int __init tasklet_example_init(void) {
+  printk(KERN_INFO "the state of task1 is %ld and count is %d\n",
+         task_test1.state, task_test1.count);
+  printk(KERN_INFO "the state of task2 is %ld and count is %d\n",
+         task_test2.state, task_test2.count);
+  printk(KERN_INFO "enable task2\n");
+  tasklet_enable(&task_test2);
+  printk(KERN_INFO "after enable, the state of task2 is %ld and count is %d\n",
+         task_test2.state, task_test2.count);
+  printk(KERN_INFO "schedule tasklets\n");
+  tasklet_schedule(&task_test1);
+  tasklet_schedule(&task_test2);
+  printk(KERN_INFO "the state of task1 is %ld and count is %d\n",
+         task_test1.state, task_test1.count);
+  printk(KERN_INFO "the state of task2 is %ld and count is %d\n",
+         task_test2.state, task_test2.count);
+  return 0;
+}
+
+static void __exit tasklet_example_exit(void) {
+  printk(KERN_INFO "tasklet exit\n");
+}
+module_init(tasklet_example_init);
+module_exit(tasklet_example_exit);
+#+end_src
+
+#+begin_src sh
+obj-m += tasklet_example.o
+
+all:
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+
+clean:
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+#+end_src
+
+run:
+#+begin_src sh
+$ make
+$ sudo insmod ./tasklet_example.ko 
+$ dmesg | tail
+[758618.602354] the state of task1 is 0 and count is 0
+[758618.602356] the state of task2 is 0 and count is 1
+[758618.602357] enable task2
+[758618.602358] after enable, the state of task2 is 0 and count is 0
+[758618.602359] schedule tasklets
+[758618.602362] the state of task1 is 1 and count is 0
+[758618.602363] the state of task2 is 1 and count is 0
+[758618.602426] tasklet function 1
+[758618.602427] tasklet function 2
+#+end_src
 * Wait queues and completions
 Wait queues被使用来使得进程等待特定事件的发生而不用一直轮询.进程在等待
-时
+时进入睡眠,当时间发生时自动由kernel唤醒.Completion建立于wati queues之
+上,并被用来等待某个动作的结束.
+
 ** Wait Queues
+*** Data Structures
+每个wait queue都有一个头部如下表示:
+#+begin_src c
+  // <wait.h>
+  struct __wait_queue_head {
+    spinlock_t lock;
+    struct list_head task_list;
+  };
+  typedef struct __wait_queue_head wait_queue_head_t;
+#+end_src
 
+因为wait queues能在中断中被修改,所以spinlock需要获取在修改它前.
+
+队列中的元素如下结构:
+#+begin_src c
+  // <wait.h>
+  struct __wait_queue {
+    unsigned int flags;
+    void *private;
+    wait_queue_func_t func;
+    struct list_head task_list;
+  };
+  typedef struct __wait_queue wait_queue_t;
+#+end_src
+
++ =flags= 有值 =WQ_FLAG_EXCLUSIVE= 或没有. 标识 =WQ_FLAG_EXCLUSIVE= 表
+  明等待进程互斥的被唤醒.
++ =private= 指向等待进程的task结构. 这个变量基本能指向任意似有数据,但
+  是kernel很少使用.
++ =func= 当唤醒时被调用.
++ =task_list= 是list元素,被用来把此元素放入等待队列.
+
+Wait queue分为两部分:
+1. 把当前进程放入wait queue而睡眠,通过调用 =wait_event= 函数.
+2. 在kernel的另外地方,调用 =wake_up= 函数唤醒等待的进程.
+*** Putting Processes to Sleep
+函数 =add_wait_queue= 被使用来把一个task加入到等待队列,这个函数在获取
+spinlock后把工作交给 =__add_wait_queue=:
+#+begin_src c
+  // <wait.h>
+  static inline void __add_wait_queue(wait_queue_head_t *head, wait_queue_t *new)
+  {
+    list_add(&new->task_list, &head->task_list);
+  }
+#+end_src
+
+使用list函数 =list_add= 把新task加入到等待队列中.
+
+=add_wait_queue_exclusive= 基本一样,只是同时设置 =WQ_EXCLUSIVE= 标识.
+
+另外方法是 =prepare_to_wait=, 并还需要task状态作为参数:
+#+begin_src c
+// kernel/wait.c
+void
+prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
+{
+	unsigned long flags;
+
+	wait->flags &= ~WQ_FLAG_EXCLUSIVE;
+	spin_lock_irqsave(&q->lock, flags);
+	if (list_empty(&wait->task_list))
+		__add_wait_queue(q, wait);
+	set_current_state(state);
+	spin_unlock_irqrestore(&q->lock, flags);
+}
+#+end_src
+
+=prepare_to_wait_exclusive= 同样是设置 =WQ_FLAG_EXCLUSIVE= 标识的版本.
+
+有2个标准的方法来初始化等待队列节点:
+1. =init_waitqueue_entry= 动态初始化 =wait_queue_t= 实例:
+   #+begin_src c
+     // <wait.h>
+     static inline void init_waitqueue_entry(wait_queue_t *q, struct task_struct *p)
+     {
+             q->flags = 0;
+             q->private = p;
+             q->func = default_wake_function;
+     }
+   #+end_src
+2. =DEFINE_WAIT= 静态的初始化一个 =wait_queue_t= 实例:
+   #+begin_src c
+          // <wait.h>
+     #define DEFINE_WAIT(name) DEFINE_WAIT_FUNC(name, autoremove_wake_function)
+     #define DEFINE_WAIT_FUNC(name, function)                                \
+       wait_queue_t name = {                                                 \
+         .private        = current,                                          \
+         .func           = function,                                         \
+         .task_list      = LIST_HEAD_INIT((name).task_list),                 \
+       }
+   #+end_src
+
+=add_wait_queue= 一般不直接使用.通常使用 =wait_event=. 这个宏有两个参
+数:
+1. 等待的队列.
+2. 等待时间的表达式.
+
+宏确保等待情况没有被满足,若已满足,处理立刻停止,因此没有什么东西可以等
+待.wait的主要工作由 =__wait_event= 定义:
+#+begin_src c
+// <wait.h>
+#define wait_event(wq, condition) 					\
+do {									\
+	if (condition)	 						\
+		break;							\
+	__wait_event(wq, condition);					\
+} while (0)
+
+#define __wait_event(wq, condition) 					\
+do {									\
+	DEFINE_WAIT(__wait);						\
+									\
+	for (;;) {							\
+		prepare_to_wait(&wq, &__wait, TASK_UNINTERRUPTIBLE);	\
+		if (condition)						\
+			break;						\
+		schedule();						\
+	}								\
+	finish_wait(&wq, &__wait);					\
+} while (0)
+#+end_src
+
+在用 =DEFINE_WAIT= 设置好等待队列元素后,宏产生一个无尽的循环.使用
+=prepare_to_wai= 让此进程在此等待队列上睡眠.每次它唤醒,都检查特定的条
+件是否满足,若是则离开循环.否则,交给调度器,自己继续睡眠.
+
+当条件得到满足后, =finish_wait= 把task状态重新设置回 =TASK_RUNNING= 并
+把它从等待队列中移除.
+
+除了 =wait_event=, kernel定义其他一些宏来让当前进程等待:
+
+#+begin_src c
+// <wait.h>
+#define wait_event_interruptible(wq, condition)
+#define wait_event_timeout(wq, condition, timeout) { ... }
+#define wait_event_interruptible_timeout(wq, condition, timeout)
+#+end_src
+
++ =wait_event_interruptible= 设置当前进程 =TASK_INTERRUPTIBLE=.睡眠中
+  的进程能被接收的signal所唤醒.
++ =wait_event_timeout= 等待特定条件满足,但是在已jiffies为单位的超时后
+  停止等待.
++ =wait_event_interruptible_timeout= 既可被接收的signal所唤醒,并超时等
+  待.
+
+*** Waking Processes
+kernel定义了一系列宏来唤醒等待队列中的进程,它们都基于同一个函数:
+#+begin_src c
+// <wait.h>
+#define wake_up(x) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, NULL)
+#define wake_up_nr(x, nr) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr, NULL)
+#define wake_up_all(x) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 0, NULL)
+#define wake_up_interruptible(x) __wake_up(x, TASK_INTERRUPTIBLE, 1, NULL)
+#define wake_up_interruptible_nr(x, nr) __wake_up(x, TASK_INTERRUPTIBLE, nr, NULL)
+#define wake_up_interruptible_all(x) __wake_up(x, TASK_INTERRUPTIBLE, 0, NULL)
+#+end_src
+在获取必要的等待队列头的锁后, =__wake_up= 把工作交给
+=__wake_up_common= :
+#+begin_src c
+  // kernel/sched.c
+  static void __wake_up_common(wait_queue_head_t *q, unsigned int mode,
+                               int nr_exclusive, int sync, void *key)
+  {
+    wait_queue_t *curr, *next;
+  
+    list_for_each_entry_safe(curr, next, &q->task_list, task_list) {
+      unsigned flags = curr->flags;
+  
+      if (curr->func(curr, mode, wake_flags, key) &&
+          (flags & WQ_FLAG_EXCLUSIVE) && !--nr_exclusive)
+        break;
+    }
+  }
+#+end_src
+
+*** Example
+[[./Files/wait_queue_example.tar.gz][源码包下载]].
+#+begin_src c
+#include <linux/fs.h>
+#include <linux/init.h>
+#include <linux/miscdevice.h>
+#include <linux/module.h>
+#include <asm/uaccess.h>
+#include <linux/wait.h>
+#include <linux/sched.h>
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("wait queue example module");
+
+//wait_queue_head_t read_wait_queue;
+DECLARE_WAIT_QUEUE_HEAD(read_wait_queue);
+int read_flag = 0;
+static ssize_t buffer_read(struct file * file, char * buf, 
+			  size_t count, loff_t *ppos) {
+  char *str = "read finished\n";
+  ssize_t ret;
+  int len = strlen(str);
+  printk(KERN_INFO "prepare to read\n");
+  wait_event_interruptible(read_wait_queue, read_flag != 0);
+  printk(KERN_INFO "reader woken up\n");
+  read_flag = 0;
+  ret = copy_to_user(buf, str, len);
+  return ret;
+}
+
+ssize_t buffer_write(struct file *file, const char *buff,
+                     size_t count, loff_t *offp) {
+  ssize_t ret;
+  char str[100];
+  printk(KERN_INFO "writer to woke up reader\n");
+  read_flag = 1;
+  wake_up_interruptible(&read_wait_queue);
+  ret = copy_from_user(str, buff, 100);
+  return ret;
+}
+
+static const struct file_operations buffer_fops = {
+	.owner		= THIS_MODULE,
+	.read		= buffer_read,
+        .write          = buffer_write,
+};
+
+static struct miscdevice wait_test_dev = {
+	/*
+	 * kernel to just pick minor number.
+	 */
+	MISC_DYNAMIC_MINOR,
+	/*
+	 * Name ourselves /dev/hello.
+	 */
+	"wait_test",
+	&buffer_fops
+};
+
+static int __init wait_test_init(void) {
+	int ret;
+	ret = misc_register(&wait_test_dev);
+	if (ret)
+		printk(KERN_ERR
+		       "Unable to register wait test misc device\n");
+	return ret;
+}
+module_init(wait_test_init);
+
+static void __exit wait_test_exit(void) {
+	misc_deregister(&wait_test_dev);
+}
+module_exit(wait_test_exit);
+#+end_src
 ** Completions
+Completions的实现基于如上的wait queues.Wait queue是等待某个条件得到满
+足,而Completion仅等待结构体中 =done= 得到满足.可以说是对wait queue等待
+某个完成的简易封装.使用如下数据结构:
+#+begin_src c
+  // <completion.h>
+  struct completion {
+    unsigned int done;
+    wait_queue_head_t wait;
+  };
+#+end_src
 
-** Work Queues
++ =done= 用来标示某个时间完成以让其他进程等待这个完成.
++ =wait= 是可以被放入睡眠的wait queue.
 
-* cc
+=DECLARE_COMPLETION= 和 =init_completion= 分别
+
+
+
 
 #+begin_src c
 
 #+end_src
 
+
+
+** Work Queues
+
+
+#+begin_src c
+
+#+end_src
+
+#+begin_src c
+static struct workqueue_struct *keventd_wq __read_mostly;
+#+end_src
 * reference
 ** =struct irq_desc=
 #+begin_src c

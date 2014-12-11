@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Hardware/Software IRQs, tasklets and wait queues</title>
-<!-- 2014-12-09 Tue 20:20 -->
+<!-- 2014-12-11 Thu 21:25 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -178,16 +178,15 @@ for the JavaScript code in this tag.
 <li><a href="#sec-5-3">Work Queues</a></li>
 </ul>
 </li>
-<li><a href="#sec-6">cc</a></li>
-<li><a href="#sec-7">reference</a>
+<li><a href="#sec-6">reference</a>
 <ul>
-<li><a href="#sec-7-1"><code>struct irq_desc</code></a></li>
-<li><a href="#sec-7-2"><code>set_irq_chip</code></a></li>
-<li><a href="#sec-7-3"><code>handle_edge_irq</code></a></li>
-<li><a href="#sec-7-4"><code>handle_level_irq</code></a></li>
-<li><a href="#sec-7-5"><code>handle_IRQ_event</code></a></li>
-<li><a href="#sec-7-6"><code>__do_softirq</code></a></li>
-<li><a href="#sec-7-7"><code>ksoftirqd</code></a></li>
+<li><a href="#sec-6-1"><code>struct irq_desc</code></a></li>
+<li><a href="#sec-6-2"><code>set_irq_chip</code></a></li>
+<li><a href="#sec-6-3"><code>handle_edge_irq</code></a></li>
+<li><a href="#sec-6-4"><code>handle_level_irq</code></a></li>
+<li><a href="#sec-6-5"><code>handle_IRQ_event</code></a></li>
+<li><a href="#sec-6-6"><code>__do_softirq</code></a></li>
+<li><a href="#sec-6-7"><code>ksoftirqd</code></a></li>
 </ul>
 </li>
 </ul>
@@ -1106,31 +1105,459 @@ tasklets基本一致,除了以下一些改变:
 
 <div id="outline-container-sec-4-4" class="outline-3">
 <h3 id="sec-4-4">Example</h3>
+<div class="outline-text-3" id="text-4-4">
+<p>
+<a href="./Files/tasklet-examples.tar.gz">源码包下载</a>.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/module.h&gt;</span>       
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/kernel.h&gt;</span>       
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/init.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/sched.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/interrupt.h&gt;</span>
+
+MODULE_LICENSE(<span style="color: #ffa07a;">"GPL"</span>);
+MODULE_DESCRIPTION(<span style="color: #ffa07a;">"tasklet examples"</span>);
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tasklet_func</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">arg</span>) {
+  printk(KERN_INFO <span style="color: #ffa07a;">"tasklet function %lu"</span>, arg);
+}
+DECLARE_TASKLET(task_test1, tasklet_func, 1);
+DECLARE_TASKLET_DISABLED(task_test2, tasklet_func, 2);
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">__init</span> tasklet_example_init(<span style="color: #98fb98;">void</span>) {
+  printk(KERN_INFO <span style="color: #ffa07a;">"the state of task1 is %ld and count is %d\n"</span>,
+         task_test1.state, task_test1.count);
+  printk(KERN_INFO <span style="color: #ffa07a;">"the state of task2 is %ld and count is %d\n"</span>,
+         task_test2.state, task_test2.count);
+  printk(KERN_INFO <span style="color: #ffa07a;">"enable task2\n"</span>);
+  tasklet_enable(&amp;task_test2);
+  printk(KERN_INFO <span style="color: #ffa07a;">"after enable, the state of task2 is %ld and count is %d\n"</span>,
+         task_test2.state, task_test2.count);
+  printk(KERN_INFO <span style="color: #ffa07a;">"schedule tasklets\n"</span>);
+  tasklet_schedule(&amp;task_test1);
+  tasklet_schedule(&amp;task_test2);
+  printk(KERN_INFO <span style="color: #ffa07a;">"the state of task1 is %ld and count is %d\n"</span>,
+         task_test1.state, task_test1.count);
+  printk(KERN_INFO <span style="color: #ffa07a;">"the state of task2 is %ld and count is %d\n"</span>,
+         task_test2.state, task_test2.count);
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__exit</span> tasklet_example_exit(<span style="color: #98fb98;">void</span>) {
+  printk(KERN_INFO <span style="color: #ffa07a;">"tasklet exit\n"</span>);
+}
+module_init(tasklet_example_init);
+module_exit(tasklet_example_exit);
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">obj-m += tasklet_example.o
+
+all:
+        make -C /lib/modules/$(shell uname -r)/build <span style="color: #eedd82;">M</span>=$(PWD) modules
+
+clean:
+        make -C /lib/modules/$(shell uname -r)/build <span style="color: #eedd82;">M</span>=$(PWD) clean
+</pre>
+</div>
+
+<p>
+run:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ make
+$ sudo insmod ./tasklet_example.ko 
+$ dmesg | tail
+[758618.602354] the state of task1 is 0 and count is 0
+[758618.602356] the state of task2 is 0 and count is 1
+[758618.602357] enable task2
+[758618.602358] after enable, the state of task2 is 0 and count is 0
+[758618.602359] schedule tasklets
+[758618.602362] the state of task1 is 1 and count is 0
+[758618.602363] the state of task2 is 1 and count is 0
+[758618.602426] tasklet <span style="color: #00ffff;">function</span> <span style="color: #87cefa;">1</span>
+[758618.602427] tasklet <span style="color: #00ffff;">function</span> <span style="color: #87cefa;">2</span>
+</pre>
+</div>
+</div>
 </div>
 </div>
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">Wait queues and completions</h2>
 <div class="outline-text-2" id="text-5">
 <p>
-Wait queues被使用来使得进程等待特定事件的发生而不用一直轮询.进程在等待时
+Wait queues被使用来使得进程等待特定事件的发生而不用一直轮询.进程在等待时进入睡眠,当时间发生时自动由kernel唤醒.Completion建立于wati queues之上,并被用来等待某个动作的结束.
 </p>
 </div>
+
 <div id="outline-container-sec-5-1" class="outline-3">
 <h3 id="sec-5-1">Wait Queues</h3>
+<div class="outline-text-3" id="text-5-1">
+</div><ul class="org-ul"><li><a id="sec-5-1-1" name="sec-5-1-1"></a>Data Structures<br  /><div class="outline-text-4" id="text-5-1-1">
+<p>
+每个wait queue都有一个头部如下表示:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue_head</span> {
+  <span style="color: #98fb98;">spinlock_t</span> <span style="color: #eedd82;">lock</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">task_list</span>;
+};
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue_head</span> <span style="color: #98fb98;">wait_queue_head_t</span>;
+</pre>
 </div>
 
+<p>
+因为wait queues能在中断中被修改,所以spinlock需要获取在修改它前.
+</p>
+
+<p>
+队列中的元素如下结构:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue</span> {
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flags</span>;
+  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">private</span>;
+  <span style="color: #98fb98;">wait_queue_func_t</span> <span style="color: #eedd82;">func</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">list_head</span> <span style="color: #eedd82;">task_list</span>;
+};
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">__wait_queue</span> <span style="color: #98fb98;">wait_queue_t</span>;
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>flags</code> 有值 <code>WQ_FLAG_EXCLUSIVE</code> 或没有. 标识 <code>WQ_FLAG_EXCLUSIVE</code> 表明等待进程互斥的被唤醒.
+</li>
+<li><code>private</code> 指向等待进程的task结构. 这个变量基本能指向任意似有数据,但是kernel很少使用.
+</li>
+<li><code>func</code> 当唤醒时被调用.
+</li>
+<li><code>task_list</code> 是list元素,被用来把此元素放入等待队列.
+</li>
+</ul>
+
+<p>
+Wait queue分为两部分:
+</p>
+<ol class="org-ol">
+<li>把当前进程放入wait queue而睡眠,通过调用 <code>wait_event</code> 函数.
+</li>
+<li>在kernel的另外地方,调用 <code>wake_up</code> 函数唤醒等待的进程.
+</li>
+</ol>
+</div>
+</li>
+<li><a id="sec-5-1-2" name="sec-5-1-2"></a>Putting Processes to Sleep<br  /><div class="outline-text-4" id="text-5-1-2">
+<p>
+函数 <code>add_wait_queue</code> 被使用来把一个task加入到等待队列,这个函数在获取
+spinlock后把工作交给 <code>__add_wait_queue</code>:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__add_wait_queue</span>(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">head</span>, <span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">new</span>)
+{
+  list_add(&amp;new-&gt;task_list, &amp;head-&gt;task_list);
+}
+</pre>
+</div>
+
+<p>
+使用list函数 <code>list_add</code> 把新task加入到等待队列中.
+</p>
+
+<p>
+<code>add_wait_queue_exclusive</code> 基本一样,只是同时设置 <code>WQ_EXCLUSIVE</code> 标识.
+</p>
+
+<p>
+另外方法是 <code>prepare_to_wait</code>, 并还需要task状态作为参数:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/wait.c</span>
+<span style="color: #98fb98;">void</span>
+<span style="color: #87cefa;">prepare_to_wait</span>(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">wait</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">state</span>)
+{
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">flags</span>;
+
+        wait-&gt;flags &amp;= ~WQ_FLAG_EXCLUSIVE;
+        spin_lock_irqsave(&amp;q-&gt;lock, flags);
+        <span style="color: #00ffff;">if</span> (list_empty(&amp;wait-&gt;task_list))
+                __add_wait_queue(q, wait);
+        set_current_state(state);
+        spin_unlock_irqrestore(&amp;q-&gt;lock, flags);
+}
+</pre>
+</div>
+
+<p>
+<code>prepare_to_wait_exclusive</code> 同样是设置 <code>WQ_FLAG_EXCLUSIVE</code> 标识的版本.
+</p>
+
+<p>
+有2个标准的方法来初始化等待队列节点:
+</p>
+<ol class="org-ol">
+<li><code>init_waitqueue_entry</code> 动态初始化 <code>wait_queue_t</code> 实例:
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">init_waitqueue_entry</span>(<span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">q</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">task_struct</span> *<span style="color: #eedd82;">p</span>)
+{
+        q-&gt;flags = 0;
+        q-&gt;private = p;
+        q-&gt;func = default_wake_function;
+}
+</pre>
+</div>
+</li>
+<li><code>DEFINE_WAIT</code> 静态的初始化一个 <code>wait_queue_t</code> 实例:
+<div class="org-src-container">
+
+<pre class="src src-c">     <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">DEFINE_WAIT</span>(<span style="color: #eedd82;">name</span>) DEFINE_WAIT_FUNC(name, autoremove_wake_function)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">DEFINE_WAIT_FUNC</span>(<span style="color: #eedd82;">name</span>, <span style="color: #eedd82;">function</span>)                                \
+  <span style="color: #98fb98;">wait_queue_t</span> <span style="color: #eedd82;">name</span> = {                                                 \
+    .private        = current,                                          \
+    .func           = function,                                         \
+    .task_list      = LIST_HEAD_INIT((name).task_list),                 \
+  }
+</pre>
+</div>
+</li>
+</ol>
+
+<p>
+<code>add_wait_queue</code> 一般不直接使用.通常使用 <code>wait_event</code>. 这个宏有两个参数:
+</p>
+<ol class="org-ol">
+<li>等待的队列.
+</li>
+<li>等待时间的表达式.
+</li>
+</ol>
+
+<p>
+宏确保等待情况没有被满足,若已满足,处理立刻停止,因此没有什么东西可以等待.wait的主要工作由 <code>__wait_event</code> 定义:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wait_event</span>(<span style="color: #eedd82;">wq</span>, <span style="color: #eedd82;">condition</span>)                                       \
+<span style="color: #00ffff;">do</span> {                                                                    \
+        <span style="color: #00ffff;">if</span> (condition)                                                  \
+                <span style="color: #00ffff;">break</span>;                                                  \
+        __wait_event(wq, condition);                                    \
+} <span style="color: #00ffff;">while</span> (0)
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">__wait_event</span>(<span style="color: #eedd82;">wq</span>, <span style="color: #eedd82;">condition</span>)                                     \
+<span style="color: #00ffff;">do</span> {                                                                    \
+        DEFINE_WAIT(__wait);                                            \
+                                                                        \
+        <span style="color: #00ffff;">for</span> (;;) {                                                      \
+                prepare_to_wait(&amp;wq, &amp;__wait, TASK_UNINTERRUPTIBLE);    \
+                <span style="color: #00ffff;">if</span> (condition)                                          \
+                        <span style="color: #00ffff;">break</span>;                                          \
+                schedule();                                             \
+        }                                                               \
+        finish_wait(&amp;wq, &amp;__wait);                                      \
+} <span style="color: #00ffff;">while</span> (0)
+</pre>
+</div>
+
+<p>
+在用 <code>DEFINE_WAIT</code> 设置好等待队列元素后,宏产生一个无尽的循环.使用
+<code>prepare_to_wai</code> 让此进程在此等待队列上睡眠.每次它唤醒,都检查特定的条件是否满足,若是则离开循环.否则,交给调度器,自己继续睡眠.
+</p>
+
+<p>
+当条件得到满足后, <code>finish_wait</code> 把task状态重新设置回 <code>TASK_RUNNING</code> 并把它从等待队列中移除.
+</p>
+
+<p>
+除了 <code>wait_event</code>, kernel定义其他一些宏来让当前进程等待:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wait_event_interruptible</span>(<span style="color: #eedd82;">wq</span>, <span style="color: #eedd82;">condition</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wait_event_timeout</span>(<span style="color: #eedd82;">wq</span>, <span style="color: #eedd82;">condition</span>, <span style="color: #eedd82;">timeout</span>) { ... }
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wait_event_interruptible_timeout</span>(<span style="color: #eedd82;">wq</span>, <span style="color: #eedd82;">condition</span>, <span style="color: #eedd82;">timeout</span>)
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>wait_event_interruptible</code> 设置当前进程 <code>TASK_INTERRUPTIBLE</code>.睡眠中的进程能被接收的signal所唤醒.
+</li>
+<li><code>wait_event_timeout</code> 等待特定条件满足,但是在已jiffies为单位的超时后停止等待.
+</li>
+<li><code>wait_event_interruptible_timeout</code> 既可被接收的signal所唤醒,并超时等待.
+</li>
+</ul>
+</div>
+</li>
+
+<li><a id="sec-5-1-3" name="sec-5-1-3"></a>Waking Processes<br  /><div class="outline-text-4" id="text-5-1-3">
+<p>
+kernel定义了一系列宏来唤醒等待队列中的进程,它们都基于同一个函数:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;wait.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up</span>(<span style="color: #eedd82;">x</span>) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 1, <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up_nr</span>(<span style="color: #eedd82;">x</span>, <span style="color: #eedd82;">nr</span>) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, nr, <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up_all</span>(<span style="color: #eedd82;">x</span>) __wake_up(x, TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE, 0, <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up_interruptible</span>(<span style="color: #eedd82;">x</span>) __wake_up(x, TASK_INTERRUPTIBLE, 1, <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up_interruptible_nr</span>(<span style="color: #eedd82;">x</span>, <span style="color: #eedd82;">nr</span>) __wake_up(x, TASK_INTERRUPTIBLE, nr, <span style="color: #7fffd4;">NULL</span>)
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">wake_up_interruptible_all</span>(<span style="color: #eedd82;">x</span>) __wake_up(x, TASK_INTERRUPTIBLE, 0, <span style="color: #7fffd4;">NULL</span>)
+</pre>
+</div>
+<p>
+在获取必要的等待队列头的锁后, <code>__wake_up</code> 把工作交给
+<code>__wake_up_common</code> :
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">kernel/sched.c</span>
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__wake_up_common</span>(<span style="color: #98fb98;">wait_queue_head_t</span> *<span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mode</span>,
+                             <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nr_exclusive</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">sync</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">key</span>)
+{
+  <span style="color: #98fb98;">wait_queue_t</span> *<span style="color: #eedd82;">curr</span>, *<span style="color: #eedd82;">next</span>;
+
+  <span style="color: #eedd82;">list_for_each_entry_safe</span>(<span style="color: #98fb98;">curr</span>, <span style="color: #98fb98;">next</span>, &amp;q-&gt;task_list, <span style="color: #98fb98;">task_list</span>) {
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">flags</span> = curr-&gt;flags;
+
+    <span style="color: #00ffff;">if</span> (curr-&gt;func(curr, mode, wake_flags, key) &amp;&amp;
+        (flags &amp; WQ_FLAG_EXCLUSIVE) &amp;&amp; !--nr_exclusive)
+      <span style="color: #00ffff;">break</span>;
+  }
+}
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="sec-5-1-4" name="sec-5-1-4"></a>Example<br  /><div class="outline-text-4" id="text-5-1-4">
+<p>
+<a href="./Files/wait_queue_example.tar.gz">源码包下载</a>.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/fs.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/init.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/miscdevice.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/module.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;asm/uaccess.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/wait.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/sched.h&gt;</span>
+
+MODULE_LICENSE(<span style="color: #ffa07a;">"GPL"</span>);
+MODULE_DESCRIPTION(<span style="color: #ffa07a;">"wait queue example module"</span>);
+
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">wait_queue_head_t read_wait_queue;</span>
+DECLARE_WAIT_QUEUE_HEAD(read_wait_queue);
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">read_flag</span> = 0;
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">ssize_t</span> <span style="color: #87cefa;">buffer_read</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> * <span style="color: #eedd82;">file</span>, <span style="color: #98fb98;">char</span> * <span style="color: #eedd82;">buf</span>, 
+                          <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">count</span>, <span style="color: #98fb98;">loff_t</span> *<span style="color: #eedd82;">ppos</span>) {
+  <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">str</span> = <span style="color: #ffa07a;">"read finished\n"</span>;
+  <span style="color: #98fb98;">ssize_t</span> <span style="color: #eedd82;">ret</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span> = strlen(str);
+  printk(KERN_INFO <span style="color: #ffa07a;">"prepare to read\n"</span>);
+  wait_event_interruptible(read_wait_queue, read_flag != 0);
+  printk(KERN_INFO <span style="color: #ffa07a;">"reader woken up\n"</span>);
+  read_flag = 0;
+  ret = copy_to_user(buf, str, len);
+  <span style="color: #00ffff;">return</span> ret;
+}
+
+<span style="color: #98fb98;">ssize_t</span> <span style="color: #87cefa;">buffer_write</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span> *<span style="color: #eedd82;">file</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">buff</span>,
+                     <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">count</span>, <span style="color: #98fb98;">loff_t</span> *<span style="color: #eedd82;">offp</span>) {
+  <span style="color: #98fb98;">ssize_t</span> <span style="color: #eedd82;">ret</span>;
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">str</span>[100];
+  printk(KERN_INFO <span style="color: #ffa07a;">"writer to woke up reader\n"</span>);
+  read_flag = 1;
+  wake_up_interruptible(&amp;read_wait_queue);
+  ret = copy_from_user(str, buff, 100);
+  <span style="color: #00ffff;">return</span> ret;
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file_operations</span> <span style="color: #eedd82;">buffer_fops</span> = {
+        .owner          = THIS_MODULE,
+        .read           = buffer_read,
+        .write          = buffer_write,
+};
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">miscdevice</span> <span style="color: #eedd82;">wait_test_dev</span> = {
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * kernel to just pick minor number.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        MISC_DYNAMIC_MINOR,
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Name ourselves /dev/hello.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #ffa07a;">"wait_test"</span>,
+        &amp;buffer_fops
+};
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">__init</span> wait_test_init(<span style="color: #98fb98;">void</span>) {
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ret</span>;
+        ret = misc_register(&amp;wait_test_dev);
+        <span style="color: #00ffff;">if</span> (ret)
+                printk(KERN_ERR
+                       <span style="color: #ffa07a;">"Unable to register wait test misc device\n"</span>);
+        <span style="color: #00ffff;">return</span> ret;
+}
+module_init(wait_test_init);
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__exit</span> wait_test_exit(<span style="color: #98fb98;">void</span>) {
+        misc_deregister(&amp;wait_test_dev);
+}
+module_exit(wait_test_exit);
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
 <div id="outline-container-sec-5-2" class="outline-3">
 <h3 id="sec-5-2">Completions</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+Completions的实现基于如上的wait queues.Wait queue是等待某个条件得到满足,而Completion仅等待结构体中 <code>done</code> 得到满足.可以说是对wait queue等待某个完成的简易封装.使用如下数据结构:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&lt;completion.h&gt;</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">completion</span> {
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">done</span>;
+  <span style="color: #98fb98;">wait_queue_head_t</span> <span style="color: #eedd82;">wait</span>;
+};
+</pre>
 </div>
 
-<div id="outline-container-sec-5-3" class="outline-3">
-<h3 id="sec-5-3">Work Queues</h3>
-</div>
-</div>
+<ul class="org-ul">
+<li><code>done</code> 用来标示某个时间完成以让其他进程等待这个完成.
+</li>
+<li><code>wait</code> 是可以被放入睡眠的wait queue.
+</li>
+</ul>
 
-<div id="outline-container-sec-6" class="outline-2">
-<h2 id="sec-6">cc</h2>
-<div class="outline-text-2" id="text-6">
+<p>
+<code>DECLARE_COMPLETION</code> 和 <code>init_completion</code> 分别
+</p>
+
+
+
+
 <div class="org-src-container">
 
 <pre class="src src-c"></pre>
@@ -1138,12 +1565,30 @@ Wait queues被使用来使得进程等待特定事件的发生而不用一直轮
 </div>
 </div>
 
-<div id="outline-container-sec-7" class="outline-2">
-<h2 id="sec-7">reference</h2>
-<div class="outline-text-2" id="text-7">
-</div><div id="outline-container-sec-7-1" class="outline-3">
-<h3 id="sec-7-1"><code>struct irq_desc</code></h3>
-<div class="outline-text-3" id="text-7-1">
+
+
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3">Work Queues</h3>
+<div class="outline-text-3" id="text-5-3">
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">workqueue_struct</span> *<span style="color: #eedd82;">keventd_wq</span> __read_mostly;
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">reference</h2>
+<div class="outline-text-2" id="text-6">
+</div><div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1"><code>struct irq_desc</code></h3>
+<div class="outline-text-3" id="text-6-1">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #ffa07a;">/**</span>
@@ -1213,9 +1658,9 @@ Wait queues被使用来使得进程等待特定事件的发生而不用一直轮
 </div>
 </div>
 </div>
-<div id="outline-container-sec-7-2" class="outline-3">
-<h3 id="sec-7-2"><code>set_irq_chip</code></h3>
-<div class="outline-text-3" id="text-7-2">
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2"><code>set_irq_chip</code></h3>
+<div class="outline-text-3" id="text-6-2">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #ffa07a;">/**</span>
@@ -1247,9 +1692,9 @@ Wait queues被使用来使得进程等待特定事件的发生而不用一直轮
 </div>
 </div>
 </div>
-<div id="outline-container-sec-7-3" class="outline-3">
-<h3 id="sec-7-3"><code>handle_edge_irq</code></h3>
-<div class="outline-text-3" id="text-7-3">
+<div id="outline-container-sec-6-3" class="outline-3">
+<h3 id="sec-6-3"><code>handle_edge_irq</code></h3>
+<div class="outline-text-3" id="text-6-3">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #98fb98;">void</span>
@@ -1317,9 +1762,9 @@ Wait queues被使用来使得进程等待特定事件的发生而不用一直轮
 </div>
 </div>
 </div>
-<div id="outline-container-sec-7-4" class="outline-3">
-<h3 id="sec-7-4"><code>handle_level_irq</code></h3>
-<div class="outline-text-3" id="text-7-4">
+<div id="outline-container-sec-6-4" class="outline-3">
+<h3 id="sec-6-4"><code>handle_level_irq</code></h3>
+<div class="outline-text-3" id="text-6-4">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #98fb98;">void</span>
@@ -1365,9 +1810,9 @@ Wait queues被使用来使得进程等待特定事件的发生而不用一直轮
 </div>
 </div>
 </div>
-<div id="outline-container-sec-7-5" class="outline-3">
-<h3 id="sec-7-5"><code>handle_IRQ_event</code></h3>
-<div class="outline-text-3" id="text-7-5">
+<div id="outline-container-sec-6-5" class="outline-3">
+<h3 id="sec-6-5"><code>handle_IRQ_event</code></h3>
+<div class="outline-text-3" id="text-6-5">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #98fb98;">irqreturn_t</span> <span style="color: #87cefa;">handle_IRQ_event</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">irq</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">irqaction</span> *<span style="color: #eedd82;">action</span>)
@@ -1434,9 +1879,9 @@ Wait queues被使用来使得进程等待特定事件的发生而不用一直轮
 </div>
 </div>
 </div>
-<div id="outline-container-sec-7-6" class="outline-3">
-<h3 id="sec-7-6"><code>__do_softirq</code></h3>
-<div class="outline-text-3" id="text-7-6">
+<div id="outline-container-sec-6-6" class="outline-3">
+<h3 id="sec-6-6"><code>__do_softirq</code></h3>
+<div class="outline-text-3" id="text-6-6">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">MAX_SOFTIRQ_RESTART</span> 10
@@ -1504,9 +1949,9 @@ asmlinkage <span style="color: #98fb98;">void</span> <span style="color: #87cefa
 </div>
 </div>
 </div>
-<div id="outline-container-sec-7-7" class="outline-3">
-<h3 id="sec-7-7"><code>ksoftirqd</code></h3>
-<div class="outline-text-3" id="text-7-7">
+<div id="outline-container-sec-6-7" class="outline-3">
+<h3 id="sec-6-7"><code>ksoftirqd</code></h3>
+<div class="outline-text-3" id="text-6-7">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ksoftirqd</span>(<span style="color: #98fb98;">void</span> * <span style="color: #eedd82;">__bind_cpu</span>)
@@ -1560,7 +2005,7 @@ asmlinkage <span style="color: #98fb98;">void</span> <span style="color: #87cefa
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2014-12-09 Tue 20:20</p>
+<p class="date">Created: 2014-12-11 Thu 21:25</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
