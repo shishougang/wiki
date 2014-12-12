@@ -926,27 +926,137 @@ Completions的实现基于如上的wait queues.Wait queue是等待某个条件�
 + =done= 用来标示某个时间完成以让其他进程等待这个完成.
 + =wait= 是可以被放入睡眠的wait queue.
 
-=DECLARE_COMPLETION= 和 =init_completion= 分别
+=DECLARE_COMPLETION= 和 =init_completion= 分别静态和动态初始化
+=completion= 实例.
 
-
-
-
+进程被加入到list中使用 =wait_for_completion=, 它们在这list中等待直到它
+们的请求得到处理.如下:
 #+begin_src c
-
+  // <completion.h>
+  void wait_for_completion(struct completion *);
+  int wait_for_completion_interruptible(struct completion *x);
+  unsigned long wait_for_completion_timeout(struct completion *x,
+                                            unsigned long timeout);
+  unsigned long wait_for_completion_interruptible_timeout(
+      struct completion *x, unsigned long timeout);
 #+end_src
 
+一旦请求被kernel其他部分得到处理, =complete= 或 =complete_all= 必须被
+调用来唤醒等待的进程. =complete= 每次只移除一个进程从completion list中,所
+以想一次移除n个等待的进程,必须调用此函数n次.或者,一次唤醒和移除所有等
+待进程. =complete_and_exit= 是个微小的封装,先应用 =complete= 然后调用
+=do_exit= 来完成kernle线程.
 
+#+begin_src c
+  // <completion.h>
+  void complete(struct completion *);
+  void complete_all(struct completion *);
+  // kernel/exit.c
+  NORET_TYPE void complete_and_exit(struct completion *comp, long code);
+#+end_src
+
+每次 =complete= 被调用, =done= 被增加1, =wait_for= 函数只使调用者睡眠
+当 =done= 等于0时. =complete_all= 类似,但是设置 =done= 为可能的最大值(
+=UINT_MAX/2= ).
 
 ** Work Queues
+Work queues延迟执行任务.相当于后台进程,它能随意睡眠才执行.
 
+对于每个work queue, kernel产生一个新的kernel后台进程,使用wait queue机
+制来延后执行任务.
+
+一个新的wait queue通过调用下面函数之一生成: =create_workqueue= 或
+=create_workqueue_singlethread= .第一个函数在所有CPU上创建一个worker
+thread. 后一个在第一个CPU上创建一个thread.两者内部都使用
+=__create_workqueue_key= :
 
 #+begin_src c
-
+// kernel/workqueue.c
+#define __create_workqueue(name, singlethread, freezeable, rt)	\
+	__create_workqueue_key((name), (singlethread), (freezeable), (rt), \
+			       NULL, NULL)
 #+end_src
 
+=name= 是产生的后台进程在进程列表中显示的名字.如果 =singlethread= 设置
+为0, 在每个CPU中都创建一个线程,否则就只在第一个.
+
+被放入wait queue中的任务必须封装成 =work_struct= 结构:
+#+begin_src c
+  // <workqueue.h>
+  struct work_struct;
+  typedef void (*work_func_t)(struct work_struct *work);
+  struct work_struct {
+    atomic_long_t data;
+    struct list_head entry;
+    work_func_t func;
+  }
+#+end_src
+
+=func= 指向要延迟执行的函数.这个并把指向本身 =work_struct= 的指针作为
+参数,这样允许函数从中获取到 =data= 元素.
+
+为什么kernel使用 =atomic_long_t= 作为数据指针的类型,而不是 =void*= 呢?
+实际上,之前的kernel版本定义 =work_struct= 如下:
+#+begin_src c
+  // <workqueue.h>
+  struct work_struct {
+    ...
+    void (*func)(void *);
+    void *data;
+    ...
+  };
+#+end_src
+
+=data= 如希望一样是指针类型.但是kernel使用了小技巧,存储更多信息到结构
+中而不用花费更多内存.因为指针以4字节对齐在所有架构上,首2个比特位保证是
+0.因此使用它们来包含更多的标识位,余下的比特位继续包含指针信息.如下的宏
+用来提取标识位:
+#+begin_src c
+// <workqueue.h>
+#define WORK_STRUCT_FLAG_MASK (3UL)
+#define WORK_STRUCT_WQ_DATA_MASK (~WORK_STRUCT_FLAG_MASK)
+#+end_src
+
+现在只有一个标识被定义: =WORK_STRUCT_PENDING= 允许检查一个可延迟的work
+当前是否被挂起还是没有.辅助宏 =work_pending(work)= 用来检查这个位. 原
+子类型确保修改而不用担心并行问题.
+
+kernel提供宏 =INIT_WORK(work, func)= 来初始化这个结构,如果参数需要,必
+须在之后再设置.
+
+此 =work_struct= 在未定义的时间后运行(当调度器选择这个后台进程运行).
+
+为了确保work queue 在 *之后* 特定时间才执行, =work_struct= 需要一个
+timer.解决方法如下:
+#+begin_src c
+  // <workqueue.h>
+  struct delayed_work {
+    struct work_struct work;
+    struct timer_list timer;
+  };
+#+end_src
+
+把两者加入work queue的放入如下:
+#+begin_src c
+  // kernel/workqueue.c
+  int fastcall queue_work(struct workqueue_struct *wq, struct work_struct *work)
+  int fastcall queue_delayed_work(struct workqueue_struct *wq,
+                                  struct delayed_work *dwork, unsigned long delay)
+#+end_src
+
+=queue_delayed_work= 先产生一个超时是 =delayed= jiffies的kernel timer,
+相应的处理函数是使用 =queue_work= 把work加入到work queue中.
+
+kernel产生一个标准的叫 =keventd_wq= 的wait queue.这个queue可以被所有
+kernel中不值得创建一个独立work queue的部分使用. 并有如下两个函数实现把
+新的work加入这个标准queue中:
 #+begin_src c
 static struct workqueue_struct *keventd_wq __read_mostly;
+// kernel/workqueue.c
+int schedule_work(struct work_struct *work)
+int schedule_delayed_work(struct delay_work *dwork, unsigned long delay)
 #+end_src
+
 * reference
 ** =struct irq_desc=
 #+begin_src c
