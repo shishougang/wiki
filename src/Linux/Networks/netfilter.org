@@ -2,6 +2,79 @@
 #+TITLE: Linux Netfilter
 #+OPTIONS: num:nil H:2
 
+
+* netfilter and iptables homepage
++ netfilter: http://www.netfilter.org/index.html
++ iptables: http://www.netfilter.org/projects/iptables/index.html
+
+service iptables save
+
+* IMQ
+
+** imq device
+#+begin_src sh
+/net/imq.ko
+#+end_src
+
+** netfilter support IMQ
+#+begin_src sh
+net/ipv4/netfilter/ipt_IMQ.ko
+net/ipv6/netfilter/ip6t_IMQ.ko
+#+end_src
+
+** iptables support IMQ
+#+begin_src sh
+iptables/libip6t_IMQ.so
+iptables/libipt_IMQ.so
+#+end_src
+
+#+begin_src sh
+# modprobe imq numdevs=2
+# modprobe ipt_IMQ
+# ifconfig imq0 up
+# ifconfig imq1 up
+#+end_src
+
+#+begin_src sh
+#!/bin/bash
+modprobe imq numdevs=2
+modprobe ipt_IMQ
+ifconfig imq0 up
+ifconfig imq1 up
+
+tc qdisc del dev imq0 root 2>/dev/null 1>&2
+tc qdisc del dev imq1 root 2>/dev/null 1>&2
+
+#IMQ 0
+tc qdisc add dev imq0 root handle 1: htb default 20
+
+tc class add dev imq0 parent 1: classid 1:1 htb rate 2mbit burst 15k
+
+tc class add dev imq0 parent 1:1 classid 1:10 htb rate 1mbit
+tc class add dev imq0 parent 1:1 classid 1:20 htb rate 1mbit
+
+tc qdisc add dev imq0 parent 1:10 handle 10: pfifo
+tc qdisc add dev imq0 parent 1:20 handle 20: sfq
+
+tc filter add dev imq0 parent 1:0 protocol ip prio 1 u32 match ip dst 192.168.228.30 flowid 1:10
+
+iptables -t mangle -A PREROUTING -i eth0 -j IMQ --todev 0
+
+#IMQ 1
+tc qdisc add dev imq1 root handle 2: htb default 20
+
+tc class add dev imq1 parent 2: classid 2:1 htb rate 10mbit burst 15k
+
+tc class add dev imq1 parent 2:1 classid 2:10 htb rate 1mbit ceil 10mbit
+tc class add dev imq1 parent 2:1 classid 2:20 htb rate 1mbit ceil 10mbit
+
+tc qdisc add dev imq1 parent 2:10 handle 10: pfifo
+tc qdisc add dev imq1 parent 2:20 handle 20: sfq
+
+tc filter add dev imq1 parent 2:0 protocol ip prio 1 u32 match ip dst 192.168.228.30 flowid 2:10
+
+iptables -t mangle -A POSTROUTING -o eth0 -j IMQ --todev 1
+#+end_src
 * reference
 http://en.wikipedia.org/wiki/Netfilter
 
@@ -17,15 +90,6 @@ http://ebtables.sourceforge.net/br_fw_ia/PacketFlow.png
 [[./files/PacketFlow.png]]
 
 * cc
-#+begin_src python
-
-#+end_src
-
-#+begin_src c++
-
-#+end_src
-
-
 #+begin_src sh
 
 #+end_src

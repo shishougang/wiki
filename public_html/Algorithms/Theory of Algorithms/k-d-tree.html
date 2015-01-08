@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<title>Linux Netfilter</title>
+<title>k-d tree</title>
 <!-- 2015-01-08 Thu 22:31 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
@@ -138,176 +138,78 @@ for the JavaScript code in this tag.
 </head>
 <body>
 <div id="content">
-<h1 class="title">Linux Netfilter</h1>
+<h1 class="title">k-d tree</h1>
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">netfilter and iptables homepage</a></li>
-<li><a href="#sec-2">IMQ</a>
-<ul>
-<li><a href="#sec-2-1">imq device</a></li>
-<li><a href="#sec-2-2">netfilter support IMQ</a></li>
-<li><a href="#sec-2-3">iptables support IMQ</a></li>
-</ul>
-</li>
-<li><a href="#sec-3">reference</a></li>
-<li><a href="#sec-4">cc</a></li>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">lib</a></li>
+<li><a href="#sec-3">cc</a></li>
 </ul>
 </div>
 </div>
 
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">netfilter and iptables homepage</h2>
+<h2 id="sec-1">Overview</h2>
 <div class="outline-text-2" id="text-1">
-<ul class="org-ul">
-<li>netfilter: <a href="http://www.netfilter.org/index.html">http://www.netfilter.org/index.html</a>
-</li>
-<li>iptables: <a href="http://www.netfilter.org/projects/iptables/index.html">http://www.netfilter.org/projects/iptables/index.html</a>
-</li>
-</ul>
-
 <p>
-service iptables save
+k-d tree (short for k-dimensional tree) is a space-partitioning data
+structure for organizing points in a k-dimensional space.<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
 </p>
 </div>
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">IMQ</h2>
+<h2 id="sec-2">lib</h2>
 <div class="outline-text-2" id="text-2">
-</div><div id="outline-container-sec-2-1" class="outline-3">
-<h3 id="sec-2-1">imq device</h3>
-<div class="outline-text-3" id="text-2-1">
-<div class="org-src-container">
+<p>
+<a href="http://spatial.sourceforge.net/">http://spatial.sourceforge.net/</a>
+</p>
 
-<pre class="src src-sh">/net/imq.ko
-</pre>
-</div>
-</div>
-</div>
+<p>
+<a href="http://libkdtree.alioth.debian.org/">http://libkdtree.alioth.debian.org/</a>
+</p>
 
-<div id="outline-container-sec-2-2" class="outline-3">
-<h3 id="sec-2-2">netfilter support IMQ</h3>
-<div class="outline-text-3" id="text-2-2">
-<div class="org-src-container">
-
-<pre class="src src-sh">net/ipv4/netfilter/ipt_IMQ.ko
-net/ipv6/netfilter/ip6t_IMQ.ko
-</pre>
-</div>
+<p>
+<a href="http://nbviewer.ipython.org/url/jakevdp.github.com/downloads/notebooks/TreeBench.ipynb">http://nbviewer.ipython.org/url/jakevdp.github.com/downloads/notebooks/TreeBench.ipynb</a>
+</p>
 </div>
 </div>
 
-<div id="outline-container-sec-2-3" class="outline-3">
-<h3 id="sec-2-3">iptables support IMQ</h3>
-<div class="outline-text-3" id="text-2-3">
-<div class="org-src-container">
 
-<pre class="src src-sh">iptables/libip6t_IMQ.so
-iptables/libipt_IMQ.so
-</pre>
-</div>
-
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">modprobe imq numdevs=2</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">modprobe ipt_IMQ</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">ifconfig imq0 up</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">ifconfig imq1 up</span>
-</pre>
-</div>
-
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/bin/</span><span style="color: #00ffff;">bash</span>
-modprobe imq <span style="color: #eedd82;">numdevs</span>=2
-modprobe ipt_IMQ
-ifconfig imq0 up
-ifconfig imq1 up
-
-tc qdisc del dev imq0 root 2&gt;/dev/null 1&gt;&amp;2
-tc qdisc del dev imq1 root 2&gt;/dev/null 1&gt;&amp;2
-
-<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">IMQ 0</span>
-tc qdisc add dev imq0 root handle 1: htb default 20
-
-tc class add dev imq0 parent 1: classid 1:1 htb rate 2mbit burst 15k
-
-tc class add dev imq0 parent 1:1 classid 1:10 htb rate 1mbit
-tc class add dev imq0 parent 1:1 classid 1:20 htb rate 1mbit
-
-tc qdisc add dev imq0 parent 1:10 handle 10: pfifo
-tc qdisc add dev imq0 parent 1:20 handle 20: sfq
-
-tc filter add dev imq0 parent 1:0 protocol ip prio 1 u32 match ip dst 192.168.228.30 flowid 1:10
-
-iptables -t mangle -A PREROUTING -i eth0 -j IMQ --todev 0
-
-<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">IMQ 1</span>
-tc qdisc add dev imq1 root handle 2: htb default 20
-
-tc class add dev imq1 parent 2: classid 2:1 htb rate 10mbit burst 15k
-
-tc class add dev imq1 parent 2:1 classid 2:10 htb rate 1mbit ceil 10mbit
-tc class add dev imq1 parent 2:1 classid 2:20 htb rate 1mbit ceil 10mbit
-
-tc qdisc add dev imq1 parent 2:10 handle 10: pfifo
-tc qdisc add dev imq1 parent 2:20 handle 20: sfq
-
-tc filter add dev imq1 parent 2:0 protocol ip prio 1 u32 match ip dst 192.168.228.30 flowid 2:10
-
-iptables -t mangle -A POSTROUTING -o eth0 -j IMQ --todev 1
-</pre>
-</div>
-</div>
-</div>
-</div>
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">reference</h2>
+<h2 id="sec-3">cc</h2>
 <div class="outline-text-2" id="text-3">
-<p>
-<a href="http://en.wikipedia.org/wiki/Netfilter">http://en.wikipedia.org/wiki/Netfilter</a>
-</p>
+<div class="org-src-container">
 
-<p>
-<a href="http://docs.openstack.org/havana/config-reference/content/under_the_hood_openvswitch.html">http://docs.openstack.org/havana/config-reference/content/under_the_hood_openvswitch.html</a>
-</p>
+<pre class="src src-python"></pre>
+</div>
 
-<p>
-<a href="http://erlerobotics.gitbooks.io/erle-robotics-introduction-to-networking-in-linux/security/introduction_to_iptables.html">http://erlerobotics.gitbooks.io/erle-robotics-introduction-to-networking-in-linux/security/introduction_to_iptables.html</a>
-</p>
+<div class="org-src-container">
 
-<p>
-<a href="http://ebtables.sourceforge.net/br_fw_ia/br_fw_ia.html">http://ebtables.sourceforge.net/br_fw_ia/br_fw_ia.html</a>
-</p>
-
-
-<div class="figure">
-<p><img src="http://ebtables.sourceforge.net/br_fw_ia/PacketFlow.png" alt="PacketFlow.png" />
-</p>
+<pre class="src src-c++"></pre>
 </div>
 
 
-
-<div class="figure">
-<p><img src="./files/PacketFlow.png" alt="PacketFlow.png" />
-</p>
-</div>
-</div>
-</div>
-
-<div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">cc</h2>
-<div class="outline-text-2" id="text-4">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
 </div>
 </div>
 </div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://en.wikipedia.org/wiki/K-d_tree">http://en.wikipedia.org/wiki/K-d_tree</a>
+</p></div>
+
+
 </div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
 <p class="date">Created: 2015-01-08 Thu 22:31</p>
