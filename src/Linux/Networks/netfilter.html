@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Linux Netfilter and Traffic Control</title>
-<!-- 2015-01-22 Thu 20:37 -->
+<!-- 2015-01-22 Thu 15:51 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -55,8 +55,6 @@
   pre.src-sql:before   { content: 'SQL'; }
 
   table { border-collapse:collapse; }
-  caption.t-above { caption-side: top; }
-  caption.t-bottom { caption-side: bottom; }
   td, th { vertical-align:top;  }
   th.right  { text-align: center;  }
   th.left   { text-align: center;   }
@@ -160,14 +158,17 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-5-1">Terminology</a></li>
 <li><a href="#sec-5-2">tc bandwidth rules</a></li>
-<li><a href="#sec-5-3">Simple, classless Queueing Disciplines</a></li>
-<li><a href="#sec-5-4">Classful Queueing Disciplines</a></li>
-<li><a href="#sec-5-5">The Intermediate queueing device (IMQ)</a></li>
-<li><a href="#sec-5-6">Advanced filters for (re-)classifying packets</a></li>
 </ul>
 </li>
-<li><a href="#sec-6">More</a></li>
-<li><a href="#sec-7">cc</a></li>
+<li><a href="#sec-6">IMQ</a>
+<ul>
+<li><a href="#sec-6-1">imq device</a></li>
+<li><a href="#sec-6-2">netfilter support IMQ</a></li>
+<li><a href="#sec-6-3">iptables support IMQ</a></li>
+</ul>
+</li>
+<li><a href="#sec-7">More</a></li>
+<li><a href="#sec-8">cc</a></li>
 </ul>
 </div>
 </div>
@@ -184,6 +185,7 @@ for the JavaScript code in this tag.
 </ul>
 </div>
 </div>
+
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">Overview</h2>
 <div class="outline-text-2" id="text-2">
@@ -216,7 +218,6 @@ And the flow of network packets through the Netfilter:
 </div>
 </div>
 </div>
-
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">Netfilter Hooks in the Linux Kernel</h2>
 <div class="outline-text-2" id="text-3">
@@ -259,7 +260,6 @@ before they leave the computer.
 </ul>
 </div>
 </div>
-
 <div id="outline-container-sec-3-2" class="outline-3">
 <h3 id="sec-3-2">Register the hooks</h3>
 <div class="outline-text-3" id="text-3-2">
@@ -296,7 +296,6 @@ kernel 提供如下函数来注册和解除hook函数.
 </div>
 </div>
 </div>
-
 <div id="outline-container-sec-3-3" class="outline-3">
 <h3 id="sec-3-3">hook functions</h3>
 <div class="outline-text-3" id="text-3-3">
@@ -331,7 +330,6 @@ kernel 提供如下函数来注册和解除hook函数.
 </div>
 </div>
 </div>
-
 <div id="outline-container-sec-3-4" class="outline-3">
 <h3 id="sec-3-4"><code>pf</code></h3>
 <div class="outline-text-3" id="text-3-4">
@@ -354,6 +352,7 @@ kernel 提供如下函数来注册和解除hook函数.
 </div>
 </div>
 </div>
+
 <div id="outline-container-sec-3-5" class="outline-3">
 <h3 id="sec-3-5"><code>hooknum</code></h3>
 <div class="outline-text-3" id="text-3-5">
@@ -384,6 +383,7 @@ for example <code>&lt;linux/netfilter_ipv4.h&gt;</code>:
 </div>
 </div>
 </div>
+
 <div id="outline-container-sec-3-6" class="outline-3">
 <h3 id="sec-3-6"><code>priority</code></h3>
 <div class="outline-text-3" id="text-3-6">
@@ -433,6 +433,7 @@ for example <code>&lt;linux/netfilter_ipv4.h&gt;</code>:
 </div>
 </div>
 </div>
+
 <div id="outline-container-sec-4" class="outline-2">
 <h2 id="sec-4">Netfilter hooks example</h2>
 <div class="outline-text-2" id="text-4">
@@ -540,6 +541,7 @@ module_exit(exit_nf_test);
 </div>
 </div>
 </div>
+
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">Traffic Control HOWTO</h2>
 <div class="outline-text-2" id="text-5">
@@ -585,6 +587,7 @@ below a configured bandwidth.
 </ul>
 </div>
 </div>
+
 <div id="outline-container-sec-5-2" class="outline-3">
 <h3 id="sec-5-2">tc bandwidth rules</h3>
 <div class="outline-text-3" id="text-5-2">
@@ -602,135 +605,36 @@ mbit = 1024 kbit =&gt; kilo bit.
 </div>
 </div>
 </div>
-<div id="outline-container-sec-5-3" class="outline-3">
-<h3 id="sec-5-3">Simple, classless Queueing Disciplines</h3>
-<div class="outline-text-3" id="text-5-3">
-</div><ul class="org-ul"><li><a id="sec-5-3-1" name="sec-5-3-1"></a><code>pfifo_fast</code><br  /><div class="outline-text-4" id="text-5-3-1">
-<p>
-这个队列的特点就象它的名字——先进先出(FIFO),也就是说没有任何数据包被特殊对待。<a href="http://www.lartc.org/lartc.html#AEN658">它的参数与使用</a>
-</p>
-</div>
-</li>
-<li><a id="sec-5-3-2" name="sec-5-3-2"></a>Token Bucket Filter<br  /><div class="outline-text-4" id="text-5-3-2">
-<p>
-令牌桶过滤器(TBF)是一个简单的队列规定:只允许以不超过事先设定的速率到来的数据包通过,但可能允许短暂突发流量朝过设定值。
-</p>
-
-<p>
-TBF 很精确,对于网络和处理器的影响都很小。所以如果您想对一个网卡限速,
-它应该成为您的第一选择!
-</p>
-
-<p>
-TBF 的实现在于一个缓冲器(桶),不断地被一些叫做“令牌”的虚拟数据以特定速率(token rate)填充着。桶最重要的参数就是它的大小,也就是它能够存储令牌的数量。<a href="http://www.lartc.org/lartc.html#AEN690">它的参数与使用</a>.
-</p>
-</div>
-</li>
-<li><a id="sec-5-3-3" name="sec-5-3-3"></a>Stochastic Fairness Queueing<br  /><div class="outline-text-4" id="text-5-3-3">
-<p>
-SFQ(Stochastic Fairness Queueing,随机公平队列)是公平队列算法家族中的一个简单实现。它的精确性不如其它的方法,但是它在实现高度公平的同时,需要的计算量却很少。
-</p>
-
-<p>
-SFQ 的关键词是“会话”(或称作“流”) ,主要针对一个 TCP 会话或者 UDP
-流。流量被分成相当多数量的 FIFO 队列中,每个队列对应一个会话。数据按照简单轮转的方式发送, 每个会话都按顺序得到发送机会。
-</p>
-
-<p>
-这种方式非常公平,保证了每一个会话都不会没其它会话所淹没。SFQ 之所以被称为“随机”,是因为它并不是真的为每一个会话创建一个队列,而是使用一个散列算法,把所有的会话映射到有限的几个队列中去。
-</p>
-
-<p>
-<a href="http://www.lartc.org/lartc.html#LARTC.SFQ">它的参数与使用</a>.
-</p>
-</div>
-</li></ul>
-</div>
-<div id="outline-container-sec-5-4" class="outline-3">
-<h3 id="sec-5-4">Classful Queueing Disciplines</h3>
-<div class="outline-text-3" id="text-5-4">
-</div><ul class="org-ul"><li><a id="sec-5-4-1" name="sec-5-4-1"></a>How filters are used to classify traffic<br  /><div class="outline-text-4" id="text-5-4-1">
-<div class="org-src-container">
-
-<pre class="src src-text">          1:   root qdisc
-           |
-          1:1    child class
-        /  |  \
-       /   |   \
-      /    |    \
-      /    |    \
-   1:10  1:11  1:12   child classes
-    |      |     | 
-    |     11:    |    leaf class
-    |            | 
-    10:         12:   qdisc
-   /   \       /   \
-10:1  10:2   12:1  12:2   leaf classes
-</pre>
-</div>
-</div>
-</li>
-<li><a id="sec-5-4-2" name="sec-5-4-2"></a>Sample configuration<br  /><div class="outline-text-4" id="text-5-4-2">
-<p>
-创建这个树:
-</p>
-
-<div class="org-src-container">
-
-<pre class="src src-text">          1:   root qdisc
-         / | \ 
-       /   |   \
-       /   |   \
-     1:1  1:2  1:3    classes
-      |    |    |
-     10:  20:  30:    qdiscs    qdiscs
-     sfq  tbf  sfq
-band  0    1    2
-</pre>
 </div>
 
-<div class="org-src-container">
 
-<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">tc qdisc add dev eth0 root handle 1: prio</span>
-<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">&#36825;&#20010;&#21629;&#20196;&#31435;&#21363;&#21019;&#24314;&#20102;&#31867;: 1:1, 1:2, 1:3</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">tc qdisc add dev eth0 parent 1:1 handle 10: sfq</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">tc qdisc add dev eth0 parent 1:2 handle 20: tbf rate 20kbit buffer 1600 limit 3000</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">tc qdisc add dev eth0 parent 1:3 handle 30: sfq</span>
-</pre>
-</div>
-</div>
-</li></ul>
-</div>
-<div id="outline-container-sec-5-5" class="outline-3">
-<h3 id="sec-5-5">The Intermediate queueing device (IMQ)</h3>
-<div class="outline-text-3" id="text-5-5">
-<p>
-中介队列设备不是一个队列规定,但它的使用与队列规定是紧密相连的。 Linux就而言,队列规定是附带在网卡上的,所有在这个网卡上排队的数据都排进这个队列规定。根据这个概念,出现了两个局限:
-</p>
 
-<ol class="org-ol">
-<li>只能进行出口整形(虽然也存在入口队列规定,但在上面实现分类的队列规定的可能性非常小)。
-</li>
-<li>一个队列规定只能处理一块网卡的流量,无法设置全局的限速。
-</li>
-</ol>
 
-<p>
-IMQ 就是用来解决上述两个局限的。简单地说,你可以往一个队列规定中放任何东西。被打了特定标记的数据包在 netfilter 的 <code>NF_IP_PRE_ROUTING</code> 和
-<code>NF_IP_POST_ROUTING</code> 两个钩子函数处被拦截,并被送到一个队列规定中,该队列规定附加到一个 IMQ 设备上。对数据包打标记要用到 iptables 的一种处理方法。这样你就可以对刚刚进入网卡的数据包打上标记进行入口整形,
-或者把网卡们当成一个个的类来看待而进行全局整形设置。
-</p>
-</div>
-<ul class="org-ul"><li><a id="sec-5-5-1" name="sec-5-5-1"></a>imq device<br  /><div class="outline-text-4" id="text-5-5-1">
+
+
+
+
+
+
+
+
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">IMQ</h2>
+<div class="outline-text-2" id="text-6">
+</div><div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1">imq device</h3>
+<div class="outline-text-3" id="text-6-1">
 <div class="org-src-container">
 
 <pre class="src src-sh">/net/imq.ko
 </pre>
 </div>
 </div>
-</li>
-
-<li><a id="sec-5-5-2" name="sec-5-5-2"></a>netfilter support IMQ<br  /><div class="outline-text-4" id="text-5-5-2">
+</div>
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2">netfilter support IMQ</h3>
+<div class="outline-text-3" id="text-6-2">
 <div class="org-src-container">
 
 <pre class="src src-sh">net/ipv4/netfilter/ipt_IMQ.ko
@@ -738,19 +642,17 @@ net/ipv6/netfilter/ip6t_IMQ.ko
 </pre>
 </div>
 </div>
-</li>
-
-<li><a id="sec-5-5-3" name="sec-5-5-3"></a>iptables support IMQ<br  /><div class="outline-text-4" id="text-5-5-3">
+</div>
+<div id="outline-container-sec-6-3" class="outline-3">
+<h3 id="sec-6-3">iptables support IMQ</h3>
+<div class="outline-text-3" id="text-6-3">
 <div class="org-src-container">
 
 <pre class="src src-sh">iptables/libip6t_IMQ.so
 iptables/libipt_IMQ.so
 </pre>
 </div>
-</div>
-</li>
 
-<li><a id="sec-5-5-4" name="sec-5-5-4"></a>Sample configuration<br  /><div class="outline-text-4" id="text-5-5-4">
 <div class="org-src-container">
 
 <pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">modprobe imq numdevs=2</span>
@@ -803,65 +705,11 @@ iptables -t mangle -A POSTROUTING -o eth0 -j IMQ --todev 1
 </pre>
 </div>
 </div>
-</li></ul>
-</div>
-<div id="outline-container-sec-5-6" class="outline-3">
-<h3 id="sec-5-6">Advanced filters for (re-)classifying packets</h3>
-<div class="outline-text-3" id="text-5-6">
-<p>
-就象在分类的队列规定一段中解释的,过滤器用与把数据包分类并放入相应的子队列。这些过滤器在分类的队列规定内部被调用。
-</p>
-
-<p>
-下面就是我们可用的分类器(部分):
-</p>
-<ul class="org-ul">
-<li>fw 根据防火墙如何对这个数据包做标记进行判断。
-</li>
-<li>u32 根据数据包中的各个字段进行判断,如源 IP 地址等等。
-</li>
-<li>route 根据数据包将被哪条路由进行路由来判断。
-</li>
-<li>rsvp, rsvp6 根据数据包的 RSVP 情况进行判断
-</li>
-<li>tcindex 用于 DSMARK 队列规定
-</li>
-<li>protocol 这个分类器所接受的协议。
-</li>
-<li>parent 这个分类器附带在哪个句柄上。句柄必须是一个已经存在的类
-</li>
-<li>prio 这个分类器的优先权值。优先权值低的优先。
-</li>
-<li>handle 对于不同过滤器,它的意义不同。
-</li>
-</ul>
 </div>
 </div>
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div id="outline-container-sec-6" class="outline-2">
-<h2 id="sec-6">More</h2>
-<div class="outline-text-2" id="text-6">
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">More</h2>
+<div class="outline-text-2" id="text-7">
 <p>
 <a href="http://ebtables.netfilter.org/br_fw_ia/br_fw_ia.html">+ ebtalbes</a>
 </p>
@@ -874,10 +722,9 @@ synthesis of the <a href="http://www.lartc.org/lartc.html#LARTC.QDISC.TERMINOLOG
 </ul>
 </div>
 </div>
-
-<div id="outline-container-sec-7" class="outline-2">
-<h2 id="sec-7">cc</h2>
-<div class="outline-text-2" id="text-7">
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">cc</h2>
+<div class="outline-text-2" id="text-8">
 <div class="org-src-container">
 
 <pre class="src src-c"></pre>
@@ -887,8 +734,8 @@ synthesis of the <a href="http://www.lartc.org/lartc.html#LARTC.QDISC.TERMINOLOG
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2015-01-22 Thu 20:37</p>
-<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="date">Created: 2015-01-22 Thu 15:51</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.50.1 (<a href="http://orgmode.org">Org</a> mode 8.2.3a)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>

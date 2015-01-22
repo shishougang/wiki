@@ -266,26 +266,133 @@ module_exit(exit_nf_test);
 Routing & Traffic Control HOWTO]] 和缩简版的 [[http://www.tldp.org/HOWTO/html_single/Traffic-Control-HOWTO/][Traffic Control HOWTO]].
 
 这里针对流控制稍作分析和总结.
+** Terminology
++ Queueing Discipline (qdisc): An algorithm that manages the queue of
+  a device, either incoming (ingress) or outgoing (egress).
++ root qdisc: The root qdisc is the qdisc attached to the device.
++ Classless qdisc: A qdisc with no configurable internal subdivisions.
++ Classful qdisc: A classful qdisc contains multiple classes
++ Classes: A classful qdisc may have many classes, each of which is
+  internal to the qdisc.
++ Classifier: Each classful qdisc needs to determine to which class it
+  needs to send a packet.
++ Filter: Classification can be performed using filters.
++ Scheduling: A qdisc may, with the help of a classifier, decide that
+  some packets need to go out earlier than others.
++ Shaping: The process of delaying packets before they go out to make
+  traffic confirm to a configured maximum rate.
++ Policing: Delaying or dropping packets in order to make traffic stay
+  below a configured bandwidth.
+** tc bandwidth rules
+tc uses the following rules for bandwith specification:
 
+#+begin_src text
+mbps = 1024 kbps = 1024 * 1024 bps => byte/s
+mbit = 1024 kbit => kilo bit/s.
+mb = 1024 kb = 1024 * 1024 b => byte
+mbit = 1024 kbit => kilo bit.
+#+end_src
+** Simple, classless Queueing Disciplines
+*** =pfifo_fast=
+这个队列的特点就象它的名字——先进先出(FIFO),也就是说没有任何数据包被特
+殊对待。[[http://www.lartc.org/lartc.html#AEN658][它的参数与使用]]
+*** Token Bucket Filter
+令牌桶过滤器(TBF)是一个简单的队列规定:只允许以不超过事先设定的速率到来
+的数据包通过,但可能允许短暂突发流量朝过设定值。
 
-* IMQ
-** imq device
+TBF 很精确,对于网络和处理器的影响都很小。所以如果您想对一个网卡限速,
+它应该成为您的第一选择!
+
+TBF 的实现在于一个缓冲器(桶),不断地被一些叫做“令牌”的虚拟数据以特定
+速率(token rate)填充着。桶最重要的参数就是它的大小,也就是它能够存储
+令牌的数量。[[http://www.lartc.org/lartc.html#AEN690][它的参数与使用]].
+*** Stochastic Fairness Queueing
+SFQ(Stochastic Fairness Queueing,随机公平队列)是公平队列算法家族中的一个
+简单实现。它的精确性不如其它的方法,但是它在实现高度公平的同时,需要的
+计算量却很少。
+
+SFQ 的关键词是“会话”(或称作“流”) ,主要针对一个 TCP 会话或者 UDP
+流。流量被分成相当多数量的 FIFO 队列中,每个队列对应一个会话。数据按照
+简单轮转的方式发送, 每个会话都按顺序得到发送机会。
+
+这种方式非常公平,保证了每一个会话都不会没其它会话所淹没。SFQ 之所以被
+称为“随机”,是因为它并不是真的为每一个会话创建一个队列,而是使用一个散
+列算法,把所有的会话映射到有限的几个队列中去。
+
+[[http://www.lartc.org/lartc.html#LARTC.SFQ][它的参数与使用]].
+** Classful Queueing Disciplines
+*** How filters are used to classify traffic
+#+begin_src text
+                     1:   root qdisc
+                      |
+                     1:1    child class
+                   /  |  \
+                  /   |   \
+                 /    |    \
+                 /    |    \
+              1:10  1:11  1:12   child classes
+               |      |     | 
+               |     11:    |    leaf class
+               |            | 
+               10:         12:   qdisc
+              /   \       /   \
+           10:1  10:2   12:1  12:2   leaf classes
+#+end_src
+*** Sample configuration
+创建这个树:
+
+#+begin_src text
+          1:   root qdisc
+         / | \ 
+       /   |   \
+       /   |   \
+     1:1  1:2  1:3    classes
+      |    |    |
+     10:  20:  30:    qdiscs    qdiscs
+     sfq  tbf  sfq
+band  0    1    2
+#+end_src
+
+#+begin_src sh
+# tc qdisc add dev eth0 root handle 1: prio
+## 这个命令立即创建了类: 1:1, 1:2, 1:3
+# tc qdisc add dev eth0 parent 1:1 handle 10: sfq
+# tc qdisc add dev eth0 parent 1:2 handle 20: tbf rate 20kbit buffer 1600 limit 3000
+# tc qdisc add dev eth0 parent 1:3 handle 30: sfq
+#+end_src
+** The Intermediate queueing device (IMQ)
+中介队列设备不是一个队列规定,但它的使用与队列规定是紧密相连的。 Linux就
+而言,队列规定是附带在网卡上的,所有在这个网卡上排队的数据都排进这个队
+列规定。根据这个概念,出现了两个局限:
+
+1. 只能进行出口整形(虽然也存在入口队列规定,但在上面实现分类的队列规定
+   的可能性非常小)。
+2. 一个队列规定只能处理一块网卡的流量,无法设置全局的限速。
+
+IMQ 就是用来解决上述两个局限的。简单地说,你可以往一个队列规定中放任
+何东西。被打了特定标记的数据包在 netfilter 的 =NF_IP_PRE_ROUTING= 和
+=NF_IP_POST_ROUTING= 两个钩子函数处被拦截,并被送到一个队列规定中,该
+队列规定附加到一个 IMQ 设备上。对数据包打标记要用到 iptables 的一种处理方法。
+这样你就可以对刚刚进入网卡的数据包打上标记进行入口整形,
+或者把网卡们当成一个个的类来看待而进行全局整形设置。
+*** imq device
 #+begin_src sh
 /net/imq.ko
 #+end_src
 
-** netfilter support IMQ
+*** netfilter support IMQ
 #+begin_src sh
 net/ipv4/netfilter/ipt_IMQ.ko
 net/ipv6/netfilter/ip6t_IMQ.ko
 #+end_src
 
-** iptables support IMQ
+*** iptables support IMQ
 #+begin_src sh
-iptables/libip6t_IMQ.so
-iptables/libipt_IMQ.so
+  iptables/libip6t_IMQ.so
+  iptables/libipt_IMQ.so
 #+end_src
 
+*** Sample configuration
 #+begin_src sh
 # modprobe imq numdevs=2
 # modprobe ipt_IMQ
@@ -333,6 +440,40 @@ tc filter add dev imq1 parent 2:0 protocol ip prio 1 u32 match ip dst 192.168.22
 
 iptables -t mangle -A POSTROUTING -o eth0 -j IMQ --todev 1
 #+end_src
+** Advanced filters for (re-)classifying packets
+就象在分类的队列规定一段中解释的,过滤器用与把数据包分类并放入相应的子
+队列。这些过滤器在分类的队列规定内部被调用。
+
+下面就是我们可用的分类器(部分):
++ fw 根据防火墙如何对这个数据包做标记进行判断。
++ u32 根据数据包中的各个字段进行判断,如源 IP 地址等等。
++ route 根据数据包将被哪条路由进行路由来判断。
++ rsvp, rsvp6 根据数据包的 RSVP 情况进行判断
++ tcindex 用于 DSMARK 队列规定
++ protocol 这个分类器所接受的协议。
++ parent 这个分类器附带在哪个句柄上。句柄必须是一个已经存在的类
++ prio 这个分类器的优先权值。优先权值低的优先。
++ handle 对于不同过滤器,它的意义不同。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 * More
 [[http://ebtables.netfilter.org/br_fw_ia/br_fw_ia.html][+ ebtalbes]]
