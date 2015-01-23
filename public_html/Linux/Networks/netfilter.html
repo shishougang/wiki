@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Linux Netfilter and Traffic Control</title>
-<!-- 2015-01-22 Thu 20:37 -->
+<!-- 2015-01-23 Fri 21:04 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -164,14 +164,14 @@ for the JavaScript code in this tag.
 <li><a href="#sec-5-4">Classful Queueing Disciplines</a></li>
 <li><a href="#sec-5-5">The Intermediate queueing device (IMQ)</a></li>
 <li><a href="#sec-5-6">Advanced filters for (re-)classifying packets</a></li>
+<li><a href="#sec-5-7">Examples</a></li>
 </ul>
 </li>
-<li><a href="#sec-6">More</a></li>
-<li><a href="#sec-7">cc</a></li>
+<li><a href="#sec-6">Kernel network parameters</a></li>
+<li><a href="#sec-7">More</a></li>
 </ul>
 </div>
 </div>
-
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">Netfilter and iptables homepage</h2>
@@ -836,32 +836,147 @@ iptables -t mangle -A POSTROUTING -o eth0 -j IMQ --todev 1
 </li>
 </ul>
 </div>
+<ul class="org-ul"><li><a id="sec-5-6-1" name="sec-5-6-1"></a>The u32 classifier<br  /><div class="outline-text-4" id="text-5-6-1">
+<p>
+U32 分类器是当前实现中最先进的过滤器。全部基于哈希表实现,所以当有很多过滤器的时候仍然能够保持健壮。
+</p>
+
+<p>
+用来配置过滤器的 tc 命令行由三部分组成:过滤器说明、选择器和动作。一个过滤器可以如下定义:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-text">tc filter add dev IF [ protocol PROTO ]
+                     [ (preference|priority) PRIO ]
+                     [ parent CBQ ]
+</pre>
 </div>
 </div>
+<ul class="org-ul"><li><a id="sec-5-6-1-1" name="sec-5-6-1-1"></a>U32 selector<br  /><div class="outline-text-5" id="text-5-6-1-1">
+<p>
+u32 选择器包含了能够对当前通过的数据包进行匹配的特征定义。它其实只是定义了 IP 包头中某些位的匹配而已,但这种看似简单的方法却非常有效。
+</p>
 
+<div class="org-src-container">
 
+<pre class="src src-text"># tc filter add dev eth0 protocol ip parent 1:0 pref 10 u32 \
+  match u32 00100000 00ff0000 at 0 flowid 1:10
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-5-6-1-2" name="sec-5-6-1-2"></a>General selectors<br  /><div class="outline-text-5" id="text-5-6-1-2">
+<p>
+一般选择器的语法是:
+</p>
+<div class="org-src-container">
 
+<pre class="src src-c">match [ u32 | u16 | u8 ] PATTERN MASK at [OFFSET | nexthdr+OFFSET]
+</pre>
+</div>
+</div>
+</li></ul>
+</li></ul>
+</div>
+<div id="outline-container-sec-5-7" class="outline-3">
+<h3 id="sec-5-7">Examples</h3>
+<div class="outline-text-3" id="text-5-7">
+</div><ul class="org-ul"><li><a id="sec-5-7-1" name="sec-5-7-1"></a>出口流限制<br  /><div class="outline-text-4" id="text-5-7-1">
+<div class="org-src-container">
 
+<pre class="src src-sh">ifconfig ath10 txqueuelen 32 up
+tc qdisc add dev ath10 handle 1: root htb
+tc class add dev ath10 parent 1: classid 1:1 htb rate 1000kbit mtu 10000
+tc filter add dev ath10 parent 1:0 prio 1 u32 match mark 25600 0xff00 classid 1:1
+ebtables -t nat -A POSTROUTING -o ath10 -j mark --mark-or 25600
 
+tc qdisc add dev ath10 parent 1:1 handle 2: htb
+tc class add dev ath10 parent 2: classid 2:1 htb rate 1000kbit ceil 1200kbit burst 1000kbit cburst 1000kbit mtu 10000
 
+tc filter add dev ath10 parent 2: prio 1 handle 800::800 u32 match u16 0x0800 0xffff at -2 match u32 0xb414701c 0xffffffff at -12 match u16 0xa088 0xffff at -14 flowid 2:1
+tc filter add dev ath10 parent 2: prio 1 handle 800::c00 u32 match u32 0xb414701c 0xffffffff at -20 match u16 0xa088 0xffff at -22 flowid 2:1
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-5-7-2" name="sec-5-7-2"></a>入口流限制<br  /><div class="outline-text-4" id="text-5-7-2">
+<div class="org-src-container">
 
+<pre class="src src-sh">ifconfig imq0 txqueuelen 32 up
+tc qdisc add dev imq0 handle 1: root htb
+tc class add dev imq0 parent 1: classid 1:1 htb rate 2000kbit mtu 10000
+tc filter add dev imq0 parent 1:0 prio 1 u32 match mark 25600 0xff00 classid 1:1
+iptables -A PREROUTING -t mangle -m physdev --physdev-in ath10 -j MARK --or-mark 25600
+iptables -t mangle -A PREROUTING -m physdev --physdev-in ath10 -j IMQ --todev 0
 
+tc qdisc add dev imq0 parent 1:1 handle 2: htb
+tc class add dev imq0 parent 2: classid 2:1 htb rate 2000kbit ceil 2400kbit burst 1000kbit cburst 1000kbit mtu 10000
 
+tc filter add dev imq0 parent 2: prio 1 handle 800::800 u32 match u16 0x0800 0xffff at -2 match u16 0x701c 0xffff at -4 match u32 0xa088b414 0xffffffff at -8 flowid 2:1
+tc filter add dev imq0 parent 2: prio 1 handle 800::c00 u32 match u16 0x701c 0xffff at -12 match u32 0xa088b414 0xffffffff at -16 flowid 2:1
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-5-7-3" name="sec-5-7-3"></a>plain simple bandwidth sharing (aka traffic shaping) with HTB<br  /><div class="outline-text-4" id="text-5-7-3">
+<div class="org-src-container">
 
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/bin/</span><span style="color: #00ffff;">sh</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">We have 1000kbit upload and want to guarantee each user a certain amount of it.</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">If one user does not use its full quota, the unused quota get evenly distributed amongst the other users.</span>
 
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Variables</span>
+<span style="color: #eedd82;">IF_DSL</span>=pppoe-dsl
+<span style="color: #eedd82;">TC</span>=$(<span style="color: #b0c4de;">which</span> tc)
+<span style="color: #eedd82;">IPT</span>=$(<span style="color: #b0c4de;">which</span> iptables)
+<span style="color: #eedd82;">IPTMOD</span>=<span style="color: #ffa07a;">"$IPT -t mangle -A POSTROUTING -o $IF_DSL"</span>
+<span style="color: #eedd82;">IP_USER1</span>=10.0.0.1
+<span style="color: #eedd82;">IP_USER2</span>=10.0.0.2
+<span style="color: #eedd82;">IP_USER3</span>=10.0.0.3
+<span style="color: #eedd82;">IP_USER4</span>=10.0.0.4
 
+insmod sch_htb
 
+$<span style="color: #eedd82;">TC</span> qdisc add dev $<span style="color: #eedd82;">IF_DSL</span> root       handle 1:    htb default 40
+$<span style="color: #eedd82;">TC</span> class add dev $<span style="color: #eedd82;">IF_DSL</span> parent 1:  classid 1:1  htb rate 1000kbit
+$<span style="color: #eedd82;">TC</span> class add dev $<span style="color: #eedd82;">IF_DSL</span> parent 1:1 classid 1:10 htb rate 250kbit <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">-- 25% to user1</span>
+$<span style="color: #eedd82;">TC</span> class add dev $<span style="color: #eedd82;">IF_DSL</span> parent 1:1 classid 1:20 htb rate 250kbit <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">-- 25% to user2</span>
+$<span style="color: #eedd82;">TC</span> class add dev $<span style="color: #eedd82;">IF_DSL</span> parent 1:1 classid 1:30 htb rate 350kbit <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">-- 35% to user3</span>
+$<span style="color: #eedd82;">TC</span> class add dev $<span style="color: #eedd82;">IF_DSL</span> parent 1:1 classid 1:40 htb rate 150kbit <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">-- 15% to user4</span>
 
-
-
-
-
-
-
-
+$<span style="color: #eedd82;">IPTMOD</span> -s $<span style="color: #eedd82;">IP_USER1</span> -j CLASSIFY --set-class 1:10
+$<span style="color: #eedd82;">IPTMOD</span> -s $<span style="color: #eedd82;">IP_USER2</span> -j CLASSIFY --set-class 1:20
+$<span style="color: #eedd82;">IPTMOD</span> -s $<span style="color: #eedd82;">IP_USER3</span> -j CLASSIFY --set-class 1:30
+$<span style="color: #eedd82;">IPTMOD</span> -s $<span style="color: #eedd82;">IP_USER4</span> -j CLASSIFY --set-class 1:40
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+</div>
 <div id="outline-container-sec-6" class="outline-2">
-<h2 id="sec-6">More</h2>
+<h2 id="sec-6">Kernel network parameters</h2>
 <div class="outline-text-2" id="text-6">
+<p>
+内核的网络有许多设置,可以参考如下:
+</p>
+
+<ul class="org-ul">
+<li><a href="http://www.lartc.org/lartc.html#AEN1492">Generic ipv4</a>
+</li>
+<li><a href="http://www.lartc.org/lartc.html#AEN1673">Per device settings</a>
+</li>
+<li><a href="http://www.lartc.org/lartc.html#AEN1730">Neighbor policy</a>
+</li>
+<li><a href="http://www.lartc.org/lartc.html#AEN1782">Routing settings</a>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">More</h2>
+<div class="outline-text-2" id="text-7">
 <p>
 <a href="http://ebtables.netfilter.org/br_fw_ia/br_fw_ia.html">+ ebtalbes</a>
 </p>
@@ -871,23 +986,17 @@ synthesis of the <a href="http://www.lartc.org/lartc.html#LARTC.QDISC.TERMINOLOG
 </li>
 <li><a href="http://wiki.openwrt.org/doc/howto/packet.scheduler/packet.scheduler">Openwrt Network Traffic Control</a>
 </li>
+<li><a href="https://github.com/frznlogic/iptables-tutorial">iptables-tutorial</a>
+</li>
+<li><a href="https://github.com/frznlogic/ipsysctl-tutorial">ipsysctl-tutorial</a>
+</li>
 </ul>
-</div>
-</div>
-
-<div id="outline-container-sec-7" class="outline-2">
-<h2 id="sec-7">cc</h2>
-<div class="outline-text-2" id="text-7">
-<div class="org-src-container">
-
-<pre class="src src-c"></pre>
-</div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2015-01-22 Thu 20:37</p>
+<p class="date">Created: 2015-01-23 Fri 21:04</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

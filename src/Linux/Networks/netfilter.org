@@ -2,7 +2,6 @@
 #+TITLE: Linux Netfilter and Traffic Control
 #+OPTIONS: num:nil H:2
 
-
 * Netfilter and iptables homepage
 + netfilter: http://www.netfilter.org/index.html
 + iptables: http://www.netfilter.org/projects/iptables/index.html
@@ -454,34 +453,103 @@ iptables -t mangle -A POSTROUTING -o eth0 -j IMQ --todev 1
 + parent 这个分类器附带在哪个句柄上。句柄必须是一个已经存在的类
 + prio 这个分类器的优先权值。优先权值低的优先。
 + handle 对于不同过滤器,它的意义不同。
+*** The u32 classifier
+U32 分类器是当前实现中最先进的过滤器。全部基于哈希表实现,所以当有很多
+过滤器的时候仍然能够保持健壮。
 
+用来配置过滤器的 tc 命令行由三部分组成:过滤器说明、选择器和动作。一个
+过滤器可以如下定义:
 
+#+begin_src text
+tc filter add dev IF [ protocol PROTO ]
+                     [ (preference|priority) PRIO ]
+                     [ parent CBQ ]
+#+end_src
+**** U32 selector
+u32 选择器包含了能够对当前通过的数据包进行匹配的特征定义。它其实只是定
+义了 IP 包头中某些位的匹配而已,但这种看似简单的方法却非常有效。
 
+#+begin_src text
+# tc filter add dev eth0 protocol ip parent 1:0 pref 10 u32 \
+  match u32 00100000 00ff0000 at 0 flowid 1:10
+#+end_src
+**** General selectors
+一般选择器的语法是:
+#+begin_src c
+match [ u32 | u16 | u8 ] PATTERN MASK at [OFFSET | nexthdr+OFFSET]
+#+end_src
+** Examples
+*** 出口流限制
+#+begin_src sh
+ifconfig ath10 txqueuelen 32 up
+tc qdisc add dev ath10 handle 1: root htb
+tc class add dev ath10 parent 1: classid 1:1 htb rate 1000kbit mtu 10000
+tc filter add dev ath10 parent 1:0 prio 1 u32 match mark 25600 0xff00 classid 1:1
+ebtables -t nat -A POSTROUTING -o ath10 -j mark --mark-or 25600
 
+tc qdisc add dev ath10 parent 1:1 handle 2: htb
+tc class add dev ath10 parent 2: classid 2:1 htb rate 1000kbit ceil 1200kbit burst 1000kbit cburst 1000kbit mtu 10000
 
+tc filter add dev ath10 parent 2: prio 1 handle 800::800 u32 match u16 0x0800 0xffff at -2 match u32 0xb414701c 0xffffffff at -12 match u16 0xa088 0xffff at -14 flowid 2:1
+tc filter add dev ath10 parent 2: prio 1 handle 800::c00 u32 match u32 0xb414701c 0xffffffff at -20 match u16 0xa088 0xffff at -22 flowid 2:1
+#+end_src
+*** 入口流限制
+#+begin_src sh
+ifconfig imq0 txqueuelen 32 up
+tc qdisc add dev imq0 handle 1: root htb
+tc class add dev imq0 parent 1: classid 1:1 htb rate 2000kbit mtu 10000
+tc filter add dev imq0 parent 1:0 prio 1 u32 match mark 25600 0xff00 classid 1:1
+iptables -A PREROUTING -t mangle -m physdev --physdev-in ath10 -j MARK --or-mark 25600
+iptables -t mangle -A PREROUTING -m physdev --physdev-in ath10 -j IMQ --todev 0
 
+tc qdisc add dev imq0 parent 1:1 handle 2: htb
+tc class add dev imq0 parent 2: classid 2:1 htb rate 2000kbit ceil 2400kbit burst 1000kbit cburst 1000kbit mtu 10000
 
+tc filter add dev imq0 parent 2: prio 1 handle 800::800 u32 match u16 0x0800 0xffff at -2 match u16 0x701c 0xffff at -4 match u32 0xa088b414 0xffffffff at -8 flowid 2:1
+tc filter add dev imq0 parent 2: prio 1 handle 800::c00 u32 match u16 0x701c 0xffff at -12 match u32 0xa088b414 0xffffffff at -16 flowid 2:1
+#+end_src
+*** plain simple bandwidth sharing (aka traffic shaping) with HTB
+#+begin_src sh
+#!/bin/sh
+# We have 1000kbit upload and want to guarantee each user a certain amount of it.
+# If one user does not use its full quota, the unused quota get evenly distributed amongst the other users.
+ 
+# Variables
+IF_DSL=pppoe-dsl
+TC=$(which tc)
+IPT=$(which iptables)
+IPTMOD="$IPT -t mangle -A POSTROUTING -o $IF_DSL"
+IP_USER1=10.0.0.1
+IP_USER2=10.0.0.2
+IP_USER3=10.0.0.3
+IP_USER4=10.0.0.4
+ 
+insmod sch_htb
+ 
+$TC qdisc add dev $IF_DSL root       handle 1:    htb default 40
+$TC class add dev $IF_DSL parent 1:  classid 1:1  htb rate 1000kbit
+$TC class add dev $IF_DSL parent 1:1 classid 1:10 htb rate 250kbit #-- 25% to user1
+$TC class add dev $IF_DSL parent 1:1 classid 1:20 htb rate 250kbit #-- 25% to user2
+$TC class add dev $IF_DSL parent 1:1 classid 1:30 htb rate 350kbit #-- 35% to user3
+$TC class add dev $IF_DSL parent 1:1 classid 1:40 htb rate 150kbit #-- 15% to user4
+ 
+$IPTMOD -s $IP_USER1 -j CLASSIFY --set-class 1:10
+$IPTMOD -s $IP_USER2 -j CLASSIFY --set-class 1:20
+$IPTMOD -s $IP_USER3 -j CLASSIFY --set-class 1:30
+$IPTMOD -s $IP_USER4 -j CLASSIFY --set-class 1:40
+#+end_src
+* Kernel network parameters
+内核的网络有许多设置,可以参考如下:
 
-
-
-
-
-
-
-
-
-
-
-
-
-
++ [[http://www.lartc.org/lartc.html#AEN1492][Generic ipv4]]
++ [[http://www.lartc.org/lartc.html#AEN1673][Per device settings]]
++ [[http://www.lartc.org/lartc.html#AEN1730][Neighbor policy]]
++ [[http://www.lartc.org/lartc.html#AEN1782][Routing settings]]
 * More
 [[http://ebtables.netfilter.org/br_fw_ia/br_fw_ia.html][+ ebtalbes]]
 + [[http://www.tldp.org/HOWTO/html_single/Traffic-Control-HOWTO/][Traffic Control HOWTO]] represents the collection, amalgamation and
   synthesis of the [[http://www.lartc.org/lartc.html#LARTC.QDISC.TERMINOLOGY][LARTC HOWTO]].
 + [[http://wiki.openwrt.org/doc/howto/packet.scheduler/packet.scheduler][Openwrt Network Traffic Control]]
++ [[https://github.com/frznlogic/iptables-tutorial][iptables-tutorial]]
++ [[https://github.com/frznlogic/ipsysctl-tutorial][ipsysctl-tutorial]]
 
-* cc
-#+begin_src c
-
-#+end_src
