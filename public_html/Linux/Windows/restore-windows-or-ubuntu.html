@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Restore windows MBR or ubuntu grub</title>
+<!-- 2015-03-15 Sun 18:18 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Restore windows MBR or ubuntu grub</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Restore windows MBR</a>
+<ul>
+<li><a href="#sec-1-1">Bootsect 命令列選項</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">Restore Ubuntu</a></li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Restore windows MBR</h2>
+<div class="outline-text-2" id="text-1">
+<ol class="org-ol">
+<li>Boot your computer to the Windows 7 DVD
+</li>
+<li>Click the button for "Use recovery tools".
+</li>
+<li>select "Command Prompt".
+</li>
+<li>The command we will use, bootsect.exe, is in a folder (named boot)
+on the DVD.
+We need to know what drive letter has been assigned the DVD drive
+to access the folder.
+<div class="org-src-container">
+
+<pre class="src src-sh">Type: diskpart
+Type: select disk 0 (zero)
+<span style="color: #b0c4de;">type</span>: list volume
+</pre>
+</div>
+<p>
+Assume the DVD is letter: <b>G</b>.
+</p>
+</li>
+<li>use the DVD driver letter 
+<div class="org-src-container">
+
+<pre class="src src-sh">Type: exit
+to close Diskpart
+Type: G: (use the letter of your DVD drive)
+Type: cd boot
+Type: dir
+</pre>
+</div>
+</li>
+<li>To restore the "bootsector code":
+<div class="org-src-container">
+
+<pre class="src src-sh">bootsect /nt60 SYS /mbr
+Type: exit
+</pre>
+</div>
+<p>
+or 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">bootsect /nt60 ALL
+</pre>
+</div>
+</li>
+</ol>
+</div>
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">Bootsect 命令列選項</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+<a href="https://technet.microsoft.com/zh-tw/library/dd744577(WS.10).aspx">Bootsect 命令列選項</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Restore Ubuntu<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-2">
+<ol class="org-ol">
+<li>Boot with your ubuntu live CD and select try ubuntu
+</li>
+<li>Now say your linux file system exists in /dev/sda1 (use any
+application like 'Disks', 'Gparted', 'fdisk' to find it) Mount all
+the required folders to your linux file system.
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo mount /dev/sda1 /mnt
+$ sudo mount --bind /proc /mnt/proc
+$ sudo mount --bind /sys /mnt/sys
+$ sudo mount --bind /dev /mnt/dev
+$ sudo mount --bind /usr /mnt/usr
+</pre>
+</div>
+</li>
+<li>The key here is to change the working root to the one in your
+installed linux
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo chroot /mnt
+</pre>
+</div>
+<p>
+If you get any error here like '/bin/bash not found.' , try:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo mount --bind /bin /mnt/bin
+$ sudo mount --bind /lib /mnt/lib
+</pre>
+</div>
+</li>
+<li>update and install grub to replace the existing bootloader
+<div class="org-src-container">
+
+<pre class="src src-sh">$ grub-install /dev/sda
+$ update-grub or $ update-grub2
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">If you get any error in the above step try this:</span>
+$ grub-mkconfig -o /boot/grub/grub.cfg
+</pre>
+</div>
+</li>
+<li>reboot
+</li>
+</ol>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://lifepluslinux.blogspot.in/2012/12/recover-grub-using-ubuntu-live-cd.html">http://lifepluslinux.blogspot.in/2012/12/recover-grub-using-ubuntu-live-cd.html</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2015-03-15 Sun 18:18</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

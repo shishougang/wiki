@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>meminfo</title>
+<!-- 2015-03-15 Sun 18:18 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">meminfo</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">free</a></li>
+<li><a href="#sec-2">meminfo</a>
+<ul>
+<li><a href="#sec-2-1">High-Level Statistics</a></li>
+<li><a href="#sec-2-2">VM Statistics</a></li>
+<li><a href="#sec-2-3">Memory Statistics</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">vmstat</a></li>
+<li><a href="#sec-4">RAM Information</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">free</h2>
+<div class="outline-text-2" id="text-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">$<span style="color: #eedd82;">free</span> -m      
+             total       used       free     shared    buffers     cached
+Mem:          7890       7157        732        801        283       3444
+-/+ buffers/cache:       3429       4460
+Swap:         3905          0       3905
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>The m option displays all data in MBs.
+</li>
+<li>The total amount of RAM installed on the system is 7890MB.
+</li>
+<li>The used column shows the amount of RAM that has been used by linux.
+</li>
+<li>The left columns mean: shared memory, buffered memory and cached
+memory.
+</li>
+<li>The second line tells that 4.4 GB is free. This is the free memory in
+first line added with the buffers and cached amount of memory.
+</li>
+<li>Swap memory.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">meminfo</h2>
+<div class="outline-text-2" id="text-2">
+<div class="org-src-container">
+
+<pre class="src src-sh">$ cat /proc/meminfo
+MemTotal:               1031016 kB      
+MemFree:                13548 kB
+MemShared:              0 kB
+Buffers:                98064 kB
+Cached:                 692320 kB
+SwapCached:             2244 kB
+Active:                 563112 kB
+Inact_dirty:            309584 kB
+Inact_clean:            79508 kB
+Inact_target:           190440 kB
+HighTotal:              130992 kB
+HighFree:               1876 kB
+LowTotal:               900024 kB
+LowFree:                11672 kB
+SwapTotal:              1052248 kB
+SwapFree:               1043908 kB
+Committed_AS:           332340 kB
+VmallocTotal:   34359738367 kB
+VmallocUsed:      365584 kB
+VmallocChunk:   34359365208 kB
+</pre>
+</div>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">High-Level Statistics</h3>
+<div class="outline-text-3" id="text-2-1">
+<ul class="org-ul">
+<li>MemTotal: HighTotal + LowTotal. Total usable ram (i.e. physical ram minus a few reserved
+bits and the kernel binary code).
+</li>
+<li>MemFree: LowFree + HighFree. sum of LowFree+HighFree (overall stat).
+</li>
+<li>MemShared: 0; is here for compat reasons but always zero.
+</li>
+<li>Buffers: Memory in buffer cache. mostly useless as metric nowadays.
+</li>
+<li>Cached: Memory in the pagecache (diskcache) minus SwapCache.
+</li>
+<li>SwapCache: Memory that once was swapped out, is swapped back in but
+still also is in the swapfile (if memory is needed it doesn't need
+to be swapped out AGAIN because it is already in the swapfile. This
+saves I/O).
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">VM Statistics</h3>
+<div class="outline-text-3" id="text-2-2">
+<ul class="org-ul">
+<li>Active:Memory that has been used more recently and usually not
+reclaimed unless absolutely necessary.
+</li>
+<li>Inact<sub>dirty</sub>: Dirty means "might need writing to disk or swap." Takes
+more work to free. Examples might be files that have not been
+written to yet. They aren't written to memory too soon in order to
+keep the I/O down. For instance, if you're writing logs, it might be
+better to wait until you have a complete log ready before sending it
+to disk.
+</li>
+<li>Inact<sub>clean</sub>: Assumed to be easily freeable. The kernel will try to
+keep some clean stuff around always to have a bit of breathing room.
+</li>
+<li>Inact<sub>target</sub>: Just a goal metric the kernel uses for making sure
+there are enough inactive pages around. When exceeded, the kernel
+will not do work to move pages from active to inactive. A page can
+also get inactive in a few other ways, e.g. if you do a long
+sequential I/O, the kernel assumes you're not going to use that
+memory and makes it inactive preventively. So you can get more
+inactive pages than the target because the kernel marks some cache
+as "more likely to be never used" and lets it cheat in the "last
+used" order.
+</li>
+<li>VmallocTotal: total size of vmalloc memory area.
+</li>
+<li>VmallocUsed:  amount of vmalloc area which is used.
+</li>
+<li>VmallocChunk: largest contigious block of vmalloc area which is free.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">Memory Statistics</h3>
+<div class="outline-text-3" id="text-2-3">
+<ul class="org-ul">
+<li>HighTotal: is the total amount of memory in the high region. Highmem
+is all memory above (approx) 860MB of physical RAM. Kernel uses
+indirect tricks to access the high memory region. Data cache can go
+in this memory region.
+</li>
+<li>LowTotal: The total amount of non-highmem memory.
+</li>
+<li>LowFree: The amount of free memory of the low memory region. This is
+the memory the kernel can address directly. All kernel
+data structures need to go into low memory.
+</li>
+<li>SwapTotal: Total amount of physical swap memory.
+</li>
+<li>SwapFree: Total amount of swap memory free.
+</li>
+<li>Committed<sub>AS</sub>: An estimate of how much RAM you would need to make a
+99.99% guarantee that there never is OOM (out of memory) for this
+workload. Normally the kernel will overcommit memory. That means,
+say you do a 1GB malloc, nothing happens, really. Only when you
+start USING that malloc memory you will get real memory on demand,
+and just as much as you use. So you sort of take a mortgage and hope
+the bank doesn't go bust. Other cases might include when you mmap a
+file that's shared only when you write to it and you get a private
+copy of that data. While it normally is shared between processes.
+The Committed<sub>AS</sub> is a guesstimate of how much RAM/swap you would
+need worst-case.
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">vmstat</h2>
+<div class="outline-text-2" id="text-3">
+<div class="org-src-container">
+
+<pre class="src src-sh">$ vmstat -s -Sm 
+         8273 m total memory
+         7611 m used memory
+         4251 m active memory
+         2830 m inactive memory
+          662 m free memory
+          314 m buffer memory
+         3652 m swap cache
+         4095 m total swap
+            0 m used swap
+         4094 m free swap
+       327240 non-nice user cpu ticks
+         2369 nice user cpu ticks
+        86623 system cpu ticks
+     13634125 idle cpu ticks
+       242936 IO-wait cpu ticks
+            0 IRQ cpu ticks
+          293 softirq cpu ticks
+            0 stolen cpu ticks
+     11687554 pages paged<span style="color: #00ffff;"> in</span>
+      6587510 pages paged out
+            0 pages swapped<span style="color: #00ffff;"> in</span>
+          197 pages swapped out
+     11925061 interrupts
+    103449780 CPU context switches
+   1426385162 boot time
+         8619 forks
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">RAM Information</h2>
+<div class="outline-text-2" id="text-4">
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo dmidecode -t 17
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">dmidecode 2.12</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">SMBIOS entry point at 0x000f0000</span>
+SMBIOS 2.7 present.
+
+Handle 0x0048, DMI type 17, 34 bytes
+Memory Device
+        Array Handle: 0x0047
+        Error Information Handle: Not Provided
+        Total Width: Unknown
+        Data Width: Unknown
+        Size: No Module Installed
+        Form Factor: DIMM
+        Set: None
+        Locator: DIMM B
+        Bank Locator: Not Specified
+        Type: Unknown
+        Type Detail: None
+        Speed: Unknown
+        Manufacturer: [Empty]
+        Serial Number: [Empty]
+        Asset Tag: 00000000
+        Part Number: [Empty]
+        Rank: Unknown
+        Configured Clock Speed: Unknown
+
+Handle 0x0049, DMI type 17, 34 bytes
+Memory Device
+        Array Handle: 0x0047
+        Error Information Handle: Not Provided
+        Total Width: 64 bits
+        Data Width: 64 bits
+        Size: 4096 MB
+        Form Factor: SODIMM
+        Set: None
+        Locator: DIMM C
+        Bank Locator: Not Specified
+        Type: DDR3
+        Type Detail: Synchronous
+        Speed: 1600 MHz
+        Manufacturer: Samsung
+        Serial Number: D0E0BF95
+        Asset Tag: 03141300
+        Part Number: M471B5173DB0-YK0  
+        Rank: 1
+        Configured Clock Speed: 1600 MHz
+
+Handle 0x004B, DMI type 17, 34 bytes
+Memory Device
+        Array Handle: 0x0047
+        Error Information Handle: Not Provided
+        Total Width: Unknown
+        Data Width: Unknown
+        Size: No Module Installed
+        Form Factor: DIMM
+        Set: None
+        Locator: DIMM A
+        Bank Locator: Not Specified
+        Type: Unknown
+        Type Detail: None
+        Speed: Unknown
+        Manufacturer: [Empty]
+        Serial Number: [Empty]
+        Asset Tag: 00000000
+        Part Number: [Empty]
+        Rank: Unknown
+        Configured Clock Speed: Unknown
+
+Handle 0x004C, DMI type 17, 34 bytes
+Memory Device
+        Array Handle: 0x0047
+        Error Information Handle: Not Provided
+        Total Width: 64 bits
+        Data Width: 64 bits
+        Size: 4096 MB
+        Form Factor: SODIMM
+        Set: None
+        Locator: DIMM D
+        Bank Locator: Not Specified
+        Type: DDR3
+        Type Detail: Synchronous
+        Speed: 1600 MHz
+        Manufacturer: Samsung
+        Serial Number: CFE0BF95
+        Asset Tag: 03141300
+        Part Number: M471B5173DB0-YK0  
+        Rank: 1
+        Configured Clock Speed: 1600 MHz
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2015-03-15 Sun 18:18</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

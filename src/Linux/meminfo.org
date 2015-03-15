@@ -1,0 +1,227 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: meminfo
+#+OPTIONS: num:nil H:2
+
+* free
+#+begin_src sh
+$free -m      
+             total       used       free     shared    buffers     cached
+Mem:          7890       7157        732        801        283       3444
+-/+ buffers/cache:       3429       4460
+Swap:         3905          0       3905
+#+end_src
+
++ The m option displays all data in MBs.
++ The total amount of RAM installed on the system is 7890MB.
++ The used column shows the amount of RAM that has been used by linux.
++ The left columns mean: shared memory, buffered memory and cached
+  memory.
++ The second line tells that 4.4 GB is free. This is the free memory in
+  first line added with the buffers and cached amount of memory.
++ Swap memory.
+
+* meminfo
+#+begin_src sh
+$ cat /proc/meminfo
+MemTotal:		1031016 kB	
+MemFree:		13548 kB
+MemShared:		0 kB
+Buffers:		98064 kB
+Cached:			692320 kB
+SwapCached:		2244 kB
+Active:			563112 kB
+Inact_dirty:		309584 kB
+Inact_clean:		79508 kB
+Inact_target:		190440 kB
+HighTotal:		130992 kB
+HighFree:		1876 kB
+LowTotal:		900024 kB
+LowFree:		11672 kB
+SwapTotal:		1052248 kB
+SwapFree:		1043908 kB
+Committed_AS:		332340 kB
+VmallocTotal:   34359738367 kB
+VmallocUsed:      365584 kB
+VmallocChunk:   34359365208 kB
+#+end_src
+
+** High-Level Statistics
++ MemTotal: HighTotal + LowTotal. Total usable ram (i.e. physical ram minus a few reserved
+  bits and the kernel binary code).
++ MemFree: LowFree + HighFree. sum of LowFree+HighFree (overall stat).
++ MemShared: 0; is here for compat reasons but always zero.
++ Buffers: Memory in buffer cache. mostly useless as metric nowadays.
++ Cached: Memory in the pagecache (diskcache) minus SwapCache.
++ SwapCache: Memory that once was swapped out, is swapped back in but
+  still also is in the swapfile (if memory is needed it doesn't need
+  to be swapped out AGAIN because it is already in the swapfile. This
+  saves I/O).
+** VM Statistics
++ Active:Memory that has been used more recently and usually not
+  reclaimed unless absolutely necessary.
++ Inact_dirty: Dirty means "might need writing to disk or swap." Takes
+  more work to free. Examples might be files that have not been
+  written to yet. They aren't written to memory too soon in order to
+  keep the I/O down. For instance, if you're writing logs, it might be
+  better to wait until you have a complete log ready before sending it
+  to disk.
++ Inact_clean: Assumed to be easily freeable. The kernel will try to
+  keep some clean stuff around always to have a bit of breathing room.
++ Inact_target: Just a goal metric the kernel uses for making sure
+  there are enough inactive pages around. When exceeded, the kernel
+  will not do work to move pages from active to inactive. A page can
+  also get inactive in a few other ways, e.g. if you do a long
+  sequential I/O, the kernel assumes you're not going to use that
+  memory and makes it inactive preventively. So you can get more
+  inactive pages than the target because the kernel marks some cache
+  as "more likely to be never used" and lets it cheat in the "last
+  used" order.
++ VmallocTotal: total size of vmalloc memory area.
++ VmallocUsed:  amount of vmalloc area which is used.
++ VmallocChunk: largest contigious block of vmalloc area which is free.
+
+** Memory Statistics
++ HighTotal: is the total amount of memory in the high region. Highmem
+  is all memory above (approx) 860MB of physical RAM. Kernel uses
+  indirect tricks to access the high memory region. Data cache can go
+  in this memory region.
++ LowTotal: The total amount of non-highmem memory.
++ LowFree: The amount of free memory of the low memory region. This is
+  the memory the kernel can address directly. All kernel
+  data structures need to go into low memory.
++ SwapTotal: Total amount of physical swap memory.
++ SwapFree: Total amount of swap memory free.
++ Committed_AS: An estimate of how much RAM you would need to make a
+  99.99% guarantee that there never is OOM (out of memory) for this
+  workload. Normally the kernel will overcommit memory. That means,
+  say you do a 1GB malloc, nothing happens, really. Only when you
+  start USING that malloc memory you will get real memory on demand,
+  and just as much as you use. So you sort of take a mortgage and hope
+  the bank doesn't go bust. Other cases might include when you mmap a
+  file that's shared only when you write to it and you get a private
+  copy of that data. While it normally is shared between processes.
+  The Committed_AS is a guesstimate of how much RAM/swap you would
+  need worst-case.
+
+* vmstat
+#+begin_src sh
+$ vmstat -s -Sm 
+         8273 m total memory
+         7611 m used memory
+         4251 m active memory
+         2830 m inactive memory
+          662 m free memory
+          314 m buffer memory
+         3652 m swap cache
+         4095 m total swap
+            0 m used swap
+         4094 m free swap
+       327240 non-nice user cpu ticks
+         2369 nice user cpu ticks
+        86623 system cpu ticks
+     13634125 idle cpu ticks
+       242936 IO-wait cpu ticks
+            0 IRQ cpu ticks
+          293 softirq cpu ticks
+            0 stolen cpu ticks
+     11687554 pages paged in
+      6587510 pages paged out
+            0 pages swapped in
+          197 pages swapped out
+     11925061 interrupts
+    103449780 CPU context switches
+   1426385162 boot time
+         8619 forks
+#+end_src
+
+* RAM Information
+#+begin_src sh
+$ sudo dmidecode -t 17
+# dmidecode 2.12
+# SMBIOS entry point at 0x000f0000
+SMBIOS 2.7 present.
+
+Handle 0x0048, DMI type 17, 34 bytes
+Memory Device
+	Array Handle: 0x0047
+	Error Information Handle: Not Provided
+	Total Width: Unknown
+	Data Width: Unknown
+	Size: No Module Installed
+	Form Factor: DIMM
+	Set: None
+	Locator: DIMM B
+	Bank Locator: Not Specified
+	Type: Unknown
+	Type Detail: None
+	Speed: Unknown
+	Manufacturer: [Empty]
+	Serial Number: [Empty]
+	Asset Tag: 00000000
+	Part Number: [Empty]
+	Rank: Unknown
+	Configured Clock Speed: Unknown
+
+Handle 0x0049, DMI type 17, 34 bytes
+Memory Device
+	Array Handle: 0x0047
+	Error Information Handle: Not Provided
+	Total Width: 64 bits
+	Data Width: 64 bits
+	Size: 4096 MB
+	Form Factor: SODIMM
+	Set: None
+	Locator: DIMM C
+	Bank Locator: Not Specified
+	Type: DDR3
+	Type Detail: Synchronous
+	Speed: 1600 MHz
+	Manufacturer: Samsung
+	Serial Number: D0E0BF95
+	Asset Tag: 03141300
+	Part Number: M471B5173DB0-YK0  
+	Rank: 1
+	Configured Clock Speed: 1600 MHz
+
+Handle 0x004B, DMI type 17, 34 bytes
+Memory Device
+	Array Handle: 0x0047
+	Error Information Handle: Not Provided
+	Total Width: Unknown
+	Data Width: Unknown
+	Size: No Module Installed
+	Form Factor: DIMM
+	Set: None
+	Locator: DIMM A
+	Bank Locator: Not Specified
+	Type: Unknown
+	Type Detail: None
+	Speed: Unknown
+	Manufacturer: [Empty]
+	Serial Number: [Empty]
+	Asset Tag: 00000000
+	Part Number: [Empty]
+	Rank: Unknown
+	Configured Clock Speed: Unknown
+
+Handle 0x004C, DMI type 17, 34 bytes
+Memory Device
+	Array Handle: 0x0047
+	Error Information Handle: Not Provided
+	Total Width: 64 bits
+	Data Width: 64 bits
+	Size: 4096 MB
+	Form Factor: SODIMM
+	Set: None
+	Locator: DIMM D
+	Bank Locator: Not Specified
+	Type: DDR3
+	Type Detail: Synchronous
+	Speed: 1600 MHz
+	Manufacturer: Samsung
+	Serial Number: CFE0BF95
+	Asset Tag: 03141300
+	Part Number: M471B5173DB0-YK0  
+	Rank: 1
+	Configured Clock Speed: 1600 MHz
+#+end_src

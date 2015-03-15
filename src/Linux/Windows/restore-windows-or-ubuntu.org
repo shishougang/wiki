@@ -1,0 +1,73 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Restore windows MBR or ubuntu grub
+#+OPTIONS: num:nil H:2
+
+
+* Restore windows MBR
+1. Boot your computer to the Windows 7 DVD
+2. Click the button for "Use recovery tools".
+3. select "Command Prompt".
+4. The command we will use, bootsect.exe, is in a folder (named boot)
+   on the DVD.
+   We need to know what drive letter has been assigned the DVD drive
+   to access the folder.
+   #+begin_src sh
+     Type: diskpart
+     Type: select disk 0 (zero)
+     type: list volume
+   #+end_src
+   Assume the DVD is letter: *G*.
+5. use the DVD driver letter 
+   #+begin_src sh
+     Type: exit
+     to close Diskpart
+     Type: G: (use the letter of your DVD drive)
+     Type: cd boot
+     Type: dir
+   #+end_src
+6. To restore the "bootsector code":
+   #+begin_src sh
+     bootsect /nt60 SYS /mbr
+     Type: exit
+   #+end_src
+   or 
+   #+begin_src sh
+   bootsect /nt60 ALL
+   #+end_src
+** Bootsect 命令列選項
+   [[https://technet.microsoft.com/zh-tw/library/dd744577(WS.10).aspx][Bootsect 命令列選項]]
+* Restore Ubuntu[fn:1]
+1. Boot with your ubuntu live CD and select try ubuntu
+2. Now say your linux file system exists in /dev/sda1 (use any
+   application like 'Disks', 'Gparted', 'fdisk' to find it) Mount all
+   the required folders to your linux file system.
+   #+begin_src sh
+     $ sudo mount /dev/sda1 /mnt
+     $ sudo mount --bind /proc /mnt/proc
+     $ sudo mount --bind /sys /mnt/sys
+     $ sudo mount --bind /dev /mnt/dev
+     $ sudo mount --bind /usr /mnt/usr
+   #+end_src
+3. The key here is to change the working root to the one in your
+   installed linux
+   #+begin_src sh
+    $ sudo chroot /mnt 
+   #+end_src
+   If you get any error here like '/bin/bash not found.' , try:
+   #+begin_src sh
+         $ sudo mount --bind /bin /mnt/bin
+         $ sudo mount --bind /lib /mnt/lib
+   #+end_src
+4. update and install grub to replace the existing bootloader
+   #+begin_src sh
+          $ grub-install /dev/sda
+          $ update-grub or $ update-grub2
+          # If you get any error in the above step try this:
+          $ grub-mkconfig -o /boot/grub/grub.cfg
+   #+end_src
+5. reboot
+
+* Footnotes
+
+[fn:1] http://lifepluslinux.blogspot.in/2012/12/recover-grub-using-ubuntu-live-cd.html
+
