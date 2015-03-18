@@ -1,0 +1,554 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>C++ Standard Allocator解析</title>
+<!-- 2015-03-18 Wed 20:11 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">C++ Standard Allocator解析</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Introduction</a></li>
+<li><a href="#sec-2">C++ standard purpose</a></li>
+<li><a href="#sec-3">C++ standard definition</a></li>
+<li><a href="#sec-4">A simple allocator</a></li>
+<li><a href="#sec-5">Divide into traits and policies</a></li>
+<li><a href="#sec-6">Tracking memory allocation policy</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Introduction</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+STL的allocator是容易被C++技术中被忽略的主题之一.当我们在使用STL的
+container时,从会想最后个参数(<code>Alloc</code>)到底有什么用.以vector的为例:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span> &lt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Alloc</span> = <span style="color: #98fb98;">allocator</span>&lt;<span style="color: #98fb98;">T</span>&gt; &gt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">vector</span>;
+</pre>
+</div>
+
+<p>
+这里先解释allocator的目的,标准C++的allocator需要满足什么条件,allocator
+如何被实现,并且如何使用并扩展它.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">C++ standard purpose</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+这本书<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>中描述其目的如下:
+</p>
+<blockquote>
+<p>
+&#x2026;.Allocators originally were introduced as part of the STL to handle
+the nasty problem of different pointer types on PCs (such as near,
+far, and huge pointers). They now serve as a base for technical
+solutions that use certain memory models, such as shared memory,
+garbage collection, and object-oriented databases, without changing
+the interfaces. However, this use is relatively new and not yet widely
+adopted &#x2026;.Allocators represent a special memory model and are an
+abstraction used to translate the need to use memory into a raw call
+for memory. They provide an interface to allocate, create, destroy,
+and deallocate objects. With allocators, containers and algorithms can
+be parameterized by the way the elements are stored. For example, you
+could implement allocators that use shared memory or that map the
+elements to a persistent database&#x2026;
+</p>
+</blockquote>
+
+<p>
+其中重点是,原本allocators被引入到STL中是处理PC上不同类型指针的可恶问题.现在是在不改变接口的情况下,使用不同内存模型的技术方案的基础.也就是
+allocator提供接口来分配,创建,销毁和收回对象.
+</p>
+
+<p>
+在C++标准文档中只有很少有关allocator的信息.主要就2小节,Allocator的要求和默认allocator.最重要的语句如下:
+</p>
+
+<blockquote>
+<p>
+The library describes a standard set of requirements for allocators,
+which are objects that encapsulate the information about an allocation
+model. This information includes the knowledge of pointer types, the
+type of their difference, the type of the size of objects in this
+allocation model, as well as the memory allocation and deallocation
+primitives for it. All of the containers are
+parameterized in terms of allocators.
+</p>
+</blockquote>
+
+<p>
+STL中的container可以通过如下函数获取默认的allocator:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">allocator_type</span> <span style="color: #87cefa;">get_allocator</span>() <span style="color: #00ffff;">const</span>;
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">C++ standard definition</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+标准要求allocator定义如下类型,指向的 <code>T(pointer)</code>,指向的定值
+<code>T(const_pointer)</code>, 参考的 <code>T(reference)</code>, 定值的参考 <code>T</code>, <code>T</code> 自身的类型 <code>value_type</code>, 能表达allocation模型中最大对象大小的一个无符号整数类型,并且表示在allocation模型中两个指针区别(<code>difference_type</code>)的有符号整数.
+</p>
+
+<p>
+然后标准要求模版的rebind成员函数,如下所述:
+</p>
+
+<blockquote>
+<p>
+The template class member rebind in the table above is effectively a
+template typedef: if the name Allocator is bound to SomeAllocator&lt;T&gt;,
+then Allocator::rebind&lt;U&gt;::other is the same type as SomeAllocator&lt;U&gt;.
+</p>
+</blockquote>
+
+<p>
+也就是,当有 <code>allocator&lt;T&gt;</code>. 我们可以做操作
+<code>allocator::rebind&lt;U&gt;::other.allocator(1)</code> 来分配足够的内存来存储对象
+<code>U</code>.这奇特的要求是为了 <code>std::list</code> 操作正确,因为对于
+<code>std::list&lt;int&gt;(allocator&lt;int&gt;())</code> , <code>std::list</code> 实际需要为
+<code>Node&lt;int&gt;</code> 分配内存,而不是 <code>int</code> .所以它们需要转而使用
+<code>allocator&lt;int&gt;()::rebind&lt;Node&lt;int&gt; &gt;::other</code>.
+</p>
+
+<p>
+接下来allocate的核心部分是,一个为类型 <code>T</code> 的 <code>n</code> 个对象分配内存而不是构造这个对象的函数( <code>allocate(n,u)</code> , <code>u</code> 是其他内存模型的暗示),并且一个用来释放类型 <code>T</code> 的 <code>n</code> 个对象的函数( <code>deallocate(p,n)</code> ).对象必须析构在调用这之前.
+</p>
+
+<p>
+如上所说, <code>allocate</code> 和 <code>deallocate</code> 只是底层内存管理,并不参与对象的构造和析构.所以关键字 <code>new</code> 和 <code>delete</code> 不能在这里使用. 应该知道如下代码:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">A</span> *<span style="color: #eedd82;">a</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">A</span>;
+<span style="color: #00ffff;">delete</span> a;
+</pre>
+</div>
+<p>
+实际上,被编译器解释为:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">A</span> *<span style="color: #eedd82;">a</span> = ::<span style="color: #00ffff;">operator</span> <span style="color: #00ffff;">new</span>(<span style="color: #00ffff;">sizeof</span>(A));
+a-&gt;<span style="color: #7fffd4;">A</span>::A();
+<span style="color: #00ffff;">if</span> (a != 0) {
+  a-&gt;~A();
+  ::<span style="color: #00ffff;">operator</span> <span style="color: #00ffff;">delete</span>(a);
+}
+</pre>
+</div>
+
+<p>
+allocator的目的是在不构造对象前提下分配原始的内存,并且在不析构对象下释放内存,因为这里使用 <code>operator new</code> 和 <code>operator delete</code> 更适合.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">A simple allocator</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+如下是符合C++标准的简单allocator的实现.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Allocator</span> {
+ <span style="color: #00ffff;">public</span>: 
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">typedefs</span>
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">T</span> <span style="color: #98fb98;">value_type</span>;
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">value_type</span>* <span style="color: #98fb98;">pointer</span>;
+    <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">value_type</span>* <span style="color: #98fb98;">const_pointer</span>;
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">value_type</span>&amp; <span style="color: #98fb98;">reference</span>;
+    <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">value_type</span>&amp; <span style="color: #98fb98;">const_reference</span>;
+    <span style="color: #00ffff;">typedef</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">size_t</span> <span style="color: #98fb98;">size_type</span>;
+    <span style="color: #00ffff;">typedef</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">ptrdiff_t</span> <span style="color: #98fb98;">difference_type</span>;
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">convert an allocator&lt;T&gt; to allocator&lt;U&gt;</span>
+    <span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>&gt;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rebind</span> {
+        <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">U</span>&gt; <span style="color: #98fb98;">other</span>;
+    };
+    <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">Allocator</span>() {}
+    <span style="color: #00ffff;">inline</span> ~<span style="color: #87cefa;">Allocator</span>() {}
+    <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">Allocator</span>(Allocator <span style="color: #00ffff;">const</span>&amp;) {}
+    <span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>&gt;
+    <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">Allocator</span>(<span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">U</span>&gt; <span style="color: #00ffff;">const</span>&amp;) {}
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">address</span>
+    <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">pointer</span> <span style="color: #87cefa;">address</span>(<span style="color: #98fb98;">reference</span> <span style="color: #eedd82;">r</span>) { <span style="color: #00ffff;">return</span> &amp;r; }
+    <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">const_pointer</span> <span style="color: #87cefa;">address</span>(<span style="color: #98fb98;">const_reference</span> <span style="color: #eedd82;">r</span>) { <span style="color: #00ffff;">return</span> &amp;r; }
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">memory allocation</span>
+    <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">pointer</span> <span style="color: #87cefa;">allocate</span>(<span style="color: #98fb98;">size_type</span> <span style="color: #eedd82;">cnt</span>, 
+       <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">allocator</span>&lt;<span style="color: #98fb98;">void</span>&gt;::<span style="color: #98fb98;">const_pointer</span> = 0) { 
+      <span style="color: #00ffff;">return</span> <span style="color: #00ffff;">reinterpret_cast</span>&lt;pointer&gt;(::<span style="color: #00ffff;">operator</span> <span style="color: #00ffff;">new</span>(<span style="color: #98fb98;">cnt</span> * <span style="color: #00ffff;">sizeof</span> (<span style="color: #98fb98;">T</span>))); 
+    }
+    <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">deallocate</span>(<span style="color: #98fb98;">pointer</span> <span style="color: #eedd82;">p</span>, <span style="color: #98fb98;">size_type</span>) { 
+        ::<span style="color: #00ffff;">operator</span> <span style="color: #00ffff;">delete</span>(p); 
+    }
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">size</span>
+    <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">size_type</span> <span style="color: #87cefa;">max_size</span>() <span style="color: #00ffff;">const</span> { 
+        <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">numeric_limits</span>&lt;size_type&gt;::max() / <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">T</span>);
+    }
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">construction/destruction</span>
+    <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">construct</span>(<span style="color: #98fb98;">pointer</span> <span style="color: #eedd82;">p</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">T</span>&amp; <span style="color: #eedd82;">t</span>) { <span style="color: #00ffff;">new</span>(p) <span style="color: #98fb98;">T</span>(t); }
+    <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">destroy</span>(<span style="color: #98fb98;">pointer</span> <span style="color: #eedd82;">p</span>) { p-&gt;~T(); }
+    <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">==</span>(Allocator <span style="color: #00ffff;">const</span>&amp;) { <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>; }
+    <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">!=</span>(Allocator <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">a</span>) { <span style="color: #00ffff;">return</span> !<span style="color: #00ffff;">operator</span>==(a); }
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Divide into traits and policies</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+遵循STL类似的设计, 分出一个 <code>Trait</code> 类来提供如下的方法,在创建 <code>T</code> 时提供对象 <code>T</code> 的正确分配的内存地址. <code>Trait</code> 类如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">ObjectTraits</span> {
+ <span style="color: #00ffff;">public</span>: 
+  <span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>&gt;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rebind</span> {
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">ObjectTraits</span>&lt;<span style="color: #98fb98;">U</span>&gt; <span style="color: #98fb98;">other</span>;
+  };
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">ObjectTraits</span>() {}
+  <span style="color: #00ffff;">inline</span> ~<span style="color: #87cefa;">ObjectTraits</span>() {}
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">ObjectTraits</span>(ObjectTraits  <span style="color: #00ffff;">const</span>&amp;) {}
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>&gt;
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">ObjectTraits</span>(<span style="color: #98fb98;">ObjectTraits</span>&lt;<span style="color: #98fb98;">U</span>&gt; <span style="color: #00ffff;">const</span>&amp;) {}
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">address</span>
+  <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">T</span>* <span style="color: #87cefa;">address</span>(<span style="color: #98fb98;">T</span>&amp; <span style="color: #eedd82;">r</span>) { <span style="color: #00ffff;">return</span> &amp;r; }
+  <span style="color: #00ffff;">inline</span> T <span style="color: #00ffff;">const</span>* <span style="color: #87cefa;">address</span>(T <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">r</span>) { <span style="color: #00ffff;">return</span> &amp;r; }
+
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">construct</span>(<span style="color: #98fb98;">T</span>* <span style="color: #eedd82;">p</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">T</span>&amp; <span style="color: #eedd82;">t</span>) { <span style="color: #00ffff;">new</span>(p) <span style="color: #98fb98;">T</span>(t); }
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">destroy</span>(<span style="color: #98fb98;">T</span>* <span style="color: #eedd82;">p</span>) { p-&gt;~T(); }
+};
+</pre>
+</div>
+
+<p>
+在traits之后,把余下的实际分配/释放内存的代码放入到一个policy类中:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>&gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">StandardAllocPolicy</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">typedefs</span>
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">T</span> <span style="color: #98fb98;">value_type</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">value_type</span>* <span style="color: #98fb98;">pointer</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">value_type</span>* <span style="color: #98fb98;">const_pointer</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">value_type</span>&amp; <span style="color: #98fb98;">reference</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">value_type</span>&amp; <span style="color: #98fb98;">const_reference</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">size_t</span> <span style="color: #98fb98;">size_type</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">ptrdiff_t</span> <span style="color: #98fb98;">difference_type</span>;
+  <span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>&gt;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rebind</span> {
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">StandardAllocPolicy</span>&lt;<span style="color: #98fb98;">U</span>&gt; <span style="color: #98fb98;">other</span>;
+  };
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">StandardAllocPolicy</span>() {}
+  <span style="color: #00ffff;">inline</span> ~<span style="color: #87cefa;">StandardAllocPolicy</span>() {}
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">StandardAllocPolicy</span>(StandardAllocPolicy <span style="color: #00ffff;">const</span>&amp;) {}
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>&gt;
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">StandardAllocPolicy</span>(<span style="color: #98fb98;">StandardAllocPolicy</span>&lt;<span style="color: #98fb98;">U</span>&gt; <span style="color: #00ffff;">const</span>&amp;) {}
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">memory allocation</span>
+  <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">pointer</span> <span style="color: #87cefa;">allocate</span>(<span style="color: #98fb98;">size_type</span> <span style="color: #eedd82;">cnt</span>,
+                          <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">allocator</span>&lt;<span style="color: #98fb98;">void</span>&gt;::<span style="color: #98fb98;">const_pointer</span> = 0) {
+    <span style="color: #00ffff;">return</span> <span style="color: #00ffff;">reinterpret_cast</span>&lt;pointer&gt;(::<span style="color: #00ffff;">operator</span> <span style="color: #00ffff;">new</span>(<span style="color: #98fb98;">cnt</span> * <span style="color: #00ffff;">sizeof</span> (<span style="color: #98fb98;">T</span>)));
+  }
+  <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">deallocate</span>(<span style="color: #98fb98;">pointer</span> <span style="color: #eedd82;">p</span>, <span style="color: #98fb98;">size_type</span>) { ::<span style="color: #00ffff;">operator</span> <span style="color: #00ffff;">delete</span>(p); }
+  <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">size_type</span> <span style="color: #87cefa;">max_size</span>() <span style="color: #00ffff;">const</span> {
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">numeric_limits</span>&lt;size_type&gt;::max() / <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">T</span>);
+  }
+};  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">end of class StandardAllocPolicy</span>
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">determines if memory from another allocator can be deallocated from this one</span>
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T2</span>&gt;
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">==</span>(<span style="color: #98fb98;">StandardAllocPolicy</span>&lt;T&gt; <span style="color: #00ffff;">const</span>&amp;,
+                       <span style="color: #98fb98;">StandardAllocPolicy</span>&lt;<span style="color: #98fb98;">T2</span>&gt; <span style="color: #00ffff;">const</span>&amp;) {
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+}
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">OtherAllocator</span>&gt;
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">==</span>(<span style="color: #98fb98;">StandardAllocPolicy</span>&lt;<span style="color: #98fb98;">T</span>&gt; <span style="color: #00ffff;">const</span>&amp;, OtherAllocator <span style="color: #00ffff;">const</span>&amp;) {
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+}
+</pre>
+</div>
+
+<p>
+这个分配原则类决定内存分配和释放是如何进行的,类型 <code>T</code> 的对象最大可分配个个数.有了 trait 和 policy 之后,我们就可以创建一个可用的allcator接口:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Policy</span> = <span style="color: #98fb98;">StandardAllocPolicy</span>&lt;<span style="color: #98fb98;">T</span>&gt;,
+         <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Traits</span> = <span style="color: #98fb98;">ObjectTraits</span>&lt;<span style="color: #98fb98;">T</span>&gt; &gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Allocator</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">Policy</span>, <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">Traits</span> {
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">Policy</span> <span style="color: #98fb98;">AllocationPolicy</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">Traits</span> <span style="color: #98fb98;">TTraits</span>;
+
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">size_type</span> <span style="color: #98fb98;">size_type</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">difference_type</span> <span style="color: #98fb98;">difference_type</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">pointer</span> <span style="color: #98fb98;">pointer</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">const_pointer</span> <span style="color: #98fb98;">const_pointer</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">reference</span> <span style="color: #98fb98;">reference</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">const_reference</span> <span style="color: #98fb98;">const_reference</span>;
+  <span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">value_type</span> <span style="color: #98fb98;">value_type</span>;
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>&gt;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rebind</span> {
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">U</span>&gt; <span style="color: #98fb98;">other</span>;
+  };
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">Allocator</span>() {}
+  <span style="color: #00ffff;">inline</span> ~<span style="color: #87cefa;">Allocator</span>() {}
+  <span style="color: #00ffff;">inline</span> <span style="color: #87cefa;">Allocator</span>(Allocator <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>):Traits(rhs), Policy(rhs) {}
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>&gt;
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">Allocator</span>(<span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">U</span>&gt; <span style="color: #00ffff;">const</span>&amp;) {}
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">P</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T2</span>&gt;
+  <span style="color: #00ffff;">inline</span> <span style="color: #87cefa;">Allocator</span>(<span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">U</span>, <span style="color: #98fb98;">P</span>, <span style="color: #98fb98;">T2</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>):Traits(rhs), Policy(rhs) {}
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">memory allocation</span>
+  <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">pointer</span> <span style="color: #87cefa;">allocate</span>(<span style="color: #98fb98;">size_type</span> <span style="color: #eedd82;">cnt</span>,
+                          <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">allocator</span>&lt;<span style="color: #98fb98;">void</span>&gt;::<span style="color: #98fb98;">const_pointer</span> <span style="color: #eedd82;">hint</span>
+                          = 0) {
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">AllocationPolicy</span>::allocate(cnt, hint);
+  }
+  <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">deallocate</span>(<span style="color: #98fb98;">pointer</span> <span style="color: #eedd82;">p</span>, <span style="color: #98fb98;">size_type</span> <span style="color: #eedd82;">cnt</span>) {
+    <span style="color: #7fffd4;">AllocationPolicy</span>::deallocate(p, cnt);
+  }
+};  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">end of class Allocator</span>
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">determines if memory from another allocator can be deallocated from this one</span>
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">P</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Tr</span>&gt;
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">==</span>(<span style="color: #98fb98;">Allocator</span>&lt;T, <span style="color: #98fb98;">P</span>, <span style="color: #98fb98;">Tr</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">lhs</span>,
+                       <span style="color: #98fb98;">Allocator</span>&lt;T, <span style="color: #98fb98;">P</span>, <span style="color: #98fb98;">Tr</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>) {
+  <span style="color: #00ffff;">return</span> <span style="color: #00ffff;">operator</span>==(<span style="color: #00ffff;">static_cast</span>&lt;P&amp;&gt;(lhs), <span style="color: #00ffff;">static_cast</span>&lt;P&amp;&gt;(rhs));
+}
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">P</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Tr</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T2</span>,
+         <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">P2</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Tr2</span>&gt;
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">==</span>(<span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">T</span>, P, Tr&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">lhs</span>,
+                       <span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">T2</span>, <span style="color: #98fb98;">P2</span>, <span style="color: #98fb98;">Tr2</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>) {
+  <span style="color: #00ffff;">return</span> <span style="color: #00ffff;">operator</span>==(<span style="color: #00ffff;">static_cast</span>&lt;P&amp;&gt;(lhs), <span style="color: #00ffff;">static_cast</span>&lt;P2&amp;&gt;(rhs));
+}
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">P</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Tr</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">OtherAllocator</span>&gt;
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">==</span>(<span style="color: #98fb98;">Allocator</span>&lt;T, <span style="color: #98fb98;">P</span>, <span style="color: #98fb98;">Tr</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">lhs</span>,
+                       OtherAllocator <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>) {
+  <span style="color: #00ffff;">return</span> <span style="color: #00ffff;">operator</span>==(<span style="color: #00ffff;">static_cast</span>&lt;P&amp;&gt;(lhs), rhs);
+}
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">P</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Tr</span>&gt;
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">!=</span>(<span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">P</span>, <span style="color: #98fb98;">Tr</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">lhs</span>,
+                       <span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">P</span>, <span style="color: #98fb98;">Tr</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>) {
+  <span style="color: #00ffff;">return</span> !<span style="color: #00ffff;">operator</span>==(lhs, rhs);
+}
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">P</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Tr</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T2</span>,
+         <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">P2</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Tr2</span>&gt;
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">!=</span>(<span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">P</span>, <span style="color: #98fb98;">Tr</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">lhs</span>,
+                       <span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">T2</span>, <span style="color: #98fb98;">P2</span>, <span style="color: #98fb98;">Tr2</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>) {
+  <span style="color: #00ffff;">return</span> !<span style="color: #00ffff;">operator</span>==(lhs, rhs);
+}
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">P</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Tr</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">OtherAllocator</span>&gt;
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">!=</span>(<span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">T</span>, <span style="color: #98fb98;">P</span>, <span style="color: #98fb98;">Tr</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">lhs</span>,
+                       OtherAllocator <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>) {
+  <span style="color: #00ffff;">return</span> !<span style="color: #00ffff;">operator</span>==(lhs, rhs);
+}
+</pre>
+</div>
+
+<p>
+如下使用这个 <code>Allocator</code> 类:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">int</span>, <span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">int</span>&gt; &gt; <span style="color: #eedd82;">v</span>;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Tracking memory allocation policy</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+上面的allocator做最基本的内存管理.其实我们可以做内存管理的一些统计和分析,如下统计当前分配的内存大小,一共分配的和一次分配最多的内存大小.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Policy</span> = <span style="color: #98fb98;">StandardAllocPolicy</span>&lt;<span style="color: #98fb98;">T</span>&gt; &gt;
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">TrackAllocPolicy</span> : <span style="color: #00ffff;">public</span> <span style="color: #98fb98;">Policy</span> {
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">Policy</span> <span style="color: #98fb98;">AllocationPolicy</span>;
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>&gt;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rebind</span> {
+    <span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">TrackAllocPolicy</span>&lt;<span style="color: #98fb98;">U</span>&gt; <span style="color: #98fb98;">other</span>;
+  };
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> <span style="color: #87cefa;">TrackAllocPolicy</span>():total_(0), current_(0), peak_(0) {}
+  <span style="color: #00ffff;">inline</span> ~<span style="color: #87cefa;">TrackAllocPolicy</span>() {}
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> 
+  <span style="color: #87cefa;">TrackAllocPolicy</span>(TrackAllocPolicy <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>):Policy(rhs), 
+                                                total_(rhs.total_),
+                                                current_(rhs.current_),
+                                                peak_(rhs.peak_) {}
+  <span style="color: #00ffff;">template</span> &lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">U</span>&gt;
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">explicit</span> 
+  <span style="color: #87cefa;">TrackAllocPolicy</span>(<span style="color: #98fb98;">TrackAllocPolicy</span>&lt;<span style="color: #98fb98;">U</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>):Policy(rhs), 
+                                                   total_(0),
+                                                   current_(0), peak_(0) {}
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">memory allocation</span>
+  <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">pointer</span> 
+  <span style="color: #87cefa;">allocate</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">size_type</span> <span style="color: #eedd82;">cnt</span>, 
+           <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">std</span>::<span style="color: #7fffd4;">allocator</span>&lt;<span style="color: #98fb98;">void</span>&gt;::<span style="color: #98fb98;">const_pointer</span> <span style="color: #eedd82;">hint</span> = 0) { 
+    <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">pointer</span> <span style="color: #eedd82;">p</span> =
+        <span style="color: #7fffd4;">AllocationPolicy</span>::allocate(cnt, hint);
+    <span style="color: #00ffff;">this</span>-&gt;total_ += cnt;
+    <span style="color: #00ffff;">this</span>-&gt;current_ += cnt;
+    <span style="color: #00ffff;">if</span> (<span style="color: #00ffff;">this</span>-&gt;current_ &gt; <span style="color: #00ffff;">this</span>-&gt;peak_ ) {
+      <span style="color: #00ffff;">this</span>-&gt;peak_ = <span style="color: #00ffff;">this</span>-&gt;current_;
+    }
+    <span style="color: #00ffff;">return</span> p;
+  }
+  <span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">deallocate</span>(<span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">pointer</span> <span style="color: #eedd82;">p</span>, 
+                         <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">size_type</span> <span style="color: #eedd82;">cnt</span>) { 
+    <span style="color: #7fffd4;">AllocationPolicy</span>::deallocate(p, cnt);
+    <span style="color: #00ffff;">this</span>-&gt;current_ -= cnt;
+  }
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">get stats</span>
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">size_type</span>
+  <span style="color: #87cefa;">TotalAllocations</span>() { <span style="color: #00ffff;">return</span> <span style="color: #00ffff;">this</span>-&gt;total_; }
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">size_type</span>
+  <span style="color: #87cefa;">CurrentAllocations</span>() { <span style="color: #00ffff;">return</span> <span style="color: #00ffff;">this</span>-&gt;current_; }
+  <span style="color: #00ffff;">inline</span> <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">size_type</span>
+  <span style="color: #87cefa;">PeakAllocations</span>() { <span style="color: #00ffff;">return</span> <span style="color: #00ffff;">this</span>-&gt;peak_; }
+
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">total allocations</span>
+  <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">size_type</span> <span style="color: #eedd82;">total_</span>;    
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">current allocations</span>
+  <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">size_type</span> <span style="color: #eedd82;">current_</span>; 
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">peak allocations   </span>
+  <span style="color: #00ffff;">typename</span> <span style="color: #7fffd4;">AllocationPolicy</span>::<span style="color: #98fb98;">size_type</span> <span style="color: #eedd82;">peak_</span>;    
+};  <span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">end of class TrackAllocPolicy</span>
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">determines if memory from another</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">allocator can be deallocated from this one</span>
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Policy</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T2</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Policy2</span>&gt;
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">==</span>(<span style="color: #98fb98;">TrackAllocPolicy</span>&lt;T, Policy&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">lhs</span>, 
+                       <span style="color: #98fb98;">TrackAllocPolicy</span>&lt;<span style="color: #98fb98;">T2</span>, <span style="color: #98fb98;">Policy2</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>) { 
+  <span style="color: #00ffff;">return</span> <span style="color: #00ffff;">operator</span>==(<span style="color: #00ffff;">static_cast</span>&lt;Policy&amp;&gt;(lhs),
+                    <span style="color: #00ffff;">static_cast</span>&lt;Policy&amp;&gt;(rhs));
+}
+<span style="color: #00ffff;">template</span>&lt;<span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">T</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">Policy</span>, <span style="color: #00ffff;">typename</span> <span style="color: #98fb98;">OtherAllocator</span>&gt;
+<span style="color: #00ffff;">inline</span> <span style="color: #98fb98;">bool</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">==</span>(<span style="color: #98fb98;">TrackAllocPolicy</span>&lt;<span style="color: #98fb98;">T</span>,
+                       <span style="color: #98fb98;">Policy</span>&gt; <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">lhs</span>, OtherAllocator <span style="color: #00ffff;">const</span>&amp; <span style="color: #eedd82;">rhs</span>) {
+  <span style="color: #00ffff;">return</span> <span style="color: #00ffff;">operator</span>==(<span style="color: #00ffff;">static_cast</span>&lt;Policy&amp;&gt;(lhs), rhs);
+}
+</pre>
+</div>
+
+<p>
+使用:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">int</span>, <span style="color: #98fb98;">Allocator</span>&lt;<span style="color: #98fb98;">int</span>, <span style="color: #98fb98;">TrackAllocPolicy</span>&lt;<span style="color: #98fb98;">int</span>&gt; &gt; &gt; <span style="color: #eedd82;">v_track</span>;
+<span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>&gt;(v_track.get_allocator().CurrentAllocations()) &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+<span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>&gt;(v_track.get_allocator().TotalAllocations()) &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+<span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #00ffff;">static_cast</span>&lt;<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>&gt;(v_track.get_allocator().PeakAllocations()) &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+</pre>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+Nicolai M. Josuttis, The C++ Standard Library: A Tutorial and
+Reference Addison-Wesley Pub 1999
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2015-03-18 Wed 20:11</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

@@ -1,0 +1,388 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: C++ Standard Allocator解析
+#+OPTIONS: num:nil H:2
+
+* Introduction
+STL的allocator是容易被C++技术中被忽略的主题之一.当我们在使用STL的
+container时,从会想最后个参数(=Alloc=)到底有什么用.以vector的为例:
+
+#+begin_src c++
+template < class T, class Alloc = allocator<T> > class vector;
+#+end_src
+
+这里先解释allocator的目的,标准C++的allocator需要满足什么条件,allocator
+如何被实现,并且如何使用并扩展它.
+
+* C++ standard purpose
+这本书[fn:1]中描述其目的如下:
+#+BEGIN_QUOTE
+....Allocators originally were introduced as part of the STL to handle
+the nasty problem of different pointer types on PCs (such as near,
+far, and huge pointers). They now serve as a base for technical
+solutions that use certain memory models, such as shared memory,
+garbage collection, and object-oriented databases, without changing
+the interfaces. However, this use is relatively new and not yet widely
+adopted ....Allocators represent a special memory model and are an
+abstraction used to translate the need to use memory into a raw call
+for memory. They provide an interface to allocate, create, destroy,
+and deallocate objects. With allocators, containers and algorithms can
+be parameterized by the way the elements are stored. For example, you
+could implement allocators that use shared memory or that map the
+elements to a persistent database...
+#+END_QUOTE
+
+其中重点是,原本allocators被引入到STL中是处理PC上不同类型指针的可恶问题.现
+在是在不改变接口的情况下,使用不同内存模型的技术方案的基础.也就是
+allocator提供接口来分配,创建,销毁和收回对象.
+
+在C++标准文档中只有很少有关allocator的信息.主要就2小节,Allocator的要求
+和默认allocator.最重要的语句如下:
+
+#+BEGIN_QUOTE
+The library describes a standard set of requirements for allocators,
+which are objects that encapsulate the information about an allocation
+model. This information includes the knowledge of pointer types, the
+type of their difference, the type of the size of objects in this
+allocation model, as well as the memory allocation and deallocation
+primitives for it. All of the containers are
+parameterized in terms of allocators.
+#+END_QUOTE
+
+STL中的container可以通过如下函数获取默认的allocator:
+
+#+begin_src c++
+allocator_type get_allocator() const;
+#+end_src
+
+* C++ standard definition
+标准要求allocator定义如下类型,指向的 =T(pointer)=,指向的定值
+=T(const_pointer)=, 参考的 =T(reference)=, 定值的参考 =T=, =T= 自身的
+类型 =value_type=, 能表达allocation模型中最大对象大小的一个无符号整数
+类型,并且表示在allocation模型中两个指针区别(=difference_type=)的有符号
+整数.
+
+然后标准要求模版的rebind成员函数,如下所述:
+
+#+BEGIN_QUOTE
+The template class member rebind in the table above is effectively a
+template typedef: if the name Allocator is bound to SomeAllocator<T>,
+then Allocator::rebind<U>::other is the same type as SomeAllocator<U>.
+#+END_QUOTE
+
+也就是,当有 =allocator<T>=. 我们可以做操作
+=allocator::rebind<U>::other.allocator(1)= 来分配足够的内存来存储对象
+=U=.这奇特的要求是为了 =std::list= 操作正确,因为对于
+=std::list<int>(allocator<int>())= , =std::list= 实际需要为
+=Node<int>= 分配内存,而不是 =int= .所以它们需要转而使用
+=allocator<int>()::rebind<Node<int> >::other=.
+
+接下来allocate的核心部分是,一个为类型 =T= 的 =n= 个对象分配内存而不是
+构造这个对象的函数( =allocate(n,u)= , =u= 是其他内存模型的暗示),并且一
+个用来释放类型 =T= 的 =n= 个对象的函数( =deallocate(p,n)= ).对象必须析
+构在调用这之前.
+
+如上所说, =allocate= 和 =deallocate= 只是底层内存管理,并不参与对象的构
+造和析构.所以关键字 =new= 和 =delete= 不能在这里使用. 应该知道如下代
+码:
+
+#+begin_src c++
+A *a = new A;
+delete a;
+#+end_src
+实际上,被编译器解释为:
+#+begin_src c++
+    A *a = ::operator new(sizeof(A));
+    a->A::A();
+    if (a != 0) {
+      a->~A();
+      ::operator delete(a);
+    }
+#+end_src
+
+allocator的目的是在不构造对象前提下分配原始的内存,并且在不析构对象下释
+放内存,因为这里使用 =operator new= 和 =operator delete= 更适合.
+
+* A simple allocator
+如下是符合C++标准的简单allocator的实现.
+#+begin_src c++
+  template<typename T>
+  class Allocator {
+   public: 
+      // typedefs
+      typedef T value_type;
+      typedef value_type* pointer;
+      typedef const value_type* const_pointer;
+      typedef value_type& reference;
+      typedef const value_type& const_reference;
+      typedef std::size_t size_type;
+      typedef std::ptrdiff_t difference_type;
+      // convert an allocator<T> to allocator<U>
+      template<typename U>
+      struct rebind {
+          typedef Allocator<U> other;
+      };
+      inline explicit Allocator() {}
+      inline ~Allocator() {}
+      inline explicit Allocator(Allocator const&) {}
+      template<typename U>
+      inline explicit Allocator(Allocator<U> const&) {}
+      // address
+      inline pointer address(reference r) { return &r; }
+      inline const_pointer address(const_reference r) { return &r; }
+      // memory allocation
+      inline pointer allocate(size_type cnt, 
+         typename std::allocator<void>::const_pointer = 0) { 
+        return reinterpret_cast<pointer>(::operator new(cnt * sizeof (T))); 
+      }
+      inline void deallocate(pointer p, size_type) { 
+          ::operator delete(p); 
+      }
+      // size
+      inline size_type max_size() const { 
+          return std::numeric_limits<size_type>::max() / sizeof(T);
+      }
+      // construction/destruction
+      inline void construct(pointer p, const T& t) { new(p) T(t); }
+      inline void destroy(pointer p) { p->~T(); }
+      inline bool operator==(Allocator const&) { return true; }
+      inline bool operator!=(Allocator const& a) { return !operator==(a); }
+  };
+#+end_src
+* Divide into traits and policies
+遵循STL类似的设计, 分出一个 =Trait= 类来提供如下的方法,在创建 =T= 时提
+供对象 =T= 的正确分配的内存地址. =Trait= 类如下:
+#+begin_src c++
+template<typename T>
+class ObjectTraits {
+ public: 
+  template<typename U>
+  struct rebind {
+    typedef ObjectTraits<U> other;
+  };
+  inline explicit ObjectTraits() {}
+  inline ~ObjectTraits() {}
+  inline explicit ObjectTraits(ObjectTraits  const&) {}
+  template <typename U>
+  inline explicit ObjectTraits(ObjectTraits<U> const&) {}
+  
+  // address
+  inline T* address(T& r) { return &r; }
+  inline T const* address(T const& r) { return &r; }
+  
+  inline static void construct(T* p, const T& t) { new(p) T(t); }
+  inline static void destroy(T* p) { p->~T(); }
+};
+#+end_src
+
+在traits之后,把余下的实际分配/释放内存的代码放入到一个policy类中:
+#+begin_src c++
+template<typename T>
+class StandardAllocPolicy {
+ public:
+  // typedefs
+  typedef T value_type;
+  typedef value_type* pointer;
+  typedef const value_type* const_pointer;
+  typedef value_type& reference;
+  typedef const value_type& const_reference;
+  typedef std::size_t size_type;
+  typedef std::ptrdiff_t difference_type;
+  template<typename U>
+  struct rebind {
+    typedef StandardAllocPolicy<U> other;
+  };
+  inline explicit StandardAllocPolicy() {}
+  inline ~StandardAllocPolicy() {}
+  inline explicit StandardAllocPolicy(StandardAllocPolicy const&) {}
+  template <typename U>
+  inline explicit StandardAllocPolicy(StandardAllocPolicy<U> const&) {}
+  // memory allocation
+  inline pointer allocate(size_type cnt,
+                          typename std::allocator<void>::const_pointer = 0) {
+    return reinterpret_cast<pointer>(::operator new(cnt * sizeof (T)));
+  }
+  inline void deallocate(pointer p, size_type) { ::operator delete(p); }
+  inline size_type max_size() const {
+    return std::numeric_limits<size_type>::max() / sizeof(T);
+  }
+};  // end of class StandardAllocPolicy
+
+// determines if memory from another allocator can be deallocated from this one
+template<typename T, typename T2>
+inline bool operator==(StandardAllocPolicy<T> const&,
+                       StandardAllocPolicy<T2> const&) {
+  return true;
+}
+template<typename T, typename OtherAllocator>
+inline bool operator==(StandardAllocPolicy<T> const&, OtherAllocator const&) {
+  return false;
+}
+#+end_src
+
+这个分配原则类决定内存分配和释放是如何进行的,类型 =T= 的对象最大可分配
+个个数.有了 trait 和 policy 之后,我们就可以创建一个可用的allcator接口:
+#+begin_src c++
+template<typename T, typename Policy = StandardAllocPolicy<T>,
+         typename Traits = ObjectTraits<T> >
+class Allocator : public Policy, public Traits {
+ private:
+  typedef Policy AllocationPolicy;
+  typedef Traits TTraits;
+
+ public:
+  typedef typename AllocationPolicy::size_type size_type;
+  typedef typename AllocationPolicy::difference_type difference_type;
+  typedef typename AllocationPolicy::pointer pointer;
+  typedef typename AllocationPolicy::const_pointer const_pointer;
+  typedef typename AllocationPolicy::reference reference;
+  typedef typename AllocationPolicy::const_reference const_reference;
+  typedef typename AllocationPolicy::value_type value_type;
+  template <typename U>
+  struct rebind {
+    typedef Allocator<U> other;
+  };
+  inline explicit Allocator() {}
+  inline ~Allocator() {}
+  inline Allocator(Allocator const& rhs):Traits(rhs), Policy(rhs) {}
+  template <typename U>
+  inline explicit Allocator(Allocator<U> const&) {}
+  template <typename U, typename P, typename T2>
+  inline Allocator(Allocator<U, P, T2> const& rhs):Traits(rhs), Policy(rhs) {}
+  // memory allocation
+  inline pointer allocate(size_type cnt,
+                          typename std::allocator<void>::const_pointer hint
+                          = 0) {
+    return AllocationPolicy::allocate(cnt, hint);
+  }
+  inline void deallocate(pointer p, size_type cnt) {
+    AllocationPolicy::deallocate(p, cnt);
+  }
+};  // end of class Allocator
+
+// determines if memory from another allocator can be deallocated from this one
+template<typename T, typename P, typename Tr>
+inline bool operator==(Allocator<T, P, Tr> const& lhs,
+                       Allocator<T, P, Tr> const& rhs) {
+  return operator==(static_cast<P&>(lhs), static_cast<P&>(rhs));
+}
+template<typename T, typename P, typename Tr, typename T2,
+         typename P2, typename Tr2>
+inline bool operator==(Allocator<T, P, Tr> const& lhs,
+                       Allocator<T2, P2, Tr2> const& rhs) {
+  return operator==(static_cast<P&>(lhs), static_cast<P2&>(rhs));
+}
+template<typename T, typename P, typename Tr, typename OtherAllocator>
+inline bool operator==(Allocator<T, P, Tr> const& lhs,
+                       OtherAllocator const& rhs) {
+  return operator==(static_cast<P&>(lhs), rhs);
+}
+template<typename T, typename P, typename Tr>
+inline bool operator!=(Allocator<T, P, Tr> const& lhs,
+                       Allocator<T, P, Tr> const& rhs) {
+  return !operator==(lhs, rhs);
+}
+template<typename T, typename P, typename Tr, typename T2,
+         typename P2, typename Tr2>
+inline bool operator!=(Allocator<T, P, Tr> const& lhs,
+                       Allocator<T2, P2, Tr2> const& rhs) {
+  return !operator==(lhs, rhs);
+}
+template<typename T, typename P, typename Tr, typename OtherAllocator>
+inline bool operator!=(Allocator<T, P, Tr> const& lhs,
+                       OtherAllocator const& rhs) {
+  return !operator==(lhs, rhs);
+}
+#+end_src
+
+如下使用这个 =Allocator= 类:
+#+begin_src c++
+std::vector<int, Allocator<int> > v;
+#+end_src
+* Tracking memory allocation policy
+上面的allocator做最基本的内存管理.其实我们可以做内存管理的一些统计和分
+析,如下统计当前分配的内存大小,一共分配的和一次分配最多的内存大小.
+#+begin_src c++
+template<typename T, typename Policy = StandardAllocPolicy<T> >
+class TrackAllocPolicy : public Policy {
+ private:
+  typedef Policy AllocationPolicy;
+ public:
+  template<typename U>
+  struct rebind {
+    typedef TrackAllocPolicy<U> other;
+  };
+  inline explicit TrackAllocPolicy():total_(0), current_(0), peak_(0) {}
+  inline ~TrackAllocPolicy() {}
+  inline explicit 
+  TrackAllocPolicy(TrackAllocPolicy const& rhs):Policy(rhs), 
+                                                total_(rhs.total_),
+                                                current_(rhs.current_),
+                                                peak_(rhs.peak_) {}
+  template <typename U>
+  inline explicit 
+  TrackAllocPolicy(TrackAllocPolicy<U> const& rhs):Policy(rhs), 
+                                                   total_(0),
+                                                   current_(0), peak_(0) {}
+  // memory allocation
+  typename AllocationPolicy::pointer 
+  allocate(typename AllocationPolicy::size_type cnt, 
+           typename std::allocator<void>::const_pointer hint = 0) { 
+    typename AllocationPolicy::pointer p =
+        AllocationPolicy::allocate(cnt, hint);
+    this->total_ += cnt;
+    this->current_ += cnt;
+    if (this->current_ > this->peak_ ) {
+      this->peak_ = this->current_;
+    }
+    return p;
+  }
+  inline void deallocate(typename AllocationPolicy::pointer p, 
+                         typename AllocationPolicy::size_type cnt) { 
+    AllocationPolicy::deallocate(p, cnt);
+    this->current_ -= cnt;
+  }
+  // get stats
+  inline typename AllocationPolicy::size_type
+  TotalAllocations() { return this->total_; }
+  inline typename AllocationPolicy::size_type
+  CurrentAllocations() { return this->current_; }
+  inline typename AllocationPolicy::size_type
+  PeakAllocations() { return this->peak_; }
+  
+ private:
+  // total allocations
+  typename AllocationPolicy::size_type total_;    
+  // current allocations
+  typename AllocationPolicy::size_type current_; 
+  // peak allocations   
+  typename AllocationPolicy::size_type peak_;    
+};  //  end of class TrackAllocPolicy
+
+// determines if memory from another
+// allocator can be deallocated from this one
+template<typename T, typename Policy, typename T2, typename Policy2>
+inline bool operator==(TrackAllocPolicy<T, Policy> const& lhs, 
+                       TrackAllocPolicy<T2, Policy2> const& rhs) { 
+  return operator==(static_cast<Policy&>(lhs),
+                    static_cast<Policy&>(rhs));
+}
+template<typename T, typename Policy, typename OtherAllocator>
+inline bool operator==(TrackAllocPolicy<T,
+                       Policy> const& lhs, OtherAllocator const& rhs) {
+  return operator==(static_cast<Policy&>(lhs), rhs);
+}
+#+end_src
+
+使用:
+#+begin_src c++
+std::vector<int, Allocator<int, TrackAllocPolicy<int> > > v_track;
+std::cout << static_cast<unsigned long>(v_track.get_allocator().CurrentAllocations()) << std::endl;
+std::cout << static_cast<unsigned long>(v_track.get_allocator().TotalAllocations()) << std::endl;
+std::cout << static_cast<unsigned long>(v_track.get_allocator().PeakAllocations()) << std::endl;
+#+end_src
+* Footnotes
+
+[fn:1] Nicolai M. Josuttis, The C++ Standard Library: A Tutorial and
+Reference Addison-Wesley Pub 1999
+
+
