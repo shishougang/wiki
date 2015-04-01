@@ -1,0 +1,251 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Time, Clock Programming in C
+#+OPTIONS: num:nil H:2
+
+* time functions in the Unix-like systems[fn:1]
+#+begin_src c 
+int adjtimex(struct timex *);
+int adjtime(const struct timeval *, struct timeval *);
+unsigned int alarm(unsigned int);
+char *asctime(const struct tm *);
+char *asctime_r(const struct tm *, char *);
+clock_t clock(void);
+int clock_getres(clockid_t, struct timespec *);
+int clock_gettime(clockid_t, struct timespec *);
+int clock_settime(clockid_t, const struct timespec *);
+char *ctime(const time_t *);
+char *ctime_r(const time_t *, char *);
+int ftime(struct timeb *tp);
+double difftime(time_t, time_t);
+struct tm *getdate(const char *);
+int gettimeofday(struct timeval *tv, struct timezone *tz);
+struct tm *gmtime(const time_t *);
+struct tm *gmtime_r(const time_t *, struct tm *);
+struct tm *localtime(const time_t *);
+struct tm *localtime_r(const time_t *, struct tm *);
+time_t mktime(struct tm *);
+int nanosleep(const struct timespec *, struct timespec *);
+int settimeofday(const struct timeval *tv, const struct timezone *tz);
+unsigned int sleep(unsigned int);
+size_t strftime(char *, size_t, const char *, const struct tm *);
+char *strptime(const char *, const char *, struct tm *);
+time_t time(time_t *);
+time_t timegm(struct tm *tm);
+time_t timelocal(struct tm *tm);
+int timer_create(clockid_t, struct sigevent *, timer_t *);
+int timer_delete(timer_t);
+int timer_gettime(timer_t, struct itimerspec *);
+int timer_getoverrun(timer_t);
+int timer_settime(timer_t, int, const struct itimerspec *, struct itimerspec *);
+void tzset(void);
+useconds_t ualarm(useconds_t, useconds_t);
+int usleep(useconds_t);
+#+end_src
+* Unix time and UTC/GMT/Zulu
++ UNIX时间: 从协调世界时1970年1月1日0时0分0秒起至现在的总秒数，不考虑闰秒.[fn:2]
++ 世界标准时间(UTC)(从英文“Coordinated Universal Time”／法文“Temps
+  Universel Cordonné”而来),以原子时秒长为基础.
++ 格林威治标准时间(GMT,Greenwich Mean Time) 是指位于英国伦敦郊区的皇家
+  格林威治天文台的标准时间，因为本初子午线被定义在通过那里的经线。
++ Zulu: 在军事中，协调世界时区会使用“Z”来表示。而在航空上，所有使用
+  的时间划一规定是协调世界时。而且Z在无线电中应读作“Zulu”. 协调世界
+  时也会被称为“Zulu time”。
+* Data Structures in Unix
+** =timeval= , =timespec= 和 =itimerspec=
+从1/1/1970到现在的秒和微微秒数
+#+begin_src c
+struct timeval {
+   time_t      tv_sec;     /* seconds */
+   suseconds_t tv_usec;    /* microseconds */
+};
+#+end_src
+POSIX time functions使用这个:
+#+begin_src c
+struct timespec {
+   time_t      tv_sec;     /* seconds */
+   long        tv_nsec;    /* nanoseconds */
+};
+#+end_src
+ interval timers:
+#+begin_src c
+struct itimerspec
+{
+    struct timespec it_interval;
+    struct timespec it_value;
+};
+#+end_src
+example:
+#+begin_src c
+  timeval tim;
+  gettimeofday(&tim, NULL);
+#+end_src
+** epoch time
+旧的系统 =time_t= 是32位的有符号数,将在 2038-01-19T03:14:07Z 之后回转
+到0.现在Unix系统使用64位有符号数表示它.
+** calendar time
+#+begin_src c
+  struct tm
+  {
+    int    tm_sec;   /* seconds [0,60] (60 for + leap second) */
+    int    tm_min;   /* minutes [0,59] */
+    int    tm_hour;  /* hour [0,23] */
+    int    tm_mday;  /* day of month [1,31] */
+    int    tm_mon ;  /* month of year [0,11] */
+    int    tm_year;  /* years since 1900 */
+    int    tm_wday;  /* day of week [0,6] (Sunday = 0) */
+    int    tm_yday;  /* day of year [0,365] */
+    int    tm_isdst; /* daylight saving flag */
+  };
+#+end_src
++ =tm_isdst= is easily misinterpreted as a flag when it’s actually
+  three-valued: 0 = DST off, 1 = DST on, -1 = DST status unknown.
+  (Actually, values < -1 are treated as -1 and values > 1 treated as
+  1.)
++ The =tm_year= base value of 1900 rather than zero - easily forgotten
+  and confusing, especially when interpreting negative values. Also,
+  int is too short for this type if sizeof(int) < sizeof(=time_t=),
+  creating potential overflow issues.
++ Inconsistency about 0- vs. 1-origin in month and day numbers.
++ No timezone offset
+
+* Delay and interval-timing functions
+** sleep(3), usleep(3), and nanosleep(3)
+#+begin_src c
+#include <unistd.h>
+
+unsigned int sleep(unsigned int seconds);
+int usleep(useconds_t usec);
+
+#include <time.h>
+
+int nanosleep(const struct timespec *rqtp, struct timespec *rmtp);
+#+end_src
+** alarm(2|3), ualarm(3), getitimer(2|3), and setitimer(2|3)
+#+begin_src c
+#include <unistd.h>
+
+unsigned alarm(unsigned seconds);
+useconds_t ualarm(useconds_t usecs, useconds_t interval);
+
+#include <sys/time.h>
+
+int getitimer(int which, struct itimerval *value);
+int setitimer(int which, const struct itimerval *restrict value,
+              struct itimerval *restrict ovalue);
+#+end_src
+
+#+begin_src c
+
+#+end_src
+* Clock and time-of-day functions
+#+begin_src c
+#include <time.h>
+time_t time(time_t *tloc);
+
+#include <time.h>
+double difftime(time_t time1, time_t time0);
+
+#include <time.h>
+clock_t clock(void);
+
+#include <sys/time.h>
+int gettimeofday(struct timeval *restrict tp, void *restrict tzp);
+int settimeofday(const struct timeval *tv, const struct timezone *tz);
+
+#include <time.h>
+int clock_getres(clockid_t clk_id, struct timespec *res);
+int clock_gettime(clockid_t clk_id, struct timespec *tp);
+int clock_settime(clockid_t clk_id, const struct timespec *tp);
+#+end_src
+* Date and timezone-aware functions
+Date formats in the Unix systems:
+#+begin_src c
+1414092747                       Unix UTC seconds
+Fri Oct 24 15:32:27 EDT 2014     date(1) output
+2014-10-24 15:32:27-0400         date(1) output with -rfc-3339 option
+Fri, 24 Oct 2014 15:32:27 -0400   e-mail RFC-822/RFC-2822 format
+Fri, 24 Oct 2014 19:32:27 GMT     HTTP (RFC-2616/RFC-7231) format
+20141024152327.000000Z            LDAP (RFC-2252/X.680/X.208) format
+2014-10-24 15:32:27              Modified ISO-8601 local time
+2014-10-24T15:32:27              Strict ISO-8601 local time
+2014-10-24T19:32:27Z              RFC-3339 time, always UTC and marked Z
+#+end_src
+** tzset(3) and ftime(3)
+#+begin_src c
+#include <time.h>
+
+void tzset (void);
+
+extern char *tzname[2]; /* time zone name */
+extern long timezone;   /* seconds west of UTC, *not* DST-corrected */
+extern int daylight;    /* nonzero if DST is ever in effect here */
+#+end_src
+** gmtime(3) and localtime(3)
+#+begin_src c
+#include <time.h>
+
+struct tm *gmtime(const time_t *);
+struct tm *gmtime_r(const time_t *, struct tm *);
+struct tm *localtime(const time_t *);
+struct tm *localtime_r(const time_t *, struct tm *);
+#+end_src
+** mktime(3), timelocal(3), timegm(3)
+#+begin_src c
+#include <time.h>
+time_t mktime(struct tm *tm);
+
+#include <time.h>
+time_t timelocal(struct tm *tm);
+time_t timegm(struct tm *tm);
+#+end_src
+** strftime
+#+begin_src c
+#include <time.h>
+size_t strftime(char *, size_t, const char *, const struct tm *);
+
+/* RFC-3339 format */
+strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", gmtime(t));
+
+/* ISO-8601 local time */
+strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", localtime(t));
+
+/* RFC-822/RFC-2822 format */
+strftime(buf, sizeof(buf), "%a, %d %b %Y %H:%M:%S %z", localtime(t));
+#+end_src
+
+** strptime(3) and getdate(3)
+#+begin_src c
+#include <time.h>
+
+char *strptime(const char *, const char *, struct tm *);
+struct tm *getdate(const char *);
+int getdate_r(const char *string, struct tm *res);
+#+end_src
+
+* Convert from =struct timeval=
++ to local time
+  #+begin_src c
+    struct tm* out;
+    localtime_r(&t_.tv_sec, out);
+  #+end_src
++ to universal time
+  #+begin_src c
+    struct tm* out;
+    gmtime_r(&t_.tv_sec, out);
+  #+end_src
++ to epoch time
+  #+begin_src c
+    return t_.tv_sec;
+  #+end_src
+* Good programming practice
+convert dates to Unix UTC on input, do all your calculations in that,
+and convert back to localtime as lare as possible.
+
+* Footnotes
+
+[fn:1] http://www.catb.org/esr/time-programming/
+
+[fn:2] http://zh.wikipedia.org/wiki/UNIX%E6%97%B6%E9%97%B4
+
+
+

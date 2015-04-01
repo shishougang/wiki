@@ -1,0 +1,494 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Time, Clock Programming in C</title>
+<!-- 2015-04-01 Wed 20:11 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Time, Clock Programming in C</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">time functions in the Unix-like systems</a></li>
+<li><a href="#sec-2">Unix time and UTC/GMT/Zulu</a></li>
+<li><a href="#sec-3">Data Structures in Unix</a>
+<ul>
+<li><a href="#sec-3-1"><code>timeval</code> , <code>timespec</code> 和 <code>itimerspec</code></a></li>
+<li><a href="#sec-3-2">epoch time</a></li>
+<li><a href="#sec-3-3">calendar time</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">Delay and interval-timing functions</a>
+<ul>
+<li><a href="#sec-4-1">sleep(3), usleep(3), and nanosleep(3)</a></li>
+<li><a href="#sec-4-2">alarm(2|3), ualarm(3), getitimer(2|3), and setitimer(2|3)</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">Clock and time-of-day functions</a></li>
+<li><a href="#sec-6">Date and timezone-aware functions</a>
+<ul>
+<li><a href="#sec-6-1">tzset(3) and ftime(3)</a></li>
+<li><a href="#sec-6-2">gmtime(3) and localtime(3)</a></li>
+<li><a href="#sec-6-3">mktime(3), timelocal(3), timegm(3)</a></li>
+<li><a href="#sec-6-4">strftime</a></li>
+<li><a href="#sec-6-5">strptime(3) and getdate(3)</a></li>
+</ul>
+</li>
+<li><a href="#sec-7">Convert from <code>struct timeval</code></a></li>
+<li><a href="#sec-8">Good programming practice</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">time functions in the Unix-like systems<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">adjtimex</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timex</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">adjtime</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> *);
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">alarm</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>);
+<span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">asctime</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *);
+<span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">asctime_r</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *, <span style="color: #98fb98;">char</span> *);
+<span style="color: #98fb98;">clock_t</span> <span style="color: #87cefa;">clock</span>(<span style="color: #98fb98;">void</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">clock_getres</span>(<span style="color: #98fb98;">clockid_t</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">clock_gettime</span>(<span style="color: #98fb98;">clockid_t</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">clock_settime</span>(<span style="color: #98fb98;">clockid_t</span>, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *);
+<span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">ctime</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">time_t</span> *);
+<span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">ctime_r</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">time_t</span> *, <span style="color: #98fb98;">char</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ftime</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeb</span> *<span style="color: #eedd82;">tp</span>);
+<span style="color: #98fb98;">double</span> <span style="color: #87cefa;">difftime</span>(<span style="color: #98fb98;">time_t</span>, <span style="color: #98fb98;">time_t</span>);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #87cefa;">getdate</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">gettimeofday</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> *<span style="color: #eedd82;">tv</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timezone</span> *<span style="color: #eedd82;">tz</span>);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #87cefa;">gmtime</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">time_t</span> *);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #87cefa;">gmtime_r</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">time_t</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #87cefa;">localtime</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">time_t</span> *);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #87cefa;">localtime_r</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">time_t</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *);
+<span style="color: #98fb98;">time_t</span> <span style="color: #87cefa;">mktime</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">nanosleep</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">settimeofday</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> *<span style="color: #eedd82;">tv</span>, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timezone</span> *<span style="color: #eedd82;">tz</span>);
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">sleep</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>);
+<span style="color: #98fb98;">size_t</span> <span style="color: #87cefa;">strftime</span>(<span style="color: #98fb98;">char</span> *, <span style="color: #98fb98;">size_t</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *);
+<span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">strptime</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *);
+<span style="color: #98fb98;">time_t</span> <span style="color: #87cefa;">time</span>(<span style="color: #98fb98;">time_t</span> *);
+<span style="color: #98fb98;">time_t</span> <span style="color: #87cefa;">timegm</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #eedd82;">tm</span>);
+<span style="color: #98fb98;">time_t</span> <span style="color: #87cefa;">timelocal</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #eedd82;">tm</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">timer_create</span>(<span style="color: #98fb98;">clockid_t</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sigevent</span> *, <span style="color: #98fb98;">timer_t</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">timer_delete</span>(<span style="color: #98fb98;">timer_t</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">timer_gettime</span>(<span style="color: #98fb98;">timer_t</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">itimerspec</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">timer_getoverrun</span>(<span style="color: #98fb98;">timer_t</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">timer_settime</span>(<span style="color: #98fb98;">timer_t</span>, <span style="color: #98fb98;">int</span>, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">itimerspec</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">itimerspec</span> *);
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tzset</span>(<span style="color: #98fb98;">void</span>);
+<span style="color: #98fb98;">useconds_t</span> <span style="color: #87cefa;">ualarm</span>(<span style="color: #98fb98;">useconds_t</span>, <span style="color: #98fb98;">useconds_t</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">usleep</span>(<span style="color: #98fb98;">useconds_t</span>);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Unix time and UTC/GMT/Zulu</h2>
+<div class="outline-text-2" id="text-2">
+<ul class="org-ul">
+<li>UNIX时间: 从协调世界时1970年1月1日0时0分0秒起至现在的总秒数，不考虑闰秒.<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup>
+</li>
+<li>世界标准时间(UTC)(从英文“Coordinated Universal Time”／法文“Temps
+Universel Cordonné”而来),以原子时秒长为基础.
+</li>
+<li>格林威治标准时间(GMT,Greenwich Mean Time) 是指位于英国伦敦郊区的皇家格林威治天文台的标准时间，因为本初子午线被定义在通过那里的经线。
+</li>
+<li>Zulu: 在军事中，协调世界时区会使用“Z”来表示。而在航空上，所有使用的时间划一规定是协调世界时。而且Z在无线电中应读作“Zulu”. 协调世界时也会被称为“Zulu time”。
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Data Structures in Unix</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1"><code>timeval</code> , <code>timespec</code> 和 <code>itimerspec</code></h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+从1/1/1970到现在的秒和微微秒数
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> {
+   <span style="color: #98fb98;">time_t</span>      <span style="color: #eedd82;">tv_sec</span>;     <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">seconds </span><span style="color: #ff7f24;">*/</span>
+   <span style="color: #98fb98;">suseconds_t</span> <span style="color: #eedd82;">tv_usec</span>;    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">microseconds </span><span style="color: #ff7f24;">*/</span>
+};
+</pre>
+</div>
+<p>
+POSIX time functions使用这个:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> {
+   <span style="color: #98fb98;">time_t</span>      <span style="color: #eedd82;">tv_sec</span>;     <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">seconds </span><span style="color: #ff7f24;">*/</span>
+   <span style="color: #98fb98;">long</span>        <span style="color: #eedd82;">tv_nsec</span>;    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">nanoseconds </span><span style="color: #ff7f24;">*/</span>
+};
+</pre>
+</div>
+<p>
+interval timers:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">itimerspec</span>
+{
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> <span style="color: #eedd82;">it_interval</span>;
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> <span style="color: #eedd82;">it_value</span>;
+};
+</pre>
+</div>
+<p>
+example:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">timeval</span> <span style="color: #eedd82;">tim</span>;
+gettimeofday(&amp;tim, <span style="color: #7fffd4;">NULL</span>);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">epoch time</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+旧的系统 <code>time_t</code> 是32位的有符号数,将在 2038-01-19T03:14:07Z 之后回转到0.现在Unix系统使用64位有符号数表示它.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">calendar time</h3>
+<div class="outline-text-3" id="text-3-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span>
+{
+  <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">tm_sec</span>;   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">seconds [0,60] (60 for + leap second) </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">tm_min</span>;   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">minutes [0,59] </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">tm_hour</span>;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">hour [0,23] </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">tm_mday</span>;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">day of month [1,31] </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">tm_mon</span> ;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">month of year [0,11] </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">tm_year</span>;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">years since 1900 </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">tm_wday</span>;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">day of week [0,6] (Sunday = 0) </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">tm_yday</span>;  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">day of year [0,365] </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">tm_isdst</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">daylight saving flag </span><span style="color: #ff7f24;">*/</span>
+};
+</pre>
+</div>
+<ul class="org-ul">
+<li><code>tm_isdst</code> is easily misinterpreted as a flag when it’s actually
+three-valued: 0 = DST off, 1 = DST on, -1 = DST status unknown.
+(Actually, values &lt; -1 are treated as -1 and values &gt; 1 treated as
+1.)
+</li>
+<li>The <code>tm_year</code> base value of 1900 rather than zero - easily forgotten
+and confusing, especially when interpreting negative values. Also,
+int is too short for this type if sizeof(int) &lt; sizeof(<code>time_t</code>),
+creating potential overflow issues.
+</li>
+<li>Inconsistency about 0- vs. 1-origin in month and day numbers.
+</li>
+<li>No timezone offset
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Delay and interval-timing functions</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">sleep(3), usleep(3), and nanosleep(3)</h3>
+<div class="outline-text-3" id="text-4-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;unistd.h&gt;</span>
+
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">sleep</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">seconds</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">usleep</span>(<span style="color: #98fb98;">useconds_t</span> <span style="color: #eedd82;">usec</span>);
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">nanosleep</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *<span style="color: #eedd82;">rqtp</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *<span style="color: #eedd82;">rmtp</span>);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">alarm(2|3), ualarm(3), getitimer(2|3), and setitimer(2|3)</h3>
+<div class="outline-text-3" id="text-4-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;unistd.h&gt;</span>
+
+<span style="color: #98fb98;">unsigned</span> <span style="color: #87cefa;">alarm</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">seconds</span>);
+<span style="color: #98fb98;">useconds_t</span> <span style="color: #87cefa;">ualarm</span>(<span style="color: #98fb98;">useconds_t</span> <span style="color: #eedd82;">usecs</span>, <span style="color: #98fb98;">useconds_t</span> <span style="color: #eedd82;">interval</span>);
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/time.h&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">getitimer</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">which</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">itimerval</span> *<span style="color: #eedd82;">value</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">setitimer</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">which</span>, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">itimerval</span> *<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">value</span>,
+              <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">itimerval</span> *<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">ovalue</span>);
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Clock and time-of-day functions</h2>
+<div class="outline-text-2" id="text-5">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+<span style="color: #98fb98;">time_t</span> <span style="color: #87cefa;">time</span>(<span style="color: #98fb98;">time_t</span> *<span style="color: #eedd82;">tloc</span>);
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+<span style="color: #98fb98;">double</span> <span style="color: #87cefa;">difftime</span>(<span style="color: #98fb98;">time_t</span> <span style="color: #eedd82;">time1</span>, <span style="color: #98fb98;">time_t</span> <span style="color: #eedd82;">time0</span>);
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+<span style="color: #98fb98;">clock_t</span> <span style="color: #87cefa;">clock</span>(<span style="color: #98fb98;">void</span>);
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/time.h&gt;</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">gettimeofday</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> *<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">tp</span>, <span style="color: #98fb98;">void</span> *<span style="color: #00ffff;">restrict</span> <span style="color: #eedd82;">tzp</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">settimeofday</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timeval</span> *<span style="color: #eedd82;">tv</span>, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timezone</span> *<span style="color: #eedd82;">tz</span>);
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">clock_getres</span>(<span style="color: #98fb98;">clockid_t</span> <span style="color: #eedd82;">clk_id</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *<span style="color: #eedd82;">res</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">clock_gettime</span>(<span style="color: #98fb98;">clockid_t</span> <span style="color: #eedd82;">clk_id</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *<span style="color: #eedd82;">tp</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">clock_settime</span>(<span style="color: #98fb98;">clockid_t</span> <span style="color: #eedd82;">clk_id</span>, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> *<span style="color: #eedd82;">tp</span>);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Date and timezone-aware functions</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+Date formats in the Unix systems:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">1414092747                       Unix UTC seconds
+Fri Oct 24 15:32:27 EDT 2014     date(1) output
+2014-10-24 15:32:27-0400         date(1) <span style="color: #98fb98;">output</span> <span style="color: #eedd82;">with</span> -rfc-3339 option
+Fri, 24 Oct 2014 15:32:27 -0400   e-mail RFC-822/RFC-2822 format
+Fri, 24 Oct 2014 19:32:27 GMT     HTTP (RFC-2616/RFC-7231) format
+20141024152327.000000Z            LDAP (RFC-2252/X.680/X.208) format
+2014-10-24 15:32:27              Modified ISO-8601 local time
+2014-10-24T15:32:27              Strict ISO-8601 local time
+2014-10-24T19:32:27Z              RFC-3339 time, always UTC and <span style="color: #98fb98;">marked</span> <span style="color: #eedd82;">Z</span>
+</pre>
+</div>
+</div>
+<div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1">tzset(3) and ftime(3)</h3>
+<div class="outline-text-3" id="text-6-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">tzset</span> (<span style="color: #98fb98;">void</span>);
+
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">tzname</span>[2]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">time zone name </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">timezone</span>;   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">seconds west of UTC, *not* DST-corrected </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">extern</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">daylight</span>;    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">nonzero if DST is ever in effect here </span><span style="color: #ff7f24;">*/</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2">gmtime(3) and localtime(3)</h3>
+<div class="outline-text-3" id="text-6-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #87cefa;">gmtime</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">time_t</span> *);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #87cefa;">gmtime_r</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">time_t</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #87cefa;">localtime</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">time_t</span> *);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #87cefa;">localtime_r</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">time_t</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-3" class="outline-3">
+<h3 id="sec-6-3">mktime(3), timelocal(3), timegm(3)</h3>
+<div class="outline-text-3" id="text-6-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+<span style="color: #98fb98;">time_t</span> <span style="color: #87cefa;">mktime</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #eedd82;">tm</span>);
+
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+<span style="color: #98fb98;">time_t</span> <span style="color: #87cefa;">timelocal</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #eedd82;">tm</span>);
+<span style="color: #98fb98;">time_t</span> <span style="color: #87cefa;">timegm</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #eedd82;">tm</span>);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-4" class="outline-3">
+<h3 id="sec-6-4">strftime</h3>
+<div class="outline-text-3" id="text-6-4">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+<span style="color: #98fb98;">size_t</span> <span style="color: #87cefa;">strftime</span>(<span style="color: #98fb98;">char</span> *, <span style="color: #98fb98;">size_t</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *, <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *);
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">RFC-3339 format </span><span style="color: #ff7f24;">*/</span>
+strftime(buf, <span style="color: #00ffff;">sizeof</span>(buf), <span style="color: #ffa07a;">"%Y-%m-%dT%H:%M:%SZ"</span>, gmtime(t));
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ISO-8601 local time </span><span style="color: #ff7f24;">*/</span>
+strftime(buf, <span style="color: #00ffff;">sizeof</span>(buf), <span style="color: #ffa07a;">"%Y-%m-%dT%H:%M:%S"</span>, localtime(t));
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">RFC-822/RFC-2822 format </span><span style="color: #ff7f24;">*/</span>
+strftime(buf, <span style="color: #00ffff;">sizeof</span>(buf), <span style="color: #ffa07a;">"%a, %d %b %Y %H:%M:%S %z"</span>, localtime(t));
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6-5" class="outline-3">
+<h3 id="sec-6-5">strptime(3) and getdate(3)</h3>
+<div class="outline-text-3" id="text-6-5">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+
+<span style="color: #98fb98;">char</span> *<span style="color: #87cefa;">strptime</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #87cefa;">getdate</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">getdate_r</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">string</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span> *<span style="color: #eedd82;">res</span>);
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">Convert from <code>struct timeval</code></h2>
+<div class="outline-text-2" id="text-7">
+<ul class="org-ul">
+<li>to local time
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span>* <span style="color: #eedd82;">out</span>;
+localtime_r(&amp;t_.tv_sec, out);
+</pre>
+</div>
+</li>
+<li>to universal time
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">tm</span>* <span style="color: #eedd82;">out</span>;
+gmtime_r(&amp;t_.tv_sec, out);
+</pre>
+</div>
+</li>
+<li>to epoch time
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">return</span> t_.tv_sec;
+</pre>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">Good programming practice</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+convert dates to Unix UTC on input, do all your calculations in that,
+and convert back to localtime as lare as possible.
+</p>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://www.catb.org/esr/time-programming/">http://www.catb.org/esr/time-programming/</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="http://zh.wikipedia.org/wiki/UNIX%E6%97%B6%E9%97%B4">http://zh.wikipedia.org/wiki/UNIX%E6%97%B6%E9%97%B4</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2015-04-01 Wed 20:11</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
