@@ -1,0 +1,431 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: C++11 New Features
+#+OPTIONS: num:nil H:2
+
+* =auto=
+#+begin_src c++
+  auto i = 42;        // i is an int
+  auto l = 42LL;      // l is an long long
+  auto p = new foo(); // p is a foo*
+
+  std::map<std::string, std::vector<int>> map;
+  for (auto it = begin(map); it != end(map); ++it) {
+  }
+#+end_src
+
+=auto= 不能直接作为函数的返回类型,但可以通过尾随指定类型,如下:
+#+begin_src c++
+  template <typename T1, typename T2>
+  auto compose(T1 t1, T2 t2) -> decltype(t1 + t2) {
+    return t1+t2;
+  }
+  auto v = compose(2, 3.14); // v's type is double
+#+end_src
+
+* =nullptr=
+0被用来表示null指针,所以有与整型的隐式转换的缺点. C++11中类
+型是 =std::nullptr_t= 的 =nullptr= 来表示null指针. 隐式转换存在从
+=nullptr= 到 任何类型的null指针,并且可以到 =bool= 类型(也就是 =false=
+). 但是与整型的隐式转换不存在.向后兼容,0仍然是有效的null指针值.
+
+#+begin_src c++
+typedef decltype(nullptr) nullptr_t;
+#+end_src
+
+#+begin_src c++
+  void foo(int* p) {}
+
+  void bar(std::shared_ptr<int> p) {}
+
+  int* p1 = NULL;
+  int* p2 = nullptr;   
+  if (p1 == p2) {
+  }
+
+  foo(nullptr);
+  bar(nullptr);
+
+  bool f = nullptr;
+  int i = nullptr; // error: A native nullptr can only be converted to bool or, using reinterpret_cast, to an integral type
+#+end_src
+* loops
+#+begin_src c++
+#include <iostream>
+#include <map>
+#include <vector>
+using namespace std;
+
+int main() {
+  std::map<std::string, std::vector<int>> map;
+  std::vector<int> v;
+  v.push_back(1);
+  v.push_back(2);
+  v.push_back(3);
+  map["one"] = v;
+
+  for (const auto& kvp : map) {
+    std::cout << kvp.first << std::endl;
+
+    for (auto v : kvp.second) {
+      std::cout << v << std::endl;
+    }
+  }
+
+  int arr[] = {1,2,3,4,5};
+  for (int& e : arr) {
+    e = e*e;
+  }
+  for (int& v : arr) {
+    cout << v << endl;
+  }
+}
+#+end_src
+* Override and final
+在多类中实现多态时,需要使用 =virtual= 关键字来实现,并且要通过类层次来
+确定是否覆盖成功,或者想覆盖却函数声明有一些不同等不易发现的错误,如下:
+
+#+begin_src c++
+  class B 
+  {
+   public:
+    virtual void f(short) {std::cout << "B::f" << std::endl;}
+  };
+
+  class D : public B
+  {
+   public:
+    virtual void f(int) {std::cout << "D::f" << std::endl;}
+  };
+#+end_src
+
+本意想 =D::f= 覆盖 =B::f=,但是它们的参数不同,使得覆盖失败, =B::f= 仅仅
+是另外个虚函数.
+
+另外如下的小错误,在基类中,函数被 =const= 标识,但继承类中的却没有.所以
+基类的虚函数不会被继承类的覆盖.
+#+begin_src c++
+  class B 
+  {
+   public:
+     virtual void f(int) const {std::cout << "B::f " << std::endl;}
+  };
+
+  class D : public B
+  {
+   public:
+     virtual void f(int) {std::cout << "D::f" << std::endl;}
+  };
+#+end_src
+
+在C++11中可以显示的描述你的多态目的. =override= 表明一个方法是基类虚函
+数的覆盖, =final= 表明虚函数不能覆盖此表示的函数.
+
+如下例子,意图 =D::f= 覆盖基类的 =B::F=:
+
+#+begin_src c++
+#include <iostream>
+using namespace std;
+
+class B {
+ public:
+  virtual void f(short) {std::cout << "B::f" << std::endl;}
+};
+
+class D : public B {
+ public:
+  virtual void f(int) override {std::cout << "D::f" << std::endl;}
+};
+
+int main() {
+  B* base = new D();
+}
+#+end_src
+
+编译,出现如下错误:
+#+begin_src sh
+./overrride.cc:11:16: error: ‘virtual void D::f(int)’ marked override, but does not override
+#+end_src
+
+如下例子,意图 =D::f= 不让之后的继承类的函数覆盖:
+#+begin_src c++
+#include <iostream>
+using namespace std;
+
+class B  {
+ public:
+   virtual void f(int) {std::cout << "B::f" << std::endl;}
+};
+
+class D : public B {
+ public:
+   virtual void f(int) override final {std::cout << "D::f" << std::endl;}
+};
+
+class F : public D {
+ public:
+   virtual void f(int) override {std::cout << "F::f" << std::endl;}
+};
+
+
+int main() {
+  B* base = new F();
+  return 0;
+}
+#+end_src
+
+编译,出现如下错误:
+#+begin_src sh
+./final.cc:16:17: error: virtual function ‘virtual void F::f(int)’
+./final.cc:11:17: error: overriding final function ‘virtual void D::f(int)’
+#+end_src
+* Strongly-typed enums
+传统的C++的enum有一些弊端: enumerators被暴露在所在的范围,如果同一范围
+定义的enumerators拥有相同的名字,那么就会造成命名冲突,并且它们隐式的被
+转换为整型.
+
+C++11引入新的enums类别,叫做 strongly-typed enums. 由 =enum class= 特定.
+它们不在把enumerators暴露到所在代码范围,并不在隐式转换成整型,如下:
+
+#+begin_src c++
+enum class Options {None, One, All};
+Options o = Options::All;
+#+end_src
+* Smart pointers
+C++11中引入如下三种smart pointer, 在头文件 =<memory>= 中:
+
++ [[http://en.cppreference.com/w/cpp/memory/unique_ptr][ =unique_ptr= ]]: 当内存资源不可共享时使用(没有copy constructor),但可
+  以转移给另一个 =unique_ptr=.
++ [[http://en.cppreference.com/w/cpp/memory/shared_ptr][ =shared_ptr= ]]: 当拥有的内存资源可共享时使用.
++ [[http://en.cppreference.com/w/cpp/memory/weak_ptr/lock][ =weak_ptr= ]]: 拥有对由 =shared_ptr= 管理的对象的reference,但不对
+  reference count影响.
+
+** =unique_ptr=
+=unique_ptr= 之间对对象的拥有权的转让通过 =std::move= 操作, 被转让的
+=unique_ptr= 成为 null, =get()= 操作返回 =nullptr=.
+
+#+begin_src c++
+#include <iostream>
+#include <memory>
+
+void foo (int* p) {
+   std::cout << *p << std::endl;
+}
+
+int main() {
+  std::unique_ptr<int> p1(new int(42));
+  std::unique_ptr<int> p2 = std::move(p1); // transfer ownership
+  
+  if (p1) {
+    foo(p1.get());
+  } else {
+    std::cout << "p1 is null" << std::endl;
+  }
+
+  (*p2)++;
+
+  if(p2)
+    foo(p2.get());
+  return 0;
+}
+#+end_src
+
+** =shared_ptr=
+#+begin_src c++
+#include <iostream>
+#include <memory>
+
+void foo(int* p) {
+  std::cout << "foo: " << *p << std::endl;
+}
+void bar(std::shared_ptr<int> p) {
+  ++(*p);
+}
+
+int main() {
+  std::shared_ptr<int> p1(new int(42));
+  std::shared_ptr<int> p2 = p1;
+  
+  bar(p1);
+  foo(p2.get());
+  return 0;
+}
+
+#+end_src
+
+第一句创建 =p1= 也可以写成如下:
+#+begin_src c++
+auto p1 = std::make_shared<int>(42);
+#+end_src
+
+=make_shared= 不是成员函数,具有为共享对象和智能指针分配一步分配完成的
+优势.而显示的创建 =shared_ptr= 通过构造对象需要两步分配来完成.除了可能
+的多余开销,并可能在某些情况下造成memory leaks.如下例子,若 =seed()=
+throw错误,那么有可能发生memory leaks.
+
+#+begin_src c++
+  void foo(std::shared_ptr<int> p, int init) {
+     *p = init;
+  }
+  foo(std::shared_ptr<int>(new int(42)), seed());
+#+end_src
+
+** =weak_ptr=
+=weak_ptr= 通过 =lock()= 操作获得此对象的 =shared_ptr= .
+
+#+begin_src c++
+#include <iostream>
+#include <memory>
+
+int main() {
+  auto p = std::make_shared<int>(42);
+  std::weak_ptr<int> wp = p;
+  {
+    auto sp = wp.lock();
+    std::cout << *sp << std::endl;
+  }
+  p.reset();
+  
+  if(wp.expired())
+    std::cout << "expired" << std::endl;
+}
+#+end_src
+* Lambdas
+C++11中引入了functional programming的lambda特性, 你能使用lambda当需要
+function object或function或 =std::function= .如下例子:
+#+begin_src c++
+#include <iostream>
+#include <vector>
+#include <algorithm>
+
+int main() {
+  std::vector<int> v;
+  v.push_back(1);
+  v.push_back(2);
+  v.push_back(3);
+
+  std::for_each(std::begin(v), std::end(v),
+                [](int n) {std::cout << n << std::endl;});
+
+  auto is_odd = [](int n) {return n % 2 == 1;};
+  auto pos = std::find_if(std::begin(v), std::end(v), is_odd);
+  if (pos != std::end(v))
+    std::cout << *pos << std::endl;
+  return 0;
+}
+#+end_src
+
+并且可以递归形式的lambda,但如果是哟功能 =auto= 来声明递归lambda会有如
+下错误:
+#+begin_src c++
+auto fib = [&fib](int n) {return n < 2 ? 1 : fib(n-1) + fib(n-2);};
+#+end_src
+
+#+begin_src sh
+./lambdas.cc: In lambda function:
+./lambdas.cc:19:55: error: ‘fib’ cannot be used as a function
+./lambdas.cc:19:66: error: ‘fib’ cannot be used as a function
+./lambdas.cc:19:68: error: return-statement with a value, in function returning 'void' [-fpermissive]
+./lambdas.cc: In function ‘int main()’:
+./lambdas.cc:19:68: error: variable ‘auto fib’ with ‘auto’ type used in its own initializer
+#+end_src
+
+问题是, =auto= 意味着对象的类型由它的初始化决定,但是初始化中却包含自己
+的引用,需要知道它自己的类型,那么就一个循环问题,不知道这个对象的类型了.
+
+所以用如下指定函数的类型:
+
+#+begin_src c++
+std::function<int(int)>  fib =
+      [&fib](int n) {return n < 2 ? 1 : fib(n-1) + fib(n-2);};
+#+end_src
+* non-member begin() and end()
+C++11中提供了函数 =begin()= 和 =end()= ,很方便的获得 STL containers的
+begin和end点,而且同样适用于C的arrays.
+
+如果不用 =begin()= 和 =end()= ,那么对C的arrays可以如下操作:
+
+#+begin_src c++
+  int arr[] = {1,2,3};
+  std::for_each(&arr[0], &arr[0]+sizeof(arr)/sizeof(arr[0]),
+                [](int n) {std::cout << n << std::endl;});
+
+  auto is_odd = [](int n) {return n%2==1;};
+  auto begin = &arr[0];
+  auto end = &arr[0]+sizeof(arr)/sizeof(arr[0]);
+  auto pos = std::find_if(begin, end, is_odd);
+  if(pos != end)
+    std::cout << *pos << std::endl;
+#+end_src
+使用 =begin()= 和 =end()=:
+#+begin_src c++
+  int arr[] = {1,2,3};
+  std::for_each(std::begin(arr), std::end(arr),
+                [](int n) {std::cout << n << std::endl;});
+
+  auto is_odd = [](int n) {return n%2==1;};
+  auto pos = std::find_if(std::begin(arr), std::end(arr), is_odd);
+  if(pos != std::end(arr))
+    std::cout << *pos << std::endl;
+#+end_src
+
+与STL containers的操作类似,可以整合成:
+#+begin_src c++
+#include <iostream>
+#include <algorithm>
+
+template <typename Iterator>
+void bar(Iterator begin, Iterator end)  {
+  std::for_each(begin, end, [](int n) {std::cout << n << std::endl;});
+  
+  auto is_odd = [](int n) {return n%2==1;};
+  auto pos = std::find_if(begin, end, is_odd);
+  if(pos != end)
+    std::cout << *pos << std::endl;
+}
+
+template <typename C>
+void foo(C c) {
+  bar(std::begin(c), std::end(c));
+}
+
+template <typename T, size_t N>
+void foo(T(&arr)[N]) {
+  bar(std::begin(arr), std::end(arr));
+}
+
+int main() {
+  int arr[] = {1,2,3};
+  foo(arr);
+
+  std::vector<int> v;
+  v.push_back(1);
+  v.push_back(2);
+  v.push_back(3);
+  foo(v);
+  return 0;
+}
+#+end_src
+* static_assert
+=static_assert= 可以用来在compile时进行assertion.
+
+#+begin_src c++
+template <typename T, size_t Size>
+class Vector {
+  static_assert(Size < 3, "Size is too small");
+  T _points[Size];
+};
+
+int main()
+{
+  Vector<int, 16> a1;
+  Vector<double, 2> a2;
+  return 0;
+}
+#+end_src
+
+产生如下错误:
+#+begin_src sh
+./static_assert.cc: In instantiation of ‘class Vector<int, 16u>’:
+./static_assert.cc:12:20:   required from here
+./static_assert.cc:6:4: error: static assertion failed: Size is too small
+#+end_src
