@@ -68,27 +68,300 @@ steeper learning curve.
 + Google Chart Tools: Having evolved from their earlier Image Charts
   API, Google’s Chart Tools can be used to generate several standard
   chart types, with support for old versions of IE.
++ gRaphaël: It has more visual flexibility than Flot, and—some might
+  say—it is prettier.
++ Highcharts JS: A JavaScript-based charting library with several
+  predesigned themes and chart types. It uses SVG for modern browsers
+  and falls back on VMLfor old versions of IE, including IE6 and
+  later.
++ JavaScript InfoVis Toolkit: The JIT provides several preset
+  visualization styles for your data. It includes lots of examples,
+  but the documentation is pretty technical. The toolkit is great if
+  you like one of the preset styles, but browser support is unclear.
++ jqPlot: A plug-in for charting with jQuery. This supports very
+  simple charts and is great if you are okay with the predefined
+  styles.
++ jQuery Sparklines: A jQuery plug-in for generating sparklines,
+  typically small bar, line, or area charts used inline with text.
++ Peity: A jQuery plug-in for very simple and very  tinybar, line, and
+  pie charts that supports only recent browsers.
++ Timeline.js: A library specifically for generating interactive
+  timelines. No coding is required; just use the code generator. There
+  is not much room for customization, but hey, timelines are really
+  hard to do well.
++ YUI Charts: The Charts module for the Y ahoo! User Interface Library
+  enables creation of simple charts with a goal of wide browser
+  support.
 
+*** Graph Visualizations
++ Arbor.js: A library for graph visualization using jQuery. Even if
+  you never use this, you should check out how the documentation is
+  presented as a graph, using the tool itself. 
++ Sigma.js: A very lightweight library for graph visualization.
+  Sigma.js is beautiful and fast, and it also uses canvas.
+*** Geomapping
++ Kartograph: A JavaScript-and-Python combo for gorgeous, entirely
+  vector-based mapping by Gregor Aisch with must-see demos. Kartograph
+  works with IE7 and newer.
++ Leaflet: A library for tiled maps, designed for smooth interaction
+  on both desktop and mobile devices.
++ Modest Maps: The granddaddy of tiled map libraries, Modest Maps has
+  been succeeded by Polymaps, but lots of people still love it, as
+  it is lightweight and works with old versions of IE and other
+  browsers. Modest Maps has been adapted for ActionScript, Processing,
+  Python, PHP, Cinder, openFrameworks…yeah, basically everything.
++ Polymaps: A library for displaying tiled maps, with layers of data
+  on top of the tiles.
+*** Almost from Scratch
++ Processing.js: A native JavaScript implementation of Processing, the
+  fantastic programming language for artists and designers new to
+  programming. Processing is written in Java, so exporting Processing
+  sketches to the Web traditionally involved clunky Java applets.
+  Thanks to Processing.js, regular Processing code can run natively,
+  in the browser.
++ Paper.js: A framework for rendering vector graphics to canvas.
++ Raphaël: Another library for drawing vector graphics, popular due to
+  its friendly syntax and support for older browsers.
+*** Three-Dimensional
++ PhiloGL: A WebGL framework specifically for 3D visualization.
++ Three.js: A library for generating any sort of 3D scene you could
+  imagine, produced by Google’s Data Arts team. 
+*** Tools Built with D3
++ Crossfilter: A library for working with large, multivariate
+  datasets, written primarily by Mike Bostock. This is useful for
+  trying to squeeze your “big data” into a relatively small web
+  browser.
++ Cubism: A D3 plug-in for visualizing time series data.
++ Dashku: An online tool for data dashboards and widgets updated in
+  real time
++ dc.js: The “dc” is short for dimensional charting, as this library
+  is optimized for exploring large, multidimensional datasets.
++ NVD3: Reusable charts with D3. NVD3 offers lots of beautiful
+  examples, w visual customizations without requiring as much code as
+  D3 alone.
++ Polychart.js: More reusable charts, with a range of chart types
+  available. Polychart.js is free only for noncommercial use.
++ Rickshaw: A toolkit for displaying time series data that is also
+  very customizable.
++ Tributary: A great tool for experimenting with live coding using D3.
 
+* Technology Fundamentals
+** A Note on Compatibility
+Older browsers don’t support SVG. So, generally speaking, Internet
+Explorer version 8 and older will not display SVG images at all. 
 
+That said, it’s polite to notify users of older browsers why the
+piece isn’t working. I recommend using *Modernizr* or a similar
+JavaScript tool to detect whether or not the browser supports SVG. If
+it does, then you can load your D3 code and proceed as normal. If SVG
+is  notsupported, then you can display a static, noninteractive
+version of your visualization alongside a message explaining that a
+current browser is needed. (Be nice and provide links to the Chrome and
+Firefox  download pages.)
 
+I’d typically have something like this in the <head>of my document:
 
+#+begin_src javascript
+  <script src="js/modernizr.js"></script>
+  <script type="text/javascript">
+      Modernizr.load({
+          test: Modernizr.svg && Modernizr.inlinesvg,
+          yep : [ 'js/d3.v3.min.js',
+                  'js/script.js' ]
+      });
+  </script>
+#+end_src
 
+caniuse.comis a fantastic resource for supported browser features. See
+their list of browsers with SVG support.
+* Setup
+** Setting Up a Web Server
+#+begin_src sh
+python -m SimpleHTTPServer 8888 &.
+#+end_src
+
+use =http://localhost:8888/.=
+* Data
+** Binding Data
+*** Loading CSV data
+#+begin_src javascript
+  var dataset;
+  d3.csv("food.csv", function(error, data) {
+      if (error) {  //If error is not null, something went wrong.
+          console.log(error);  //Log the error.
+      } else {  //If no error, the file loaded correctly. Yay!
+          console.log(data);  //Log the data.
+          //Include other code to execute after successful file load here
+          dataset = data;
+          generateVis();
+          hideLoadingMsg();
+      }
+  });
+#+end_src
+
+One more tip: if you have tab-separated data in a TSV file, try the
+=d3.tsv()=  method.
+*** Loading JSON data
+#+begin_src javascript
+  d3.json("waterfallVelocities.json", function(json) {
+      console.log(json);  //Log output to console
+  });
+#+end_src
+* Drawing with Data
+=attr()= sets DOM attribute values, whereas  =style()= applies CSS
+styles directly to an element.
+** Multivalue Maps
+
+#+begin_src javascript
+    svg.select("circle")
+        .attr("cx", 0)
+        .attr("cy", 0)
+        .attr("fill", "red");
+    
+    svg.select("circle")
+        .attr({
+            cx: 0,
+            cy: 0,
+            fill: red
+        });
+    
+  svg.selectAll("rect")
+      .data(dataset)
+      .enter()
+      .append("rect")
+      .attr({
+          x: function(d, i) { return i * (w / dataset.length); },
+          y: function(d) { return h - (d * 4); },
+          width: w / dataset.length - barPadding,
+          height: function(d) { return d * 4; },
+          fill: function(d) { return "rgb(0, 0, " + (d * 10) + ")"; }
+      });
+#+end_src
+* Scales
+#+begin_src javascript
+  var scale = d3.scale.linear()
+      .domain([100, 500])
+      .range([10, 350]);
+#+end_src
+
+=d3.min() and d3.max()=
+
+#+begin_src javascript
+  d3.max(dataset, function(d) {
+      return d[0];
+  });
+#+end_src
+** Setting Up Dynamic Scales
+#+begin_src javascript
+  var xScale = d3.scale.linear()
+      .domain([0, d3.max(dataset, function(d) { return d[0]; })])
+      .range([0, w]);
+#+end_src
+
+** Incorporating Scaled Values
+#+begin_src javascript
+      .attr("x", function(d) {
+      return xScale(d[0]);
+      })
+      .attr("y", function(d) {
+          return yScale(d[1]);
+      })
+#+end_src
+** Other Methods
++ nice()
++ rangeRound()
++ clamp(): Calling clamp(true)on a scale, however, forces all output
+  values to be within the specified range. This means excessive values
+  will be rounded to the range’s low or high value (whichever is
+  nearest).
+** Other Scales
++ sqrt
++ pow
++ log
++ quantize
++ quantile
++ ordinal
++ d3.scale.category10(), d3.scale.category20(),
+  d3.scale.category20b(), and d3.scale.category20c()
++ d3.time.scale()
+* Axes
+** Setting Up an Axis
+#+begin_src javascript
+    var xScale = d3.scale.linear()
+        .domain([0, d3.max(dataset, function(d) { return d[0]; })])
+        .range([padding, w - padding * 2]);
+    //Create SVG element
+  var svg = d3.select("body")
+      .append("svg")
+      .attr("width", w)
+      .attr("height", h);
+
+  svg.append("g")
+      .call(xAxis);
+#+end_src
+** Cleaning It Up
+
+#+begin_src javascript
+    <style type="text/css">
+        .axis path,
+        .axis line {
+            fill: none;
+            stroke: black;
+            shape-rendering: crispEdges;
+        }
+                            
+        .axis text {
+            font-family: sans-serif;
+            font-size: 11px;
+        }
+    </style>
+  <script type="text/javascript">
+  //Create scale functions
+      var xScale = d3.scale.linear()
+      .domain([0, d3.max(dataset, function(d) { return d[0]; })])
+      .range([padding, w - padding * 2]);
+  //Create SVG element
+  var svg = d3.select("body")
+      .append("svg")
+      .attr("width", w)
+      .attr("height", h);
+  //Create X axis
+  svg.append("g")
+      .attr("class", "axis")
+      .attr("transform", "translate(0," + (h - padding) + ")")
+      .call(xAxis);
+  </script>
+#+end_src
+
+review your  property namesvery closely to ensure you’re using SVG
+names, not CSS ones. (You can reference the complete SVG attribute
+list on the MDN site.)
+** Check for Ticks
+#+begin_src javascript
+  var xAxis = d3.svg.axis()
+      .scale(xScale)
+      .orient("bottom")
+      .ticks(5);  //Set rough # of tick
+#+end_src
+
+D3 inteprets the =ticks()= value as merely a suggestion and will override
+your suggestion with what it determines to be the most clean and
+human-readable values
+** Formatting Tick Labels
+#+begin_src javascript
+var formatAsPercentage = d3.format(".1%");
+xAxis.tickFormat(formatAsPercentage);
+#+end_src
+* Updates, Transitions, and Motion
+** Modernizing the Bar Chart
 
 
 
 
 
 * cc
-#+begin_src python
+
+#+begin_src javascript
 
 #+end_src
 
-#+begin_src c++
-
-#+end_src
-
-
-#+begin_src sh
-
-#+end_src
