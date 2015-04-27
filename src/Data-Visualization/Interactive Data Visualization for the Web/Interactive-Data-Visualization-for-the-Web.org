@@ -1,4 +1,4 @@
-#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+ nm#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
 #+TITLE: Interactive Data Visualization for the Web
 #+OPTIONS: num:nil H:2
 
@@ -354,14 +354,435 @@ xAxis.tickFormat(formatAsPercentage);
 #+end_src
 * Updates, Transitions, and Motion
 ** Modernizing the Bar Chart
-
-
-
-
-
-* cc
+#+begin_src javascript
+    var xScale = d3.scale.ordinal()
+        .domain(d3.range(dataset.length))
+        .rangeRoundBands([0, w], 0.05);
+  //Create bars
+  svg.selectAll("rect")
+      .data(dataset)
+      .enter()
+      .append("rect")
+      .attr("x", function(d, i) {
+          return xScale(i);
+      })
+      .attr("width", xScale.rangeBand())
+#+end_src
+** Transitions
+Making a nice, super smooth, animated transition is as simple as
+adding one line of code:
 
 #+begin_src javascript
-
+.transition()
 #+end_src
 
+ease() must also be specified after transition(), but before the
+attr() statements to which the transition applies. 
+#+begin_src javascript
+…  //Selection statement(s)
+.transition()
+.duration(2000)
+.ease("linear")
+…  //attr() statements
+#+end_src
+
+cubic-in-outis the default.
+*** each() Transition Starts and Ends
+#+begin_src javascript
+  //Update all circles
+  svg.selectAll("circle")
+      .data(dataset)
+      .transition()
+      .duration(1000)
+      .each("start", function() {  // <-- Executes at start of transition
+          d3.select(this)
+              .attr("fill", "magenta")
+              .attr("r", 3);
+      })
+          .attr("cx", function(d) {
+              return xScale(d[0]);
+          })
+      .attr("cy", function(d) {
+          return yScale(d[1]);
+      })
+      .each("end", function() {  // <-- Executes at end of transition
+          d3.select(this)
+              .attr("fill", "black")
+              .attr("r", 2);
+      });
+#+end_src
+** Other Kinds of Data Updates
+*** Adding Values
+we can use =enter()= to address the one new corresponding DOM element,
+without touching all the existing rects.
+
+#+begin_src javascript
+  dataset.push(newNumber);
+  var bars = svg.selectAll("rect")                        //Select all bars
+      .data(dataset); //Re-bind data to existing bars, return the 'update' selection
+  bars.enter()                                                //References the enter selection (a subset of the update selection)
+      .append("rect")         //Creates a new rect
+      .attr("x", w)                       //Sets the initial x position of the rect beyond the far right edge of the SVG
+      .attr("y", function(d) {               //Sets the y value, based on the updated yScale
+          return h - yScale(d);
+      })
+      .attr("width", xScale.rangeBand())    //Sets the width value, based on the updated xScale
+      .attr("height", function(d) {          //Sets the height value, based on the updated yScale
+          return yScale(d);
+      })
+      .attr("fill", function(d) {        //Sets the fill value
+          return "rgb(0, 0, " + (d * 10) + ")";
+      });
+#+end_src
+*** Removing Values
+#+begin_src javascript
+  //Remove one value from dataset
+  dataset.shift();
+
+  bars.exit()                             //References the exit selection (a subset of the update selection)
+      .transition()           //Initiates a transition on the one element we're deleting
+      .duration(500)
+      .attr("x", w)           //Move past the right edge of the SVG
+      .remove();              //Deletes this element from the DOM once transition is complete
+#+end_src
+*** Add and Remove
+#+begin_src javascript
+  //See which p was clicked
+  var paragraphID = d3.select(this).attr("id");
+  //Decide what to do next
+  if (paragraphID == "add") {
+      //Add a data value
+      var maxValue = 25;
+      var newNumber = Math.floor(Math.random() * maxValue);
+      var lastKeyValue = dataset[dataset.length - 1].key;
+      console.log(lastKeyValue);
+      dataset.push({
+          key: lastKeyValue + 1,
+          value: newNumber
+      });
+  } else {
+      //Remove a value
+      dataset.shift();
+  }
+#+end_src
+* Interactivity
+Making your visualization interactive is a simple, two-step process
+that includes:
+1. Binding event listeners
+2. Defining the behavior
+** Introducing Behaviors
+*** Hover to Highlight
++ mouseover
+
+#+begin_src javascript
+  .on("mouseover", function() {
+      d3.select(this)
+          .attr("fill", "orange");
+  });
+#+end_src
++ mouseout
+#+begin_src javascript
+      .on("mouseout", function(d) {
+          d3.select(this)
+              .attr("fill", "rgb(0, 0, " + (d * 10) + ")");
+      });
+#+end_src
+
+Mouse events are triggered only on elements with pixels that can be
+“touched” by the mouse. If two elements overlap, and the mouse moves
+over the element that is “on top” (in other words, closer to the
+front), then the mouseover event will be triggered on the frontmost
+element, and noton the element behind it.
+
+* Layouts
+** Pie Layout
+#+begin_src javascript
+  var w = 300;
+  var h = 300;
+
+  var dataset = [ 5, 10, 20, 45, 6, 25 ];
+
+  var outerRadius = w / 2;
+  var innerRadius = 0;
+  var arc = d3.svg.arc()
+      .innerRadius(innerRadius)
+      .outerRadius(outerRadius);
+  var pie = d3.layout.pie();
+
+  //Easy colors accessible via a 10-step ordinal scale
+  var color = d3.scale.category10();
+
+  //Create SVG element
+  var svg = d3.select("body")
+      .append("svg")
+      .attr("width", w)
+      .attr("height", h);
+
+  //Set up groups
+  var arcs = svg.selectAll("g.arc")
+      .data(pie(dataset))
+      .enter()
+      .append("g")
+      .attr("class", "arc")
+      .attr("transform", "translate(" + outerRadius + "," + outerRadius + ")");
+                          
+  //Draw arc paths
+  arcs.append("path")
+      .attr("fill", function(d, i) {
+          return color(i);
+      })
+      .attr("d", arc);
+#+end_src
+
+** Stack Layout
+#+begin_src javascript
+//Set up stack method
+			var stack = d3.layout.stack();
+
+			//Data, stacked
+			stack(dataset);
+
+			//Set up scales
+			var xScale = d3.scale.ordinal()
+				.domain(d3.range(dataset[0].length))
+				.rangeRoundBands([0, w], 0.05);
+		
+			var yScale = d3.scale.linear()
+				.domain([0,				
+					d3.max(dataset, function(d) {
+						return d3.max(d, function(d) {
+							return d.y0 + d.y;
+						});
+					})
+				])
+				.range([0, h]);
+				
+			//Easy colors accessible via a 10-step ordinal scale
+			var colors = d3.scale.category10();
+		
+			//Create SVG element
+			var svg = d3.select("body")
+						.append("svg")
+						.attr("width", w)
+						.attr("height", h);
+	
+			// Add a group for each row of data
+			var groups = svg.selectAll("g")
+				.data(dataset)
+				.enter()
+				.append("g")
+				.style("fill", function(d, i) {
+					return colors(i);
+				});
+	
+			// Add a rect for each data value
+			var rects = groups.selectAll("rect")
+				.data(function(d) { return d; })
+				.enter()
+				.append("rect")
+				.attr("x", function(d, i) {
+					return xScale(i);
+				})
+				.attr("y", function(d) {
+					return yScale(d.y0);
+				})
+				.attr("height", function(d) {
+					return yScale(d.y);
+				})
+				.attr("width", xScale.rangeBand());
+#+end_src
+** Force Layout
+#+begin_src javascript
+//Initialize a default force layout, using the nodes and edges in dataset
+			var force = d3.layout.force()
+								 .nodes(dataset.nodes)
+								 .links(dataset.edges)
+								 .size([w, h])
+								 .linkDistance([50])
+								 .charge([-100])
+								 .start();
+
+			var colors = d3.scale.category10();
+
+			//Create SVG element
+			var svg = d3.select("body")
+						.append("svg")
+						.attr("width", w)
+						.attr("height", h);
+			
+			//Create edges as lines
+			var edges = svg.selectAll("line")
+				.data(dataset.edges)
+				.enter()
+				.append("line")
+				.style("stroke", "#ccc")
+				.style("stroke-width", 1);
+			
+			//Create nodes as circles
+			var nodes = svg.selectAll("circle")
+				.data(dataset.nodes)
+				.enter()
+				.append("circle")
+				.attr("r", 10)
+				.style("fill", function(d, i) {
+					return colors(i);
+				})
+				.call(force.drag);
+			
+			//Every time the simulation "ticks", this will be called
+			force.on("tick", function() {
+
+				edges.attr("x1", function(d) { return d.source.x; })
+					 .attr("y1", function(d) { return d.source.y; })
+					 .attr("x2", function(d) { return d.target.x; })
+					 .attr("y2", function(d) { return d.target.y; });
+			
+				nodes.attr("cx", function(d) { return d.x; })
+					 .attr("cy", function(d) { return d.y; });
+	
+			});
+#+end_src
+
+* Geomapping
+** JSON, Meet GeoJSON
+[[http://teczno.com/squares/#11.64/37.9587/-121.8676][Get Lat+Lon]] is a great resource by Michal Migurski for doublechecking
+coordinate values. 
+
+Its core features from Squares. [[https://github.com/migurski/Squares][Squares]] is a small, extensible, free
+and open-source library for in-browser maps, written in Typescript and
+using D3 v2 under the hood..
+
+** Paths
+#+begin_src javascript
+  var path = d3.geo.path();
+  var svg = d3.select("body")
+      .append("svg")
+      .attr("width", w)
+      .attr("height", h);
+  
+  //Load in GeoJSON data
+  d3.json("us-states.json", function(json) {
+      //Bind data and create one path per GeoJSON feature
+      svg.selectAll("path")
+          .data(json.features)
+          .enter()
+          .append("path")
+          .attr("d", path);
+  });
+#+end_src
+** Projections
+#+begin_src javascript
+			//Define map projection
+			var projection = d3.geo.albersUsa()
+			//Define path generator
+			var path = d3.geo.path()
+							 .projection(projection);
+			//Create SVG element
+			var svg = d3.select("body")
+						.append("svg")
+						.attr("width", w)
+						.attr("height", h);
+			//Load in GeoJSON data
+			d3.json("us-states.json", function(json) {
+				//Bind data and create one path per GeoJSON feature
+				svg.selectAll("path")
+				   .data(json.features)
+				   .enter()
+				   .append("path")
+				   .attr("d", path)
+				   .style("fill", "steelblue");
+		
+			});
+#+end_src
+** Choropleth
+#+begin_src javascript
+  //Define map projection
+  var projection = d3.geo.albersUsa()
+      .translate([w/2, h/2])
+      .scale([500]);
+  //Define path generator
+  var path = d3.geo.path()
+      .projection(projection);
+  //Define quantize scale to sort data values into buckets of color
+  var color = d3.scale.quantize()
+      .range(["rgb(237,248,233)","rgb(186,228,179)","rgb(116,196,118)","rgb(49,163,84)","rgb(0,109,44)"]);
+  //Colors taken from colorbrewer.js, included in the D3 download
+  //Create SVG element
+  var svg = d3.select("body")
+      .append("svg")
+      .attr("width", w)
+      .attr("height", h);
+  //Load in agriculture data
+  d3.csv("us-ag-productivity-2004.csv", function(data) {
+      //Set input domain for color scale
+      color.domain([
+          d3.min(data, function(d) { return d.value; }), 
+          d3.max(data, function(d) { return d.value; })
+      ]);
+      //Load in GeoJSON data
+      d3.json("us-states.json", function(json) {
+          //Merge the ag. data and GeoJSON
+          //Loop through once for each ag. data value
+          for (var i = 0; i < data.length; i++) {
+              //Grab state name
+              var dataState = data[i].state;
+              //Grab data value, and convert from string to float
+              var dataValue = parseFloat(data[i].value);
+              //Find the corresponding state inside the GeoJSON
+              for (var j = 0; j < json.features.length; j++) {
+                  var jsonState = json.features[j].properties.name;
+                  if (dataState == jsonState) {
+                      //Copy the data value into the JSON
+                      json.features[j].properties.value = dataValue;
+                      //Stop looking through the JSON
+                      break;
+                  }
+              }               
+          }
+          //Bind data and create one path per GeoJSON feature
+          svg.selectAll("path")
+              .data(json.features)
+              .enter()
+              .append("path")
+              .attr("d", path)
+              .style("fill", function(d) {
+                  //Get data value
+                  var value = d.properties.value;
+                  if (value) {
+                      //If value exists…
+                      return color(value);
+                  } else {
+                      //If value is undefined…
+                      return "#ccc";
+                  }
+              });
+  
+      });
+  });
+#+end_src
+* More reference
++ [[http://www.quirksmode.org/blog/archives/2008/04/event_compatibi.html][Peter-Paul Koch’s  event compatibility tables]]
++ Getting Starting with D3by Mike Dewar . O’Reilly, 2012
++ github.com/mbostock/d3/wiki/Gallery  The D3 gallery contains
+  hundredsof examples.
++ bl.ocks.org/mbostock    Even more examples, in this case all by Mike
+  Bostock, each one typically highlighting just one of D3’s features.
++ github.com/mbostock/d3/wiki/API-Reference
+  The D3 API reference, an essential reference for every method and
+  its parameters.
++ groups.google.com/forum/?fromgroups#!forum/d3-js
+  Everyone who’s anyone is on the D3 Google Group.
++ bl.ocks.org
+  A service for posting code hosted on GitHub’s Gist, by Mike
+  Bostock.
++ blog.visual.ly/creating-animations-and-transitions-with-d3-js/
+  An excellent tutorial on Creating Animations and Transitions With D3
+  with lots of inline, interactive examples by Jérôme Cukier.
++ d3noob.org
+  A new, promising resource for D3 tips and tricks.
++ tributary.io
+   A live-coding environment for experimenting with D3 code, by Ian
+  Johnson.
++ D3 Plug-ins
+   A listing of all the official plug-ins that extend D3’s
+  functionality, in case it doesn’t do enough for you already.
