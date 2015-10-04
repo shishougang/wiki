@@ -1,0 +1,96 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Read/write files within a Linux modules
+#+OPTIONS: num:nil H:2
+
+
+[[./Files/file-write-module.tar.gz][Source codes download]].
+
+* write and read API
+#+begin_src c
+#include <linux/fs.h>
+#include <asm/segment.h>
+#include <asm/uaccess.h>
+#include <linux/buffer_head.h>
+
+struct file* file_open(const char* path, int flags, int rights) {
+  struct file* filp = NULL;
+  mm_segment_t oldfs;
+  int err = 0;
+
+  oldfs = get_fs();
+  set_fs(get_ds());
+  filp = filp_open(path, flags, rights);
+  set_fs(oldfs);
+  if(IS_ERR(filp)) {
+    err = PTR_ERR(filp);
+    return NULL;
+  }
+  return filp;
+}
+
+void file_close(struct file* file) {
+  filp_close(file, NULL);
+}
+
+int file_read(struct file* file, unsigned long long offset,
+              unsigned char* data, unsigned int size) {
+  mm_segment_t oldfs;
+  int ret;
+  oldfs = get_fs();
+  set_fs(get_ds());
+  ret = vfs_read(file, data, size, &offset);
+  set_fs(oldfs);
+  return ret;
+}
+
+int file_write(struct file* file, unsigned long long offset,
+               unsigned char* data, unsigned int size) {
+    mm_segment_t oldfs;
+    int ret;
+    
+    oldfs = get_fs();
+    set_fs(get_ds());
+    ret = vfs_write(file, data, size, &offset);
+    set_fs(oldfs);
+    return ret;
+}
+
+int file_sync(struct file* file) {
+  vfs_fsync(file, 0);
+  return 0;
+}
+#+end_src
+* reference right and mode
+#+begin_src c
+O_ACCMODE <0003>;: 读写文件操作时，用于取出flag的低2位。 
+O_RDONLY<00>;: 只读打开 
+O_WRONLY<01>;: 只写打开 
+O_RDWR<02>;: 读写打开 
+O_CREAT<0100>;: 文件不存在则创建，需要mode_t，not fcntl 
+O_EXCL<0200>;: 如果同时指定了O_CREAT，而文件已经存在，则出错， not fcntl 
+O_NOCTTY<0400>;: 如果pathname指终端设备，则不将此设备分配作为此进程的控制终端。not fcntl O_TRUNC<01000>;: 如果此文件存在，而且为只读或只写成功打开，则将其长度截短为0。not fcntl 
+O_APPEND<02000>;: 每次写时都加到文件的尾端 
+O_NONBLOCK<04000>;: 如果p a t h n a m e指的是一个F I F O、一个块特殊文件或一个字符特殊文件，则此选择项为此文件的本次打开操作和后续的I / O操作设置非阻塞方式。 
+O_NDELAY;; 
+O_SYNC<010000>;: 使每次write都等到物理I/O操作完成。 
+FASYNC<020000>;: 兼容BSD的fcntl同步操作 
+O_DIRECT<040000>;: 直接磁盘操作标识 
+O_LARGEFILE<0100000>;: 大文件标识 
+O_DIRECTORY<0200000>;: 必须是目录 
+O_NOFOLLOW<0400000>;: 不获取连接文件 
+O_NOATIME<01000000>;: 暂无
+
+当新创建一个文件时，需要指定mode 参数，以下说明的格式如宏定义名称<实际常数值>;: 描述。 
+S_IRWXU<00700>;：文件拥有者有读写执行权限 
+S_IRUSR (S_IREAD)<00400>;：文件拥有者仅有读权限 
+S_IWUSR (S_IWRITE)<00200>;：文件拥有者仅有写权限 
+S_IXUSR (S_IEXEC)<00100>;：文件拥有者仅有执行权限 
+S_IRWXG<00070>;：组用户有读写执行权限 
+S_IRGRP<00040>;：组用户仅有读权限 
+S_IWGRP<00020>;：组用户仅有写权限 
+S_IXGRP<00010>;：组用户仅有执行权限 
+S_IRWXO<00007>;：其他用户有读写执行权限 
+S_IROTH<00004>;：其他用户仅有读权限 
+S_IWOTH<00002>;：其他用户仅有写权限 
+S_IXOTH<00001>;：其他用户仅有执行权限
+#+end_src

@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Read/write files within a Linux modules</title>
+<!-- 2015-10-04 Sun 22:50 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Read/write files within a Linux modules</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">write and read API</a></li>
+<li><a href="#sec-2">reference right and mode</a></li>
+</ul>
+</div>
+</div>
+<p>
+<a href="./Files/file-write-module.tar.gz">Source codes download</a>.
+</p>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">write and read API</h2>
+<div class="outline-text-2" id="text-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/fs.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;asm/segment.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;asm/uaccess.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;linux/buffer_head.h&gt;</span>
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span>* <span style="color: #87cefa;">file_open</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">path</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flags</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rights</span>) {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span>* <span style="color: #eedd82;">filp</span> = <span style="color: #7fffd4;">NULL</span>;
+  <span style="color: #98fb98;">mm_segment_t</span> <span style="color: #eedd82;">oldfs</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">err</span> = 0;
+
+  oldfs = get_fs();
+  set_fs(get_ds());
+  filp = filp_open(path, flags, rights);
+  set_fs(oldfs);
+  <span style="color: #00ffff;">if</span>(IS_ERR(filp)) {
+    err = PTR_ERR(filp);
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+  }
+  <span style="color: #00ffff;">return</span> filp;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">file_close</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span>* <span style="color: #eedd82;">file</span>) {
+  filp_close(file, <span style="color: #7fffd4;">NULL</span>);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">file_read</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span>* <span style="color: #eedd82;">file</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">offset</span>,
+              <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">data</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>) {
+  <span style="color: #98fb98;">mm_segment_t</span> <span style="color: #eedd82;">oldfs</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ret</span>;
+  oldfs = get_fs();
+  set_fs(get_ds());
+  ret = vfs_read(file, data, size, &amp;offset);
+  set_fs(oldfs);
+  <span style="color: #00ffff;">return</span> ret;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">file_write</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span>* <span style="color: #eedd82;">file</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">offset</span>,
+               <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">data</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>) {
+    <span style="color: #98fb98;">mm_segment_t</span> <span style="color: #eedd82;">oldfs</span>;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ret</span>;
+
+    oldfs = get_fs();
+    set_fs(get_ds());
+    ret = vfs_write(file, data, size, &amp;offset);
+    set_fs(oldfs);
+    <span style="color: #00ffff;">return</span> ret;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">file_sync</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">file</span>* <span style="color: #eedd82;">file</span>) {
+  vfs_fsync(file, 0);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">reference right and mode</h2>
+<div class="outline-text-2" id="text-2">
+<div class="org-src-container">
+
+<pre class="src src-c">O_ACCMODE &lt;0003&gt;;: &#35835;&#20889;&#25991;&#20214;&#25805;&#20316;&#26102;&#65292;&#29992;&#20110;&#21462;&#20986;flag&#30340;&#20302;2&#20301;&#12290; 
+O_RDONLY&lt;00&gt;;: &#21482;&#35835;&#25171;&#24320; 
+O_WRONLY&lt;01&gt;;: &#21482;&#20889;&#25171;&#24320; 
+O_RDWR&lt;02&gt;;: &#35835;&#20889;&#25171;&#24320; 
+O_CREAT&lt;0100&gt;;: &#25991;&#20214;&#19981;&#23384;&#22312;&#21017;&#21019;&#24314;&#65292;&#38656;&#35201;mode_t&#65292;not fcntl 
+O_EXCL&lt;0200&gt;;: &#22914;&#26524;&#21516;&#26102;&#25351;&#23450;&#20102;O_CREAT&#65292;&#32780;&#25991;&#20214;&#24050;&#32463;&#23384;&#22312;&#65292;&#21017;&#20986;&#38169;&#65292; not fcntl 
+O_NOCTTY&lt;0400&gt;;: &#22914;&#26524;pathname&#25351;&#32456;&#31471;&#35774;&#22791;&#65292;&#21017;&#19981;&#23558;&#27492;&#35774;&#22791;&#20998;&#37197;&#20316;&#20026;&#27492;&#36827;&#31243;&#30340;&#25511;&#21046;&#32456;&#31471;&#12290;not fcntl O_TRUNC&lt;01000&gt;;: &#22914;&#26524;&#27492;&#25991;&#20214;&#23384;&#22312;&#65292;&#32780;&#19988;&#20026;&#21482;&#35835;&#25110;&#21482;&#20889;&#25104;&#21151;&#25171;&#24320;&#65292;&#21017;&#23558;&#20854;&#38271;&#24230;&#25130;&#30701;&#20026;0&#12290;not fcntl 
+O_APPEND&lt;02000&gt;;: &#27599;&#27425;&#20889;&#26102;&#37117;&#21152;&#21040;&#25991;&#20214;&#30340;&#23614;&#31471; 
+O_NONBLOCK&lt;04000&gt;;: &#22914;&#26524;p a t h n a m e&#25351;&#30340;&#26159;&#19968;&#20010;F I F O&#12289;&#19968;&#20010;&#22359;&#29305;&#27530;&#25991;&#20214;&#25110;&#19968;&#20010;&#23383;&#31526;&#29305;&#27530;&#25991;&#20214;&#65292;&#21017;&#27492;&#36873;&#25321;&#39033;&#20026;&#27492;&#25991;&#20214;&#30340;&#26412;&#27425;&#25171;&#24320;&#25805;&#20316;&#21644;&#21518;&#32493;&#30340;I / O&#25805;&#20316;&#35774;&#32622;&#38750;&#38459;&#22622;&#26041;&#24335;&#12290; 
+O_NDELAY;; 
+O_SYNC&lt;010000&gt;;: &#20351;&#27599;&#27425;write&#37117;&#31561;&#21040;&#29289;&#29702;I/O&#25805;&#20316;&#23436;&#25104;&#12290; 
+FASYNC&lt;020000&gt;;: &#20860;&#23481;BSD&#30340;fcntl&#21516;&#27493;&#25805;&#20316; 
+O_DIRECT&lt;040000&gt;;: &#30452;&#25509;&#30913;&#30424;&#25805;&#20316;&#26631;&#35782; 
+O_LARGEFILE&lt;0100000&gt;;: &#22823;&#25991;&#20214;&#26631;&#35782; 
+O_DIRECTORY&lt;0200000&gt;;: &#24517;&#39035;&#26159;&#30446;&#24405; 
+O_NOFOLLOW&lt;0400000&gt;;: &#19981;&#33719;&#21462;&#36830;&#25509;&#25991;&#20214; 
+O_NOATIME&lt;01000000&gt;;: &#26242;&#26080;
+
+&#24403;&#26032;&#21019;&#24314;&#19968;&#20010;&#25991;&#20214;&#26102;&#65292;&#38656;&#35201;&#25351;&#23450;mode &#21442;&#25968;&#65292;&#20197;&#19979;&#35828;&#26126;&#30340;&#26684;&#24335;&#22914;&#23439;&#23450;&#20041;&#21517;&#31216;&lt;&#23454;&#38469;&#24120;&#25968;&#20540;&gt;;: &#25551;&#36848;&#12290; 
+S_IRWXU&lt;00700&gt;;&#65306;&#25991;&#20214;&#25317;&#26377;&#32773;&#26377;&#35835;&#20889;&#25191;&#34892;&#26435;&#38480; 
+S_IRUSR (S_IREAD)&lt;00400&gt;;&#65306;&#25991;&#20214;&#25317;&#26377;&#32773;&#20165;&#26377;&#35835;&#26435;&#38480; 
+S_IWUSR (S_IWRITE)&lt;00200&gt;;&#65306;&#25991;&#20214;&#25317;&#26377;&#32773;&#20165;&#26377;&#20889;&#26435;&#38480; 
+S_IXUSR (S_IEXEC)&lt;00100&gt;;&#65306;&#25991;&#20214;&#25317;&#26377;&#32773;&#20165;&#26377;&#25191;&#34892;&#26435;&#38480; 
+S_IRWXG&lt;00070&gt;;&#65306;&#32452;&#29992;&#25143;&#26377;&#35835;&#20889;&#25191;&#34892;&#26435;&#38480; 
+S_IRGRP&lt;00040&gt;;&#65306;&#32452;&#29992;&#25143;&#20165;&#26377;&#35835;&#26435;&#38480; 
+S_IWGRP&lt;00020&gt;;&#65306;&#32452;&#29992;&#25143;&#20165;&#26377;&#20889;&#26435;&#38480; 
+S_IXGRP&lt;00010&gt;;&#65306;&#32452;&#29992;&#25143;&#20165;&#26377;&#25191;&#34892;&#26435;&#38480; 
+S_IRWXO&lt;00007&gt;;&#65306;&#20854;&#20182;&#29992;&#25143;&#26377;&#35835;&#20889;&#25191;&#34892;&#26435;&#38480; 
+S_IROTH&lt;00004&gt;;&#65306;&#20854;&#20182;&#29992;&#25143;&#20165;&#26377;&#35835;&#26435;&#38480; 
+S_IWOTH&lt;00002&gt;;&#65306;&#20854;&#20182;&#29992;&#25143;&#20165;&#26377;&#20889;&#26435;&#38480; 
+S_IXOTH&lt;00001&gt;;&#65306;&#20854;&#20182;&#29992;&#25143;&#20165;&#26377;&#25191;&#34892;&#26435;&#38480;
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2015-10-04 Sun 22:50</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
