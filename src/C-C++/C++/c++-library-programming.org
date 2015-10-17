@@ -1,0 +1,110 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: C++ library programming
+#+OPTIONS: num:nil H:2
+
+
+* static libraries
+=filter.h=
+#+begin_src c++
+#ifndef FILTER_H_
+#define FILTER_H_
+
+class Filter {
+ public:
+  virtual void process(int v) = 0;
+};
+
+#endif  // FILTER_H_
+#+end_src
+
+=low_pass_filter.h= and =low_pass_filter.cc=
+#+begin_src c++
+#ifndef LOW_PASS_FILTER_H_
+#define LOW_PASS_FILTER_H_
+#include "filter.h"
+
+class LowPassFilter : public Filter {
+ public:
+  virtual void process(int v);
+};
+
+#endif  // LOW_PASS_FILTER_H_
+
+#include <iostream>
+using namespace std;
+#include "low_pass_filter.h"
+
+void LowPassFilter::process(int v) {
+  cout << "Low Pass Filter value = " << v << endl;
+}
+#+end_src
+
+=program.cc=
+#+begin_src c++
+#include "filter.h"
+#include "low_pass_filter.h"
+using namespace std;
+int main() {
+  Filter* filter = new LowPassFilter();
+  filter->process(10);
+  return 0;
+}
+#+end_src
+
+#+begin_src sh
+	g++ -Wall -c low_pass_filter.cc 
+	ar rcs libfilter.a ./low_pass_filter.o
+	g++ -static program.cc -L. -lfilter -o program
+#+end_src
+
+
+* dynamic libraries
+
+** =ldd=
+List dynamic dependencies =ldd= command is  to list all necessary
+libraries for given executable file.
+
+** Linux dynamic loader order
+1. On the path defined inside the environment variable
+   =LD_LIBRARY_PATH=.
+
+2. On the path defined inside the =/etc/ld.so.cache= file made from the
+   =/etc/ld.so.conf= file where user can list his own library paths. The
+   act of creating =/etc/ld.so.cache= is initiated by issuing =ldconfig=
+   command after every modification of =/etc/ld.so.conf= file.
+
+3. On the =/lib/= and =/usr/lib= paths.
+
+** soname
+A soname is a field of data in a shared object file. The soname is a
+string, which is used as a "logical name" describing the functionality
+of the object. 
+
+The soname is often used to provide version backwards-compatibility
+information. For instance, if versions 1.0 through 1.9 of the shared
+library libx provide identical interface, they would all have the same
+soname, e.g. libx.so.1. If the system only includes version 1.3 of
+that shared object, with filename libx.so.1.3, the soname field of the
+shared object tells the system that it can be used to fill the
+dependency for a binary which was originally compiled using version
+1.2.[fn:1]
+
+
+* dynamic loaded(DL) libraries
+
+
+* cc
+
+#+begin_src c++
+
+#+end_src
+
+
+#+begin_src sh
+
+#+end_src
+
+* Footnotes
+
+[fn:1] https://en.wikipedia.org/wiki/Soname
+
