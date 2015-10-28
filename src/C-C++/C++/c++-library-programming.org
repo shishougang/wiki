@@ -2,7 +2,6 @@
 #+TITLE: C++ library programming
 #+OPTIONS: num:nil H:2
 
-
 * static libraries
 =filter.h=
 #+begin_src c++
@@ -57,9 +56,7 @@ int main() {
 	g++ -static program.cc -L. -lfilter -o program
 #+end_src
 
-
 * dynamic libraries
-
 ** =ldd=
 List dynamic dependencies =ldd= command is  to list all necessary
 libraries for given executable file.
@@ -89,20 +86,116 @@ shared object tells the system that it can be used to fill the
 dependency for a binary which was originally compiled using version
 1.2.[fn:1]
 
+** make and execute
+Set the =LD_LIBRARY_PATH= to the current directory because Linux dynamic
+loader uses this variable to search for libraries.
+#+begin_src sh
+  g++ -Wall -fPIC -c low_pass_filter.cc
+  g++ -shared -Wl,-soname,libfilter.so.1 -o libfilter.so.1.0 low_pass_filter.o
+  ln -sf libfilter.so.1.0 libfilter.so
+  ln -sf libfilter.so.1.0 libfilter.so.1
+  g++ -Wall -L. program.cc -lfilter -o program
+  export LD_LIBRARY_PATH=.
+  ./program
+#+end_src
 
 * dynamic loaded(DL) libraries
+** name mangling
+In any executable or shared library, all non-static functions are
+represented by a symbol, which is usually the same as the function
+name, and represents the start address of the function in memory. In
+C, the symbol is the same as the function name — e.g., the symbol for
+the =init= function will be =init=, since no two functions can have the
+same name.
 
+However, in C++, because of overloading and polymorphism in classes,
+it is possible to have the same name for two functions in a program.
+Hence, it’s not possible to use the function name as the symbol. To
+solve this problem of having two functions with the same name, C++
+compilers use [[https://en.wikipedia.org/wiki/Name_mangling][name-mangling]] techniques, in which they change the
+symbol names. Name mangling makes it difficult for programmers to
+access a specific symbol in the compiled shared library file, even if
+they know the original function name.
 
-* cc
+The solution to this issue is to use the special keyword extern “C”
+before the function implementation (i.e., =extern "C" void
+function_name()= ). This tells the C++ compiler to compile the
+function in C style — to keep the symbol name the same as the function
+name. 
 
+** example
+1. change the original =low_pass_filter.cc= to:
 #+begin_src c++
+#include <iostream>
+using namespace std;
+#include "low_pass_filter.h"
 
+extern "C" {
+  void* loadFilter(void) {
+    return reinterpret_cast<void *>(new LowPassFilter());
+  }
+  void deleteFilter(void* obj) {
+    delete reinterpret_cast<LowPassFilter*>(obj);
+  }
+}
+
+void LowPassFilter::process(int v) {
+  cout << "Low Pass Filter value = " << v << endl;
+}
 #+end_src
 
+2. change =program.cc= to dynamic load this library.
+#+begin_src c++
+#include <cstdlib>
+#include <cstdio>
+#include <dlfcn.h>
+#include "filter.h"
+using namespace std;
 
+int main() {
+  char *error;
+  void* library = dlopen("./libfilter.so", RTLD_LAZY);
+  if (!library) {
+    fputs (dlerror(), stderr);
+    exit(1);
+  }
+  typedef void* CreateT();
+  CreateT* loadFilter = (CreateT*)dlsym(library, "loadFilter");
+  if ((error = dlerror()) != NULL)  {
+    fputs(error, stderr);
+    exit(1);
+  }
+  void* filter_vp = (*loadFilter)();
+  Filter* filter = reinterpret_cast<Filter*>(filter_vp);
+  filter->process(10);
+  typedef void* DestoryT(void*);
+  
+  DestoryT* deleteFilter = (DestoryT*)dlsym(library, "deleteFilter");
+  (*deleteFilter)(filter_vp);
+  return 0;
+}
+#+end_src
+
+used =dlopen= to load the library, then retrieved references to the
+symbols for our two access functions with =dlsym=, and then via these,
+first invoked the create function to get an instance of the shared
+object, and then destroyed the object.
+
+3. compile program without link with filter library.
 #+begin_src sh
-
+  g++ -Wall -fPIC -c low_pass_filter.cc
+  g++ -shared -Wl,-soname,libfilter.so.1 -o libfilter.so.1.0 low_pass_filter.o
+  ln -sf libfilter.so.1.0 libfilter.so
+  ln -sf libfilter.so.1.0 libfilter.so.1
+  g++ -Wall program.cc  -o program  -ldl
 #+end_src
+
+* More reference
++ [[http://www.techytalk.info/c-cplusplus-library-programming-on-linux-part-three-dynamic-libraries-using-posix-api/][Dynamic libraries using POSIX API]]
++ [[http://opensourceforu.efytimes.com/2011/12/loading-library-files-in-cpp/][Loading Library Files in C++]]
++ [[http://stackoverflow.com/questions/496664/c-dynamic-shared-library-on-linux][C++ Dynamic Shared Library on Linux]]
++ [[http://tldp.org/HOWTO/Program-Library-HOWTO/dl-libraries.html][Dynamically Loaded (DL) Libraries]]
++ [[http://www.drdobbs.com/dynamically-loaded-c-objects/184401900?pgno=5][Dynamically Loaded C++ Objects]]
 
 * Footnotes
 
