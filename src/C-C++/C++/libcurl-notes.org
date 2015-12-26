@@ -1,0 +1,77 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: libcurl Notes
+#+OPTIONS: num:nil H:2
+
+* libcurl Overview
++ homepage: http://curl.haxx.se/libcurl/
++ example:  http://curl.haxx.se/libcurl/c/example.html
+
+* Examples
+** download quandl csv
+#+begin_src c++
+#include <stdio.h>
+#include <curl/curl.h>
+#include <string>
+
+size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *stream) {
+  size_t written = fwrite(ptr, size, nmemb, stream);
+  return written;
+}
+
+int main(void) {
+  CURL *curl;
+  FILE *fp;
+  CURLcode res;
+  const char *url = "https://www.quandl.com/api/v3/datasets/WIKI/FB.csv";
+  char outfilename[FILENAME_MAX] = "fb.csv";
+  curl = curl_easy_init();
+  if (curl) {
+    fp = fopen(outfilename,"wb");
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    res = curl_easy_perform(curl);
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+    fclose(fp);
+  }
+  return 0;
+}
+#+end_src
+
+** download yahoo csv
+#+begin_src c++
+  #include <stdio.h>
+  #include <curl/curl.h>
+  #include <string>
+
+  size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *stream) {
+    size_t written = fwrite(ptr, size, nmemb, stream);
+    return written;
+  }
+
+  int main(void) {
+    CURL *curl;
+    FILE *fp;
+    CURLcode res;
+    const char *url = "http://finance.yahoo.com/d/quotes.csv?s=XOM+BBDb.TO+JNJ+MSFT&f=snd1l1yr";
+    char outfilename[FILENAME_MAX] = "quotes.csv";
+    curl = curl_easy_init();
+    if (curl) {
+      fp = fopen(outfilename,"wb");
+      curl_easy_setopt(curl, CURLOPT_URL, url);
+      curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+      curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+      curl_easy_setopt(curl, CURLOPT_NOBODY, 0L);
+      curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+      res = curl_easy_perform(curl);
+      /* always cleanup */
+      curl_easy_cleanup(curl);
+      fclose(fp);
+    }
+    return 0;
+  }
+#+end_src
+
+
