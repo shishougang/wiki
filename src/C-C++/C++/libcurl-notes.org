@@ -74,4 +74,127 @@ int main(void) {
   }
 #+end_src
 
+* Debug[fn:1]
+
+#+begin_src c++
+  static void dump(const char *text,
+            FILE *stream, unsigned char *ptr, size_t size)
+  {
+    size_t i;
+    size_t c;
+    unsigned int width=0x10;
+   
+    fprintf(stream, "%s, %10.10ld bytes (0x%8.8lx)\n",
+            text, (long)size, (long)size);
+   
+    for(i=0; i<size; i+= width) {
+      fprintf(stream, "%4.4lx: ", (long)i);
+   
+      /* show hex to the left */
+      for(c = 0; c < width; c++) {
+        if(i+c < size)
+          fprintf(stream, "%02x ", ptr[i+c]);
+        else
+          fputs("   ", stream);
+      }
+   
+      /* show data on the right */
+      for(c = 0; (c < width) && (i+c < size); c++)
+        fputc((ptr[i+c]>=0x20) && (ptr[i+c]<0x80)? ptr[i+c]:'.', stream);
+   
+      fputc('\n', stream); /* newline */
+    }
+  }
+   
+  static int my_trace(CURL *handle, curl_infotype type,
+               char *data, size_t size,
+               void *userp)
+  {
+    const char *text;
+    (void)handle; /* prevent compiler warning */
+   
+    switch (type) {
+    case CURLINFO_TEXT:
+      fprintf(stderr, "== Info: %s", data);
+    default: /* in case a new one is introduced to shock us */
+      return 0;
+   
+    case CURLINFO_HEADER_OUT:
+      text = "=> Send header";
+      break;
+    case CURLINFO_DATA_OUT:
+      text = "=> Send data";
+      break;
+    case CURLINFO_SSL_DATA_OUT:
+      text = "=> Send SSL data";
+      break;
+    case CURLINFO_HEADER_IN:
+      text = "<= Recv header";
+      break;
+    case CURLINFO_DATA_IN:
+      text = "<= Recv data";
+      break;
+    case CURLINFO_SSL_DATA_IN:
+      text = "<= Recv SSL data";
+      break;
+    }
+    
+    dump(text, stderr, (unsigned char *)data, size);
+    return 0;
+  }
+  
+  curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, my_trace);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+#+end_src
+
+* Issues
+
+** SSL issues
+
+#+begin_src sh
+$ curl https://www.google.com
+curl: (60) SSL certificate problem: unable to get local issuer certificate
+More details here: http://curl.haxx.se/docs/sslcerts.html
+
+curl performs SSL certificate verification by default, using a "bundle"
+ of Certificate Authority (CA) public keys (CA certs). If the default
+ bundle file isn't adequate, you can specify an alternate file
+ using the --cacert option.
+If this HTTPS server uses a certificate signed by a CA represented in
+ the bundle, the certificate verification probably failed due to a
+ problem with the certificate (it might be expired, or the name might
+ not match the domain name in the URL).
+If you'd like to turn off curl's verification of the certificate, use
+ the -k (or --insecure) option.
+#+end_src 
+
+1. Check curl support
+#+begin_src sh
+$ curl -V
+curl 7.46.0 (Linux) libcurl/7.46.0 OpenSSL/1.0.1 zlib/1.2.3.4
+Protocols: dict file ftp ftps gopher http https imap imaps pop3 pop3s rtsp smb smbs smtp smtps telnet tftp 
+Features: IPv6 NTLM SSL libz UnixSockets 
+#+end_src
+
+2. Check curl ca bundle install path
+#+begin_src sh
+$ curl-config --ca
+
+#+end_src
+It is empty.
+
+3. Reinstall curl and check ca bundle path
+#+begin_src sh
+$ curl-config --ca
+/etc/ssl/certs/ca-certificates.crt
+#+end_src
+
+More, curl use env(=.curlrc=):
+#+begin_src sh
+capath=/etc/ssl/certs/
+CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+#+end_src
+* Footnotes
+
+[fn:1] http://curl.haxx.se/libcurl/c/CURLOPT_DEBUGFUNCTION.html
 

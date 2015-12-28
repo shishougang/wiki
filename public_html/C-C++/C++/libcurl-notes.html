@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>libcurl Notes</title>
-<!-- 2015-12-26 Sat 12:49 -->
+<!-- 2015-12-29 Tue 00:48 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -58,6 +58,23 @@ for the JavaScript code in this tag.
  }
 /*]]>*///-->
 </script>
+<script type="text/javascript">
+    function rpl(expr,a,b) {
+      var i=0
+      while (i!=-1) {
+         i=expr.indexOf(a,i);
+         if (i>=0) {
+            expr=expr.substring(0,i)+b+expr.substring(i+a.length);
+            i+=b.length;
+         }
+      }
+      return expr
+    }
+
+    function show_org_source(){
+       document.location.href = rpl(document.location.href,"html","org.html");
+    }
+</script>
 </head>
 <body>
 <div id="content">
@@ -71,6 +88,12 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-2-1">download quandl csv</a></li>
 <li><a href="#sec-2-2">download yahoo csv</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">Debug</a></li>
+<li><a href="#sec-4">Issues</a>
+<ul>
+<li><a href="#sec-4-1">SSL issues</a></li>
 </ul>
 </li>
 </ul>
@@ -171,10 +194,173 @@ for the JavaScript code in this tag.
 </div>
 </div>
 </div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Debug<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-3">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">dump</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">text</span>,
+          <span style="color: #98fb98;">FILE</span> *<span style="color: #eedd82;">stream</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">ptr</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>)
+{
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">c</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">width</span>=0x10;
+
+  fprintf(stream, <span style="color: #ffa07a;">"%s, %10.10ld bytes (0x%8.8lx)\n"</span>,
+          text, (<span style="color: #98fb98;">long</span>)size, (<span style="color: #98fb98;">long</span>)size);
+
+  <span style="color: #00ffff;">for</span>(i=0; i&lt;size; i+= width) {
+    fprintf(stream, <span style="color: #ffa07a;">"%4.4lx: "</span>, (<span style="color: #98fb98;">long</span>)i);
+
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">show hex to the left */</span>
+    <span style="color: #00ffff;">for</span>(c = 0; c &lt; width; c++) {
+      <span style="color: #00ffff;">if</span>(i+c &lt; size)
+        fprintf(stream, <span style="color: #ffa07a;">"%02x "</span>, ptr[i+c]);
+      <span style="color: #00ffff;">else</span>
+        fputs(<span style="color: #ffa07a;">"   "</span>, stream);
+    }
+
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">show data on the right */</span>
+    <span style="color: #00ffff;">for</span>(c = 0; (c &lt; width) &amp;&amp; (i+c &lt; size); c++)
+      fputc((ptr[i+c]&gt;=0x20) &amp;&amp; (ptr[i+c]&lt;0x80)? ptr[i+c]:<span style="color: #ffa07a;">'.'</span>, stream);
+
+    fputc(<span style="color: #ffa07a;">'\n'</span>, stream); <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">newline */</span>
+  }
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">my_trace</span>(<span style="color: #98fb98;">CURL</span> *<span style="color: #eedd82;">handle</span>, <span style="color: #98fb98;">curl_infotype</span> <span style="color: #eedd82;">type</span>,
+             <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">data</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>,
+             <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">userp</span>)
+{
+  <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">text</span>;
+  (<span style="color: #98fb98;">void</span>)handle; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">prevent compiler warning */</span>
+
+  <span style="color: #00ffff;">switch</span> (type) {
+  <span style="color: #00ffff;">case</span> CURLINFO_TEXT:
+    fprintf(stderr, <span style="color: #ffa07a;">"== Info: %s"</span>, data);
+  <span style="color: #00ffff;">default</span>: <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">in case a new one is introduced to shock us */</span>
+    <span style="color: #00ffff;">return</span> 0;
+
+  <span style="color: #00ffff;">case</span> CURLINFO_HEADER_OUT:
+    text = <span style="color: #ffa07a;">"=&gt; Send header"</span>;
+    <span style="color: #00ffff;">break</span>;
+  <span style="color: #00ffff;">case</span> CURLINFO_DATA_OUT:
+    text = <span style="color: #ffa07a;">"=&gt; Send data"</span>;
+    <span style="color: #00ffff;">break</span>;
+  <span style="color: #00ffff;">case</span> CURLINFO_SSL_DATA_OUT:
+    text = <span style="color: #ffa07a;">"=&gt; Send SSL data"</span>;
+    <span style="color: #00ffff;">break</span>;
+  <span style="color: #00ffff;">case</span> CURLINFO_HEADER_IN:
+    text = <span style="color: #ffa07a;">"&lt;= Recv header"</span>;
+    <span style="color: #00ffff;">break</span>;
+  <span style="color: #00ffff;">case</span> CURLINFO_DATA_IN:
+    text = <span style="color: #ffa07a;">"&lt;= Recv data"</span>;
+    <span style="color: #00ffff;">break</span>;
+  <span style="color: #00ffff;">case</span> CURLINFO_SSL_DATA_IN:
+    text = <span style="color: #ffa07a;">"&lt;= Recv SSL data"</span>;
+    <span style="color: #00ffff;">break</span>;
+  }
+
+  dump(text, stderr, (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> *)data, size);
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, my_trace);
+curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+</pre>
 </div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Issues</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">SSL issues</h3>
+<div class="outline-text-3" id="text-4-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">$ curl https://www.google.com
+curl: (60) SSL certificate problem: unable to get local issuer certificate
+More details here: http://curl.haxx.se/docs/sslcerts.html
+
+curl performs SSL certificate verification by default, using a <span style="color: #ffa07a;">"bundle"</span>
+ of Certificate Authority (CA) public keys (CA certs). If the default
+ bundle file isn<span style="color: #ffa07a;">'t adequate, you can specify an alternate file</span>
+<span style="color: #ffa07a;"> using the --cacert option.</span>
+<span style="color: #ffa07a;">If this HTTPS server uses a certificate signed by a CA represented in</span>
+<span style="color: #ffa07a;"> the bundle, the certificate verification probably failed due to a</span>
+<span style="color: #ffa07a;"> problem with the certificate (it might be expired, or the name might</span>
+<span style="color: #ffa07a;"> not match the domain name in the URL).</span>
+<span style="color: #ffa07a;">If you'</span>d like to turn off curl<span style="color: #ffa07a;">'s verification of the certificate, use</span>
+<span style="color: #ffa07a;"> the -k (or --insecure) option.</span>
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>Check curl support
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ curl -V
+curl 7.46.0 (Linux) libcurl/7.46.0 OpenSSL/1.0.1 zlib/1.2.3.4
+Protocols: dict file ftp ftps gopher http https imap imaps pop3 pop3s rtsp smb smbs smtp smtps telnet tftp 
+Features: IPv6 NTLM SSL libz UnixSockets
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>Check curl ca bundle install path
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ curl-config --ca
+</pre>
+</div>
+<p>
+It is empty.
+</p>
+
+<ol class="org-ol">
+<li>Reinstall curl and check ca bundle path
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ curl-config --ca
+/etc/ssl/certs/ca-certificates.crt
+</pre>
+</div>
+
+<p>
+More, curl use env(<code>.curlrc</code>):
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">capath</span>=/etc/ssl/certs/
+<span style="color: #eedd82;">CURL_CA_BUNDLE</span>=/etc/ssl/certs/ca-certificates.crt
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://curl.haxx.se/libcurl/c/CURLOPT_DEBUGFUNCTION.html">http://curl.haxx.se/libcurl/c/CURLOPT_DEBUGFUNCTION.html</a>
+</p></div>
+
+
+</div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2015-12-26 Sat 12:49</p>
+<p class="date">Created: 2015-12-29 Tue 00:48</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
