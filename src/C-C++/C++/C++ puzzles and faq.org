@@ -247,6 +247,56 @@ http://stackoverflow.com/questions/3174104/how-to-write-own-dynamic-cast
 
 http://www.codeproject.com/Articles/609598/Priori-A-Fast-dynamic-cast-Alternative
 
+* std::bind the overloaded function
+#+begin_src c++
+  #include <iostream>
+  #include <functional>
+  #include <string>
+  using namespace std;
+  class Foo {
+   public:
+    void print(int a) {
+      cout << "int: " << a << endl;
+    }
+    void print(string a) {
+      cout << "string: " << a << endl;
+    }
+  };
+
+  double f(double x) {
+    return x;
+  }
+  int main() {
+    function<void(int)> func1;
+    Foo foo;
+    func1 = bind(&Foo::print, foo, placeholders::_1);
+    return 0;
+  }
+#+end_src
+
+Compile it will dump below error:
+#+begin_src sh
+./func_same_name.cc: In function ‘int main()’:
+./func_same_name.cc:29:50: error: no matching function for call to ‘bind(<unresolved overloaded function type>, Foo&, const std::_Placeholder<1>&)’
+   func1 = bind(&Foo::print, foo, placeholders::_1);
+                                                  ^
+./func_same_name.cc:29:50: note: candidates are:
+In file included from ./func_same_name.cc:2:0:
+#+end_src
+
+** use =static_cast= to disambiguate the address of the overloaded function
+1. the function
+#+begin_src c++
+function<double(void)> func =
+      std::bind(static_cast<double(&)(double)>(f), 2.);
+#+end_src
+
+2. class member function
+#+begin_src c++
+  Foo foo;
+  func = bind(static_cast<void(Foo::*)(int)>(&Foo::print),
+                 foo, placeholders::_1);
+#+end_src
 
 * Footnotes
 
