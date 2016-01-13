@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Red Hat Enterprise MRG Realtime Tuning Guid Notes</title>
+<!-- 2016-01-13 Wed 21:44 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Red Hat Enterprise MRG Realtime Tuning Guid Notes</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Homepage</a></li>
+<li><a href="#sec-2">Preface</a></li>
+<li><a href="#sec-3">⁠Chapter 1. Before you start tuning your MRG Realtime system</a>
+<ul>
+<li><a href="#sec-3-1">Things to remember while you are tuning your MRG Realtime kernel</a></li>
+<li><a href="#sec-3-2">How Tuning Improves Performance</a></li>
+<li><a href="#sec-3-3">MRG Realtime Scheduling Policies</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">⁠Chapter 2. General System Tuning</a></li>
+<li><a href="#sec-5">cc</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Homepage</h2>
+<div class="outline-text-2" id="text-1">
+<ul class="org-ul">
+<li><a href="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_MRG/2/html/Realtime_Tuning_Guide/index.html">Red Hat Enterprise MRG Realtime Tuning Guid</a>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Preface</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Red Hat Enterprise MRG is a high performance distributed computing
+platform consisting of three components:
+</p>
+
+<ul class="org-ul">
+<li>Messaging — Cross platform, high performance, reliable messaging
+using the Advanced Message Queuing Protocol (AMQP) standard.
+</li>
+<li>Realtime — Consistent low-latency and predictable response times for
+applications that require microsecond latency.
+</li>
+<li>Grid — Distributed High Throughput (HTC) and High Performance
+Computing (HPC).
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">⁠Chapter 1. Before you start tuning your MRG Realtime system</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+Kernel system tuning offers the vast majority of the improvement in
+ determinism. For example, in many workloads thorough system tuning
+ improves consistency of results by around 90%. 
+</p>
+</div>
+
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">Things to remember while you are tuning your MRG Realtime kernel</h3>
+<div class="outline-text-3" id="text-3-1">
+<ol class="org-ol">
+<li>Be Patient
+Realtime tuning is an iterative process; you will almost never be
+able to tweak a few variables and know that the change is the best
+that can be achieved. Be prepared to spend days or weeks narrowing
+down the set of tunings that work best for your system.
+
+<p>
+Additionally, always make long test runs. Changing some tuning
+parameters then doing a five minute test run is not a good
+validation of a set of tunes. Make the length of your test runs
+adjustable and run them for longer than a few minutes. Try to
+narrow down to a few different tuning sets with test runs of a few
+hours, then run those sets for many hours or days at a time, to try
+and catch corner-cases of max latencies or resource exhaustion.
+</p>
+</li>
+
+<li>Be Accurate
+Build a measurement mechanism into your application, so that you
+can accurately gauge how a particular set of tuning changes affect
+the application's performance. Anecdotal evidence (e.g. "The mouse
+moves more smoothly") is usually wrong and varies from person to
+person. Do hard measurements and record them for later analysis.
+</li>
+
+<li>Be Methodical
+It is very tempting to make multiple changes to tuning variables
+between test runs, but doing so means that you do not have a way to
+narrow down which tune affected your test results. Keep the tuning
+changes between test runs as small as you can.
+</li>
+
+<li>Be Conservative
+It is also tempting to make large changes when tuning, but it is
+almost always better to make incremental changes. You will find
+that working your way up from the lowest to highest priority values
+will yield better results in the long run.
+</li>
+
+<li>Be Smart
+Use the tools you have available. The Tuna graphical tuning tool
+makes it easy to change processor affinities for threads and
+interrupts, thread priorities and to isolate processors for
+application use. The taskset and chrt command line utilities allow
+you to do most of what Tuna does. If you run into performance
+problems, the ftrace facility in the trace kernel can help locate
+latency issues.
+</li>
+
+<li>Be Flexible
+Rather than hard-coding values into your application, use external
+tools to change policy, priority and affinity. This allows you to
+try many different combinations and simplifies your logic. Once you
+have found some settings that give good results, you can either add
+them to your application, or set up some startup logic to implement
+the settings when the application starts.
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">How Tuning Improves Performance</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+Most performance tuning is performed by manipulating processors
+(CPUs). Processors are manipulated through:
+</p>
+<ul class="org-ul">
+<li>Interrupts:
+In software, an interrupt is an event that calls for a change in
+execution.
+
+<p>
+Interrupts are serviced by a set of processors. By adjusting the
+affinity setting of an interrupt we can determine on which processor
+the interrupt will run.
+</p>
+</li>
+
+<li>Threads:
+Threads provide programs with the ability to run two or more tasks
+simultaneously.
+
+<p>
+Threads, like interrupts, can be manipulated through the affinity
+setting, which determines on which processor the thread will run.
+</p>
+
+<p>
+It is also possible to set scheduling priority and scheduling
+policies to further control threads.
+</p>
+</li>
+</ul>
+
+<p>
+By manipulating interrupts and threads off and on to processors, you
+are able to indirectly manipulate the processors. This gives you
+greater control over scheduling and priorities and, subsequently,
+latency and determinism.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">MRG Realtime Scheduling Policies</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+Linux uses three main scheduling policies:
+</p>
+
+<ul class="org-ul">
+<li><code>SCHED_OTHER (sometimes called SCHED_NORMAL)</code>
+This is the default thread policy and has dynamic priority
+controlled by the kernel. The priority is changed based on thread
+activity. Threads with this policy are considered to have a realtime
+priority of 0 (zero).
+</li>
+<li><code>SCHED_FIFO (First in, first out)</code>
+A realtime policy with a priority range of from 1 - 99, with 1 being
+the lowest and 99 the highest. <code>SCHED_FIFO</code> threads always have a
+higher priority than <code>SCHED_OTHER</code> threads (for example, a <code>SCHED_FIFO</code>
+thread with a priority of 1 will have a higher priority than any
+<code>SCHED_OTHER</code> thread). Any thread created as a <code>SCHED_OTHER</code> thread has
+a fixed priority and will run until it is blocked or preempted by a
+higher priority thread.
+</li>
+<li><code>SCHED_RR (Round-Robin)</code>
+<code>SCHED_RR</code> is an optimization of <code>SCHED_FIFO</code>. Threads with the same
+priority have a quantum and are round-robin scheduled among all
+equal priority SCHED<sub>RR</sub> threads. This policy is rarely used.
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">⁠Chapter 2. General System Tuning</h2>
+</div>
+
+
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">cc</h2>
+<div class="outline-text-2" id="text-5">
+<div class="org-src-container">
+
+<pre class="src src-c++"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2016-01-13 Wed 21:44</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

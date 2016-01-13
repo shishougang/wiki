@@ -1,0 +1,157 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: Low Latency Programming
+#+OPTIONS: num:nil H:2
+
+
+* Linux kernel tuning
++ page cache (kernel) lock contention
++ power management tuning in BIOS & OS
++ mapped file access faults & safepoints
++ Out-of-the box Linux has come bad defaults
++ Page cache: vm.min_free_kbytes [needs > 1GB]
++ Transparent Huge Pages (THP) [should be turned off]
++ Swappines [should be set to 0]
++ zone_claim_info [should be set to 0]
+
+* Programming Optimization
+** Concepts
+*** Temporal locality and Spatial locality
+Program code and data has temporal and spatial locality. This means
+that, over short periods of time, there is a good chance that the same
+code or data gets reused:
+
++ Temporal locality refers to the reuse of specific data, and/or resources, within a relatively small time duration.
++ Spatial locality refers to the use of data elements within relatively close storage locations.
+
+** C++ Optimization
++ Optimise your data layout to benefit from Cache Coherence: When you
+  are processing things in a tight loop, you want to make the data for
+  each iteration as small as possible, and as close together as
+  possible in memory. This way, when the CPU fetches the data for the
+  first iteration of your loop, the next several iterations worth of
+  data will get loaded into the cache with it. (There is famous
+  example with two loop and in the right loop code accesses
+  consecutive memory addresses, which not only utilizes cache
+  coherency, but prefetching as well
+
++ GCC has a function called =__builtin_expect= which lets you inform the
+  compiler what the value of a result probably is. GCC can use that
+  data to optimize conditionals to perform as quickly as possible in
+  the expected case, with slightly slower execution in the unexpected
+  case.
+  #+begin_src c++
+    if(__builtin_expect(entity->extremely_unlikely_flag, 0)) {
+      // code that is rarely run
+    }
+  #+end_src
++ Look at memory usage, look at branching penalties, Look at function
+  call overhead, look at pipeline utilisation.
++ Look at virtual function calls, excessive callstack depth, etc. A
+  common cause for bad performance is the erroneous belief that base
+  classes must be virtual.
++ Be careful of excessive allocation/deallocation. If it’s
+  performance critical, don’t call into the runtime.
++ Avoid copy constructors. If it can be a const reference, make it
+  one.
++ Remove unnecessary branches.
+
+* Memory and cache
+** Memory hierarchy(L1, L2, L3)
++ CPU registers (8-256 registers) – immediate access, with the speed
+  of the inner most core of the processor
++ L1 CPU caches (32 KiB to 512 KiB; ~4 cycles) – fast access, with the
+  speed of the inner most memory bus owned exclusively by each core
++ L2 CPU caches (128 KiB to 24 MiB; ~10 cycles) – slightly slower
+  access, with the speed of the memory bus shared between twins of
+  cores
++ L3 CPU caches (2 MiB to 32 MiB; ~40 – 75 cycles) – even slower
+  access, with the speed of the memory bus shared between even more
+  cores of the same processor
++ Main physical memory (RAM) (256 MiB to 64 GiB) – slow access, the speed of which is limited by the spatial distances and general hardware interfaces between the processor and the memory modules on the motherboard
++ Disk (virtual memory, file system) (1 GiB to 256 TiB, ~250 ms) – very slow
++ Remote Memory (such as other computers or the Internet)
+
+** Cache friendly data structures
++ Data structures that are contained within a single cache-line are
+  more efficient.
++ Use appropriate containers (e.g. prefer reserved std::vector than
+  std::list).
++ Organize your data to avoid alignment holes (sorting your struct
+  members by decreasing size is one way).
++ Don’t neglect the cache in data structure and algorithm design.
++ Use smaller data types
++ Beware of the standard dynamic memory allocator, which may introduce
+  holes and spread your data around in memory as it warms up.
++ Make sure all adjacent data is actually used in the hot loops.
+  Otherwise, consider breaking up data structures into hot and cold
+  components, so that the hot loops use hot data.
++ Avoid algorithms and datastructures that exhibit irregular access
+  patterns, and favor linear data structures.
++ Know and exploit the implicit structure of data.
+** Write cache friendly code
++ Place related data close in memory to allow efficient caching – the
+  principle of locality
++ Understand how cache lines work
++ Use appropriate data structures
++ Avoid unpredictable branches
++ Avoid virtual functions
++ Avoid false sharing problem
++ When context switch happens the processor involved is likely to lose
+  the data in its caches.
++ Try to have regular access pattern that will let hardware prefetcher
+  to work efficiently.
++ Start addressing what is called temporal locality
++ Merge loops that touch the same data (loop fusion), and employing
+  rewriting techniques known as tiling or blocking
+
+Following those rules will minimize numer of page faults (caused by
+thrashing) – latency killer.
+
+* Opinions
+** LOW LATENCY HITS BY ANONYMOUS CONSULTANT
+To give you an idea on the type of optimizations we’re doing:
+
++ Our applications are using IPC shared memory for the aboslute lowest
+  latency between our trading processes.
+
++ We get a 10 Gigabit hand off from our co-located market data
+  provider going into a hardware based ticker planet which our servers
+  subscribe to for market data via infiniband by passing the TCP stack
+  using RDMA “Remote direct memory access”.
+
++ We cross connect many exchange feeds directly to our infrastructure
+  system we trading all major asset classes and are co-located in the
+  same physical buildings as the major exchanges like NYSE, TSX, BATs,
+  CME, NYSE. ARCA, FXALL etc..
+
++ We utilizing Linux Realtime and currently looking at writing custom
+  processes running on Cuda GPU’s for our models.
+
++ We do some nitfy tricks to limit resource consumption on our servers
+  like CPU shielding/processor affinity, IRQ balance, splitting order
+  entry nics, and market data nics etc..
+* Some Examples
+[[https://www.lmax.com/][LMAX]] is a [[https://www.lmax.com/popup-how-we-measure-trade-latency?width=900&height=600&iframe=true][low latency]] financial trading platform having such metrics:
++ High throughput >100k messages/second
++ Sustained capacity to process 5k orders/second or 400 million orders/day
++ Average trade latency is 4 ms
+
+[[http://martinfowler.com/articles/lmax.html][The LMAX Architecture]] is valuable for low latency system engineers.
+
+* Read More
++ [[http://lwn.net/Articles/250967/][What every programmer should know about memory]]
++ [[https://en.wikibooks.org/wiki/Optimizing_C%2B%2B][Optimizing C++]]
++ [[http://www.agner.org/optimize/#testp][Software optimization resources]]
++ [[http://mechanical-sympathy.blogspot.de/][Mechanical Sympathy]]
++ [[http://preshing.com/][Preshing on Programming]]
++ [[http://seremak.org/low-latency/][Low Latency]]
++ [[http://hft.computer/][High Frequency Trading]]
+
+* cc
+
+#+begin_src c++
+
+#+end_src
+
+
+

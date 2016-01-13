@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Low Latency Programming</title>
+<!-- 2016-01-13 Wed 21:44 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Low Latency Programming</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Linux kernel tuning</a></li>
+<li><a href="#sec-2">Programming Optimization</a>
+<ul>
+<li><a href="#sec-2-1">Concepts</a></li>
+<li><a href="#sec-2-2">C++ Optimization</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">Memory and cache</a>
+<ul>
+<li><a href="#sec-3-1">Memory hierarchy(L1, L2, L3)</a></li>
+<li><a href="#sec-3-2">Cache friendly data structures</a></li>
+<li><a href="#sec-3-3">Write cache friendly code</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">Opinions</a>
+<ul>
+<li><a href="#sec-4-1">LOW LATENCY HITS BY ANONYMOUS CONSULTANT</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">Some Examples</a></li>
+<li><a href="#sec-6">Read More</a></li>
+<li><a href="#sec-7">cc</a></li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Linux kernel tuning</h2>
+<div class="outline-text-2" id="text-1">
+<ul class="org-ul">
+<li>page cache (kernel) lock contention
+</li>
+<li>power management tuning in BIOS &amp; OS
+</li>
+<li>mapped file access faults &amp; safepoints
+</li>
+<li>Out-of-the box Linux has come bad defaults
+</li>
+<li>Page cache: vm.min<sub>free</sub><sub>kbytes</sub> [needs &gt; 1GB]
+</li>
+<li>Transparent Huge Pages (THP) [should be turned off]
+</li>
+<li>Swappines [should be set to 0]
+</li>
+<li>zone<sub>claim</sub><sub>info</sub> [should be set to 0]
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Programming Optimization</h2>
+<div class="outline-text-2" id="text-2">
+</div><div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Concepts</h3>
+<div class="outline-text-3" id="text-2-1">
+</div><ul class="org-ul"><li><a id="sec-2-1-1" name="sec-2-1-1"></a>Temporal locality and Spatial locality<br  /><div class="outline-text-4" id="text-2-1-1">
+<p>
+Program code and data has temporal and spatial locality. This means
+that, over short periods of time, there is a good chance that the same
+code or data gets reused:
+</p>
+
+<ul class="org-ul">
+<li>Temporal locality refers to the reuse of specific data, and/or resources, within a relatively small time duration.
+</li>
+<li>Spatial locality refers to the use of data elements within relatively close storage locations.
+</li>
+</ul>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">C++ Optimization</h3>
+<div class="outline-text-3" id="text-2-2">
+<ul class="org-ul">
+<li>Optimise your data layout to benefit from Cache Coherence: When you
+are processing things in a tight loop, you want to make the data for
+each iteration as small as possible, and as close together as
+possible in memory. This way, when the CPU fetches the data for the
+first iteration of your loop, the next several iterations worth of
+data will get loaded into the cache with it. (There is famous
+example with two loop and in the right loop code accesses
+consecutive memory addresses, which not only utilizes cache
+coherency, but prefetching as well
+</li>
+
+<li>GCC has a function called <code>__builtin_expect</code> which lets you inform the
+compiler what the value of a result probably is. GCC can use that
+data to optimize conditionals to perform as quickly as possible in
+the expected case, with slightly slower execution in the unexpected
+case.
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">if</span>(__builtin_expect(entity-&gt;extremely_unlikely_flag, 0)) {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">code that is rarely run</span>
+}
+</pre>
+</div>
+</li>
+<li>Look at memory usage, look at branching penalties, Look at function
+call overhead, look at pipeline utilisation.
+</li>
+<li>Look at virtual function calls, excessive callstack depth, etc. A
+common cause for bad performance is the erroneous belief that base
+classes must be virtual.
+</li>
+<li>Be careful of excessive allocation/deallocation. If it’s
+performance critical, don’t call into the runtime.
+</li>
+<li>Avoid copy constructors. If it can be a const reference, make it
+one.
+</li>
+<li>Remove unnecessary branches.
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Memory and cache</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">Memory hierarchy(L1, L2, L3)</h3>
+<div class="outline-text-3" id="text-3-1">
+<ul class="org-ul">
+<li>CPU registers (8-256 registers) – immediate access, with the speed
+of the inner most core of the processor
+</li>
+<li>L1 CPU caches (32 KiB to 512 KiB; ~4 cycles) – fast access, with the
+speed of the inner most memory bus owned exclusively by each core
+</li>
+<li>L2 CPU caches (128 KiB to 24 MiB; ~10 cycles) – slightly slower
+access, with the speed of the memory bus shared between twins of
+cores
+</li>
+<li>L3 CPU caches (2 MiB to 32 MiB; ~40 – 75 cycles) – even slower
+access, with the speed of the memory bus shared between even more
+cores of the same processor
+</li>
+<li>Main physical memory (RAM) (256 MiB to 64 GiB) – slow access, the speed of which is limited by the spatial distances and general hardware interfaces between the processor and the memory modules on the motherboard
+</li>
+<li>Disk (virtual memory, file system) (1 GiB to 256 TiB, ~250 ms) – very slow
+</li>
+<li>Remote Memory (such as other computers or the Internet)
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">Cache friendly data structures</h3>
+<div class="outline-text-3" id="text-3-2">
+<ul class="org-ul">
+<li>Data structures that are contained within a single cache-line are
+more efficient.
+</li>
+<li>Use appropriate containers (e.g. prefer reserved std::vector than
+std::list).
+</li>
+<li>Organize your data to avoid alignment holes (sorting your struct
+members by decreasing size is one way).
+</li>
+<li>Don’t neglect the cache in data structure and algorithm design.
+</li>
+<li>Use smaller data types
+</li>
+<li>Beware of the standard dynamic memory allocator, which may introduce
+holes and spread your data around in memory as it warms up.
+</li>
+<li>Make sure all adjacent data is actually used in the hot loops.
+Otherwise, consider breaking up data structures into hot and cold
+components, so that the hot loops use hot data.
+</li>
+<li>Avoid algorithms and datastructures that exhibit irregular access
+patterns, and favor linear data structures.
+</li>
+<li>Know and exploit the implicit structure of data.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">Write cache friendly code</h3>
+<div class="outline-text-3" id="text-3-3">
+<ul class="org-ul">
+<li>Place related data close in memory to allow efficient caching – the
+principle of locality
+</li>
+<li>Understand how cache lines work
+</li>
+<li>Use appropriate data structures
+</li>
+<li>Avoid unpredictable branches
+</li>
+<li>Avoid virtual functions
+</li>
+<li>Avoid false sharing problem
+</li>
+<li>When context switch happens the processor involved is likely to lose
+the data in its caches.
+</li>
+<li>Try to have regular access pattern that will let hardware prefetcher
+to work efficiently.
+</li>
+<li>Start addressing what is called temporal locality
+</li>
+<li>Merge loops that touch the same data (loop fusion), and employing
+rewriting techniques known as tiling or blocking
+</li>
+</ul>
+
+<p>
+Following those rules will minimize numer of page faults (caused by
+thrashing) – latency killer.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Opinions</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">LOW LATENCY HITS BY ANONYMOUS CONSULTANT</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+To give you an idea on the type of optimizations we’re doing:
+</p>
+
+<ul class="org-ul">
+<li>Our applications are using IPC shared memory for the aboslute lowest
+latency between our trading processes.
+</li>
+
+<li>We get a 10 Gigabit hand off from our co-located market data
+provider going into a hardware based ticker planet which our servers
+subscribe to for market data via infiniband by passing the TCP stack
+using RDMA “Remote direct memory access”.
+</li>
+
+<li>We cross connect many exchange feeds directly to our infrastructure
+system we trading all major asset classes and are co-located in the
+same physical buildings as the major exchanges like NYSE, TSX, BATs,
+CME, NYSE. ARCA, FXALL etc..
+</li>
+
+<li>We utilizing Linux Realtime and currently looking at writing custom
+processes running on Cuda GPU’s for our models.
+</li>
+
+<li>We do some nitfy tricks to limit resource consumption on our servers
+like CPU shielding/processor affinity, IRQ balance, splitting order
+entry nics, and market data nics etc..
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Some Examples</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+<a href="https://www.lmax.com/">LMAX</a> is a <a href="https://www.lmax.com/popup-how-we-measure-trade-latency?width=900&height=600&iframe=true">low latency</a> financial trading platform having such metrics:
+</p>
+<ul class="org-ul">
+<li>High throughput &gt;100k messages/second
+</li>
+<li>Sustained capacity to process 5k orders/second or 400 million orders/day
+</li>
+<li>Average trade latency is 4 ms
+</li>
+</ul>
+
+<p>
+<a href="http://martinfowler.com/articles/lmax.html">The LMAX Architecture</a> is valuable for low latency system engineers.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Read More</h2>
+<div class="outline-text-2" id="text-6">
+<ul class="org-ul">
+<li><a href="http://lwn.net/Articles/250967/">What every programmer should know about memory</a>
+</li>
+<li><a href="https://en.wikibooks.org/wiki/Optimizing_C++">Optimizing C++</a>
+</li>
+<li><a href="http://www.agner.org/optimize/#testp">Software optimization resources</a>
+</li>
+<li><a href="http://mechanical-sympathy.blogspot.de/">Mechanical Sympathy</a>
+</li>
+<li><a href="http://preshing.com/">Preshing on Programming</a>
+</li>
+<li><a href="http://seremak.org/low-latency/">Low Latency</a>
+</li>
+<li><a href="http://hft.computer/">High Frequency Trading</a>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">cc</h2>
+<div class="outline-text-2" id="text-7">
+<div class="org-src-container">
+
+<pre class="src src-c++"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2016-01-13 Wed 21:44</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

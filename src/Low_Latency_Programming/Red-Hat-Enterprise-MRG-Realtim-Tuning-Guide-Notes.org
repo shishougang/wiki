@@ -1,0 +1,127 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: Red Hat Enterprise MRG Realtime Tuning Guid Notes
+#+OPTIONS: num:nil H:2
+
+* Homepage
++ [[https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_MRG/2/html/Realtime_Tuning_Guide/index.html][Red Hat Enterprise MRG Realtime Tuning Guid]]
+
+* Preface
+ Red Hat Enterprise MRG is a high performance distributed computing
+ platform consisting of three components:
+
++ Messaging — Cross platform, high performance, reliable messaging
+  using the Advanced Message Queuing Protocol (AMQP) standard.
++ Realtime — Consistent low-latency and predictable response times for
+  applications that require microsecond latency.
++ Grid — Distributed High Throughput (HTC) and High Performance
+  Computing (HPC).
+* ⁠Chapter 1. Before you start tuning your MRG Realtime system
+Kernel system tuning offers the vast majority of the improvement in
+ determinism. For example, in many workloads thorough system tuning
+ improves consistency of results by around 90%. 
+
+** Things to remember while you are tuning your MRG Realtime kernel
+1. Be Patient
+   Realtime tuning is an iterative process; you will almost never be
+   able to tweak a few variables and know that the change is the best
+   that can be achieved. Be prepared to spend days or weeks narrowing
+   down the set of tunings that work best for your system.
+
+   Additionally, always make long test runs. Changing some tuning
+   parameters then doing a five minute test run is not a good
+   validation of a set of tunes. Make the length of your test runs
+   adjustable and run them for longer than a few minutes. Try to
+   narrow down to a few different tuning sets with test runs of a few
+   hours, then run those sets for many hours or days at a time, to try
+   and catch corner-cases of max latencies or resource exhaustion.
+
+2. Be Accurate
+   Build a measurement mechanism into your application, so that you
+   can accurately gauge how a particular set of tuning changes affect
+   the application's performance. Anecdotal evidence (e.g. "The mouse
+   moves more smoothly") is usually wrong and varies from person to
+   person. Do hard measurements and record them for later analysis.
+
+3. Be Methodical
+   It is very tempting to make multiple changes to tuning variables
+   between test runs, but doing so means that you do not have a way to
+   narrow down which tune affected your test results. Keep the tuning
+   changes between test runs as small as you can.
+
+4. Be Conservative
+   It is also tempting to make large changes when tuning, but it is
+   almost always better to make incremental changes. You will find
+   that working your way up from the lowest to highest priority values
+   will yield better results in the long run.
+
+5. Be Smart
+   Use the tools you have available. The Tuna graphical tuning tool
+   makes it easy to change processor affinities for threads and
+   interrupts, thread priorities and to isolate processors for
+   application use. The taskset and chrt command line utilities allow
+   you to do most of what Tuna does. If you run into performance
+   problems, the ftrace facility in the trace kernel can help locate
+   latency issues.
+
+6. Be Flexible
+   Rather than hard-coding values into your application, use external
+   tools to change policy, priority and affinity. This allows you to
+   try many different combinations and simplifies your logic. Once you
+   have found some settings that give good results, you can either add
+   them to your application, or set up some startup logic to implement
+   the settings when the application starts.
+** How Tuning Improves Performance
+Most performance tuning is performed by manipulating processors
+(CPUs). Processors are manipulated through:
++ Interrupts:
+  In software, an interrupt is an event that calls for a change in
+  execution.
+
+  Interrupts are serviced by a set of processors. By adjusting the
+  affinity setting of an interrupt we can determine on which processor
+  the interrupt will run.
+
++ Threads:
+  Threads provide programs with the ability to run two or more tasks
+  simultaneously.
+
+  Threads, like interrupts, can be manipulated through the affinity
+  setting, which determines on which processor the thread will run.
+
+  It is also possible to set scheduling priority and scheduling
+  policies to further control threads.
+
+By manipulating interrupts and threads off and on to processors, you
+are able to indirectly manipulate the processors. This gives you
+greater control over scheduling and priorities and, subsequently,
+latency and determinism.
+** MRG Realtime Scheduling Policies
+Linux uses three main scheduling policies:
+
++ =SCHED_OTHER (sometimes called SCHED_NORMAL)=
+  This is the default thread policy and has dynamic priority
+  controlled by the kernel. The priority is changed based on thread
+  activity. Threads with this policy are considered to have a realtime
+  priority of 0 (zero).
++ =SCHED_FIFO (First in, first out)=
+  A realtime policy with a priority range of from 1 - 99, with 1 being
+  the lowest and 99 the highest. =SCHED_FIFO= threads always have a
+  higher priority than =SCHED_OTHER= threads (for example, a =SCHED_FIFO=
+  thread with a priority of 1 will have a higher priority than any
+  =SCHED_OTHER= thread). Any thread created as a =SCHED_OTHER= thread has
+  a fixed priority and will run until it is blocked or preempted by a
+  higher priority thread.
++ =SCHED_RR (Round-Robin)=
+  =SCHED_RR= is an optimization of =SCHED_FIFO=. Threads with the same
+  priority have a quantum and are round-robin scheduled among all
+  equal priority SCHED_RR threads. This policy is rarely used.
+* ⁠Chapter 2. General System Tuning
+
+
+
+* cc
+
+#+begin_src c++
+
+#+end_src
+
