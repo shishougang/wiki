@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Red Hat Enterprise MRG Realtime Tuning Guid Notes</title>
-<!-- 2016-01-13 Wed 21:44 -->
+<!-- 2016-01-15 Fri 00:44 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -75,7 +75,15 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3-3">MRG Realtime Scheduling Policies</a></li>
 </ul>
 </li>
-<li><a href="#sec-4">⁠Chapter 2. General System Tuning</a></li>
+<li><a href="#sec-4">⁠Chapter 2. General System Tuning</a>
+<ul>
+<li><a href="#sec-4-1">2.1. Using the Tuna interface</a></li>
+<li><a href="#sec-4-2">2.2. Setting persistent tuning parameters</a></li>
+<li><a href="#sec-4-3">2.3. Setting BIOS parameters</a></li>
+<li><a href="#sec-4-4">⁠2.4. Interrupt and process binding</a></li>
+<li><a href="#sec-4-5">⁠2.5. File system determinism tips</a></li>
+</ul>
+</li>
 <li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
@@ -263,8 +271,340 @@ equal priority SCHED<sub>RR</sub> threads. This policy is rarely used.
 </div>
 <div id="outline-container-sec-4" class="outline-2">
 <h2 id="sec-4">⁠Chapter 2. General System Tuning</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">2.1. Using the Tuna interface</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+<a href="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_MRG/1.3/html/Tuna_User_Guide/">Tuna User Guide</a>
+</p>
 </div>
+</div>
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">2.2. Setting persistent tuning parameters</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+Once you have decided what tuning configuration works for your system,
+persist those parameters. The method you choose depends on the type of
+parameter you are setting.
+</p>
 
+<ul class="org-ul">
+<li>Editing the /etc/sysctl.conf file
+<ol class="org-ol">
+<li>Remove the <code>/proc/sys/</code> prefix from the command and replace the
+central / character with a . character.
+</li>
+<li>Insert the new entry into the /etc/sysctl.conf file with the
+required parameter.
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Enable gettimeofday(2)</span>
+kernel.vsyscall64 = 2
+</pre>
+</div>
+</li>
+<li>Run # sysctl -p to refresh with the new configuration.
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">sysctl -p</span>
+...[output truncated]...
+kernel.vsyscall64 = 2
+</pre>
+</div>
+</li>
+</ol>
+</li>
+<li>Editing the /etc/rc.d/rc.local file 
+Adjust the command as per the “Editing the /etc/sysctl.conf file”
+instructions.
+</li>
+</ul>
+<p class="warning">
+Use this alternative only as a last resort.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3">2.3. Setting BIOS parameters</h3>
+<div class="outline-text-3" id="text-4-3">
+<ul class="org-ul">
+<li>Power Management
+Anything that tries to save power by either changing the system
+clock frequency or by putting the CPU into various sleep states can
+affect how quickly the system responds to external events.
+
+<p>
+For best response times, disable power management options in the
+BIOS.
+</p>
+</li>
+<li>Error Detection and Correction (EDAC) units
+EDAC units are devices used to detect and correct errors signaled
+from Error Correcting Code (ECC) memory. Usually EDAC options range
+from no ECC checking to a periodic scan of all memory nodes for
+errors. The higher the EDAC level, the more time is spent in BIOS,
+and the more likely that crucial event deadlines will be missed.
+
+<p>
+Turn EDAC off if possible. Otherwise, switch to the lowest
+functional level.
+</p>
+</li>
+<li>System Management Interrupts (SMI)
+SMIs are a facility used by hardware vendors ensure the system is
+operating correctly. The SMI interrupt is usually not serviced by
+the running operating system, but by code in the BIOS. SMIs are
+typically used for thermal management, remote console management
+(IPMI), EDAC checks, and various other housekeeping tasks.
+
+<p>
+If the BIOS contains SMI options, check with the vendor and any
+relevant documentation to check to what extent it is safe to disable
+them.
+</p>
+<p class="warning">
+While it is possible to completely disable SMIs, it is strongly
+recommended that you do not do this. Removing the ability for your
+system to generate and service SMIs can result in catastrophic
+hardware failure.
+</p>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4">⁠2.4. Interrupt and process binding</h3>
+<div class="outline-text-3" id="text-4-4">
+<p>
+Realtime environments need to minimize or eliminate latency when
+responding to various events. Ideally, interrupts (IRQs) and user
+processes can be isolated from one another on different dedicated
+CPUs.
+</p>
+
+<p>
+Interrupts are generally shared evenly between CPUs. This can delay
+interrupt processing through having to write new data and instruction
+caches, and often creates conflicts with other processing occurring on
+the CPU. In order to overcome this problem, time-critical interrupts
+and processes can be dedicated to a CPU (or a range of CPUs). In this
+way, the code and data structures needed to process this interrupt
+will have the highest possible likelihood to be in the processor data
+and instruction caches. The dedicated process can then run as quickly
+as possible, while all other non-time-critical processes run on the
+remainder of the CPUs.
+</p>
+</div>
+<ul class="org-ul"><li><a id="sec-4-4-1" name="sec-4-4-1"></a>Procedure 2.3. Disabling the irqbalance daemon<br  /><div class="outline-text-4" id="text-4-4-1">
+<p>
+This daemon is enabled by default and periodically forces interrupts
+to be handled by CPUs in an even, fair manner. However in realtime
+deployments, applications are typically dedicated and bound to
+specific CPUs, so the <b>irqbalance</b> daemon is not required.
+</p>
+
+<ol class="org-ol">
+<li>Check the status of the irqbalance daemon.
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">service irqbalance status</span>
+<span style="color: #87cefa;">irqbalance</span> (pid PID) is running...
+</pre>
+</div>
+</li>
+<li>If the irqbalance daemon is running, stop it using the service
+command.
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">service irqbalance stop</span>
+Stopping irqbalance:             [  OK  ]
+</pre>
+</div>
+</li>
+<li>Use chkconfig to ensure that irqbalance does not restart on boot.
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">chkconfig irqbalance off</span>
+</pre>
+</div>
+</li>
+</ol>
+</div>
+</li>
+<li><a id="sec-4-4-2" name="sec-4-4-2"></a>Procedure 2.4. Excluding CPUs from IRQ Balancing<br  /><div class="outline-text-4" id="text-4-4-2">
+<p>
+he <code>/etc/sysconfig/irqbalance</code> configuration file contains a setting
+that allows CPUs to be excluded from consideration by the IRQ balacing
+service. This parameter is named <code>IRQBALANCE_BANNED_CPUS</code> and is a
+64-bit hexadecimal bit mask, where each bit of the mask represents a
+CPU core.
+</p>
+
+<ol class="org-ol">
+<li>Open /etc/sysconfig/irqbalance in your preferred text editor and
+find the section of the file titled IRQBALANCE<sub>BANNED</sub><sub>CPUS</sub>.
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">IRQBALANCE_BANNED_CPUS</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">64 bit bitmask which allows you to indicate which cpu's should</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">be skipped when reblancing irqs. Cpu numbers which have their</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">corresponding bits set to one in this mask will not have any</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">irq's assigned to them on rebalance</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">IRQBALANCE_BANNED_CPUS=</span>
+</pre>
+</div>
+</li>
+<li>Exclude CPUs 8 to 15 by uncommenting the variable
+<code>IRQBALANCE_BANNED_CPUS</code> and setting its value this way:
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">IRQBALANCE_BANNED_CPUS</span>=0000ff00
+</pre>
+</div>
+<p>
+This will cause the irqbalance process to ignore the CPUs that have
+bits set in the bitmask; in this case, bits 8 through 15.
+</p>
+</li>
+<li>If you are running a system with up to 64 CPU cores, separate each
+group of eight hexadecimal digits with a comma:
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">IRQBALANCE_BANNED_CPUS</span>=00000001,0000ff00
+</pre>
+</div>
+<p>
+The above mask excludes CPUs 8 to 15 as well as CPU 33 from IRQ
+balancing.
+</p>
+</li>
+</ol>
+</div>
+</li>
+<li><a id="sec-4-4-3" name="sec-4-4-3"></a>Procedure 2.5. Manually Assigning CPU Affinity to Individual IRQs<br  /><div class="outline-text-4" id="text-4-4-3">
+<ol class="org-ol">
+<li>Check which IRQ is in use by each device by viewing the
+<code>/proc/interrupts</code> file:
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">cat /proc/interrupts</span>
+</pre>
+</div>
+<p>
+This file contains a list of IRQs. Each line shows the IRQ number,
+the number of interrupts that happened in each CPU, followed by the
+IRQ type and a description:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">CPU0             CPU1
+0:   26575949         11         IO-APIC-edge  timer
+1:         14          7         IO-APIC-edge  i8042
+...[output truncated]...
+</pre>
+</div>
+</li>
+<li>To instruct an IRQ to run on only one processor, echo the CPU mask
+(as a hexadecimal number) to <code>/proc/interrupts</code>. In this example, we
+are instructing the interrupt with IRQ number 142 to run on CPU 0
+only:
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">echo 1 &gt; /proc/irq/142/smp_affinity</span>
+</pre>
+</div>
+</li>
+<li>This change will only take effect once an interrupt has occurred. 
+</li>
+</ol>
+</div>
+</li>
+<li><a id="sec-4-4-4" name="sec-4-4-4"></a>Procedure 2.6. Binding Processes to CPUs using the taskset utility<br  /><div class="outline-text-4" id="text-4-4-4">
+<p>
+The <b>taskset</b> utility uses the process ID (PID) of a task to view or set
+the affinity, or can be used to launch a command with a chosen CPU
+affinity.
+</p>
+<ol class="org-ol">
+<li>To set the affinity of a process that is not currently running, use
+taskset and specify the CPU mask and the process. In this example,
+<code>my_embedded_process</code> is being instructed to use only CPU 3
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">taskset 8 /usr/local/bin/my_embedded_process</span>
+</pre>
+</div>
+</li>
+<li>It is also possible to specify more than one CPU in the bitmask. In
+this example, <code>my_embedded_process</code> is being instructed to execute on
+processors 4, 5, 6, and 7
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">taskset 0xF0 /usr/local/bin/my_embedded_process</span>
+</pre>
+</div>
+</li>
+<li>It is also possible to set the CPU affinity for processes that are
+already running by using the -p (&#x2013;pid) option with the CPU mask
+and the PID of the process you wish to change. In this example, the
+process with a PID of 7013 is being instructed to run only on
+CPU 0.
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">taskset -p 1 7013</span>
+</pre>
+</div>
+</li>
+</ol>
+
+<p class="warning">
+The taskset utility works on a Non-Uniform Memory Access (NUMA)
+system, but it does not allow the user to bind threads to CPUs and the
+closest NUMA memory node. On such systems, taskset is not the
+preferred tool, and the numactl utility should be used instead for its
+advanced capabilities.
+</p>
+</div>
+</li>
+<li><a id="sec-4-4-5" name="sec-4-4-5"></a>Related Manual<br  /><div class="outline-text-4" id="text-4-4-5">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #87cefa;">chrt</span>(1)
+<span style="color: #87cefa;">taskset</span>(1)
+<span style="color: #87cefa;">nice</span>(1)
+<span style="color: #87cefa;">renice</span>(1)
+<span style="color: #87cefa;">sched_setscheduler</span>(2) <span style="color: #00ffff;">for</span> a description of the Linux scheduling scheme.
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-4-5" class="outline-3">
+<h3 id="sec-4-5">⁠2.5. File system determinism tips</h3>
+<div class="outline-text-3" id="text-4-5">
+<p>
+The order in which journal changes arrive are sometimes not in the
+order that they are actually written to disk. The kernel I/O system
+has the option of reordering the journal changes, usually to try and
+make best use of available storage space. Journal activity can
+introduce latency through re-ordering journal changes and committing
+data and metadata.
+</p>
+
+<p>
+The default filesystem used by Linux distributions including Red Hat
+Enterprise Linux 6 is a journaling file system called ext4. An
+earlier, mostly compatible implementation of the file system called
+ext2 does not use journaling. Unless your organization specifically
+requires journaling, consider using ext2. In many of our best
+benchmark results, we utilize the ext2 file system and consider it one
+of the top initial tuning recommendations.
+</p>
+</div>
+</div>
+</div>
 
 
 <div id="outline-container-sec-5" class="outline-2">
@@ -272,14 +612,22 @@ equal priority SCHED<sub>RR</sub> threads. This policy is rarely used.
 <div class="outline-text-2" id="text-5">
 <div class="org-src-container">
 
+<pre class="src src-sh"></pre>
+</div>
+
+<div class="org-src-container">
+
 <pre class="src src-c++"></pre>
 </div>
+
+<p class="warning">
+</p>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-01-13 Wed 21:44</p>
+<p class="date">Created: 2016-01-15 Fri 00:44</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

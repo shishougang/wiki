@@ -116,12 +116,233 @@ Linux uses three main scheduling policies:
   priority have a quantum and are round-robin scheduled among all
   equal priority SCHED_RR threads. This policy is rarely used.
 * ⁠Chapter 2. General System Tuning
+** 2.1. Using the Tuna interface
+[[https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_MRG/1.3/html/Tuna_User_Guide/][Tuna User Guide]]
+** 2.2. Setting persistent tuning parameters
+Once you have decided what tuning configuration works for your system,
+persist those parameters. The method you choose depends on the type of
+parameter you are setting.
 
++ Editing the /etc/sysctl.conf file
+  1. Remove the =/proc/sys/= prefix from the command and replace the
+     central / character with a . character.
+  2. Insert the new entry into the /etc/sysctl.conf file with the
+     required parameter.
+    #+begin_src sh
+      # Enable gettimeofday(2)
+      kernel.vsyscall64 = 2
+    #+end_src
+  3. Run # sysctl -p to refresh with the new configuration.
+     #+begin_src sh
+       # sysctl -p
+       ...[output truncated]...
+       kernel.vsyscall64 = 2
+     #+end_src
++ Editing the /etc/rc.d/rc.local file 
+  Adjust the command as per the “Editing the /etc/sysctl.conf file”
+  instructions.
+#+begin_html
+<p class="warning">
+Use this alternative only as a last resort.
+</p>
+#+end_html
+** 2.3. Setting BIOS parameters
++ Power Management
+  Anything that tries to save power by either changing the system
+  clock frequency or by putting the CPU into various sleep states can
+  affect how quickly the system responds to external events.
+
+  For best response times, disable power management options in the
+  BIOS.
++ Error Detection and Correction (EDAC) units
+  EDAC units are devices used to detect and correct errors signaled
+  from Error Correcting Code (ECC) memory. Usually EDAC options range
+  from no ECC checking to a periodic scan of all memory nodes for
+  errors. The higher the EDAC level, the more time is spent in BIOS,
+  and the more likely that crucial event deadlines will be missed.
+
+  Turn EDAC off if possible. Otherwise, switch to the lowest
+  functional level.
++ System Management Interrupts (SMI)
+  SMIs are a facility used by hardware vendors ensure the system is
+  operating correctly. The SMI interrupt is usually not serviced by
+  the running operating system, but by code in the BIOS. SMIs are
+  typically used for thermal management, remote console management
+  (IPMI), EDAC checks, and various other housekeeping tasks.
+
+  If the BIOS contains SMI options, check with the vendor and any
+  relevant documentation to check to what extent it is safe to disable
+  them.
+  #+begin_html
+  <p class="warning">
+  While it is possible to completely disable SMIs, it is strongly
+  recommended that you do not do this. Removing the ability for your
+  system to generate and service SMIs can result in catastrophic
+  hardware failure.
+  </p>
+  #+end_html
+** ⁠2.4. Interrupt and process binding
+Realtime environments need to minimize or eliminate latency when
+responding to various events. Ideally, interrupts (IRQs) and user
+processes can be isolated from one another on different dedicated
+CPUs.
+
+Interrupts are generally shared evenly between CPUs. This can delay
+interrupt processing through having to write new data and instruction
+caches, and often creates conflicts with other processing occurring on
+the CPU. In order to overcome this problem, time-critical interrupts
+and processes can be dedicated to a CPU (or a range of CPUs). In this
+way, the code and data structures needed to process this interrupt
+will have the highest possible likelihood to be in the processor data
+and instruction caches. The dedicated process can then run as quickly
+as possible, while all other non-time-critical processes run on the
+remainder of the CPUs.
+*** Procedure 2.3. Disabling the irqbalance daemon
+This daemon is enabled by default and periodically forces interrupts
+to be handled by CPUs in an even, fair manner. However in realtime
+deployments, applications are typically dedicated and bound to
+specific CPUs, so the *irqbalance* daemon is not required.
+
+1. Check the status of the irqbalance daemon.
+   #+begin_src sh
+     # service irqbalance status
+     irqbalance (pid PID) is running...
+   #+end_src
+2. If the irqbalance daemon is running, stop it using the service
+   command.
+   #+begin_src sh
+     # service irqbalance stop
+     Stopping irqbalance:             [  OK  ]
+   #+end_src
+3. Use chkconfig to ensure that irqbalance does not restart on boot.
+   #+begin_src sh
+    # chkconfig irqbalance off
+   #+end_src
+*** Procedure 2.4. Excluding CPUs from IRQ Balancing
+he =/etc/sysconfig/irqbalance= configuration file contains a setting
+that allows CPUs to be excluded from consideration by the IRQ balacing
+service. This parameter is named =IRQBALANCE_BANNED_CPUS= and is a
+64-bit hexadecimal bit mask, where each bit of the mask represents a
+CPU core.
+
+1. Open /etc/sysconfig/irqbalance in your preferred text editor and
+   find the section of the file titled IRQBALANCE_BANNED_CPUS.
+   #+begin_src sh
+     # IRQBALANCE_BANNED_CPUS
+     # 64 bit bitmask which allows you to indicate which cpu's should
+     # be skipped when reblancing irqs. Cpu numbers which have their
+     # corresponding bits set to one in this mask will not have any
+     # irq's assigned to them on rebalance
+     #
+     #IRQBALANCE_BANNED_CPUS=
+   #+end_src
+2. Exclude CPUs 8 to 15 by uncommenting the variable
+   =IRQBALANCE_BANNED_CPUS= and setting its value this way:
+   #+begin_src sh
+     IRQBALANCE_BANNED_CPUS=0000ff00
+   #+end_src
+   This will cause the irqbalance process to ignore the CPUs that have
+   bits set in the bitmask; in this case, bits 8 through 15.
+3. If you are running a system with up to 64 CPU cores, separate each
+   group of eight hexadecimal digits with a comma:
+   #+begin_src sh
+     IRQBALANCE_BANNED_CPUS=00000001,0000ff00
+   #+end_src
+   The above mask excludes CPUs 8 to 15 as well as CPU 33 from IRQ
+   balancing.
+*** Procedure 2.5. Manually Assigning CPU Affinity to Individual IRQs
+1. Check which IRQ is in use by each device by viewing the
+   =/proc/interrupts= file:
+   #+begin_src sh
+     # cat /proc/interrupts
+   #+end_src
+   This file contains a list of IRQs. Each line shows the IRQ number,
+   the number of interrupts that happened in each CPU, followed by the
+   IRQ type and a description:
+   #+begin_src sh
+     CPU0             CPU1
+     0:   26575949         11         IO-APIC-edge  timer
+     1:         14          7         IO-APIC-edge  i8042
+     ...[output truncated]...
+   #+end_src
+2. To instruct an IRQ to run on only one processor, echo the CPU mask
+   (as a hexadecimal number) to =/proc/interrupts=. In this example, we
+   are instructing the interrupt with IRQ number 142 to run on CPU 0
+   only:
+   #+begin_src sh
+     # echo 1 > /proc/irq/142/smp_affinity
+   #+end_src
+3. This change will only take effect once an interrupt has occurred. 
+*** Procedure 2.6. Binding Processes to CPUs using the taskset utility
+The *taskset* utility uses the process ID (PID) of a task to view or set
+the affinity, or can be used to launch a command with a chosen CPU
+affinity.
+1. To set the affinity of a process that is not currently running, use
+   taskset and specify the CPU mask and the process. In this example,
+   =my_embedded_process= is being instructed to use only CPU 3
+   #+begin_src sh
+     # taskset 8 /usr/local/bin/my_embedded_process
+   #+end_src
+2. It is also possible to specify more than one CPU in the bitmask. In
+   this example, =my_embedded_process= is being instructed to execute on
+   processors 4, 5, 6, and 7
+   #+begin_src sh
+     # taskset 0xF0 /usr/local/bin/my_embedded_process
+   #+end_src
+3. It is also possible to set the CPU affinity for processes that are
+   already running by using the -p (--pid) option with the CPU mask
+   and the PID of the process you wish to change. In this example, the
+   process with a PID of 7013 is being instructed to run only on
+   CPU 0.
+   #+begin_src sh
+     # taskset -p 1 7013
+   #+end_src
+
+#+begin_html
+<p class="warning">
+The taskset utility works on a Non-Uniform Memory Access (NUMA)
+system, but it does not allow the user to bind threads to CPUs and the
+closest NUMA memory node. On such systems, taskset is not the
+preferred tool, and the numactl utility should be used instead for its
+advanced capabilities.
+</p>
+#+end_html
+*** Related Manual
+#+begin_src sh
+chrt(1)
+taskset(1)
+nice(1)
+renice(1)
+sched_setscheduler(2) for a description of the Linux scheduling scheme.
+#+end_src
+** ⁠2.5. File system determinism tips
+The order in which journal changes arrive are sometimes not in the
+order that they are actually written to disk. The kernel I/O system
+has the option of reordering the journal changes, usually to try and
+make best use of available storage space. Journal activity can
+introduce latency through re-ordering journal changes and committing
+data and metadata.
+
+The default filesystem used by Linux distributions including Red Hat
+Enterprise Linux 6 is a journaling file system called ext4. An
+earlier, mostly compatible implementation of the file system called
+ext2 does not use journaling. Unless your organization specifically
+requires journaling, consider using ext2. In many of our best
+benchmark results, we utilize the ext2 file system and consider it one
+of the top initial tuning recommendations.
 
 
 * cc
+
+#+begin_src sh
+
+#+end_src
 
 #+begin_src c++
 
 #+end_src
 
+#+begin_html
+<p class="warning">
+</p>
+#+end_html
