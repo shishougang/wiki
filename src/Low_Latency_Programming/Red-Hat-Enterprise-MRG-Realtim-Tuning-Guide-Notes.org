@@ -4,6 +4,9 @@
 
 * Homepage
 + [[https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_MRG/2/html/Realtime_Tuning_Guide/index.html][Red Hat Enterprise MRG Realtime Tuning Guid]]
++ MRG Realtime Installation Guide
++ [[https://rt.wiki.kernel.org/index.php/HOWTO:_Build_an_RT-application][HOWTO: Build an RT-application
+]]
 
 * Preface
  Red Hat Enterprise MRG is a high performance distributed computing
@@ -330,7 +333,3370 @@ ext2 does not use journaling. Unless your organization specifically
 requires journaling, consider using ext2. In many of our best
 benchmark results, we utilize the ext2 file system and consider it one
 of the top initial tuning recommendations.
+*** Procedure 2.7. Disabling atime
+1. Open the =/etc/fstab=
+   #+begin_src sh
+     LABEL=/       /       ext4    defaults        1 1
+     ...[output truncated]...
+   #+end_src
+2. Edit the options sections to include the terms noatime and
+   =nodiratime=. =noatime= prevents access timestamps being updated when a
+   file is read and =nodiratime= will stop directory inode access times
+   being updated.
+   #+begin_src sh
+     LABEL=/       /       ext4    noatime,nodiratime        1 1
+   #+end_src
+*** Related Manual Pages
+#+begin_src sh
+mkfs.ext2(8)
+mkfs.ext4(8)
+mount(8) - for information on atime, nodiratime and noatime
+chattr(1)
+#+end_src
 
+** 2.6. Using hardware clocks for system timestamping
+Multiprocessor systems such as NUMA or SMP have multiple instances of
+hardware clocks. During boot time the kernel discovers the available
+clock sources and selects one to use. For the list of the available
+clock sources in your system, view the
+=/sys/devices/system/clocksource/clocksource0/available_clocksource=
+file:
+
+#+begin_src sh
+# cat /sys/devices/system/clocksource/clocksource0/available_clocksource 
+tsc hpet acpi_pm
+#+end_src
+
+In the example above, the TSC, HPET and =ACPI_PM= clock sources are
+available.
+
+The clock source currently in use can be inspected by reading the
+=/sys/devices/system/clocksource/clocksource0/current_clocksource=
+file:
+
+#+begin_src sh
+# cat /sys/devices/system/clocksource/clocksource0/current_clocksource
+tsc
+#+end_src
+
+*** Changing clock sources
+Requirements for crucial applications vary on each system. Therefore,
+the best clock for each application, and consequently each system,
+also varies. Some applications depend on clock resolution, and a clock
+that delivers reliable nanoseconds readings can be more suitable.
+Applications that read the clock too often can benefit from a clock
+with a smaller reading cost (the time between a read request and the
+result).
+
+To do so, select a clock source from the list presented in the
+=/sys/devices/system/clocksource/clocksource0/available_clocksource=
+file and write the clock's name into the
+=/sys/devices/system/clocksource/clocksource0/current_clocksource= file.
+For example, the following command sets HPET as the clock source in
+use:
+
+#+begin_src sh
+# echo hpet > /sys/devices/system/clocksource/clocksource0/current_clocksource
+#+end_src
+
+*** Configuring additional boot parameters for the TSC clock
+While there is no single clock which is ideal for all systems, TSC is
+generally the preferred clock source. To optimize the reliability of
+the TSC clock, you can configure additional parameters when booting
+the kernel, for example:
+
++ =idle=poll=: Forces the clock to avoid entering the idle state.
++ =processor.max_cstate=1=: Prevents the clock from entering deeper
+  C-states (energy saving mode), so it does not become out of sync.
+*** Controlling power management transitions
+Modern processors actively transition to higher power saving states
+(C-states) from lower states. Unfortunately, transitioning from a high
+power saving state back to a running state can consume more time than
+is optimal for a Realtime application. To prevent these transitions,
+an application can use the Power Management Quality of Service (PM
+QoS) interface.
+
+When an application holds the =/dev/cpu_dma_latency= file open, the PM
+QoS interface prevents the processor from entering deep sleep states
+and causing unexpected latencies when exiting deep sleep states. When
+the file is closed, the system returns to a power-saving state.
+
+1. Open the =/dev/cpu_dma_latency= file. 
+2. Write a 32-bit number to it. This number represents a maximum
+   response time in microseconds. For the fastest possible response
+   time, use 0.
+
+An example =/dev/cpu_dma_latency= file is as follows:
+#+begin_src c++
+static int pm_qos_fd = -1;
+
+void start_low_latency(void)
+{
+	s32_t target = 0;
+
+	if (pm_qos_fd &gt;= 0)
+		return;
+	pm_qos_fd = open("/dev/cpu_dma_latency", O_RDWR);
+	if (pm_qos_fd &lt; 0) {
+	   fprintf(stderr, "Failed to open PM QOS file: %s",
+	           strerror(errno));
+	   exit(errno);
+	}
+	write(pm_qos_fd, &target, sizeof(target));
+}
+
+void stop_low_latency(void)
+{
+	if (pm_qos_fd &gt;= 0)
+	   close(pm_qos_fd);
+}
+#+end_src
+
+The application will first =call start_low_latency()=, perform the
+required latency-sensitive processing, then call =stop_low_latency()=.
+** ⁠2.7. Avoid running extra applications
++ Graphical desktop
+  open the /etc/inittab file, change =id:5:initdefault:= into
+  =id:3:initdefault:=. By default, the runlevel is 5 - full
+  multi-user mode, using the graphical interface. By changing the
+  number in the string to 3, the default runlevel will be full
+  multi-user mode, but without the graphical interface.
++ Mail Transfer Agents (MTA, such as Sendmail or Postfix)
++ Remote Procedure Calls (RPCs)
++ Network File System (NFS)
++ Mouse Services
+  Remove the hardware and uninstall gpm.
++ Automated tasks
++ Check for automated cron or at jobs that could impact performance.
+
+** ⁠2.8. Swapping and out of memory tips
+Swapping pages out to disk can introduce latency in any environment.
+To ensure low latency, the best strategy is to have enough memory in
+your systems so that swapping is not necessary. Use =vmstat= to monitor
+memory usage and watch the =si (swap in)= and =so (swap out)= fields. It
+is optimal that they remain on zero as much as possible.
+
+*** Procedure 2.8. Out of Memory (OOM)
+Out of Memory (OOM) refers to a computing state where all available
+memory, including swap space, has been allocated. Normally this will
+cause the system to panic and stop functioning as expected. There is a
+switch that controls OOM behavior in =/proc/sys/vm/panic_on_oom=. When
+set to 1 the kernel will panic on OOM. The default setting is =0= which
+instructs the kernel to call a function named =oom_killer= on an OOM. 
+
+1. The easiest way to change this is to echo the new value to
+   =/proc/sys/vm/panic_on_oom=.
+   #+begin_src sh
+     # cat /proc/sys/vm/panic_on_oom
+     0
+     
+     #  echo 1 > /proc/sys/vm/panic_on_oom
+     
+     # cat /proc/sys/vm/panic_on_oom
+     1
+   #+end_src
+2. It is also possible to prioritize which processes get killed by
+   adjusting the oom_killer score. In =/proc/PID/= there are two tools
+   labeled =oom_adj= and =oom_score=. Valid scores for oom_adj= are in the
+   range -16 to +15. This value is used to calculate the 'badness' of
+   the process using an algorithm that also takes into account how
+   long the process has been running, among other factors. =oom_killer=
+   will kill processes with the highest scores first.
+   
+   This example adjusts the =oom_score= of a process with a PID of 12465
+   to make it less likely that =oom_killer= will kill it.
+   #+begin_src sh
+     # cat /proc/12465/oom_score 
+     79872
+     
+     # echo -5 > /proc/12465/oom_adj
+             
+     # cat /proc/12465/oom_score
+     78
+   #+end_src
+3. There is also a special value of -17, which disables =oom_killer= for
+   that process. 
+   #+begin_src sh
+     # cat /proc/12465/oom_score
+     78
+             
+     # echo -17 > /proc/12465/oom_adj
+             
+     # cat /proc/12465/oom_score
+     0
+   #+end_src
+** ⁠2.9. Network determinism tips
+*** Transmission Control Protocol (TCP)
+TCP can have a large effect on latency. TCP adds latency in order to
+obtain efficiency, control congestion, and to ensure reliable
+delivery. When tuning, consider the following points:
+
++ Do you need ordered delivery?
++ Do you need to guard against packet loss?
+  Transmitting packets more than once can cause delays.
++ If you must use TCP, consider disabling the Nagle buffering
+  algorithm by using =TCP_NODELAY= on your socket. The Nagle algorithm
+  collects small outgoing packets to send all at once, and can have a
+  detrimental effect on latency.
+*** Network Tuning
+There are numerous tools for tuning the network.
+*** Interrupt Coalescing
+To reduce network traffic, packets can be collected and a single
+interrupt generated.
+
+Use the =-C (--coalesce)= option with the *ethtool* command to enable.
+*** Congestion
+Often, I/O switches can be subject to back-pressure, where network
+data builds up as a result of full buffers.
+
+Use the =-A (--pause)= option with the *ethtool* command to change pause
+parameters and avoid network congestion.
+*** Infiniband (IB)
+Infiniband is a type of communications architecture often used to
+increase bandwidth and provide quality of service and failover. It can
+also be used to improve latency through Remote Direct Memory Access
+(RDMA) capabilities.
+*** Network Protocol Statistics
+Use the =-s (--statistics)= option with the *netstat* command to monitor
+network traffic.
+
+** ⁠2.10. syslog tuning tips
+syslog can forward log messages from any number of programs over a
+network. The less often this occurs, the larger the pending
+transaction is likely to be. If the transaction is very large an I/O
+spike can occur. To prevent this, keep the interval reasonably small.
+
+The system logging daemon, called =syslogd=, is used to collect messages
+from a number of different programs. It also collects information
+reported by the kernel from the kernel logging daemon =klogd=.
+Typically, syslogd will log to a local file, but it can also be
+configured to log over a network to a remote logging server.
+
+** ⁠2.11. The PC card daemon
+The pcscd daemon is used to manage connections to PC and SC smart card
+readers. Although pcscd is usually a low priority task, it can often
+use more CPU than any other daemon.
+
+*** Procedure 2.10. Disabling the pcscd Daemon
+1. Check the status of the pcscd daemon.
+   #+begin_src sh
+     # service pcscd status
+     pcscd (pid PID) is running...
+   #+end_src
+2. If the =pcscd= daemon is running, stop it using the =service= command.
+   #+begin_src sh
+     # service pcscd stop
+     Stopping PC/SC smart card daemon (pcscd):            [  OK  ]
+   #+end_src
+3. Use =chkconfig= to ensure that =pcscd= does not restart on boot.
+   #+begin_src sh
+     # chkconfig pcscd off
+   #+end_src
+** ⁠2.12. Reduce TCP performance spikes
+Turn timestamps off to reduce performance spikes related to timestamp
+generation. The =sysctl= command controls the values of TCP related
+entries, setting the timestamps kernel parameter found at
+=/proc/sys/net/ipv4/tcp_timestamps=.
++ Turn timestamps off with the following command:
+  #+begin_src sh
+    # sysctl -w net.ipv4.tcp_timestamps=0
+    net.ipv4.tcp_timestamps = 0
+  #+end_src
++ Turn timestamps on with the following command:
+  #+begin_src sh
+    # sysctl -w net.ipv4.tcp_timestamps=1
+    net.ipv4.tcp_timestamps = 1
+  #+end_src
+** ⁠2.13. Reducing the TCP delayed ack timeout
+On Red Hat Enterprise Linux, there are two modes used by TCP to
+acknowledge data reception:
++ Quick ACK
+  1. This mode is used at the start of a TCP connection so that the
+     congestion window can grow quickly.
+  2. To change the default TCP ACK timeout value, write the desired
+     value in milliseconds to the =/proc/sys/net/ipv4/tcp_ato_min= file:
+     #+begin_src sh
+       # echo 4 > /proc/sys/net/ipv4/tcp_ato_min
+     #+end_src
++ Delayed ACK
+  1. After the connection is established, TCP assumes this mode, in
+     which ACKs for multiple received packets can be sent in a single
+     packet.
+  2. To change the default TCP Delayed ACK value, write the desired
+     value in milliseconds to the =/proc/sys/net/ipv4/tcp_delack_min=
+     file:
+    #+begin_src sh
+      # echo 4 > /proc/sys/net/ipv4/tcp_delack_min
+    #+end_src
+
+TCP switches between the two modes depending on the current
+congestion.
+
+Some applications that send small network packets could experience
+latencies due to the TCP quick and delayed acknowledgment timeouts,
+which previously were 40 ms by default. That means small packets from
+an application that seldom sends information through the network could
+experience a delay up to 40 ms to receive the acknowledgment that a
+packet has been received by the other side. To minimize this issue,
+both =tcp_ato_min= and =tcp_delack_min= timeouts are now 4 ms by default.
+* Chapter 3. Realtime-Specific Tuning
+** ⁠3.4. Infiniband
+[[http://people.redhat.com/dledford/infiniband_get_started.html][Getting Started with InfiniBand]]
+** ⁠3.6. Non-Uniform Memory Access
+Non-Uniform Memory Access (NUMA) is a design used to allocate memory
+resources to a specific CPU. This can improve access time and results
+in fewer memory locks. Although this appears as though it would be
+useful for reducing latency, NUMA systems have been known to interact
+badly with realtime applications, as they can cause unexpected event
+latencies.
+
+For more information about the NUMA API, see Andi Kleen's whitepaper
+[[http://www.halobates.de/numaapi3.pdf][An NUMA API for Linux]].
+** ⁠3.8. Using the ftrace utility for tracing latencies
+One of the diagnostic facilities provided with the MRG Realtime kernel
+is *ftrace*, which is used by developers to analyze and debug latency
+and performance issues that occur outside of user-space. The ftrace
+utility has a variety of options that allow you to use the utility in
+a number of different ways. It can be used to trace context switches,
+measure the time it takes for a high-priority task to wake up, the
+length of time interrupts are disabled, or list all the kernel
+functions executed during a given period.
+** ⁠3.9. Latency tracing using trace-cmd
+*trace-cmd* is a MRG Realtime function that traces all kernel function
+calls, and some special events. It records what is happening in the
+system during a short period of time, providing information that can
+be used to analyze system behavior.
+
+install the trace-cmd:
+#+begin_src sh
+# sudo apt-get install trace-cmd
+# or
+# yum install trace-cmd
+#+end_src
+
+The commands instruct trace-cmd to trace in specific ways.
+#+begin_src sh
+Command	Description
+record	Record a trace into a trace.dat file.
+start	Start tracing without recording into a file.
+extract	Extract a trace from the kernel.
+stop	Stops the kernel from recording trace data.
+reset	Disable all kernel tracing and clear the trace buffers.
+report	Read out the trace stored in a trace.dat file.
+split	Parse a trace.dat file into smaller file(s).
+listen	Listen on a network socket for trace clients.
+list	List the available events, plugins or options.
+#+end_src
+
+In this example, the trace-cmd utility will trace a single trace
+point:
+#+begin_src sh
+# ./trace-cmd record -e sched_wakeup ls /bin
+#+end_src
+** ⁠3.10. Using sched_nr_migrate to limit SCHED_OTHER task migration
+If a =SCHED_OTHER= task spawns a large number of other tasks, they will
+all run on the same CPU. The migration task or =softirq= will try to
+balance these tasks so they can run on idle CPUs. The =sched_nr_migrate=
+option can be set to specify the number of tasks that will move at a
+time. Because realtime tasks have a different way to migrate, they are
+not directly affected by this, however when =softirq= moves the tasks it
+locks the run queue spinlock that is needed to disable interrupts. If
+there are a large number of tasks that need to be moved, it will occur
+while interrupts are disabled, so no timer events or wakeups will
+happen simultaneously. This can cause severe latencies for realtime
+tasks when the =sched_nr_migrate= is set to a large value.
+*** Procedure 3.4. Adjusting the value of the sched_nr_migrate variable
+1. Increasing the =sched_nr_migrate= variable gives high performance
+   from =SCHED_OTHER= threads that spawn lots of tasks, at the expense
+   of realtime latencies. For low realtime task latency at the expense
+   of =SCHED_OTHER= task performance, the value must be lowered. The
+   default value is 8.
+2. To adjust the value of the sched_nr_migrate variable, you can echo
+   the value directly to /proc/sys/kernel/sched_nr_migrate:
+   #+begin_src sh
+     # echo 2 > /proc/sys/kernel/sched_nr_migrate
+   #+end_src
+* Chapter 4. Application Tuning and Deployment
+For further reading on developing your own MRG Realtime applications,
+start by reading the [[https://rt.wiki.kernel.org/index.php/HOWTO:_Build_an_RT-application][HOWTO: Build an RT-application]].
+
+** 
+
+
+* ⁠Appendix A. Event Tracing
+#+begin_src sh
+Event Tracing
+
+		Documentation written by Theodore Ts'o
+		Updated by Li Zefan and Tom Zanussi
+
+1. Introduction
+===============
+
+Tracepoints (see Documentation/trace/tracepoints.txt) can be used
+without creating custom kernel modules to register probe functions
+using the event tracing infrastructure.
+
+Not all tracepoints can be traced using the event tracing system;
+the kernel developer must provide code snippets which define how the
+tracing information is saved into the tracing buffer, and how the
+tracing information should be printed.
+
+2. Using Event Tracing
+======================
+
+2.1 Via the 'set_event' interface
+---------------------------------
+
+The events which are available for tracing can be found in the file
+/sys/kernel/debug/tracing/available_events.
+
+To enable a particular event, such as 'sched_wakeup', simply echo it
+to /sys/kernel/debug/tracing/set_event. For example:
+
+	# echo sched_wakeup >> /sys/kernel/debug/tracing/set_event
+
+[ Note: '>>' is necessary, otherwise it will firstly disable
+  all the events. ]
+
+To disable an event, echo the event name to the set_event file prefixed
+with an exclamation point:
+
+	# echo '!sched_wakeup' >> /sys/kernel/debug/tracing/set_event
+
+To disable all events, echo an empty line to the set_event file:
+
+	# echo > /sys/kernel/debug/tracing/set_event
+
+To enable all events, echo '*:*' or '*:' to the set_event file:
+
+	# echo *:* > /sys/kernel/debug/tracing/set_event
+
+The events are organized into subsystems, such as ext4, irq, sched,
+etc., and a full event name looks like this: <subsystem>:<event>.  The
+subsystem name is optional, but it is displayed in the available_events
+file.  All of the events in a subsystem can be specified via the syntax
+"<subsystem>:*"; for example, to enable all irq events, you can use the
+command:
+
+	# echo 'irq:*' > /sys/kernel/debug/tracing/set_event
+
+2.2 Via the 'enable' toggle
+---------------------------
+
+The events available are also listed in /sys/kernel/debug/tracing/events/ hierarchy
+of directories.
+
+To enable event 'sched_wakeup':
+
+	# echo 1 > /sys/kernel/debug/tracing/events/sched/sched_wakeup/enable
+
+To disable it:
+
+	# echo 0 > /sys/kernel/debug/tracing/events/sched/sched_wakeup/enable
+
+To enable all events in sched subsystem:
+
+	# echo 1 > /sys/kernel/debug/tracing/events/sched/enable
+
+To enable all events:
+
+	# echo 1 > /sys/kernel/debug/tracing/events/enable
+
+When reading one of these enable files, there are four results:
+
+ 0 - all events this file affects are disabled
+ 1 - all events this file affects are enabled
+ X - there is a mixture of events enabled and disabled
+ ? - this file does not affect any event
+
+2.3 Boot option
+---------------
+
+In order to facilitate early boot debugging, use boot option:
+
+	trace_event=[event-list]
+
+The format of this boot option is the same as described in section 2.1.
+
+3. Defining an event-enabled tracepoint
+=======================================
+
+See The example provided in samples/trace_events
+
+4. Event formats
+================
+
+Each trace event has a 'format' file associated with it that contains
+a description of each field in a logged event.  This information can
+be used to parse the binary trace stream, and is also the place to
+find the field names that can be used in event filters (see section 5).
+
+It also displays the format string that will be used to print the
+event in text mode, along with the event name and ID used for
+profiling.
+
+Every event has a set of 'common' fields associated with it; these are
+the fields prefixed with 'common_'.  The other fields vary between
+events and correspond to the fields defined in the TRACE_EVENT
+definition for that event.
+
+Each field in the format has the form:
+
+     field:field-type field-name; offset:N; size:N; signed:N;
+
+where offset is the offset of the field in the trace record and size
+is the size of the data item, in bytes, signed will be 0 or 1 denoting
+if the type of field is signed or not.
+
+For example, here's the information displayed for the 'sched_wakeup'
+event:
+
+# cat /sys/kernel/debug/tracing/events/sched/sched_wakeup/format
+name: sched_wakeup
+ID: 62
+format:
+	field:unsigned short common_type;	offset:0;	size:2;	signed:0;
+	field:unsigned char common_flags;	offset:2;	size:1;	signed:0;
+	field:unsigned char common_preempt_count;	offset:3;	size:1;	signed:0;
+	field:int common_pid;	offset:4;	size:4;	signed:1;
+	field:int common_lock_depth;	offset:8;	size:4;	signed:1;
+
+	field:char comm[TASK_COMM_LEN];	offset:12;	size:16;	signed:1;
+	field:pid_t pid;	offset:28;	size:4;	signed:1;
+	field:int prio;	offset:32;	size:4;	signed:1;
+	field:int success;	offset:36;	size:4;	signed:1;
+	field:int target_cpu;	offset:40;	size:4;	signed:1;
+
+print fmt: "comm=%s pid=%d prio=%d success=%d target_cpu=%03d", REC->comm, REC->pid, REC->prio, REC->success, REC->target_cpu
+
+This event contains 10 fields, the first 5 common and the remaining 5
+event-specific.  All the fields for this event are numeric, except for
+'comm' which is a string, a distinction important for event filtering.
+
+5. Event filtering
+==================
+
+Trace events can be filtered in the kernel by associating boolean
+'filter expressions' with them.  As soon as an event is logged into
+the trace buffer, its fields are checked against the filter expression
+associated with that event type.  An event with field values that
+'match' the filter will appear in the trace output, and an event whose
+values don't match will be discarded.  An event with no filter
+associated with it matches everything, and is the default when no
+filter has been set for an event.
+
+5.1 Expression syntax
+---------------------
+
+A filter expression consists of one or more 'predicates' that can be
+combined using the logical operators '&&' and '||'.  A predicate is
+simply a clause that compares the value of a field contained within a
+logged event with a constant value and returns either 0 or 1 depending
+on whether the field value matched (1) or didn't match (0):
+
+	  field-name relational-operator value
+
+Parentheses can be used to provide arbitrary logical groupings and
+double-quotes can be used to prevent the shell from interpreting
+operators as shell meta characters.
+
+The field-names available for use in filters can be found in the
+'format' files for trace events (see section 4).
+
+The relational-operators depend on the type of the field being tested:
+
+The operators available for numeric fields are:
+
+==, !=, <, <=, >, >=
+
+And for string fields they are:
+
+==, !=
+
+Currently, only exact string matches are supported.
+
+Currently, the maximum number of predicates in a filter is 16.
+
+5.2 Setting filters
+-------------------
+
+A filter for an individual event is set by writing a filter expression
+to the 'filter' file for the given event.
+
+For example:
+
+# cd /sys/kernel/debug/tracing/events/sched/sched_wakeup
+# echo "common_preempt_count > 4" > filter
+
+A slightly more involved example:
+
+# cd /sys/kernel/debug/tracing/events/signal/signal_generate
+# echo "((sig >= 10 && sig < 15) || sig == 17) && comm != bash" > filter
+
+If there is an error in the expression, you'll get an 'Invalid
+argument' error when setting it, and the erroneous string along with
+an error message can be seen by looking at the filter e.g.:
+
+# cd /sys/kernel/debug/tracing/events/signal/signal_generate
+# echo "((sig >= 10 && sig < 15) || dsig == 17) && comm != bash" > filter
+-bash: echo: write error: Invalid argument
+# cat filter
+((sig >= 10 && sig < 15) || dsig == 17) && comm != bash
+^
+parse_error: Field not found
+
+Currently the caret ('^') for an error always appears at the beginning of
+the filter string; the error message should still be useful though
+even without more accurate position info.
+
+5.3 Clearing filters
+--------------------
+
+To clear the filter for an event, write a '0' to the event's filter
+file.
+
+To clear the filters for all events in a subsystem, write a '0' to the
+subsystem's filter file.
+
+5.3 Subsystem filters
+---------------------
+
+For convenience, filters for every event in a subsystem can be set or
+cleared as a group by writing a filter expression into the filter file
+at the root of the subsystem.  Note however, that if a filter for any
+event within the subsystem lacks a field specified in the subsystem
+filter, or if the filter can't be applied for any other reason, the
+filter for that event will retain its previous setting.  This can
+result in an unintended mixture of filters which could lead to
+confusing (to the user who might think different filters are in
+effect) trace output.  Only filters that reference just the common
+fields can be guaranteed to propagate successfully to all events.
+
+Here are a few subsystem filter examples that also illustrate the
+above points:
+
+Clear the filters on all events in the sched subsytem:
+
+# cd /sys/kernel/debug/tracing/events/sched
+# echo 0 > filter
+# cat sched_switch/filter
+none
+# cat sched_wakeup/filter
+none
+
+Set a filter using only common fields for all events in the sched
+subsytem (all events end up with the same filter):
+
+# cd /sys/kernel/debug/tracing/events/sched
+# echo common_pid == 0 > filter
+# cat sched_switch/filter
+common_pid == 0
+# cat sched_wakeup/filter
+common_pid == 0
+
+Attempt to set a filter using a non-common field for all events in the
+sched subsytem (all events but those that have a prev_pid field retain
+their old filters):
+
+# cd /sys/kernel/debug/tracing/events/sched
+# echo prev_pid == 0 > filter
+# cat sched_switch/filter
+prev_pid == 0
+# cat sched_wakeup/filter
+common_pid == 0
+#+end_src
+
+* ⁠Appendix B. Function Tracer
+#+begin_src sh
+ftrace - Linux kernel internal tracer
+
+Introduction
+------------
+
+Ftrace is an internal tracer for the Linux kernel. It is designed to
+follow the processing of what happens within the kernel as that is
+normally a black box. It allows the user to trace kernel functions
+that are called in real time, as well as to see various events like
+tasks scheduling, interrupts, disk activity and other services that
+the kernel provides.
+
+Ftrace was intorduced to Linux in the 2.6.27 kernel, and has increased
+in functionality ever since. It is not meant to trace what is happening
+inside user applications, but can be used to trace within system calls
+that user applications make.
+
+
+The Debug File System
+---------------------
+
+The user interface for ftrace is a series of files within the debug
+file system that is usually mounted at /sys/kernel/debug. The ftrace
+files are in the tracing directory that can be accessed at
+/sys/kernel/debug/tracing.
+
+Note, there is also a user interface tool called trace-cmd. See later
+in this document for more information about that tool.
+
+In order to mount the debug filesystem, perform the following:
+
+ mount -t debugfs nodev /sys/kernel/debug
+
+Then you can change directory into the ftrace tracing location:
+
+ cd /sys/kernel/debug/tracing
+
+Note, all these files can only be modified by root user, as enabling
+tracing can have an impact on the performance of the system.
+
+
+Ftrace files
+------------
+
+The main files within this directory are:
+
+ trace - the file that shows the output of a ftrace trace. This is
+       really a snapshot of the trace in time, as it stops tracing as
+       this file is read, and it does not consume the events read.
+       That is, if the user disabled tracing and read this file, it
+       will always report the same thing every time its read.
+
+       Also, to clear the trace buffer, simply write into this file.
+
+          ># echo > trace
+
+       This will erase the entire contents of the trace buffer.
+
+ trace_pipe - like "trace" but is used to read the trace live. It is
+       a producer / consumer trace, where each read will consume the
+       event that is read. But this can be used to see an active trace
+       without stopping the trace as it is read.
+
+ available_tracers - a list of ftrace tracers that have been compiled
+       into the kernel.
+
+ current_tracer   - enables or disables a ftrace tracer
+
+ events - a directory that contains events to trace and can be used
+       to enable or disable events as well as set filters for the events
+
+ tracing_on - disable and enable recording to the ftrace buffer.
+       Note, disabling tracing via the tracing_on file does not disable
+       the actual tracing that is happening inside the kernel. It only
+       disables writing to the buffer. The work to do the trace still
+       happens, but the data does not go anywhere.
+
+There are several other files, but we will get to them as they come
+up with functionalities of the tracers.
+
+
+Tracers and Events
+------------------
+
+Tracers have specific functionality within the kernel, where as events
+are just some kind of data that is recorded into the ftrace buffer.
+To understand this more, we need to take a look at the tracers themselves
+and the events as well.
+
+nop
+---
+
+The default tracer is called "nop". It is just a nop tracer, and does not
+provide any tracing facility itself. But, as events may interleave into
+any tracer, the "nop" tracer is what is used if you are only interested
+in tracing events.
+
+When the "nop" tracer is active and the trace buffer is empty, the "trace"
+file shows the following:
+
+># cat trace
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 0/0   #P:8
+#
+#                              _-------=> irqs-off          
+#                            /  _------=> need-resched      
+#                            |/  _-----=> need-resched_lazy 
+#                            ||/  _----=> hardirq/softirq   
+#                            |||/  _---=> preempt-depth     
+#                            ||||/  _--=> preempt-lazy-depth
+#                            ||||| / _-=> migrate-disable   
+#                            |||||| /     delay
+#           TASK-PID   CPU#  |||||||    TIMESTAMP  FUNCTION
+#              | |       |   |||||||       |         |
+
+
+It starts with what tracer is active and then gives a default header.
+
+Now to enable an event, you must write an ASCII '1' into the "enable"
+file for the particular event.
+
+># echo 1 > events/sched/sched_switch/enable
+># cat trace
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 463/463   #P:8
+#
+#                              _-------=> irqs-off          
+#                            /  _------=> need-resched      
+#                            |/  _-----=> need-resched_lazy 
+#                            ||/  _----=> hardirq/softirq   
+#                            |||/  _---=> preempt-depth     
+#                            ||||/  _--=> preempt-lazy-depth
+#                            ||||| / _-=> migrate-disable   
+#                            |||||| /     delay
+#           TASK-PID   CPU#  |||||||    TIMESTAMP  FUNCTION
+#              | |       |   |||||||       |         |
+            bash-1367  [007] d...... 11927.750484: sched_switch: prev_comm=bash prev_pid=1367 prev_prio=120 prev_state=S ==> next_comm=kworker/7:1 next_pid=121 next_prio=120
+     kworker/7:1-121   [007] d...... 11927.750514: sched_switch: prev_comm=kworker/7:1 prev_pid=121 prev_prio=120 prev_state=S ==> next_comm=swapper/7 next_pid=0 next_prio=120
+          <idle>-0     [000] d...... 11927.750531: sched_switch: prev_comm=swapper/0 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=sshd next_pid=1365 next_prio=120
+          <idle>-0     [007] d...... 11927.750555: sched_switch: prev_comm=swapper/7 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=kworker/7:1 next_pid=121 next_prio=120
+     kworker/7:1-121   [007] d...... 11927.750575: sched_switch: prev_comm=kworker/7:1 prev_pid=121 prev_prio=120 prev_state=S ==> next_comm=swapper/7 next_pid=0 next_prio=120
+            sshd-1365  [000] d...... 11927.750673: sched_switch: prev_comm=sshd prev_pid=1365 prev_prio=120 prev_state=S ==> next_comm=swapper/0 next_pid=0 next_prio=120
+          <idle>-0     [001] d...... 11927.752568: sched_switch: prev_comm=swapper/1 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=kworker/1:1 next_pid=57 next_prio=120
+          <idle>-0     [002] d...... 11927.752589: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=rcu_sched next_pid=10 next_prio=120
+     kworker/1:1-57    [001] d...... 11927.752590: sched_switch: prev_comm=kworker/1:1 prev_pid=57 prev_prio=120 prev_state=S ==> next_comm=swapper/1 next_pid=0 next_prio=120
+       rcu_sched-10    [002] d...... 11927.752610: sched_switch: prev_comm=rcu_sched prev_pid=10 prev_prio=120 prev_state=S ==> next_comm=swapper/2 next_pid=0 next_prio=120
+          <idle>-0     [007] d...... 11927.753548: sched_switch: prev_comm=swapper/7 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=rcu_sched next_pid=10 next_prio=120
+       rcu_sched-10    [007] d...... 11927.753568: sched_switch: prev_comm=rcu_sched prev_pid=10 prev_prio=120 prev_state=S ==> next_comm=swapper/7 next_pid=0 next_prio=120
+          <idle>-0     [007] d...... 11927.755538: sched_switch: prev_comm=swapper/7 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=kworker/7:1 next_pid=121 next_prio=120
+
+
+As you can see there is quite a lot of information that is displayed
+by simply enabling the sched_switch event.
+
+Events
+------
+
+The events are broken up into "systems". Each system of events has its
+own directory under the "events" directory located in the ftrace "tracing"
+directory in the debug file system.
+
+># ls -F events
+block/       header_event  lock/     printk/        skb/       vsyscall/
+compaction/  header_page   mce/      random/        sock/      workqueue/
+drm/         i915/         migrate/  raw_syscalls/  sunrpc/    writeback/
+enable       irq/          module/   rcu/           syscalls/
+ext4/        jbd2/         napi/     rpm/           task/
+ftrace/      kmem/         net/      sched/         timer/
+hda/         kvm/          oom/      scsi/          udp/
+hda_intel/   kvmmmu/       power/    signal/        vmscan/
+
+Each of these directories represent a system or group of events. Notice that
+there's three files in this directory:
+
+enable
+header_event
+header_page
+
+The only one you should be concerned about is the "enable" file, as that
+will enable all events when an ASCII '1' is written into it and disable
+all events when an ASCII '0' is written into it.
+
+The header_event and header_page provides information necessary for
+the trace-cmd tool.
+
+Each of these directories shows the events that are within that system:
+
+># ls -F events/sched
+enable                   sched_process_exit/  sched_stat_sleep/
+filter                   sched_process_fork/  sched_stat_wait/
+sched_kthread_stop/      sched_process_free/  sched_switch/
+sched_kthread_stop_ret/  sched_process_wait/  sched_wait_task/
+sched_migrate_task/      sched_stat_blocked/  sched_wakeup/
+sched_pi_setprio/        sched_stat_iowait/   sched_wakeup_new/
+sched_process_exec/      sched_stat_runtime/
+
+
+Each directory here represents a single event. Notice that there's two
+files in the system directory:
+
+enable
+filter
+
+The "enable" file here can enable or disable all events within the system
+when an ASCII '1' or '0', respectively, is written to this file.
+
+The "filter" file will be described shortly.
+
+
+Within the individual event directories exist control files:
+
+># ls -F events/sched/sched_wakeup/
+enable  filter  format  id
+
+
+We already used the "enable" file. Now to explain the other files.
+
+The "format" file shows the fields that are written when the event
+is enabled, as well as the fields that can be used for the filter.
+
+The "id" file is used by the perf tool and is not something that needs
+to be delt with here.
+
+
+># cat events/sched/sched_wakeup/format
+name: sched_wakeup
+ID: 249
+format:
+        field:unsigned short common_type;        offset:0;        size:2;        signed:0;
+        field:unsigned char common_flags;        offset:2;        size:1;        signed:0;
+        field:unsigned char common_preempt_count;        offset:3;        size:1;        signed:0;
+        field:int common_pid;        offset:4;        size:4;        signed:1;
+        field:unsigned short common_migrate_disable;        offset:8;        size:2;        signed:0;
+        field:unsigned short common_padding;        offset:10;        size:2;        signed:0;
+
+        field:char comm[16];        offset:16;        size:16;        signed:1;
+        fieldid_t pid;        offset:32;        size:4;        signed:1;
+        field:int prio;        offset:36;        size:4;        signed:1;
+        field:int success;        offset:40;        size:4;        signed:1;
+        field:int target_cpu;        offset:44;        size:4;        signed:1;
+
+print fmt: "comm=%s pid=%d prio=%d success=%d target_cpu=%03d", REC->comm, REC->pid, REC->prio, REC->success, REC->target_cpu
+
+
+This file is also used by perf and trace-cmd to tell how to read the
+raw binary output from the tracing buffers for the event. But what you
+need to know is the field names, as they are used by the filtering.
+
+The first set of fields before the blank line are the common fields that
+exist for all events. The specific fields for the event come after the
+blank line and here it starts with "comm".
+
+
+Filtering events
+----------------
+
+There are times when you may not want to trace all events, but only
+events where one of the event's fields contains a certain value.
+The "filter" file allows for this.
+
+The filter provides the following predicates:
+
+For numerical fields:
+
+ ==, !=, <, <=, >, >=
+
+
+For string fields:
+
+ ==, !=, ~
+
+
+Logical && and || as well as parenthesis are also acceptable.
+
+The syntax is
+
+ <filter> = FIELD <pred-num> | FIELD <pred-string> |
+    '(' <filter> ')' | <filter> '&&' <filter> | <filter> '||' <filter>
+
+ <pred-num> = <num-op> <number>
+
+ <pred-string> = <string-op> <string>
+
+ <num-op> = '==' | '!=' | '<' | '<=' | '>' | '>='
+
+ <string-op> = '==' | '!=' | '~'
+
+ <number> = <digits> | '0x'<hex-number> 
+
+ <digits> = [0-9] | <digits><digits>
+
+ <hex-number> = [0-9] | [a-f] | [A-F] | <hex-number><hex-number>
+
+ <string> = '"' VALUE '"'
+
+The glob expression '~' is a very simple glob. it can only be:
+
+ <glob> = VALUE | '*' VALUE | VALUE '*' | '*' VALUE '*'
+
+That is, anything more complex will not be valid. Such as:
+
+  VALUE '*' VALUE
+
+
+What the glob does is to match a string with wild cards at the beginning
+or end or both, of a value:
+
+  comm ~ "kwork*"
+
+
+Example:
+
+To trace all schedule switches to a real time task:
+
+># echo 'next_prio < 100' > events/sched/sched_switch/filter
+># cat events/sched/sched_switch/filter
+next_prio < 100
+># cat trace
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 11/11   #P:8
+#
+#                              _-------=> irqs-off          
+#                            /  _------=> need-resched      
+#                            |/  _-----=> need-resched_lazy 
+#                            ||/  _----=> hardirq/softirq   
+#                            |||/  _---=> preempt-depth     
+#                            ||||/  _--=> preempt-lazy-depth
+#                            ||||| / _-=> migrate-disable   
+#                            |||||| /     delay
+#           TASK-PID   CPU#  |||||||    TIMESTAMP  FUNCTION
+#              | |       |   |||||||       |         |
+          <idle>-0     [001] d...... 14331.192687: sched_switch: prev_comm=swapper/1 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=rtkit-daemon next_pid=992 next_prio=0
+          <idle>-0     [001] d...... 14333.737030: sched_switch: prev_comm=swapper/1 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=watchdog/1 next_pid=12 next_prio=0
+          <idle>-0     [000] d...... 14333.738023: sched_switch: prev_comm=swapper/0 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=watchdog/0 next_pid=11 next_prio=0
+          <idle>-0     [002] d...... 14333.751985: sched_switch: prev_comm=swapper/2 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=watchdog/2 next_pid=17 next_prio=0
+          <idle>-0     [003] d...... 14333.765947: sched_switch: prev_comm=swapper/3 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=watchdog/3 next_pid=22 next_prio=0
+          <idle>-0     [004] d...... 14333.779933: sched_switch: prev_comm=swapper/4 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=watchdog/4 next_pid=27 next_prio=0
+          <idle>-0     [005] d...... 14333.794114: sched_switch: prev_comm=swapper/5 prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=watchdog/5 next_pid=32 next_prio=0
+
+
+
+Task priorities
+---------------
+
+This is a good time to explain task priorities, as the tracer reports them
+differently than the way user processes see priorities. A task has priority
+policies that are SCHED_OTHER, SCHED_FIFO and SCHED_RR. By default
+tasks are assigned SCHED_OTHER which runs under the kernels Completely
+Fail Scheduler (CFS), where as SCHED_FIFO and SCHED_RR runs under
+the real-time scheduler. The real-time scheduler has 99 different priorities
+ranging from 1 - 99, where 99 is the highest priority and 1 is the lowest.
+This is set by sched_setscheduler(2).
+
+If you noticed above, to show real time tasks, the filter used
+"next_prio < 100". Ftrace reports the internal kernel version of priorities
+for tasks and not the priority that a task sees. This can be a little
+confusing. For user real-time priorities of 1 through 99 are mapped
+internally as 98 to 0, where 0 is the highest priority and 98 is the lowest
+of the real time priorities. All non real-time tasks show a priority of 120,
+as CFS does not use the priority to determine which tasks to run, although
+it does use a nice value, but that's not represented by the prio field
+reported in the traces.
+
+
+
+Tracers
+-------
+
+Depending on how the kernel was configured, not all tracers may be available
+for a given kernel.For the MRG kernels, the trace and debug kernels have
+different tracers than the production kernel does. This is because some
+of the tracers have a noticeable overhead when the tracer is configured
+into the kernel but not active. Those tracers are only enabled for
+the trace and debug kernels.
+
+
+To see what tracers are available for the kernel, cat out the contents
+of "available_tracers":
+
+># cat available_tracers 
+function_graph wakeup_rt wakeup preemptirqsoff preemptoff irqsoff function nop
+
+
+The "nop" tracer has already been discussed and is available in all
+kernels.
+
+
+The "function" tracer
+---------------------
+
+The most popular tracer aside from the "nop" tracer is the "function"
+tracer. This tracer traces the function calls within the kernel.
+Depending on how many functions are tracer or which specific functions,
+it can cause a very noticeable overhead when tracing is active.
+
+Note, due to a clever trick with code modification, the function tracer
+induces very little overhead when not active. This is because the
+hooks in the function calls to be traced are converted into nops on
+boot, and are only converted back to hooks into the tracer when activated.
+
+># echo function > current_tracer
+># cat trace
+# tracer: function
+#
+# entries-in-buffer/entries-written: 319338/253106705   #P:8
+#
+#                              _-------=> irqs-off          
+#                            /  _------=> need-resched      
+#                            |/  _-----=> need-resched_lazy 
+#                            ||/  _----=> hardirq/softirq   
+#                            |||/  _---=> preempt-depth     
+#                            ||||/  _--=> preempt-lazy-depth
+#                            ||||| / _-=> migrate-disable   
+#                            |||||| /     delay
+#           TASK-PID   CPU#  |||||||    TIMESTAMP  FUNCTION
+#              | |       |   |||||||       |         |
+     kworker/5:1-58    [005] ....... 32462.200700: smp_call_function_single <-cpufreq_get_measured_perf
+     kworker/5:1-58    [005] d...... 32462.200700: read_measured_perf_ctrs <-smp_call_function_single
+     kworker/5:1-58    [005] ....... 32462.200701: cpufreq_cpu_put <-__cpufreq_driver_getavg
+     kworker/5:1-58    [005] ....... 32462.200702: module_put <-cpufreq_cpu_put
+     kworker/5:1-58    [005] ....... 32462.200702: od_check_cpu <-dbs_check_cpu
+     kworker/5:1-58    [005] ....... 32462.200702: usecs_to_jiffies <-od_dbs_timer
+     kworker/5:1-58    [005] ....... 32462.200703: schedule_delayed_work_on <-od_dbs_timer
+     kworker/5:1-58    [005] ....... 32462.200703: queue_delayed_work_on <-schedule_delayed_work_on
+     kworker/5:1-58    [005] d...... 32462.200704: __queue_delayed_work <-queue_delayed_work_on
+     kworker/5:1-58    [005] d...... 32462.200704: get_work_gcwq <-__queue_delayed_work
+     kworker/5:1-58    [005] d...... 32462.200704: get_cwq <-__queue_delayed_work
+     kworker/5:1-58    [005] d...... 32462.200705: add_timer_on <-__queue_delayed_work
+     kworker/5:1-58    [005] d...... 32462.200705: _raw_spin_lock_irqsave <-add_timer_on
+     kworker/5:1-58    [005] d...... 32462.200705: internal_add_timer <-add_timer_on
+
+
+Filtering on functions
+----------------------
+
+As tracing all functions can be induce a substantial overhead, as well
+as adding a lot of noise to the trace (you may not be interested in every
+function call), ftrace provides a way to limit what functions can be
+traced. There are two files for this purpose:
+
+ set_ftrace_filter
+
+ set_ftrace_notrace
+
+
+For a list of functions that can be traced, as well as added to these files:
+
+ available_filter_functions
+
+
+By writing a name of a function into the "set_ftrace_filter" file, the
+function tracer will only trace that function.
+
+># echo schedule_delayed_work > set_ftrace_filter
+># cat set_ftrace_filter
+schedule_delayed_work
+># cat trace
+# tracer: function
+#
+# entries-in-buffer/entries-written: 8/8   #P:8
+#
+#                              _-------=> irqs-off          
+#                            /  _------=> need-resched      
+#                            |/  _-----=> need-resched_lazy 
+#                            ||/  _----=> hardirq/softirq   
+#                            |||/  _---=> preempt-depth     
+#                            ||||/  _--=> preempt-lazy-depth
+#                            ||||| / _-=> migrate-disable   
+#                            |||||| /     delay
+#           TASK-PID   CPU#  |||||||    TIMESTAMP  FUNCTION
+#              | |       |   |||||||       |         |
+     kworker/0:2-1586  [000] ....... 32820.361913: schedule_delayed_work <-vmstat_update
+     kworker/2:1-62    [002] ....... 32820.370891: schedule_delayed_work <-vmstat_update
+     kworker/3:2-5004  [003] ....... 32820.373881: schedule_delayed_work <-vmstat_update
+     kworker/0:2-1586  [000] ....... 32820.448658: schedule_delayed_work <-do_cache_clean
+     kworker/4:1-61    [004] ....... 32820.537541: schedule_delayed_work <-vmstat_update
+     kworker/4:1-61    [004] ....... 32820.537546: schedule_delayed_work <-sync_cmos_clock
+     kworker/7:1-121   [007] ....... 32820.897372: schedule_delayed_work <-vmstat_update
+     kworker/1:1-57    [001] ....... 32820.898361: schedule_delayed_work <-vmstat_update
+
+
+Note, modifications to these files follows shell concatenation rules:
+
+># cat set_ftrace_filter
+schedule_delayed_work
+># echo do_IRQ > set_ftrace_filter
+># cat set_ftrace_filter
+do_IRQ
+
+Notice that writing with '>' into set_ftrace_filter cleared what was
+currently in the file and replaced it with the new contents. Just
+writing into the file will clear it:
+
+># cat set_ftrace_filter
+do_IRQ
+># echo > set_ftrace_filter
+># cat set_ftrace_filter
+#### all functions enabled ####
+
+To append to the list, use the shell append operation '>>':
+
+># cat set_ftrace_filter
+do_IRQ
+># echo schedule_delayed_work >> set_ftrace_filter
+># cat set_ftrace_filter
+schedule_delayed_work
+do_IRQ
+
+
+Note, the order of functions displayed has nothing to do with how they
+were added. Their order is dependent upon how the functions are layed
+out in the kernel internal function list table.
+
+
+Globs
+-----
+
+Functions can be added to these files with the same type of glob
+expressions described in the event filtering section. The format is
+identical:
+
+ <glob> = VALUE | '*' VALUE | VALUE '*' | '*' VALUE '*'
+
+
+If you want to trace all functions that start with "sched":
+
+># echo 'sched*' > set_ftrace_filter
+># cat set_ftrace_filter
+schedule_delayed_work_on
+schedule_delayed_work
+schedule_work_on
+schedule_work
+schedule_on_each_cpu
+sched_feat_open
+sched_feat_show
+[...]
+># echo function > current_tracer
+># cat trace
+# tracer: function
+#
+# entries-in-buffer/entries-written: 1270/1270   #P:8
+#
+#                              _-------=> irqs-off          
+#                            /  _------=> need-resched      
+#                            |/  _-----=> need-resched_lazy 
+#                            ||/  _----=> hardirq/softirq   
+#                            |||/  _---=> preempt-depth     
+#                            ||||/  _--=> preempt-lazy-depth
+#                            ||||| / _-=> migrate-disable   
+#                            |||||| /     delay
+#           TASK-PID   CPU#  |||||||    TIMESTAMP  FUNCTION
+#              | |       |   |||||||       |         |
+            bash-1367  [001] ....... 34240.654888: schedule_work <-tty_flip_buffer_push
+            bash-1367  [001] .N..... 34240.654902: schedule <-sysret_careful
+     kworker/1:1-57    [001] ....... 34240.654921: schedule <-worker_thread
+          <idle>-0     [000] .N..... 34240.654949: schedule <-cpu_idle
+            bash-1367  [001] ....... 34240.655069: schedule_work <-tty_flip_buffer_push
+            bash-1367  [001] .N..... 34240.655079: schedule <-sysret_careful
+            sshd-1365  [000] ....... 34240.655087: schedule_timeout <-wait_for_common
+            sshd-1365  [000] ....... 34240.655088: schedule <-schedule_timeout
+
+
+
+set_ftrace_notrace
+------------------
+
+There are cases were you may want to trace everything except for various
+functions that you don't care about. Perhaps there's functions that cause
+too much noise in the trace, for example, perhaps locks are showing
+up in the trace and you don't care about them:
+
+># echo '*lock*' > set_ftrace_notrace
+># cat set_ftrace_notrace
+update_persistent_clock
+read_persistent_clock
+set_task_blockstep
+user_enable_block_step
+read_hv_clock
+__acpi_acquire_global_lock
+__acpi_release_global_lock
+cpu_hotplug_driver_lock
+cpu_hotplug_driver_unlock
+[...]
+
+But notice that you also included functions that have "clock" and "block"
+in their names. To remove them but still keep the "lock" functions, use
+the '!' symbol:
+
+
+># echo '!*clock*' >> set_ftrace_notrace
+># echo '!*block*' >> set_ftrace_notrace
+># cat set_ftrace_notrace
+__acpi_acquire_global_lock
+__acpi_release_global_lock
+cpu_hotplug_driver_lock
+cpu_hotplug_driver_unlock
+lock_vector_lock
+unlock_vector_lock
+console_lock
+console_trylock
+console_unlock
+is_console_locked
+kmsg_dump_get_line_nolock
+[...]
+
+But remember to use '>>' instead of '>', as that will clear out all
+functions in the file.
+
+
+
+Latency tracers
+---------------
+
+As stated, the difference between events and tracers, is that events
+just enable recording some specific information within the kernel.
+Traces have a bit more impact. Function tracing, in essence, also
+just records information, but it requires a bit more work than enabling
+a static tracepoint (event). Also, to limit what function tracing can
+trace, requires writing into control files for the function tracer.
+
+Another type of tracer is the latency tracers. These record a snapshot
+of the trace when the latency is greater than the previously recorded
+latency. There are two types of latency tracers, one kind records the
+length of time when activities within the kernel are disabled, and the
+other records the time it takes from when a task is woken from sleep
+to the time it gets scheduled.
+
+tracing_max_latency
+-------------------
+
+A latency tracer will just keep track of a snapshot of a trace when a new
+max latency is hit. To see the current max latency time, cat the contents
+of the file "tracing_max_latency". This file can also be used to set
+the max time. Either to reset it back to zero or some lesser number to
+trigger new snapshots of latencies, or to set it to a greater number to
+not record anything unless a latency has exceeded some given time.
+
+The unit of time that "tracing_max_latency" uses (as well as all other
+tracing files, unless otherwise specified) is microseconds.
+
+
+irqsoff tracer
+--------------
+
+A common use of the tracing facility is to see how long interrupts have
+been disabled for. When interrupts are disabled, the system can not
+respond to external events, which can include a packet coming in on the
+network card, or perhaps a task on another CPU woke up a task on the current
+CPU and sent an interprocessor interrupt (IPI) to tell the current CPU
+to run the new task. With interrupts disabled, the current CPU will
+ignore all external events, which is a source of latencies. This is why
+monitorying how long interrupts are disabled can show why the system
+did not react in a proper time that was expected.
+
+The irqsoff tracer traces the time interrupts are disabled to the time
+they are enabled again. If the time interrupts were disabled is larger
+than the time specified by "tracing_max_latency" has, then it will
+save the current trace off to a "snapshot" buffer, reset the current
+buffer and continue tracing looking for the next time interrupts
+are off for a long time.
+
+Here's an example of how to use irqsoff tracer:
+
+># echo 0 > tracing_max_latency
+># echo irqsoff > current_tracer
+># sleep 10
+># cat trace
+# tracer: irqsoff
+#
+# irqsoff latency trace v1.1.5 on 3.8.13-test-mrg-rt9+
+# --------------------------------------------------------------------
+# latency: 523 us, #1301/1301, CPU#2 | (Mreempt VP:0, KP:0, SP:0 HP:0 #P:8)
+#    -----------------
+#    | task: swapper/2-0 (uid:0 nice:0 policy:0 rt_prio:0)
+#    -----------------
+#  => started at: cpu_idle
+#  => ended at:   cpu_idle
+#
+#
+#                  _--------=> CPU#              
+#                 / _-------=> irqs-off          
+#                | / _------=> need-resched      
+#                || / _-----=> need-resched_lazy 
+#                ||| / _----=> hardirq/softirq   
+#                |||| / _---=> preempt-depth     
+#                ||||| / _--=> preempt-lazy-depth
+#                |||||| / _-=> migrate-disable   
+#                ||||||| /     delay             
+#  cmd     pid   |||||||| time  |   caller       
+#     \   /      ||||||||  \   |   /            
+  <idle>-0       2dN..1..    0us : tick_nohz_idle_exit <-cpu_idle
+  <idle>-0       2dN..1..    1us : menu_hrtimer_cancel <-tick_nohz_idle_exit
+  <idle>-0       2dN..1..    1us : ktime_get <-tick_nohz_idle_exit
+  <idle>-0       2dN..1..    1us : tick_do_update_jiffies64 <-tick_nohz_idle_exit
+  <idle>-0       2dN..1..    2us : update_cpu_load_nohz <-tick_nohz_idle_exit
+  <idle>-0       2dN..1..    2us : _raw_spin_lock <-update_cpu_load_nohz
+  <idle>-0       2dN..1..    3us : add_preempt_count <-_raw_spin_lock
+  <idle>-0       2dN..2..    3us : __update_cpu_load <-update_cpu_load_nohz
+  <idle>-0       2dN..2..    4us : sub_preempt_count <-update_cpu_load_nohz
+  <idle>-0       2dN..1..    4us : calc_load_exit_idle <-tick_nohz_idle_exit
+  <idle>-0       2dN..1..    5us : touch_softlockup_watchdog <-tick_nohz_idle_exit
+  <idle>-0       2dN..1..    5us : hrtimer_cancel <-tick_nohz_idle_exit
+
+[...]
+
+  <idle>-0       2dN..1..  521us : account_idle_time <-irqtime_account_process_tick.isra.2
+  <idle>-0       2dN..1..  521us : irqtime_account_process_tick.isra.2 <-account_idle_ticks
+  <idle>-0       2dN..1..  521us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       2dN..1..  522us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       2dN..1..  522us : account_idle_time <-irqtime_account_process_tick.isra.2
+  <idle>-0       2dN..1..  522us : irqtime_account_process_tick.isra.2 <-account_idle_ticks
+  <idle>-0       2dN..1..  522us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       2dN..1..  523us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       2dN..1..  523us : account_idle_time <-irqtime_account_process_tick.isra.2
+  <idle>-0       2dN..1..  523us : tick_nohz_idle_exit <-cpu_idle
+  <idle>-0       2dN..1..  524us+: trace_hardirqs_on <-cpu_idle
+  <idle>-0       2dN..1..  537us : <stack trace>
+ => tick_nohz_idle_exit
+ => cpu_idle
+ => start_secondary
+
+
+By default, the irqsoff tracer enables function tracing to show what functions
+are being called while interrupts were disabled. But as you can see, it
+can produce a lot of output (the total line count of the above trace
+was 1,327 lines. Most of that was cut to not waste space in this document).
+The problem with the function tracer is that it incurs a substantial overhead
+and exagerates the actual latency.
+
+The reported latency above is 523 microseconds. The trace ends at 537
+microseconds, but that's because it took 14 microseconds to produce the
+stack trace.
+
+The end of the trace does a stack dump to show where the latency occurred.
+The above happened in tick_nohz_idle_exit(), and even though we can blame
+the function tracer for exagerating the latency, this trace shows
+that using NO HZ idle can have issues with a real time system. When a
+system with NO HZ set is idle, the timer tick is stopped. When the system
+resumes from idle, the timer must catch up to the current time and executes
+all the ticks it missed in the loop. This is done with interrupts disabled.
+
+Looking at the latency field "2dN..1.." you can see that this loop
+ran on CPU 2, had interrupts disabled "d". The scheduler needed to run
+"N" (for NEED_RESCHED). Preemption was disabled, as the preempt_count
+counter was set to "1".
+
+Ideally, when coming out of NO HZ, the accounting could be done in a single
+step, but as that is tricky to get right, the current method is to just
+run the current code in a loop as if the timer went off each time.
+
+
+No function tracing
+-------------------
+
+As function tracing can exaggerate the latency, you can either
+limit what functions are traced via the "set_ftrace_filter" and
+"set_ftrace_notrace" files as described above in the function tracing
+section. But you can also disable tracing totally via the
+sysctl file "kernel/ftrace_enabled".
+
+># echo 0 > /proc/sys/kernel/ftrace_enabled
+
+  or
+
+># sysctl kernel.ftrace_enabled=0
+
+This disables function tracing by all the ftrace tracers. Including
+the function tracer, which would make it rather pointless because
+the function tracer would act just like the "nop" tracer.
+
+># echo 0 > /proc/sys/kernel/ftrace_enabled
+># echo 0 > tracing_max_latency
+># echo irqsoff > current_tracer
+># sleep 10
+># cat trace
+# tracer: irqsoff
+#
+# irqsoff latency trace v1.1.5 on 3.8.13-test-mrg-rt9+
+# --------------------------------------------------------------------
+# latency: 80 us, #4/4, CPU#6 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:8)
+#    -----------------
+#    | task: swapper/6-0 (uid:0 nice:0 policy:0 rt_prio:0)
+#    -----------------
+#  => started at: cpu_idle
+#  => ended at:   cpu_idle
+#
+#
+#                  _--------=> CPU#              
+#                 / _-------=> irqs-off          
+#                | / _------=> need-resched      
+#                || / _-----=> need-resched_lazy 
+#                ||| / _----=> hardirq/softirq   
+#                |||| / _---=> preempt-depth     
+#                ||||| / _--=> preempt-lazy-depth
+#                |||||| / _-=> migrate-disable   
+#                ||||||| /     delay             
+#  cmd     pid   |||||||| time  |   caller       
+#     \   /      ||||||||  \   |   /            
+  <idle>-0       6dN..1..    0us+: tick_nohz_idle_exit <-cpu_idle
+  <idle>-0       6dN..1..   81us : tick_nohz_idle_exit <-cpu_idle
+  <idle>-0       6dN..1..   81us+: trace_hardirqs_on <-cpu_idle
+  <idle>-0       6dN..1..   87us : <stack trace>
+ => tick_nohz_idle_exit
+ => cpu_idle
+ => start_secondary
+
+
+This time the latency is much more compact and accurate (80 microseconds
+is still a lot, but much lower than 523). Here the backtrace is much more
+important as its now the only real information to know where the latency
+occurred.
+
+
+preemptoff tracer
+-----------------
+
+There are points in the kernel that disables preemption but not interrupts.
+That is, an interrupt can still interrupt the current process but that
+process can not be scheduled out for a higher priority process.
+
+This tracer records the time that preemption is disabed via the
+kernel internal "preempt_disable()" function.
+
+># echo 0 > /proc/sys/kernel/ftrace_enabled
+># echo 0 > tracing_max_latency
+># echo preemptoff > current_tracer
+># sleep 10
+># cat trace
+# tracer: preemptoff
+#
+# preemptoff latency trace v1.1.5 on 3.8.13-test-mrg-rt9+
+# --------------------------------------------------------------------
+# latency: 65 us, #4/4, CPU#6 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:8)
+#    -----------------
+#    | task: swapper/6-0 (uid:0 nice:0 policy:0 rt_prio:0)
+#    -----------------
+#  => started at: cpuidle_enter
+#  => ended at:   start_secondary
+#
+#
+#                   _--------=> CPU#              
+#                  / _-------=> irqs-off          
+#                 | / _------=> need-resched      
+#                 || / _-----=> need-resched_lazy 
+#                 ||| / _----=> hardirq/softirq   
+#                 |||| / _---=> preempt-depth     
+#                 ||||| / _--=> preempt-lazy-depth
+#                 |||||| / _-=> migrate-disable   
+#                 ||||||| /     delay             
+#  cmd     pid    |||||||| time  |   caller       
+#     \   /      ||||||||  \   |   /            
+  <idle>-0       6d...1..    1us+: intel_idle <-cpuidle_enter
+  <idle>-0       6.N..1..   65us : cpu_idle <-start_secondary
+  <idle>-0       6.N..1..   66us+: trace_preempt_on <-start_secondary
+  <idle>-0       6.N..1..   71us : <stack trace>
+ => sub_preempt_count
+ => cpu_idle
+ => start_secondary
+
+
+There's not much interesting in this trace except that preemption was
+disabled for 65 microseconds.
+
+
+preemptirqsoff tracer
+---------------------
+
+Knowing when interrupts are disabled or how long preemption is disabled
+via the preempt_disable() kernel interface is not as interesting as
+knowing how long true preemption is disabled. That is, if we have the
+following scenario:
+
+A) preempt_disable()
+
+[...]
+
+B) irqs_disable()
+
+[...]
+
+C) preempt_enable();
+
+[...]
+
+D) irqs_enable();
+
+
+"irqsoff" tracer will give you the time from B to D
+"preemptoff" tracer will give you the time from A to C.
+
+But the current task can not be preempted from A to D which is what we
+really care about. When a task can not be preempted, a new task can
+no execute when it is woken up if it is to run on the same CPU as the
+task that has true preemption disabled (either interrupts disabled or
+preemption disabled). The "preemptirqsoff" tracer will handle this.
+
+"preemptirqsoff" tracer will give you the time from A to D
+
+
+># echo 1 > /proc/sys/kernel/ftrace_enabled
+># echo 0 > tracing_max_latency
+># echo preemptirqsoff > current_tracer
+># sleep 10
+># cat trace
+# tracer: preemptirqsoff
+#
+# preemptirqsoff latency trace v1.1.5 on 3.8.13-test-mrg-rt9+
+# --------------------------------------------------------------------
+# latency: 377 us, #1289/1289, CPU#1 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:8)
+#    -----------------
+#    | task: swapper/1-0 (uid:0 nice:0 policy:0 rt_prio:0)
+#    -----------------
+#  => started at: cpuidle_enter
+#  => ended at:   start_secondary
+#
+#
+#                  _--------=> CPU#              
+#                 / _-------=> irqs-off          
+#                | / _------=> need-resched      
+#                || / _-----=> need-resched_lazy 
+#                ||| / _----=> hardirq/softirq   
+#                |||| / _---=> preempt-depth     
+#                ||||| / _--=> preempt-lazy-depth
+#                |||||| / _-=> migrate-disable   
+#                ||||||| /     delay             
+#  cmd     pid   |||||||| time  |   caller       
+#     \   /      ||||||||  \   |   /            
+  <idle>-0       1d...1..    0us : intel_idle <-cpuidle_enter
+  <idle>-0       1d...1..    1us : ktime_get <-cpuidle_wrap_enter
+  <idle>-0       1d...1..    2us : smp_reschedule_interrupt <-reschedule_interrupt
+  <idle>-0       1d...1..    3us : scheduler_ipi <-smp_reschedule_interrupt
+  <idle>-0       1d...1..    3us : irq_enter <-scheduler_ipi
+  <idle>-0       1d...1..    4us : rcu_irq_enter <-irq_enter
+  <idle>-0       1d...1..    4us : rcu_eqs_exit_common.isra.45 <-rcu_irq_enter
+  <idle>-0       1d...1..    5us : tick_check_idle <-irq_enter
+  <idle>-0       1d...1..    5us : tick_check_oneshot_broadcast <-tick_check_idle
+  <idle>-0       1d...1..    5us : ktime_get <-tick_check_idle
+  <idle>-0       1d...1..    6us : tick_nohz_stop_idle <-tick_check_idle
+  <idle>-0       1d...1..    6us : update_ts_time_stats <-tick_nohz_stop_idle
+  <idle>-0       1d...1..    7us : nr_iowait_cpu <-update_ts_time_stats
+  <idle>-0       1d...1..    7us : touch_softlockup_watchdog <-sched_clock_idle_wakeup_event
+  <idle>-0       1d...1..    7us : tick_do_update_jiffies64 <-tick_check_idle
+  <idle>-0       1d...1..    8us : touch_softlockup_watchdog <-tick_check_idle
+  <idle>-0       1d...1..    8us : irqtime_account_irq <-irq_enter
+  <idle>-0       1d...1..    9us : in_serving_softirq <-irqtime_account_irq
+  <idle>-0       1d...1..    9us : add_preempt_count <-irq_enter
+  <idle>-0       1d..h1..    9us : sched_ttwu_pending <-scheduler_ipi
+  <idle>-0       1d..h1..   10us : _raw_spin_lock <-sched_ttwu_pending
+  <idle>-0       1d..h1..   10us : add_preempt_count <-_raw_spin_lock
+  <idle>-0       1d..h2..   11us : sub_preempt_count <-sched_ttwu_pending
+  <idle>-0       1d..h1..   11us : raise_softirq_irqoff <-scheduler_ipi
+  <idle>-0       1d..h1..   12us : do_raise_softirq_irqoff <-raise_softirq_irqoff
+  <idle>-0       1d..h1..   12us : irq_exit <-scheduler_ipi
+  <idle>-0       1d..h1..   12us : irqtime_account_irq <-irq_exit
+  <idle>-0       1d..h1..   13us : sub_preempt_count <-irq_exit
+  <idle>-0       1d...2..   13us : wakeup_softirqd <-irq_exit
+  <idle>-0       1d...2..   14us : wake_up_process <-wakeup_softirqd
+  <idle>-0       1d...2..   14us : try_to_wake_up <-wake_up_process
+
+[...]
+
+  <idle>-0       1d...4..   18us : dequeue_rt_stack <-enqueue_task_rt
+  <idle>-0       1d...4..   19us : cpupri_set <-enqueue_task_rt
+  <idle>-0       1d...4..   20us : update_rt_migration <-enqueue_task_rt
+  <idle>-0       1d...4..   20us : ttwu_do_wakeup <-ttwu_do_activate.constprop.90
+  <idle>-0       1d...4..   20us : check_preempt_curr <-ttwu_do_wakeup
+  <idle>-0       1d...4..   21us : resched_task <-check_preempt_curr
+  <idle>-0       1dN..4..   21us : task_woken_rt <-ttwu_do_wakeup
+  <idle>-0       1dN..4..   22us : sub_preempt_count <-try_to_wake_up
+  <idle>-0       1dN..3..   22us : ttwu_stat <-try_to_wake_up
+  <idle>-0       1dN..3..   23us : _raw_spin_unlock_irqrestore <-try_to_wake_up
+  <idle>-0       1dN..3..   23us : sub_preempt_count <-_raw_spin_unlock_irqrestore
+
+[...]
+
+  <idle>-0       1dN..1..  376us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       1dN..1..  376us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       1dN..1..  376us : account_idle_time <-irqtime_account_process_tick.isra.2
+  <idle>-0       1dN..1..  377us : irqtime_account_process_tick.isra.2 <-account_idle_ticks
+  <idle>-0       1dN..1..  377us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       1dN..1..  377us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       1dN..1..  377us : account_idle_time <-irqtime_account_process_tick.isra.2
+  <idle>-0       1.N..1..  378us : cpu_idle <-start_secondary
+  <idle>-0       1.N..1..  378us+: trace_preempt_on <-start_secondary
+  <idle>-0       1.N..1..  391us : <stack trace>
+ => sub_preempt_count
+ => cpu_idle
+ => start_secondary
+
+The above is a much more interesting trace. Although we enabled function
+tracing again, it allows us to see more of what is happening during
+the trace.
+
+The trace starts out at intel_idle() which on the box the trace was run on
+is the idle function. Idle function usually disable preemption and
+sometimes interrupts when the system is put to sleep, although an
+interrupt will wake up the processor, the interrupt will not be serviced
+until the processor re-enables interrupts again.
+
+As interrupts and preemption is disabled across a full idle, the tracer
+must account for this, as it is pretty useless to trace how long the
+CPU has been idle. Thus, immediately exiting the idle state, the
+latency tracers are re-enabled. This is where the start of the trace
+occurred.
+
+Then we can see that an interrupt is triggered after interrupts were
+enabled (schedule_ipi). An interprocessor interrupt happened to wake up
+a process that is on the current CPU.
+
+Next the irq_enter() is called. This tells the system (including the
+tracing system) that the kernel is now int interrupt mode. Notice that
+'h' is not set until after "add_preempt_count" is called. That's because
+the irq accounting is shared with the preempt_count code. A lot has happened
+before that got set, as NO HZ and RCU must perform activities immediately
+when coming out of idle via an interrupt.
+
+A softirq was raised while in the interrupt and as the MRG kernel runs
+soft interrupts as threads, the corresponding softirq was woken up
+on exiting the interrupt (irq_exit).
+
+This wakeup also triggered the NEED_RESCHED flag "N" to be set, to let
+the system know that the kernel needs to call schedule as soon as
+preemption is re-enabled.
+
+Finally the NO HZ accounting ran again with interrupts and preemption
+disabled. Finally, interrupts were enabled and so was the preemption.
+
+
+
+wakeup tracer
+-------------
+
+The previous tracers ("irqsoff", "preemptoff", and "preemptirqsoff")
+were single CPU tracers. That is, they only reported the activities
+on a single CPU, as interrupts only occurred there.
+
+Both "wakeup" and "wakeup_rt" tracers are full CPU tracers. That is,
+they report the activities of what happens across all CPUs. This is
+because a task may be woken from one CPU but get scheduled on another
+CPU.
+
+The "wakeup" tracer is not that interresting from a real-time perspective,
+as it records the time it takes to wake up the highest priority task
+in the system even if that task does not happen to be a real time task.
+Non real-time tasks may be delayed due scheduling balacing, and not
+immediately scheduled for throughput reasons. Real-time tasks are scheduled
+immediately after they are woken. Recording the max time it takes to
+wake up a non real-time task will hide the times it takes to wake up
+a real-time task. Because of this, we will focus on the "wakeup_rt" tracer
+instead.
+
+
+wakeup_rt tracer
+----------------
+
+The "wakeup" tracer records the time it takes from the current highest
+priority task to wake up to the time it is scheduled. Because non real-time
+tasks may take much longer to wake up than a real-time task, and that
+the latency tracers only record the longest time, "wakeup" tracer is not
+that suitable for seeing how long a real-time task takes to be scheduled
+from the time it is woken. For that, we use the "wakeup_rt" tracer.
+
+The "wakeup_rt" tracer only records the time for real-time tasks and
+ignores the time for non real-time tasks.
+
+># echo 0 > tracing_max_latency
+># echo preemptirqsoff > current_tracer
+># sleep 10
+># cat trace
+# tracer: wakeup_rt
+#
+# wakeup_rt latency trace v1.1.5 on 3.8.13-test-mrg-rt9+
+# --------------------------------------------------------------------
+# latency: 385 us, #1339/1339, CPU#7 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:8)
+#    -----------------
+#    | task: ksoftirqd/7-51 (uid:0 nice:0 policy:1 rt_prio:1)
+#    -----------------
+#
+#                  _--------=> CPU#              
+#                 / _-------=> irqs-off          
+#                | / _------=> need-resched      
+#                || / _-----=> need-resched_lazy 
+#                ||| / _----=> hardirq/softirq   
+#                |||| / _---=> preempt-depth     
+#                ||||| / _--=> preempt-lazy-depth
+#                |||||| / _-=> migrate-disable   
+#                ||||||| /     delay             
+#  cmd     pid   |||||||| time  |   caller       
+#     \   /      ||||||||  \   |   /            
+  <idle>-0       7d...5..    0us :      0:120:R   + [007]    51: 98:R ksoftirqd/7
+  <idle>-0       7d...5..    2us : ttwu_do_activate.constprop.90 <-try_to_wake_up
+  <idle>-0       7d...4..    2us : check_preempt_curr <-ttwu_do_wakeup
+  <idle>-0       7d...4..    3us : resched_task <-check_preempt_curr
+  <idle>-0       7dN..4..    3us : task_woken_rt <-ttwu_do_wakeup
+  <idle>-0       7dN..4..    4us : sub_preempt_count <-try_to_wake_up
+  <idle>-0       7dN..3..    4us : ttwu_stat <-try_to_wake_up
+  <idle>-0       7dN..3..    4us : _raw_spin_unlock_irqrestore <-try_to_wake_up
+  <idle>-0       7dN..3..    5us : sub_preempt_count <-_raw_spin_unlock_irqrestore
+  <idle>-0       7dN..2..    5us : idle_cpu <-irq_exit
+  <idle>-0       7dN..2..    5us : rcu_irq_exit <-irq_exit
+  <idle>-0       7dN..2..    6us : rcu_eqs_enter_common.isra.47 <-rcu_irq_exit
+
+[...]
+
+  <idle>-0       7dN..1..   53us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   53us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   54us : account_idle_time <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   54us : irqtime_account_process_tick.isra.2 <-account_idle_ticks
+  <idle>-0       7dN..1..   54us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   54us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   55us : account_idle_time <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   55us : irqtime_account_process_tick.isra.2 <-account_idle_ticks
+  <idle>-0       7dN..1..   55us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   55us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   56us : account_idle_time <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   56us : irqtime_account_process_tick.isra.2 <-account_idle_ticks
+  <idle>-0       7dN..1..   56us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   56us : nsecs_to_jiffies64 <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   57us : account_idle_time <-irqtime_account_process_tick.isra.2
+  <idle>-0       7dN..1..   57us : irqtime_account_process_tick.isra.2 <-account_idle_ticks
+
+[...]
+
+  <idle>-0       7dN.h1..  377us : tick_program_event <-hrtimer_interrupt
+  <idle>-0       7dN.h1..  378us : clockevents_program_event <-tick_program_event
+  <idle>-0       7dN.h1..  378us : ktime_get <-clockevents_program_event
+  <idle>-0       7dN.h1..  378us : lapic_next_deadline <-clockevents_program_event
+  <idle>-0       7dN.h1..  379us : irq_exit <-smp_apic_timer_interrupt
+  <idle>-0       7dN.h1..  379us : irqtime_account_irq <-irq_exit
+  <idle>-0       7dN.h1..  379us : sub_preempt_count <-irq_exit
+  <idle>-0       7dN..2..  379us : wakeup_softirqd <-irq_exit
+  <idle>-0       7dN..2..  380us : idle_cpu <-irq_exit
+  <idle>-0       7dN..2..  380us : rcu_irq_exit <-irq_exit
+  <idle>-0       7dN..2..  380us : sub_preempt_count <-irq_exit
+  <idle>-0       7.N..1..  381us : sub_preempt_count <-cpu_idle
+  <idle>-0       7.N.....  381us : __schedule <-preempt_schedule
+  <idle>-0       7.N.....  382us : add_preempt_count <-__schedule
+  <idle>-0       7.N..1..  382us : rcu_note_context_switch <-__schedule
+  <idle>-0       7.N..1..  382us : _raw_spin_lock_irq <-__schedule
+  <idle>-0       7dN..1..  382us : add_preempt_count <-_raw_spin_lock_irq
+  <idle>-0       7dN..2..  383us : update_rq_clock <-__schedule
+  <idle>-0       7dN..2..  383us : put_prev_task_idle <-__schedule
+  <idle>-0       7dN..2..  383us : pick_next_task_stop <-__schedule
+  <idle>-0       7dN..2..  384us : pick_next_task_rt <-__schedule
+  <idle>-0       7dN..2..  384us : dequeue_pushable_task <-pick_next_task_rt
+  <idle>-0       7d...3..  385us : __schedule <-preempt_schedule
+  <idle>-0       7d...3..  385us :      0:120:R ==> [007]    51: 98:R ksoftirqd/7
+
+
+And once again we can see that NO HZ affects the wake up time of a
+real time task (this case it was ksoftirqd).
+
+Notice the first traced item:
+
+       0:120:R   + [007]    51: 98:R ksoftirqd/7
+
+This is in the format of:
+
+  <pid>:<prio>:<process-state>    + [<CPU#>]   <pid>:<prio>:<process-state>
+
+The first pid, prio and process-state is for the task performing the
+wake up. Again, the prio is the internal kernel prio, where 120 is for
+SCHED_OTHER. The "+" represents a wake up is happening. The CPU# the
+CPU waking task in currently assigned to (and being woken up on).
+The second set of pid, prio and process-state is for the task being
+woken up. The prio of 98 is internal to the kernel, and to get the real
+real-time priority for the task you must subtract it from 99.
+(99 - 98 = real-time priority of 1 - low priority)
+
+The process-state should be always in the "R" (running) state, and
+can be ignored. The original location to record the trace when waking
+up was before the task was actually woken. Due to changes in the wake
+up code, the trace hook had to be moved to after the wake up, which
+means the task being woken up will have already been set to running
+and the trace will reflect that.
+
+The last line of the trace:
+
+      0:120:R ==> [007]    51: 98:R ksoftirqd/7
+
+Represents the scheduling of a task.
+
+  <pid>:<prio>:<process-state> ==> [CPU#] <pid>:<prio><process-state>
+
+The first set of pid, prio and process-state belongs to the task that
+is being scheduled out. The second set is for the task that is being
+scheduled in. The "==>" represents a task scheduling switch, and the
+CPU# should always match the current CPU that is on (7 in this case).
+
+The first process-state here is of more importance than that of the
+wake up trace. If the previous task is in the running state (as it is
+in this case), that means it has been preempted (still wants to run
+but must yield for the new task).
+
+
+
+Using events in tracers
+-----------------------
+
+With the "wakeup_rt" tracer, as with all tracers, function tracing can
+exaggerate the latency times. But disabling the function tracing for
+"wakeup_rt" is not very useful.
+
+># echo 0 > /proc/sys/kernel/ftrace_enabled
+># echo 0 > tracing_max_latency
+># echo wakeup_rt > current_tracer
+># sleep 10
+># cat trace
+# tracer: wakeup_rt
+#
+# wakeup_rt latency trace v1.1.5 on 3.8.13-test-mrg-rt9+
+# --------------------------------------------------------------------
+# latency: 64 us, #18446744073709512109/18446744073709512109, CPU#5 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:8)
+#    -----------------
+#    | task: irq/43-em1-878 (uid:0 nice:0 policy:1 rt_prio:50)
+#    -----------------
+#
+#                  _--------=> CPU#              
+#                 / _-------=> irqs-off          
+#                | / _------=> need-resched      
+#                || / _-----=> need-resched_lazy 
+#                ||| / _----=> hardirq/softirq   
+#                |||| / _---=> preempt-depth     
+#                ||||| / _--=> preempt-lazy-depth
+#                |||||| / _-=> migrate-disable   
+#                ||||||| /     delay             
+#  cmd     pid   |||||||| time  |   caller       
+#     \   /      ||||||||  \   |   /            
+  <idle>-0       0d..h4..    0us :      0:120:R   + [005]   878: 49:R irq/43-em1
+  <idle>-0       0d..h4..    2us+: ttwu_do_activate.constprop.90 <-try_to_wake_up
+  <idle>-0       5d...3..   63us : __schedule <-preempt_schedule
+  <idle>-0       5d...3..   64us :      0:120:R ==> [005]   878: 49:R irq/43-em1
+
+The irq thread was woken up by a task on CPU 0, and it scheduled on
+CPU 5.
+
+
+As function tracing causes a large overhead, with the wakeup tracers, you
+can still get information by using events, and events are sparse enough
+to not cause much overhead even when enabled.
+
+># echo 0 > /proc/sys/kernel/ftrace_enabled
+># echo 1 > events/enable
+># echo 0 > tracing_max_latency
+># echo wakeup_rt > current_tracer
+># sleep 10
+># cat trace
+# tracer: wakeup_rt
+#
+# wakeup_rt latency trace v1.1.5 on 3.8.13-test-mrg-rt9+
+# --------------------------------------------------------------------
+# latency: 67 us, #15/15, CPU#1 | (M:preempt VP:0, KP:0, SP:0 HP:0 #P:8)
+#    -----------------
+#    | task: irq/43-em1-878 (uid:0 nice:0 policy:1 rt_prio:50)
+#    -----------------
+#
+#                   _--------=> CPU#              
+#                  / _-------=> irqs-off          
+#                 | / _------=> need-resched      
+#                 || / _-----=> need-resched_lazy 
+#                 ||| / _----=> hardirq/softirq   
+#                 |||| / _---=> preempt-depth     
+#                 ||||| / _--=> preempt-lazy-depth
+#                 |||||| / _-=> migrate-disable   
+#                 ||||||| /     delay             
+#  cmd     pid    |||||||| time  |   caller       
+#     \   /      ||||||||  \   |   /            
+  <idle>-0       0d..h4..    0us :      0:120:R   + [001]   878: 49:R irq/43-em1
+  <idle>-0       0d..h4..    1us : ttwu_do_activate.constprop.90 <-try_to_wake_up
+  <idle>-0       0d..h4..    1us+: sched_wakeup: comm=irq/43-em1 pid=878 prio=49 success=1 target_cpu=001
+  <idle>-0       0....2..    5us : power_end: cpu_id=0
+  <idle>-0       0....2..    6us+: cpu_idle: state=4294967295 cpu_id=0
+  <idle>-0       0d...2..    9us : power_start: type=1 state=3 cpu_id=0
+  <idle>-0       0d...2..   10us+: cpu_idle: state=3 cpu_id=0
+  <idle>-0       1.N..2..   25us+: power_end: cpu_id=1
+  <idle>-0       1.N..2..   27us+: cpu_idle: state=4294967295 cpu_id=1
+  <idle>-0       1dN..3..   30us : hrtimer_cancel: hrtimer=ffff88011ea4cf40
+  <idle>-0       1dN..3..   31us+: hrtimer_start: hrtimer=ffff88011ea4cf40 function=tick_sched_timer expires=9670689000000 softexpires=9670689000000
+  <idle>-0       1.N..2..   64us : rcu_utilization: Start context switch
+  <idle>-0       1.N..2..   65us+: rcu_utilization: End context switch
+  <idle>-0       1d...3..   66us : __schedule <-preempt_schedule
+  <idle>-0       1d...3..   67us :      0:120:R ==> [001]   878: 49:R irq/43-em1
+
+
+The above trace is much more accurate to a real latency, but this time
+we get a lot more information. The task being woken up in on CPU 1, and
+the first time we see CPU 1 is at the 25 microsecond time. The "power_end"
+trace point shows that the CPU is coming out of a deep power state, which
+explains why the time took so long. The high resolution timer has been
+reinitialized, and we can assume from our other traces that the NO HZ
+code is running again to catch up on the tick, although no trace points
+currently represent that. This process took 33 microseconds, where we
+see RCU handling a context switch, and eventually the schedule takes place.
+
+
+
+function_graph
+--------------
+
+The "function" tracer is extremely informative, albeit invasive, but
+it is a bit difficult for a human to read.
+
+          <idle>-0     [000] ....1.. 10698.878897: sub_preempt_count <-__schedule
+            less-3062  [006] ....... 10698.878897: add_preempt_count <-migrate_disable
+             cat-3061  [007] d...... 10698.878897: add_preempt_count <-_raw_spin_lock
+          <idle>-0     [000] ....... 10698.878897: add_preempt_count <-cpu_idle
+            less-3062  [006] ....11. 10698.878897: pin_current_cpu <-migrate_disable
+          <idle>-0     [000] ....1.. 10698.878898: tick_nohz_idle_enter <-cpu_idle
+             cat-3061  [007] d...1.. 10698.878898: sub_preempt_count <-__raw_spin_unlock
+            less-3062  [006] ....111 10698.878898: sub_preempt_count <-migrate_disable
+          <idle>-0     [000] ....1.. 10698.878898: set_cpu_sd_state_idle <-tick_nohz_idle_enter
+             cat-3061  [007] ....... 10698.878898: free_delayed <-__slab_alloc.isra.60
+            less-3062  [006] .....11 10698.878898: migrate_disable <-get_page_from_freelist
+            less-3062  [006] .....11 10698.878898: add_preempt_count <-migrate_disable
+          <idle>-0     [000] d...1.. 10698.878898: __tick_nohz_idle_enter <-tick_nohz_idle_enter
+            less-3062  [006] ....112 10698.878898: sub_preempt_count <-migrate_disable
+          <idle>-0     [000] d...1.. 10698.878898: ktime_get <-__tick_nohz_idle_enter
+             cat-3061  [007] ....... 10698.878898: __rt_mutex_init <-tracing_open
+
+
+The "function_graph" tracer is a bit more easy on the eyes, and lets
+the developer follow the code in much more detail.
+
+># echo function_graph > current_tracer
+># cat trace
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+ 5)   0.125 us    |            source_load();
+ 5)   0.137 us    |            idle_cpu();
+ 5)   0.105 us    |            source_load();
+ 5)   0.110 us    |            idle_cpu();
+ 5)   0.132 us    |            source_load();
+ 5)   0.134 us    |            idle_cpu();
+ 5)   0.127 us    |            source_load();
+ 5)   0.144 us    |            idle_cpu();
+ 5)   0.132 us    |            source_load();
+ 5)   0.112 us    |            idle_cpu();
+ 5)   0.120 us    |            source_load();
+ 5)   0.130 us    |            idle_cpu();
+ 5) + 20.812 us   |          } /* find_busiest_group */
+ 5) + 21.905 us   |        } /* load_balance */
+ 5)   0.099 us    |        msecs_to_jiffies();
+ 5)   0.120 us    |        __rcu_read_unlock();
+ 5)               |        _raw_spin_lock() {
+ 5)   0.115 us    |          add_preempt_count();
+ 5)   1.115 us    |        }
+ 5) + 46.645 us   |      } /* idle_balance */
+ 5)               |      put_prev_task_rt() {
+ 5)               |        update_curr_rt() {
+ 5)               |          cpuacct_charge() {
+ 5)   0.110 us    |            __rcu_read_lock();
+ 5)   0.110 us    |            __rcu_read_unlock();
+ 5)   2.111 us    |          }
+ 5)   0.100 us    |          sched_avg_update();
+ 5)               |          _raw_spin_lock() {
+ 5)   0.116 us    |            add_preempt_count();
+ 5)   1.151 us    |          }
+ 5)   0.122 us    |          balance_runtime();
+ 5)   0.110 us    |          sub_preempt_count();
+ 5)   8.165 us    |        }
+ 5)   9.152 us    |      }
+ 5)   0.148 us    |      pick_next_task_fair();
+ 5)   0.112 us    |      pick_next_task_stop();
+ 5)   0.117 us    |      pick_next_task_rt();
+ 5)   0.123 us    |      pick_next_task_fair();
+ 5)   0.138 us    |      pick_next_task_idle();
+ ------------------------------------------
+ 5)   ksoftir-39   =>    <idle>-0   
+ ------------------------------------------
+
+ 5)               |      finish_task_switch() {
+ 5)               |        _raw_spin_unlock_irq() {
+ 5)   0.260 us    |          sub_preempt_count();
+ 5)   1.289 us    |        }
+ 5)   2.309 us    |      }
+ 5)   0.132 us    |      sub_preempt_count();
+ 5) ! 151.784 us  |    } /* __schedule */
+ 5)   0.272 us    |  } /* sub_preempt_count */
+
+
+The "function" tracer only traces the start of the function where as the
+"function_graph" tracer also traces the exit of the function, allowing
+to show a flow of function calls in the kernel. As one function calls
+the next function, it is indented in the trace and C code curly brackets
+are placed around them. When there's a leaf function (a function that
+does not call any other function, or any function that happens to be
+traced), it is simply finished with a ";".
+
+This tracer has a different format than the other tracers, to help
+ease the reading of the trace. The first number "5)" represents the
+CPU that the trace happened on. The second number is the time the
+function took to execute. Note, this time also include the overhead
+of the "function_graph" tracer itself, so for functions that have
+several other functions traced within it, its time will be rather
+exaggerated. For leaf functions, the time is rather accurate.
+
+When a schedule switch is detected (does not require the sched_switch
+event enabled, as all traces record the pid), it shows up as separately
+displayed.
+
+ ------------------------------------------
+ 5)   ksoftir-39   =>    <idle>-0   
+ ------------------------------------------
+
+The name is cropped to 7 characters (from "ksoftirqd" to "ksoftir").
+
+
+Follow a function
+-----------------
+
+Because the "function_graph" tracer records both the start and exit
+of a function, several more features are possible. One of these features
+is to graph only a specific function. That is, to see what a specific
+function calls and ignore all other functions.
+
+For example, if you are interested in what the sys_read() function
+calls, you can use the "set_graph_function" file in the tracing
+debug file system.
+
+># echo sys_read > set_graph_function
+># echo function_graph > current_tracer
+># sleep 10
+># cat trace
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+ 0)               |  sys_read() {
+ 0)   0.126 us    |    fget_light();
+ 0)               |    vfs_read() {
+ 0)               |      rw_verify_area() {
+ 0)               |        security_file_permission() {
+ 0)   0.077 us    |          cap_file_permission();
+ 0)   0.076 us    |          __fsnotify_parent();
+ 0)   0.100 us    |          fsnotify();
+ 0)   2.001 us    |        }
+ 0)   2.608 us    |      }
+ 0)               |      tty_read() {
+ 0)   0.070 us    |        tty_paranoia_check();
+ 0)               |        tty_ldisc_ref_wait() {
+ 0)               |          tty_ldisc_try() {
+ 0)               |            _raw_spin_lock_irqsave() {
+ 0)   0.130 us    |              add_preempt_count();
+ 0)   0.759 us    |            }
+ 0)               |            _raw_spin_unlock_irqrestore() {
+ 0)   0.132 us    |              sub_preempt_count();
+ 0)   0.774 us    |            }
+ 0)   2.576 us    |          }
+ 0)   3.161 us    |        }
+ 0)               |        n_tty_read() {
+ 0)               |          _mutex_lock_interruptible() {
+ 0)   0.087 us    |            rt_mutex_lock_interruptible();
+ 0)   0.694 us    |          }
+ 0)               |          add_wait_queue() {
+ 0)               |            migrate_disable() {
+ 0)   0.100 us    |              add_preempt_count();
+ 0)   0.073 us    |              pin_current_cpu();
+ 0)   0.085 us    |              sub_preempt_count();
+ 0)   1.829 us    |            }
+ 0)   0.060 us    |            rt_spin_lock();
+ 0)   0.065 us    |            rt_spin_unlock();
+ 0)               |            migrate_enable() {
+ 0)   0.077 us    |              add_preempt_count();
+ 0)   0.070 us    |              unpin_current_cpu();
+ 0)   0.077 us    |              sub_preempt_count();
+ 0)   1.847 us    |            }
+ 0)   5.899 us    |          }
+
+
+The above shows the flow of functions called by sys_read().
+
+
+To reset the "set_graph_function" simply write into that file like
+the "set_ftrace_filter" file is done.
+
+># echo > set_graph_function
+
+
+Time a function
+---------------
+
+As the "function_graph" tracer is associated to the "function" tracer
+it is also affected by the "set_ftrace_filter", "set_ftrace_notrace"
+as well as the sysctl feature "kernel.ftrace_enabled".
+
+As mentioned previously, only the leaf functions contain the most accurate
+times of execution. By filtering on a specific function, you can see
+the time it takes to execute a single function.
+
+
+># echo do_IRQ > set_ftrace_filter
+># echo function_graph > current_tracer
+># sleep 10
+># cat trace
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+ 4)   ==========> |
+ 4)   6.486 us    |  do_IRQ();
+ 0)   ==========> |
+ 0)   3.801 us    |  do_IRQ();
+ 4)   ==========> |
+ 4)   3.221 us    |  do_IRQ();
+ 0)   ==========> |
+ 0) + 11.153 us   |  do_IRQ();
+ 0)   ==========> |
+ 0) + 10.968 us   |  do_IRQ();
+ 6)   ==========> |
+ 6)   9.280 us    |  do_IRQ();
+ 0)   ==========> |
+ 0)   9.467 us    |  do_IRQ();
+ 0)   ==========> |
+ 0) + 11.238 us   |  do_IRQ();
+
+
+The "==========>" show when an interrupt entered. The "<==========" is
+missing because it is associated with the exit part of the trace.
+As "do_IRQ" is a leaf function here, the exit arrow was folded into
+the function and does not appear in the trace.
+
+
+Events in function graph tracer
+-------------------------------
+
+As explained previously, events can be enabled with all tracers.
+But with the "function_graph" tracer, they are displayed a little
+differently.
+
+># echo 1 > events/irq/enable
+># echo do_IRQ > set_ftrace_filter
+># echo function_graph > current_tracer
+># sleep 10
+># cat trace
+# tracer: function_graph
+#
+# CPU  DURATION                  FUNCTION CALLS
+# |     |   |                     |   |   |   |
+ 5)   ==========> |
+ 5)               |  do_IRQ() {
+ 5)               |  /* irq_handler_entry: irq=43 name=em1 */
+ 5)               |  /* irq_handler_exit: irq=43 ret=handled */
+ 5) + 15.721 us   |  }
+ 5)   <========== |
+ 3)               |  /* softirq_raise: vec=3 [action=NET_RX] */
+ 3)               |  /* softirq_entry: vec=3 [action=NET_RX] */
+ 3)               |  /* softirq_exit: vec=3 [action=NET_RX] */
+ 0)   ==========> |
+ 0)               |  do_IRQ() {
+ 0)               |  /* irq_handler_entry: irq=43 name=em1 */
+ 0)               |  /* irq_handler_exit: irq=43 ret=handled */
+ 0)   8.915 us    |  }
+ 0)   <========== |
+ 3)               |  /* softirq_raise: vec=3 [action=NET_RX] */
+ 3)               |  /* softirq_entry: vec=3 [action=NET_RX] */
+ 3)               |  /* softirq_exit: vec=3 [action=NET_RX] */
+ 0)               |  /* softirq_raise: vec=1 [action=TIMER] */
+ 0)               |  /* softirq_raise: vec=9 [action=RCU] */
+ ------------------------------------------
+ 0)    <idle>-0    =>   ksoftir-3   
+ ------------------------------------------
+
+ 0)               |  /* softirq_entry: vec=1 [action=TIMER] */
+ 0)               |  /* softirq_exit: vec=1 [action=TIMER] */
+ 0)               |  /* softirq_entry: vec=9 [action=RCU] */
+ 0)               |  /* softirq_exit: vec=9 [action=RCU] */
+ ------------------------------------------
+ 0)   ksoftir-3    =>    <idle>-0   
+ ------------------------------------------
+
+Keeping with the C formatting, events in the "function_graph" tracer
+appear as comments. Recording the interrupt events gives more detail
+to what interrupts are occurring when "do_IRQ()" is called. As the
+"do_IRQ()" exit trace is not folded, the "<==========" appears to
+display that the interrupt is over.
+
+
+Annotations
+-----------
+
+In the traces, including the "function_graph" tracer, you may see
+annotations around the times. "+" and "!". A "+" appears when the
+time between events is greater than 10 microseconds, and a "!" appears
+when that time is greater than 100 microseconds. You can see this in the
+above tracers:
+
+  <idle>-0       0d..h4..    2us+: ttwu_do_activate.constprop.90 <-try_to_wake_up
+  <idle>-0       5d...3..   63us : __schedule <-preempt_schedule
+
+
+ 5) + 20.812 us   |          } /* find_busiest_group */
+ 5) + 21.905 us   |        } /* load_balance */
+
+ 5) ! 151.784 us  |    } /* __schedule */
+
+
+
+Buffer size
+-----------
+
+When tracing functions, you will almost always use events. This is because
+the amount of functions being traced will quickly fill the ring buffer
+faster than anything can read from it. The amount lost can be minimized
+with filtering the trace as well as increasing the size of the buffer.
+
+The size of the buffer is controlled by the "buffer_size_kb" file.
+As the name suggests, the size is in kilobytes. When you first boot up,
+as tracing is used by only a small minority of users, the trace buffer
+is compressed. The first time you use any of the tracing features,
+the tracing buffer will automatically increase to a decent size.
+
+># cat buffer_size_kb 
+7 (expanded: 1408)
+
+Note, for efficiency reasons, the buffer is split into multiple buffers
+per CPU. The size displayed by "buffer_size_kb" is the size of each
+CPU buffer. To see the total size of all buffers look at
+"buffer_total_size_kb"
+
+># cat buffer_total_size_kb
+56 (expanded: 11264)
+
+After running any trace, the buffer will expand to the size that is
+denoted by the "expanded" value.
+
+># echo 1 > events/enable
+># cat buffer_size_kb 
+1408
+
+To change the size of the buffer, simply echo in a number.
+
+># echo 10000 > buffer_size_kb
+># cat buffer_size_kb
+10000
+
+Note, if you change the size before using any tracer, the buffers
+will go to that size, and the expanded value will then be ignored.
+
+
+Buffer size per CPU
+-------------------
+
+If there's a case you care about activity on one CPU more than another
+CPU, and you need to save memory, you can change the sizes of the
+ring buffers per CPU. These files exist in a "per_cpu/cpuX/" directory.
+
+># cat per_cpu/cpu1/buffer_size_kb
+10000
+
+># echo 100 > per_cpu/cpu1/buffer_size_kb
+># cat per_cpu/cpu1/buffer_size_kb
+100
+
+When the per CPU buffers differ in size, the top level buffer_size_kb
+will display an "X".
+
+># cat buffer_size_kb
+X
+
+But the total size will still display the amount allocated.
+
+># cat buffer_total_size_kb 
+70100
+
+
+Trace Marker
+------------
+
+It is sometimes useful to synchronize actions in userspace with events
+within the kernel. The "trace_marker" allows userspace to write into
+the ftrace buffer.
+
+># echo hello world > trace_marker 
+># cat trace
+# tracer: nop
+#
+# entries-in-buffer/entries-written: 1/1   #P:8
+#
+#                              _-------=> irqs-off          
+#                            /  _------=> need-resched      
+#                            |/  _-----=> need-resched_lazy 
+#                            ||/  _----=> hardirq/softirq   
+#                            |||/  _---=> preempt-depth     
+#                            ||||/  _--=> preempt-lazy-depth
+#                            ||||| / _-=> migrate-disable   
+#                            |||||| /     delay
+#           TASK-PID   CPU#  |||||||    TIMESTAMP  FUNCTION
+#              | |       |   |||||||       |         |
+            bash-1086  [001] .....11 21351.346541: tracing_mark_write: hello world
+
+Writing into the kernel is very light weight. User programs can take
+advantage of this with the following C code:
+
+        static int trace_fd = -1;
+
+        void trace_write(const char *fmt, ...)
+        {
+                va_list ap;
+                char buf[256];
+                int n;
+
+                if (trace_fd < 0)
+                        return;
+
+                va_start(ap, fmt);
+                n = vsnprintf(buf, 256, fmt, ap);
+                va_end(ap);
+
+                write(trace_fd, buf, n);
+        }
+
+
+        [...]
+
+        trace_fd = open("trace_marker", WR_ONLY);
+
+
+and later use the "trace_write()" function to record into the ftrace
+buffer.
+
+        trace_write("record this event\n");
+
+
+tracer options
+--------------
+
+There are several options that can affect the formating of the trace
+output as well as how the tracers behave. Some trace options only exist
+for a given tracer and their control file appears only when the tracer
+is activated.
+
+The trace option control files exist in the "options" directory.
+
+># ls options
+annotate         graph-time       print-parent  sym-userobj
+bin              hex              raw           test_nop_accept
+block            irq-info         record-cmd    test_nop_refuse
+branch           latency-format   sleep-time    trace_printk
+context-info     markers          stacktrace    userstacktrace
+disable_on_free  overwrite        sym-addr      verbose
+ftrace_preempt   printk-msg-only  sym-offset
+
+The "function_graph" tracer adds several of its own.
+
+># echo function_graph > current_tracer
+># ls options
+annotate           funcgraph-cpu       irq-info         sleep-time
+bin                funcgraph-duration  latency-format   stacktrace
+block              funcgraph-irqs      markers          sym-addr
+branch             funcgraph-overhead  overwrite        sym-offset
+context-info       funcgraph-overrun   printk-msg-only  sym-userobj
+disable_on_free    funcgraph-proc      print-parent     trace_printk
+ftrace_preempt     graph-time          raw              userstacktrace
+funcgraph-abstime  hex                 record-cmd       verbose
+
+
+
+  annotate - It is sometimes confusing when the CPU buffers are full
+               and one CPU buffer had a lot of events recently, thus
+             a shorter time frame, were another CPU may have only had
+             a few events, which lets it have older events. When
+             the trace is reported, it shows the oldest events first,
+             and it may look like only one CPU ran (the one with the
+             oldest events). When the annotate option is set, it will
+             display when a new CPU buffer started:
+
+          <idle>-0     [005] d...1..   910.328077: cpuidle_wrap_enter <-cpuidle_enter_tk
+          <idle>-0     [005] d...1..   910.328077: ktime_get <-cpuidle_wrap_enter
+          <idle>-0     [005] d...1..   910.328078: intel_idle <-cpuidle_enter
+          <idle>-0     [005] d...1..   910.328078: leave_mm <-intel_idle
+##### CPU 7 buffer started ####
+          <idle>-0     [007] d...1..   910.360866: tick_do_update_jiffies64 <-tick_check_idle
+          <idle>-0     [007] d...1..   910.360866: _raw_spin_lock <-tick_do_update_jiffies64
+          <idle>-0     [007] d...1..   910.360866: add_preempt_count <-_raw_spin_lock
+
+
+  bin - This will print out the formats in raw binary.
+
+  block - When set, reading trace_pipe will not block when polled.
+
+  context-info - Show only the event data. Hides the comm, PID,
+                   timestamp, CPU, and other useful data.
+
+  disable_on_free - When the free_buffer is closed, tracing will
+                      stop (tracing_on set to 0).
+
+  ftrace_preempt - Normally the function tracer disables interrupts as
+                   the recursion protection will hide interrupts from being
+                 traced if the interrupt happened while another function
+                 was being traced. If this option is enabled, then it
+                 will not disable interrupts but will only disable
+                 preemption. But note, if an interrupt were to arrive
+                 when another function is being traced, all functions
+                 within that interrupt will not be traced, as function
+                 tracing is temporarily disablde for recursion protection.
+
+  graph-time - When running function graph tracer, to include the
+                 time to call nested functions. When this is not set,
+               the time reported for the function will only include
+               the time the function itself executed for, not the time
+               for functions that it called.
+
+  hex - Similar to raw, but the numbers will be in a hexadecimal
+        format.
+
+  irq-info - Shows the interrupt, preempt count, need resched data.
+               When disabled, the trace looks like:
+
+# tracer: function
+#
+# entries-in-buffer/entries-written: 319494/4972382   #P:8
+#
+#           TASK-PID   CPU#      TIMESTAMP  FUNCTION
+#              | |       |          |         |
+          <idle>-0     [004]    983.062800: lock_hrtimer_base.isra.25 <-__hrtimer_start_range_ns
+          <idle>-0     [004]    983.062801: _raw_spin_lock_irqsave <-lock_hrtimer_base.isra.25
+          <idle>-0     [004]    983.062801: add_preempt_count <-_raw_spin_lock_irqsave
+          <idle>-0     [004]    983.062801: __remove_hrtimer <-__hrtimer_start_range_ns
+          <idle>-0     [004]    983.062801: hrtimer_force_reprogram <-__remove_hrtimer
+
+
+  latency-format - This option changes the trace. When
+                   it is enabled, the trace displays
+                   additional information about the
+                   latencies, as described in "Latency
+                   trace format".
+
+  markers - When set, the trace_marker is writable (only by root).
+              When disabled, the trace_marker will error with EINVAL
+            on write.
+
+  overwrite - This controls what happens when the trace buffer is
+              full. If "1" (default), the oldest events are
+              discarded and overwritten. If "0", then the newest
+              events are discarded.
+                (see per_cpu/cpu0/stats for overrun and dropped)
+
+  printk-msg-only - When set, trace_printk()s will only show the format
+                      and not their parameters (if trace_bprintk() or
+                    trace_bputs() was used to save the trace_printk()).
+
+  print-parent - On function traces, display the calling (parent)
+                 function as well as the function being traced.
+
+    print-parent:
+       bash-1423  [006]   1755.774709: msecs_to_jiffies <-idle_balance
+
+    noprint-parent:
+       bash-1423  [006]   1755.774709: msecs_to_jiffies
+
+
+  raw - This will display raw numbers. This option is best for
+        use with user applications that can translate the raw
+        numbers better than having it done in the kernel.
+
+  record-cmd - When any event or tracer is enabled, a hook is enabled
+                 in the sched_switch trace point to fill comm cache
+               with mapped pids and comms. But this may cause some
+               overhead, and if you only care about pids, and not the
+               name of the task, disabling this option can lower the
+               impact of tracing.
+
+  sleep-time - When running function graph tracer, to include
+                 the time a task schedules out in its function.
+               When enabled, it will account time the task has been
+               scheduled out as part of the function call.
+
+  stacktrace - This is one of the options that changes the trace
+               itself. When a trace is recorded, so is the stack
+               of functions. This allows for back traces of
+               trace sites.
+
+  sym-addr - this will also display the function address as well
+             as the function name.
+
+  sym-offset - Display not only the function name, but also the
+               offset in the function. For example, instead of
+               seeing just "ktime_get", you will see
+               "ktime_get+0xb/0x20".
+
+    sym-offset:
+      bash-1423  [006]   1755.774709: msecs_to_jiffies+0x0/0x20
+
+    sym-addr:
+      bash-1423  [006]   1755.774709: msecs_to_jiffies <ffffffff8106b5f0>
+
+
+  sym-userobj - when user stacktrace are enabled, look up which
+                object the address belongs to, and print a
+                relative address. This is especially useful when
+                ASLR is on, otherwise you don't get a chance to
+                resolve the address to object/file/line after
+                the app is no longer running
+
+                The lookup is performed when you read
+                trace,trace_pipe. Example:
+
+        a.out-1623  [000] 40874.465068: /root/a.out[+0x480] <-/root/a.out[+0x494] <- /root/a.out[+0x4a8] <- /lib/libc-2.7.so[+0x1e1a6]
+
+  trace_printk - Can disable trace_printk() from writing into the buffer.
+
+  userstacktrace - This option changes the trace. It records a
+                   stacktrace of the current userspace thread at each event.
+
+  verbose - This deals with the trace file when the
+            latency-format option is enabled.
+
+    bash  4000 1 0 00000000 00010a95 [58127d26] 1720.415ms \
+    (+0.000ms): simple_strtoul (strict_strtoul)
+
+
+
+
+This has been quite an in depth look at how to use ftrace via the
+debug file system. But it can be quite daunting to handle all these
+different files. Luckily, there's a tool that can do most of this
+work for you. It's called "trace-cmd"
+
+
+
+Using trace-cmd
+---------------
+
+trace-cmd is a tool that interacts with the ftrace tracing facility.
+It reads and writes to the same files that are described above as
+well as reading the files that can transfer the binary data of
+the kernel tracing buffers in an efficient manner to be read later.
+The tool is very simple and easy to use.
+
+There are several man pages for trace-cmd. First look at 
+
+  man trace-cmd
+
+to find out more information on the other commands. All of trace-cmd's
+commands also have their own man pages in the format of:
+
+  man trace-cmd-<command>
+
+For example, the "record" command's man page is under trace-cmd-record.
+
+This document will describe all the options for each command, but
+instead will briefly discuss how to use trace-cmd and describe most of
+its commands.
+
+
+
+trace-cmd record and report
+---------------------------
+
+To use ftrace tracers and events you must first have to start tracing
+by either echoing a name of a tracer into the "current_tracer" file
+or by echoing "1" into one of the event "enable" files.
+
+For trace-cmd, the record option starts the tracing and will also save
+the traced data into a file. Let's start with an example:
+
+
+># cd ~
+># trace-cmd record -p function
+  plugin 'function'
+Hit Ctrl^C to stop recording
+(^C)
+Kernel buffer statistics:
+  Note: "entries" are the entries left in the kernel ring buffer and are not
+        recorded in the trace data. They should all be zero.
+
+CPU: 0
+entries: 0
+overrun: 38650181
+commit overrun: 0
+bytes: 3060
+oldest event ts: 15634.891771
+now ts: 15634.953219
+dropped events: 0
+
+CPU: 1
+entries: 0
+overrun: 38523960
+commit overrun: 0
+bytes: 1368
+oldest event ts: 15634.891771
+now ts: 15634.953938
+dropped events: 0
+
+CPU: 2
+entries: 0
+overrun: 41461508
+commit overrun: 0
+bytes: 1872
+oldest event ts: 15634.891773
+now ts: 15634.954630
+dropped events: 0
+
+CPU: 3
+entries: 0
+overrun: 38246206
+commit overrun: 0
+bytes: 36
+oldest event ts: 15634.891785
+now ts: 15634.955263
+dropped events: 0
+
+CPU: 4
+entries: 0
+overrun: 32730902
+commit overrun: 0
+bytes: 432
+oldest event ts: 15634.891716
+now ts: 15634.955952
+dropped events: 0
+
+CPU: 5
+entries: 0
+overrun: 33264601
+commit overrun: 0
+bytes: 2952
+oldest event ts: 15634.891769
+now ts: 15634.956630
+dropped events: 0
+
+CPU: 6
+entries: 0
+overrun: 30974204
+commit overrun: 0
+bytes: 2484
+oldest event ts: 15634.891772
+now ts: 15634.957249
+dropped events: 0
+
+CPU: 7
+entries: 0
+overrun: 32374274
+commit overrun: 0
+bytes: 3564
+oldest event ts: 15634.891652
+now ts: 15634.957938
+dropped events: 0
+
+CPU0 data recorded at offset=0x302000
+    146325504 bytes in size
+CPU1 data recorded at offset=0x8e8e000
+    148217856 bytes in size
+CPU2 data recorded at offset=0x11be8000
+    148066304 bytes in size
+CPU3 data recorded at offset=0x1a91d000
+    146219008 bytes in size
+CPU4 data recorded at offset=0x2348f000
+    145940480 bytes in size
+CPU5 data recorded at offset=0x2bfbd000
+    145403904 bytes in size
+CPU6 data recorded at offset=0x34a68000
+    141570048 bytes in size
+CPU7 data recorded at offset=0x3d16b000
+    147513344 bytes in size
+
+
+The "-p" is for ftrace tracers (use to be known as 'plugins' and the name
+is kept for historical reasons). In this case we started the
+"function" tracer. Since we did not add a command to execute, by
+default, trace-cmd will just start the tracing and record the data
+and wait for the user to hit Ctrl^C to stop.
+
+When the trace stops, it prints out status of each of the kernel's
+per cpu trace buffers. The are:
+
+  entries:  - Which is the number of entries still in the kernel buffer.
+              Ideally this should be zero, as trace-cmd would consume them
+            all and put them into the data file.
+
+  overrun:  - As tracing can be much faster than the saving of data,
+              events can be lost due to overwriting of the old events
+            that were not consumed yet when the buffer filled up.
+            This is the number of events that were lost.
+
+            The "function" tracer can fill up the buffer extremely fast
+            it is not uncommon to lose millions of events when
+            tracing functions for any length of time.
+
+  commit overrun: - This should always be zero, and if it is not, then
+              the buffer size is way too small or something went wrong
+            with the tracer.
+
+  bytes: - The number of bytes consumed (not read as pages). This is
+             more a status for developers of the tracing utitily.
+
+  oldest event ts: - The timestamp for the oldest event still in the ring
+             buffer. Unless it gets overwritten, it will be the timestamp
+           of the next event read.
+
+  now ts: The current timestamp used by the tracing facility.
+
+  dropped events: - If the buffer has overwrite mode disabled (from the
+            trace options), then this will show the number of events that
+          were lost due to not being able to write to the buffer because
+          it was full. This is similar to the overrun field except that
+          those are events that made it into the buffer but were overwritten.
+
+
+
+By default, the file used to record the trace is called "trace.dat".
+You can override the output file with the -o option.
+
+To read the trace.dat file, simply run the trace-cmd report command:
+
+># trace-cmd report
+version = 6
+cpus=8
+       trace-cmd-3735  [003] 15618.722889: function:             __hrtimer_start_range_ns
+       trace-cmd-3734  [002] 15618.722889: function:             _mutex_unlock
+          <idle>-0     [000] 15618.722889: function:             cpuidle_wrap_enter
+       trace-cmd-3735  [003] 15618.722890: function:                lock_hrtimer_base.isra.25
+       trace-cmd-3734  [002] 15618.722890: function:                rt_mutex_unlock
+          <idle>-0     [000] 15618.722890: function:                ktime_get
+       trace-cmd-3735  [003] 15618.722890: function:                   _raw_spin_lock_irqsave
+       trace-cmd-3735  [003] 15618.722891: function:                      add_preempt_count
+       trace-cmd-3734  [002] 15618.722891: function:             __fsnotify_parent
+          <idle>-0     [000] 15618.722891: function:             intel_idle
+       trace-cmd-3735  [003] 15618.722891: function:                idle_cpu
+       trace-cmd-3734  [002] 15618.722891: function:             fsnotify
+          <idle>-0     [000] 15618.722891: function:                leave_mm
+       trace-cmd-3735  [003] 15618.722891: function:                ktime_get
+       trace-cmd-3734  [002] 15618.722891: function:                __srcu_read_lock
+          <idle>-0     [000] 15618.722891: function:                   __phys_addr
+       trace-cmd-3734  [002] 15618.722891: function:                   add_preempt_count
+       trace-cmd-3735  [003] 15618.722891: function:                enqueue_hrtimer
+       trace-cmd-3735  [003] 15618.722892: function:                _raw_spin_unlock_irqrestore
+       trace-cmd-3734  [002] 15618.722892: function:                   sub_preempt_count
+       trace-cmd-3735  [003] 15618.722892: function:                   sub_preempt_count
+       trace-cmd-3734  [002] 15618.722892: function:                __srcu_read_unlock
+       trace-cmd-3735  [003] 15618.722892: function:             schedule
+       trace-cmd-3734  [002] 15618.722892: function:                   add_preempt_count
+       trace-cmd-3735  [003] 15618.722893: function:                __schedule
+       trace-cmd-3734  [002] 15618.722893: function:                   sub_preempt_count
+       trace-cmd-3735  [003] 15618.722893: function:                   add_preempt_count
+       trace-cmd-3735  [003] 15618.722893: function:                   rcu_note_context_switch
+       trace-cmd-3734  [002] 15618.722893: function:             __audit_syscall_exit
+       trace-cmd-3735  [003] 15618.722893: function:                   _raw_spin_lock_irq
+       trace-cmd-3735  [003] 15618.722894: function:                      add_preempt_count
+       trace-cmd-3734  [002] 15618.722894: function:                path_put
+       trace-cmd-3735  [003] 15618.722894: function:                   deactivate_task
+       trace-cmd-3734  [002] 15618.722894: function:                   dput
+       trace-cmd-3735  [003] 15618.722894: function:                      dequeue_task
+       trace-cmd-3734  [002] 15618.722894: function:                   mntput
+       trace-cmd-3735  [003] 15618.722894: function:                         update_rq_clock
+       trace-cmd-3734  [002] 15618.722894: function:                unroll_tree_refs
+
+
+To filter out a CPU, use the --cpu option.
+
+># trace-cmd report --cpu 1
+version = 6
+cpus=8
+          <idle>-0     [001] 15618.723287: function:             ktime_get
+          <idle>-0     [001] 15618.723288: function:             smp_apic_timer_interrupt
+          <idle>-0     [001] 15618.723289: function:                irq_enter
+          <idle>-0     [001] 15618.723289: function:                   rcu_irq_enter
+          <idle>-0     [001] 15618.723289: function:                      rcu_eqs_exit_common.isra.45
+          <idle>-0     [001] 15618.723289: function:                   tick_check_idle
+          <idle>-0     [001] 15618.723290: function:                      tick_check_oneshot_broadcast
+          <idle>-0     [001] 15618.723290: function:                      ktime_get
+          <idle>-0     [001] 15618.723290: function:                      tick_nohz_stop_idle
+          <idle>-0     [001] 15618.723290: function:                         update_ts_time_stats
+          <idle>-0     [001] 15618.723290: function:                            nr_iowait_cpu
+          <idle>-0     [001] 15618.723291: function:             touch_softlockup_watchdog
+          <idle>-0     [001] 15618.723291: function:                      tick_do_update_jiffies64
+          <idle>-0     [001] 15618.723291: function:                      touch_softlockup_watchdog
+          <idle>-0     [001] 15618.723291: function:                   irqtime_account_irq
+          <idle>-0     [001] 15618.723292: function:                      in_serving_softirq
+          <idle>-0     [001] 15618.723292: function:                   add_preempt_count
+          <idle>-0     [001] 15618.723292: function:             exit_idle
+          <idle>-0     [001] 15618.723292: function:                atomic_notifier_call_chain
+          <idle>-0     [001] 15618.723293: function:                   __atomic_notifier_call_chain
+          <idle>-0     [001] 15618.723293: function:                      __rcu_read_lock
+
+
+Notice how the functions are indented similar to the function_graph
+tracer.  This is because trace-cmd can post process the trace data
+with more complex algorithms than are acceptable to implement in the
+kernel. It uses the parent function to follow which function is called
+by other functions and be able to deduce a call graph.
+
+To disable the indentation, use the -O report option.
+
+># trace-cmd report --cpu 1 -O indent=0
+version = 6
+cpus=8
+          <idle>-0     [001] 15618.723287: function:             ktime_get
+          <idle>-0     [001] 15618.723288: function:             smp_apic_timer_interrupt
+          <idle>-0     [001] 15618.723289: function:             irq_enter
+          <idle>-0     [001] 15618.723289: function:             rcu_irq_enter
+          <idle>-0     [001] 15618.723289: function:             rcu_eqs_exit_common.isra.45
+          <idle>-0     [001] 15618.723289: function:             tick_check_idle
+          <idle>-0     [001] 15618.723290: function:             tick_check_oneshot_broadcast
+          <idle>-0     [001] 15618.723290: function:             ktime_get
+          <idle>-0     [001] 15618.723290: function:             tick_nohz_stop_idle
+          <idle>-0     [001] 15618.723290: function:             update_ts_time_stats
+          <idle>-0     [001] 15618.723290: function:             nr_iowait_cpu
+          <idle>-0     [001] 15618.723291: function:             touch_softlockup_watchdog
+          <idle>-0     [001] 15618.723291: function:             tick_do_update_jiffies64
+          <idle>-0     [001] 15618.723291: function:             touch_softlockup_watchdog
+
+
+To add back the parent:
+
+># trace-cmd report --cpu 1 -O indent=0 -O parent=1
+version = 6
+cpus=8
+          <idle>-0     [001] 15618.723287: function:             ktime_get <-- cpuidle_wrap_enter
+          <idle>-0     [001] 15618.723288: function:             smp_apic_timer_interrupt <-- apic_timer_interrupt
+          <idle>-0     [001] 15618.723289: function:             irq_enter <-- smp_apic_timer_interrupt
+          <idle>-0     [001] 15618.723289: function:             rcu_irq_enter <-- irq_enter
+          <idle>-0     [001] 15618.723289: function:             rcu_eqs_exit_common.isra.45 <-- rcu_irq_enter
+          <idle>-0     [001] 15618.723289: function:             tick_check_idle <-- irq_enter
+          <idle>-0     [001] 15618.723290: function:             tick_check_oneshot_broadcast <-- tick_check_idle
+          <idle>-0     [001] 15618.723290: function:             ktime_get <-- tick_check_idle
+          <idle>-0     [001] 15618.723290: function:             tick_nohz_stop_idle <-- tick_check_idle
+          <idle>-0     [001] 15618.723290: function:             update_ts_time_stats <-- tick_nohz_stop_idle
+          <idle>-0     [001] 15618.723290: function:             nr_iowait_cpu <-- update_ts_time_stats
+          <idle>-0     [001] 15618.723291: function:             touch_softlockup_watchdog <-- sched_clock_idle_wakeup_event
+          <idle>-0     [001] 15618.723291: function:             tick_do_update_jiffies64 <-- tick_check_idle
+          <idle>-0     [001] 15618.723291: function:             touch_softlockup_watchdog <-- tick_check_idle
+          <idle>-0     [001] 15618.723291: function:             irqtime_account_irq <-- irq_enter
+          <idle>-0     [001] 15618.723292: function:             in_serving_softirq <-- irqtime_account_irq
+          <idle>-0     [001] 15618.723292: function:             add_preempt_count <-- irq_enter
+          <idle>-0     [001] 15618.723292: function:             exit_idle <-- smp_apic_timer_interrupt
+          <idle>-0     [001] 15618.723292: function:             atomic_notifier_call_chain <-- exit_idle
+          <idle>-0     [001] 15618.723293: function:             __atomic_notifier_call_chain <-- atomic_notifier_call_chain
+
+
+Now the trace looks similar to the debug file system output.
+
+
+
+Use the "-e" option to record events:
+
+># trace-cmd record -e sched_switch
+/sys/kernel/debug/tracing/events/sched_switch/filter
+/sys/kernel/debug/tracing/events/*/sched_switch/filter
+Hit Ctrl^C to stop recording
+(^C)
+[...]
+
+># trace-cmd report
+version = 6
+cpus=8
+          <idle>-0     [006] 21642.751755: sched_switch:         swapper/6:0 [120] R ==> trace-cmd:4876 [120]
+          <idle>-0     [002] 21642.751776: sched_switch:         swapper/2:0 [120] R ==> sshd:1208 [120]
+       trace-cmd-4875  [005] 21642.751782: sched_switch:         trace-cmd:4875 [120] D ==> swapper/5:0 [120]
+       trace-cmd-4869  [001] 21642.751792: sched_switch:         trace-cmd:4869 [120] S ==> swapper/1:0 [120]
+       trace-cmd-4873  [003] 21642.751819: sched_switch:         trace-cmd:4873 [120] S ==> swapper/3:0 [120]
+          <idle>-0     [005] 21642.751835: sched_switch:         swapper/5:0 [120] R ==> trace-cmd:4875 [120]
+       trace-cmd-4877  [007] 21642.751847: sched_switch:         trace-cmd:4877 [120] D ==> swapper/7:0 [120]
+            sshd-1208  [002] 21642.751875: sched_switch:         sshd:1208 [120] S ==> swapper/2:0 [120]
+          <idle>-0     [007] 21642.751880: sched_switch:         swapper/7:0 [120] R ==> trace-cmd:4877 [120]
+       trace-cmd-4874  [004] 21642.751885: sched_switch:         trace-cmd:4874 [120] S ==> swapper/4:0 [120]
+          <idle>-0     [001] 21642.751902: sched_switch:         swapper/1:0 [120] R ==> irq/43-em1:865 [49]
+       trace-cmd-4876  [006] 21642.751903: sched_switch:         trace-cmd:4876 [120] D ==> swapper/6:0 [120]
+          <idle>-0     [006] 21642.751926: sched_switch:         swapper/6:0 [120] R ==> trace-cmd:4876 [120]
+      irq/43-em1-865   [001] 21642.751927: sched_switch:         irq/43-em1:865 [49] S ==> swapper/1:0 [120]
+       trace-cmd-4875  [005] 21642.752029: sched_switch:         trace-cmd:4875 [120] S ==> swapper/5:0 [120]
+
+
+Notice that only the "sched_switch" name was used. trace-cmd will
+search for a match of "-e"'s option for trace event systems, or single
+trace events themselves. To trace all interrupt events:
+
+># trace-cmd record -e irq sleep 10
+/sys/kernel/debug/tracing/events/irq/filter
+/sys/kernel/debug/tracing/events/*/irq/filter
+[...]
+
+Notice that when a command is passed to trace-cmd, it will just run that
+command and exit the trace when complete.
+
+># trace-cmd report
+version = 6
+cpus=8
+          <idle>-0     [002] 21767.342089: softirq_raise:        vec=9 [action=RCU]
+           sleep-4917  [007] 21767.342089: softirq_raise:        vec=9 [action=RCU]
+          <idle>-0     [006] 21767.342089: softirq_raise:        vec=9 [action=RCU]
+     ksoftirqd/0-3     [000] 21767.342096: softirq_entry:        vec=1 [action=TIMER]
+     ksoftirqd/4-33    [004] 21767.342096: softirq_entry:        vec=1 [action=TIMER]
+     ksoftirqd/3-27    [003] 21767.342097: softirq_entry:        vec=1 [action=TIMER]
+     ksoftirqd/7-51    [007] 21767.342097: softirq_entry:        vec=1 [action=TIMER]
+     ksoftirqd/4-33    [004] 21767.342097: softirq_exit:         vec=1 [action=TIMER]
+
+
+
+To get the status information of events similar to what the debug
+file system provides, add the "-l" (think "latency") option to the report.
+
+
+># trace-cmd report -l
+version = 6
+cpus=8
+  <idle>-0       3d.h20 21767.341545: softirq_raise:        vec=8 [action=HRTIMER]
+ksoftirq-27      3...11 21767.341552: softirq_entry:        vec=8 [action=HRTIMER]
+ksoftirq-27      3...11 21767.341554: softirq_exit:         vec=8 [action=HRTIMER]
+  <idle>-0       4d.h20 21767.342085: softirq_raise:        vec=7 [action=SCHED]
+  <idle>-0       0d.h20 21767.342086: softirq_raise:        vec=7 [action=SCHED]
+  <idle>-0       3d.h20 21767.342086: softirq_raise:        vec=7 [action=SCHED]
+   sleep-4917    7d.h10 21767.342086: softirq_raise:        vec=7 [action=SCHED]
+  <idle>-0       6d.h20 21767.342087: softirq_raise:        vec=7 [action=SCHED]
+  <idle>-0       2d.h20 21767.342087: softirq_raise:        vec=1 [action=TIMER]
+  <idle>-0       1d.h20 21767.342087: softirq_raise:        vec=1 [action=TIMER]
+
+
+
+Tracing all events
+------------------
+
+As mentioned above, the "-e" option to trace-cmd record is to choose
+what event should be traced. You can specify either an individual event,
+or a trace system:
+
+># trace-cmd record -e irq
+
+The above enables all tracepoints within the "irq" system.
+
+># trace-cmd record -e irq_handler_enter
+># trace-cmd record -e irq:irq_handler_enter
+
+The commands above are equivalent and will enable the tracepoint
+event "irq_handler_enter".
+
+But then there is the case where you want to trace all events.
+To do this, use the keyword "all".
+
+># trace-cmd record -e all
+
+This will enable all events.
+
+
+Tracing tracers and events
+--------------------------
+
+As events can be enabled within any tracer, it makes sense that trace-cmd
+would allow this as well. This is indeed the case. You may use both
+the "-p" and the "-e" options at the same time.
+
+># trace-cmd record -p function_graph -e all
+[...]
+># trace-cmd report
+version = 6
+cpus=8
+       trace-cmd-1698  [002]  2724.485397: funcgraph_entry:                   |                  kmem_cache_alloc() {
+       trace-cmd-1699  [007]  2724.485397: funcgraph_entry:        0.073 us   |      find_vma();
+       trace-cmd-1696  [000]  2724.485397: funcgraph_entry:                   |          lg_local_lock() {
+       trace-cmd-1698  [002]  2724.485397: funcgraph_entry:        0.033 us   |                    add_preempt_count();
+       trace-cmd-1696  [000]  2724.485397: funcgraph_entry:                   |            migrate_disable() {
+       trace-cmd-1699  [007]  2724.485398: funcgraph_entry:                   |      handle_mm_fault() {
+       trace-cmd-1696  [000]  2724.485398: funcgraph_entry:        0.027 us   |              add_preempt_count();
+       trace-cmd-1698  [002]  2724.485398: funcgraph_entry:        0.034 us   |                    sub_preempt_count();
+       trace-cmd-1699  [007]  2724.485398: funcgraph_entry:                   |        __mem_cgroup_count_vm_event() {
+       trace-cmd-1696  [000]  2724.485398: funcgraph_entry:        0.031 us   |              pin_current_cpu();
+       trace-cmd-1699  [007]  2724.485398: funcgraph_entry:        0.029 us   |          __rcu_read_lock();
+       trace-cmd-1698  [002]  2724.485398: kmem_cache_alloc:     (return_to_handler+0x0) call_site=ffffffff81662345 ptr=0xffff880114e260f0 bytes_req=240 bytes_alloc=240 gfp_flags=G
+FP_KERNEL
+       trace-cmd-1696  [000]  2724.485398: funcgraph_entry:        0.034 us   |              sub_preempt_count();
+       trace-cmd-1699  [007]  2724.485398: funcgraph_entry:        0.028 us   |          __rcu_read_unlock();
+       trace-cmd-1698  [002]  2724.485398: funcgraph_exit:         0.758 us   |                  }
+       trace-cmd-1698  [002]  2724.485398: funcgraph_entry:        0.029 us   |                  __rt_mutex_init();
+       trace-cmd-1696  [000]  2724.485398: funcgraph_exit:         0.727 us   |            }
+       trace-cmd-1699  [007]  2724.485398: funcgraph_exit:         0.466 us   |        }
+
+Notice here that trace-cmd report does not disply the function graph
+tracer any different than any other trace, like the "trace" file does.
+
+
+Function filtering
+------------------
+
+The "set_ftrace_filter" and "set_ftrace_notrace" is very useful in
+filtering out functions that you do not care about. These can be done
+with trace-cmd as well.
+
+The "-l" and "-n" are used the same as "set_ftrace_filter" and
+"set_ftrace_notrace" respectively. Think of "limit functions" for
+"-l" as the "-f" is used for event filtering.
+
+To add more than one function to the list, either used the glob expressions
+described previously, or use multiple "-l" or "-n" options.
+
+># trace-cmd record -p function -l "sched*" -n "*stat*"
+
+The above traces all functions that start with "sched" except those that
+have "stat" in their names.
+
+
+
+Event filtering
+---------------
+
+To filter events the same way as writing to the "filter" file inside
+the "events" directory (see "Filtering events" above), use the "-f"
+option. This option must follow the event that it will filter.
+
+># trace-cmd record -e sched_switch -f "prev_prio < 100" \
+   -e sched_wakeup -f 'comm == "bash"'
+
+
+Graph a function
+----------------
+
+To perform a graph of a specific function using "function_graph" tracer,
+trace-cmd provides the "-g" option.
+
+># trace-cmd record -p function_graph -g sys_read ls /
+[...]
+># trace-cmd report
+version = 6
+CPU 3 is empty
+CPU 4 is empty
+CPU 5 is empty
+cpus=8
+       trace-cmd-2183  [006]  4689.643252: funcgraph_entry:                   |  sys_read() {
+       trace-cmd-2183  [006]  4689.643253: funcgraph_entry:        0.147 us   |    fget_light();
+       trace-cmd-2183  [006]  4689.643254: funcgraph_entry:                   |    vfs_read() {
+       trace-cmd-2183  [006]  4689.643254: funcgraph_entry:                   |      rw_verify_area() {
+       trace-cmd-2183  [006]  4689.643255: funcgraph_entry:                   |        security_file_permission() {
+       trace-cmd-2183  [006]  4689.643255: funcgraph_entry:        0.068 us   |          cap_file_permission();
+       trace-cmd-2183  [006]  4689.643256: funcgraph_entry:        0.064 us   |          __fsnotify_parent();
+       trace-cmd-2183  [006]  4689.643256: funcgraph_entry:        0.095 us   |          fsnotify();
+       trace-cmd-2183  [006]  4689.643257: funcgraph_exit:         1.792 us   |        }
+       trace-cmd-2183  [006]  4689.643257: funcgraph_exit:         2.328 us   |      }
+       trace-cmd-2183  [006]  4689.643257: funcgraph_entry:                   |      seq_read() {
+       trace-cmd-2183  [006]  4689.643257: funcgraph_entry:                   |        _mutex_lock() {
+       trace-cmd-2183  [006]  4689.643258: funcgraph_entry:        0.062 us   |          rt_mutex_lock();
+       trace-cmd-2183  [006]  4689.643258: funcgraph_exit:         0.584 us   |        }
+       trace-cmd-2183  [006]  4689.643259: funcgraph_entry:                   |        m_start() {
+       trace-cmd-2183  [006]  4689.643259: funcgraph_entry:                   |          rt_down_read() {
+       trace-cmd-2183  [006]  4689.643259: funcgraph_entry:                   |            rt_mutex_lock() {
+
+
+Modify trace buffer size via trace-cmd
+--------------------------------------
+
+The trace-cmd record "-b" option lets you change the size of the
+ftrace buffer before recording the trace. Note, currently trace-cmd
+does not support per-cpu resize. The size is what is entered into
+"buffer_size_kb" at the top level.
+
+
+># trace-cmd record -b 10000 -p function
+
+
+trace-cmd start, stop and extract
+---------------------------------
+
+The trace-cmd start command takes almost all the options as the trace-cmd
+record command does. The difference between the two is that "start"
+will only enable ftrace, it will not do any recording. It is equivalent
+to enabling ftrace via the debug file system.
+
+># trace-cmd start -p function -e all
+># cat /sys/kernel/debug/tracing/trace
+# tracer: function
+#
+# entries-in-buffer/entries-written: 1544167/2039168   #P:8
+#
+#                              _-------=> irqs-off          
+#                            /  _------=> need-resched      
+#                            |/  _-----=> need-resched_lazy 
+#                            ||/  _----=> hardirq/softirq   
+#                            |||/  _---=> preempt-depth     
+#                            ||||/  _--=> preempt-lazy-depth
+#                            ||||| / _-=> migrate-disable   
+#                            |||||| /     delay
+#           TASK-PID   CPU#  |||||||    TIMESTAMP  FUNCTION
+#              | |       |   |||||||       |         |
+       trace-cmd-2390  [003] .......  5946.816132: _mutex_unlock <-rb_simple_write
+       trace-cmd-2390  [003] .......  5946.816133: rt_mutex_unlock <-_mutex_unlock
+       trace-cmd-2390  [003] .......  5946.816134: __fsnotify_parent <-vfs_write
+       trace-cmd-2390  [003] .......  5946.816134: fsnotify <-vfs_write
+       trace-cmd-2390  [003] .......  5946.816135: __srcu_read_lock <-fsnotify
+       trace-cmd-2390  [003] .......  5946.816135: add_preempt_count <-__srcu_read_lock
+       trace-cmd-2390  [003] ....1..  5946.816135: sub_preempt_count <-__srcu_read_lock
+       trace-cmd-2390  [003] .......  5946.816135: __srcu_read_unlock <-fsnotify
+       trace-cmd-2390  [003] .......  5946.816136: add_preempt_count <-__srcu_read_unlock
+       trace-cmd-2390  [003] ....1..  5946.816136: sub_preempt_count <-__srcu_read_unlock
+       trace-cmd-2390  [003] .......  5946.816137: syscall_trace_leave <-int_check_syscall_exit_work
+       trace-cmd-2390  [003] .......  5946.816137: __audit_syscall_exit <-syscall_trace_leave
+       trace-cmd-2390  [003] .......  5946.816137: path_put <-__audit_syscall_exit
+       trace-cmd-2390  [003] .......  5946.816137: dput <-path_put
+       trace-cmd-2390  [003] .......  5946.816138: mntput <-path_put
+       trace-cmd-2390  [003] .......  5946.816138: unroll_tree_refs <-__audit_syscall_exit
+       trace-cmd-2390  [003] .......  5946.816138: kfree <-__audit_syscall_exit
+       trace-cmd-2390  [003] ....1..  5946.816139: kfree: call_site=ffffffff810eaff0 ptr=          (null)
+       trace-cmd-2390  [003] ....1..  5946.816139: sys_exit: NR 1 = 1
+       trace-cmd-2390  [003] d......  5946.816140: sys_write -> 0x1
+       trace-cmd-2390  [003] d......  5946.816151: do_page_fault <-page_fault
+       trace-cmd-2390  [003] d......  5946.816151: __do_page_fault <-do_page_fault
+       trace-cmd-2390  [003] .......  5946.816152: rt_down_read_trylock <-__do_page_fault
+       trace-cmd-2390  [003] .......  5946.816152: rt_mutex_trylock <-rt_down_read_trylock
+
+
+Running trace-cmd stop is exactly the same as echoing "0" into the
+"tracing_on" file in the debug file system. This only stops writing to
+the trace buffers, it does not stop all the tracing mechanisms inside
+the kernel and still adds some overhead to the system.
+
+># cat /sys/kernel/debug/tracing/tracing_on
+1
+># trace-cmd stop
+># cat /sys/kernel/debug/tracing/tracing_on
+0
+
+
+Finally, if you want to create a "trace.dat" file from the ftrace
+kernel buffers you use the "extract" command. The tracing could
+have started with the "start" command or by manually modifying the
+ftrace debug file system files. This is useful if you found a trace
+and want to save it off where you can send it to other people, and
+also have the full features of the trace-cmd "report" command.
+
+># trace-cmd extract
+># trace-cmd report
+version = 6
+cpus=8
+CPU:6 [2544372 EVENTS DROPPED]
+     ksoftirqd/6-45    [006]  6192.717580: function:             rcu_note_context_switch
+     ksoftirqd/6-45    [006]  6192.717580: rcu_utilization:      ffffffff819e743b
+     ksoftirqd/6-45    [006]  6192.717580: rcu_utilization:      ffffffff819e7450
+     ksoftirqd/6-45    [006]  6192.717581: function:             add_preempt_count
+     ksoftirqd/6-45    [006]  6192.717581: function:             kthread_should_stop
+     ksoftirqd/6-45    [006]  6192.717581: function:             kthread_should_park
+     ksoftirqd/6-45    [006]  6192.717581: function:             ksoftirqd_should_run
+     ksoftirqd/6-45    [006]  6192.717582: function:             sub_preempt_count
+     ksoftirqd/6-45    [006]  6192.717582: function:             schedule
+     ksoftirqd/6-45    [006]  6192.717582: function:                __schedule
+     ksoftirqd/6-45    [006]  6192.717582: function:                   add_preempt_count
+     ksoftirqd/6-45    [006]  6192.717582: function:                   rcu_note_context_switch
+     ksoftirqd/6-45    [006]  6192.717583: rcu_utilization:      ffffffff819e743b
+     ksoftirqd/6-45    [006]  6192.717583: rcu_utilization:      ffffffff819e7450
+     ksoftirqd/6-45    [006]  6192.717583: function:                   _raw_spin_lock_irq
+     ksoftirqd/6-45    [006]  6192.717583: function:                      add_preempt_count
+     ksoftirqd/6-45    [006]  6192.717584: function:                   deactivate_task
+     ksoftirqd/6-45    [006]  6192.717584: function:                      dequeue_task
+     ksoftirqd/6-45    [006]  6192.717584: function:                         update_rq_clock
+
+
+The "extract" command takes a "-o" option to save the trace in a different
+name like the "record" command does. By default it just saves it into
+a file called "trace.dat".
+
+
+Resetting the trace
+-------------------
+
+As mentioned, the "stop" command does not lower the overhead of ftrace.
+It simply disables writing to the ftrace buffer. There's two ways of
+resetting ftrace with trace-cmd.
+
+The first way is with the "reset" command.
+
+># trace-cmd reset
+
+This disables practically everything in ftrace. It also sets the
+"tracing_on" file to "0". It also erases everything inside the buffers,
+so make sure to do your "extract" before running the "reset" command.
+
+The "reset" command also takes a "-b" option that lets you resize the
+buffer as well. This is useful to free the allocated buffers when you
+are finished tracing.
+
+># trace-cmd reset -b 0
+># cat /sys/kernel/debug/tracing/buffer_total_size_kb
+8
+
+
+The problem with the "reset" command is that it may make it hard to
+use the debug file system tracing files directly. It may disable various
+parts of tracing that may give unexpected results when trying to use
+the files directly. If you plan to use ftrace's files directly after
+using trace-cmd, the trick is to start the "nop" tracer.
+
+># trace-cmd start -p nop
+
+This sets up ftrace to run the "nop" tracer, which does no tracing and
+has no overhead when enabled, and disables all events, and clears out
+the "trace" file. After running this command, the system should be
+set up to use the ftrace files directly as they are expected.
+
+
+
+Using trace-cmd over the network
+--------------------------------
+
+If the target system to trace is limited on disk space, or perhaps
+the disk usage is what is being traced, it can be prudent to record
+the trace via another median than to the hard drive. The "listen"
+command sets up a way for trace-cmd to record over the network.
+
+[Server]
+>$ mkdir traces
+>$ cd traces
+>$ trace-cmd listen -p 55577
+
+
+Notice that the prompt above is "$". This denotes that the listen command
+does not need to be root if the listening port is not a privileged port.
+
+[Target]
+># trace-cmd record -e all -N Server:55577 ls /
+
+
+[Server]
+connected!
+Connected with Target:50671
+cpus=8
+pagesize=4096
+version = 6
+CPU0 data recorded at offset=0x3a7000
+    0 bytes in size
+CPU1 data recorded at offset=0x3a7000
+    8192 bytes in size
+CPU2 data recorded at offset=0x3a9000
+    8192 bytes in size
+CPU3 data recorded at offset=0x3ab000
+    8192 bytes in size
+CPU4 data recorded at offset=0x3ad000
+    8192 bytes in size
+CPU5 data recorded at offset=0x3af000
+    8192 bytes in size
+CPU6 data recorded at offset=0x3b1000
+    4096 bytes in size
+CPU7 data recorded at offset=0x3b2000
+    8192 bytes in size
+connected!
+(^C)
+
+>$ ls
+trace.Target:50671.dat
+>$ trace-cmd report trace.Target:50671.dat
+version = 6
+CPU 0 is empty
+cpus=8
+           <...>-2976  [007]  8865.266143: mm_page_alloc:        page=0xffffea00007e8740 pfn=8292160 order=0 migratetype=0 gfp_flags=GFP_KERNEL|GFP_REPEAT|GFP_ZERO|GFP_NOTRACK
+           <...>-2976  [007]  8865.266145: kmalloc:              (pte_lock_init+0x2c) call_site=ffffffff8116d78c ptr=0xffff880111e40d00 bytes_req=48 bytes_alloc=64 gfp_flags=GFP_KERNEL
+           <...>-2976  [007]  8865.266152: mm_page_alloc:        page=0xffffea00034a50c0 pfn=55201984 order=0 migratetype=0 gfp_flags=GFP_KERNEL|GFP_REPEAT|GFP_ZERO|GFP_NOTRACK
+           <...>-2976  [007]  8865.266153: kmalloc:              (pte_lock_init+0x2c) call_site=ffffffff8116d78c ptr=0xffff880111e40e40 bytes_req=48 bytes_alloc=64 gfp_flags=GFP_KERNEL
+           <...>-2976  [007]  8865.266155: mm_page_alloc:        page=0xffffea000307d380 pfn=50844544 order=0 migratetype=2 gfp_flags=GFP_HIGHUSER_MOVABLE
+           <...>-2976  [007]  8865.266167: mm_page_alloc:        page=0xffffea000323f900 pfn=52689152 order=0 migratetype=2 gfp_flags=GFP_HIGHUSER_MOVABLE
+           <...>-2976  [007]  8865.266171: mm_page_alloc:        page=0xffffea00032cda80 pfn=53271168 order=0 migratetype=2 gfp_flags=GFP_HIGHUSER_MOVABLE
+           <...>-2976  [007]  8865.266192: hrtimer_cancel:       hrtimer=0xffff88011ebccf40
+          <idle>-0     [006]  8865.266193: hrtimer_cancel:       hrtimer=0xffff88011eb8cf40
+           <...>-2976  [007]  8865.266193: hrtimer_expire_entry: hrtimer=0xffff88011ebccf40 now=8905356001470 function=tick_sched_timer/0x0
+          <idle>-0     [006]  8865.266194: hrtimer_expire_entry: hrtimer=0xffff88011eb8cf40 now=8905356002620 function=tick_sched_timer/0x0
+           <...>-2976  [007]  8865.266196: sched_stat_runtime:   comm=trace-cmd pid=2976 runtime=228684 [ns] vruntime=2941412131 [ns]
+          <idle>-0     [006]  8865.266197: softirq_raise:        vec=1 [action=TIMER]
+          <idle>-0     [006]  8865.266197: rcu_utilization:      ffffffff819e740d
+           <...>-2976  [007]  8865.266198: softirq_raise:        vec=1 [action=TIMER]
+          <idle>-0     [006]  8865.266198: softirq_raise:        vec=9 [action=RCU]
+           <...>-2976  [007]  8865.266199: rcu_utilization:      ffffffff819e740d
+
+
+By default, the data is transfered via UDP. This is very efficient but
+it is possible to lose data and not know it. If you are worried about
+a full connection, then use the TCP protocol. The "-t" option
+on the "record" command forces trace-cmd to send the data over a TCP
+connection instead of a UDP one.
+
+
+Summary
+-------
+
+This document just highlighted the most common features of ftrace and
+trace-cmd. For more in depth look at what trace-cmd can do, read
+the man pages:
+
+  trace-cmd
+  trace-cmd-record
+  trace-cmd-report
+  trace-cmd-start
+  trace-cmd-stop
+  trace-cmd-extract
+  trace-cmd-reset
+  trace-cmd-listen
+  trace-cmd-split
+  trace-cmd-restore
+  trace-cmd-list
+  trace-cmd-stack
+#+end_src
 
 * cc
 
