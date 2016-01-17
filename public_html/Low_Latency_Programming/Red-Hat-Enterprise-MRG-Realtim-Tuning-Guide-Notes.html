@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Red Hat Enterprise MRG Realtime Tuning Guid Notes</title>
-<!-- 2016-01-16 Sat 22:51 -->
+<!-- 2016-01-17 Sun 22:19 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -103,12 +103,16 @@ for the JavaScript code in this tag.
 </li>
 <li><a href="#sec-6">Chapter 4. Application Tuning and Deployment</a>
 <ul>
-<li><a href="#sec-6-1"></a></li>
+<li><a href="#sec-6-1">⁠4.1. Signal processing in Realtime applications</a></li>
+<li><a href="#sec-6-2">⁠4.2. Using sched<sub>yield</sub> and other synchronization mechanisms</a></li>
+<li><a href="#sec-6-3">⁠4.4. <code>TCP_NODELAY</code> and small buffer writes</a></li>
+<li><a href="#sec-6-4">⁠4.6. Loading dynamic libraries</a></li>
+<li><a href="#sec-6-5">⁠4.7. Using _COARSE POSIX clocks for application timestamping</a></li>
+<li><a href="#sec-6-6">⁠4.8. About Perf</a></li>
 </ul>
 </li>
 <li><a href="#sec-7">⁠Appendix A. Event Tracing</a></li>
 <li><a href="#sec-8">⁠Appendix B. Function Tracer</a></li>
-<li><a href="#sec-9">cc</a></li>
 </ul>
 </div>
 </div>
@@ -125,7 +129,7 @@ for the JavaScript code in this tag.
 </li>
 </ul>
 <p>
-]]
+]]+ <a href="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_MRG/1.3/html/Realtime_Reference_Guide/">Red Hat Enterprise MRG 1.3 Realtime Reference Guide</a>
 </p>
 </div>
 </div>
@@ -1283,11 +1287,258 @@ start by reading the <a href="https://rt.wiki.kernel.org/index.php/HOWTO:_Build_
 </div>
 
 <div id="outline-container-sec-6-1" class="outline-3">
-<h3 id="sec-6-1"></h3>
-</div>
+<h3 id="sec-6-1">⁠4.1. Signal processing in Realtime applications</h3>
+<div class="outline-text-3" id="text-6-1">
+<p>
+Traditional UNIX and POSIX signals have their uses, especially for
+error handling, but they are not suitable for use in realtime
+applications as an event delivery mechanism. The reason for this is
+that the current Linux kernel signal handling code is quite complex,
+due mainly to legacy behavior and the multitude of APIs that need to
+be supported. This complexity means that the code paths that are taken
+when delivering a signal are not always optimal, and quite long
+latencies can be experienced by applications.
+</p>
+
+<p>
+The original motivation behind UNIX™ signals was to multiplex one
+thread of control (the process) between different "threads" of
+execution. Signals behave somewhat like operating system interrupts -
+when a signal is delivered to an application, the application's
+context is saved and it starts executing a previously registered
+signal handler. Once the signal handler has completed, the application
+returns to executing where it was when the signal was delivered. This
+can get complicated in practice.
+</p>
+
+<p>
+Signals are too non-deterministic to trust them in a realtime
+application. A better option is to use POSIX Threads (pthreads) to
+distribute your workload and communicate between various components.
+You can coordinate groups of threads using the pthreads mechanisms of
+mutexes, condition variables and barriers and trust that the code
+paths through these relatively new constructs are much cleaner than
+the legacy handling code for signals.
+</p>
 </div>
 
+<ul class="org-ul"><li><a id="sec-6-1-1" name="sec-6-1-1"></a>Further Reading<br  /><div class="outline-text-4" id="text-6-1-1">
+<p>
+<a href="https://www.akkadia.org/drepper/posix-signal-model.xml">Requirements of the POSIX Signal Model</a>
+</p>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2">⁠4.2. Using sched<sub>yield</sub> and other synchronization mechanisms</h3>
+<div class="outline-text-3" id="text-6-2">
+<p>
+The <code>sched_yield</code> system call is used by a thread allowing other threads
+a chance to run. Often when <code>sched_yield</code> is used, the thread can go to
+the end of the run queues, taking a long time to be scheduled again,
+or it can be rescheduled straight away, creating a busy loop on the
+CPU. The scheduler is better able to determine when and if there are
+actually other threads wanting to run. Avoid using <code>sched_yield</code> on any
+RT task.
+</p>
 
+<p>
+For more information, see Arnaldo Carvalho de Melo's paper on
+<a href="http://vger.kernel.org/~acme/unbehaved.txt">Earthquaky kernel interfaces</a>.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-6-3" class="outline-3">
+<h3 id="sec-6-3">⁠4.4. <code>TCP_NODELAY</code> and small buffer writes</h3>
+<div class="outline-text-3" id="text-6-3">
+<p>
+By default TCP uses Nagle's algorithm to collect small outgoing
+packets to send all at once. This can have a detrimental effect on
+latency.
+</p>
+</div>
+<ul class="org-ul"><li><a id="sec-6-3-1" name="sec-6-3-1"></a>Procedure 4.3. Using <code>TCP_NODELAY</code> and <code>TCP_CORK</code> to improve network latency<br  /><div class="outline-text-4" id="text-6-3-1">
+<ol class="org-ol">
+<li>Applications that require lower latency on every packet sent must
+be run on sockets with <code>TCP_NODELAY</code> enabled. It can be enabled
+through the setsockopt command with the sockets API:
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">int one = 1;</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">setsockopt(descriptor, SOL_TCP, TCP_NODELAY, &amp;one, sizeof(one));</span>
+</pre>
+</div>
+</li>
+<li>For this to be used effectively, applications must avoid doing
+small, logically related buffer writes. Because <code>TCP_NODELAY</code> is
+enabled, these small writes will make TCP send these multiple
+buffers as individual packets, which can result in poor overall
+performance.
+
+<p>
+If applications have several buffers that are logically related, and
+are to be sent as one packet, it is possible to build a contiguous
+packet in memory and then send the logical packet to TCP on a
+socket configured with <code>TCP_NODELAY</code>.
+</p>
+</li>
+<li>Another option is to use <code>TCP_CORK</code>, which tells TCP to wait for the
+application to remove the cork before sending any packets. This
+command will cause the buffers it receives to be appended to the
+existing buffers. This allows applications to build a packet in
+kernel space, which can be required when using different libraries
+that provides abstractions for layers. To enable <code>TCP_CORK</code>, set it
+to a value of 1 using the <code>setsockopt</code> sockets API (this is known as
+"corking the socket"):
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">int one = 1;</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">setsockopt(descriptor, SOL_TCP, TCP_CORK, &amp;one, sizeof(one));</span>
+</pre>
+</div>
+</li>
+<li>When the logical packet has been built in the kernel by the various
+components in the application, tell TCP to remove the cork. TCP
+will send the accumulated logical packet right away, without
+waiting for any further packets from the application.
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">int zero = 0;</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">setsockopt(descriptor, SOL_TCP, TCP_CORK, &amp;zero, sizeof(zero));</span>
+</pre>
+</div>
+</li>
+</ol>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-6-4" class="outline-3">
+<h3 id="sec-6-4">⁠4.6. Loading dynamic libraries</h3>
+<div class="outline-text-3" id="text-6-4">
+<p>
+Dynamic Libraries can be instructed to load at system startup by
+setting the <code>LD_BIND_NOW</code> variable with ld.so, the dynamic
+<code>linker/loader</code>.
+</p>
+
+<p>
+The following is an example shell script. This script exports the
+<code>LD_BIND_NOW</code> variable with a non-null value of 1, then runs a program
+with a scheduler policy of FIFO and a priority of <code>1</code>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/bin/</span><span style="color: #00ffff;">sh</span>
+
+<span style="color: #eedd82;">LD_BIND_NOW</span>=1
+<span style="color: #b0c4de;">export</span> LD_BIND_NOW
+
+chrt --fifo 1 /opt/myapp/myapp-server &amp;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-5" class="outline-3">
+<h3 id="sec-6-5">⁠4.7. Using _COARSE POSIX clocks for application timestamping</h3>
+<div class="outline-text-3" id="text-6-5">
+<p>
+To illustrate that concept, imagine using a clock, inside a drawer, to
+time events being observed. If every time one has to open the drawer,
+get the clock and only then read the time, the cost of reading the
+clock is too high and can lead to missing events or incorrectly
+timestamping them.
+</p>
+
+<p>
+Conversely, a clock on the wall would be faster to read, and
+timestamping would produce less interference to the observed events.
+Standing right in front of that wall clock would make it even faster
+to obtain time readings.
+</p>
+
+<p>
+The function used to read a given POSIX clock is <code>clock_gettime()</code>,
+which is defined at <code>&lt;time.h&gt;</code>. <code>clock_gettime()</code> has a counterpart in the
+kernel, in the form of a system call. When the user process calls
+<code>clock_gettime()</code>, the corresponding C library (glibc) calls the
+<code>sys_clock_gettime()</code> system call which performs the requested operation
+and then returns the result to the user program.
+</p>
+
+<p>
+However, this context switch from the user application to the kernel
+has a cost. Even though this cost is very low, if the operation is
+repeated thousands of times, the accumulated cost can have an impact
+on the overall performance of the application. To avoid that context
+switch to the kernel, thus making it faster to read the clock, support
+for the <code>CLOCK_MONOTONIC_COARSE</code> and <code>CLOCK_REALTIME_COARSE</code> POSIX clocks
+was created in the form of a VDSO library function.
+</p>
+
+<p>
+Time readings performed by <code>clock_gettime()</code>, using one of the <code>_COARSE</code>
+clock variants, do not require kernel intervention and are executed
+entirely in user space, which yields a significant performance gain.
+Time readings for <code>_COARSE</code> clocks have a millisecond (ms) resolution,
+meaning that time intervals smaller than 1ms will not be recorded. The
+<code>_COARSE</code> variants of the POSIX clocks are suitable for any application
+that can accommodate millisecond clock resolution, and the benefits
+are more evident on systems which use hardware clocks with high
+reading costs.
+</p>
+
+<p>
+Usually the only required change is to replace <code>CLOCK_MONOTONIC</code> with
+ <code>CLOCK_MONOTONIC_COARSE</code> on the <code>clock_gettime()</code> calls in the source
+ code, for example:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
+<span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rc</span>;
+  <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timespec</span> <span style="color: #eedd82;">ts</span>;
+
+  <span style="color: #00ffff;">for</span> (i=0; i&lt;10000000; i++) {
+    rc = clock_gettime(CLOCK_MONOTONIC_COARSE, &amp;ts);
+  }
+}
+</pre>
+</div>
+
+<p>
+Programs using the <code>clock_gettime()</code> function must be linked with the <code>rt</code>
+library by adding '-lrt' to the gcc command line.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">cc clock_timing.c -o clock_timing -lrt
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-6" class="outline-3">
+<h3 id="sec-6-6">⁠4.8. About Perf</h3>
+<div class="outline-text-3" id="text-6-6">
+<p>
+Perf is included in Linux kernels 2.6 and above as a performance
+analysis tool. It presents a simple command line interface and
+separates the CPU hardware difference in Linux performance
+measurements. Perf is based on the <code>perf_events</code> interface exported by
+the kernel.
+</p>
+
+<p>
+One advantage of perf is that it is both kernel and architecture
+neutral. The analysis data can be reviewed without requiring specific
+system configuration.
+</p>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-7" class="outline-2">
 <h2 id="sec-7">⁠Appendix A. Event Tracing</h2>
 <div class="outline-text-2" id="text-7">
@@ -4274,28 +4525,10 @@ the files directly. If you plan to use ftrace<span style="color: #ffa07a;">'s fi
 </div>
 </div>
 </div>
-
-<div id="outline-container-sec-9" class="outline-2">
-<h2 id="sec-9">cc</h2>
-<div class="outline-text-2" id="text-9">
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
-</div>
-
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
-
-<p class="warning">
-</p>
-</div>
-</div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-01-16 Sat 22:51</p>
+<p class="date">Created: 2016-01-17 Sun 22:19</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

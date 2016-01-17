@@ -6,7 +6,7 @@
 + [[https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_MRG/2/html/Realtime_Tuning_Guide/index.html][Red Hat Enterprise MRG Realtime Tuning Guid]]
 + MRG Realtime Installation Guide
 + [[https://rt.wiki.kernel.org/index.php/HOWTO:_Build_an_RT-application][HOWTO: Build an RT-application
-]]
+]]+ [[https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_MRG/1.3/html/Realtime_Reference_Guide/][Red Hat Enterprise MRG 1.3 Realtime Reference Guide]]
 
 * Preface
  Red Hat Enterprise MRG is a high performance distributed computing
@@ -720,9 +720,174 @@ tasks when the =sched_nr_migrate= is set to a large value.
 For further reading on developing your own MRG Realtime applications,
 start by reading the [[https://rt.wiki.kernel.org/index.php/HOWTO:_Build_an_RT-application][HOWTO: Build an RT-application]].
 
-** 
+** ⁠4.1. Signal processing in Realtime applications
+Traditional UNIX and POSIX signals have their uses, especially for
+error handling, but they are not suitable for use in realtime
+applications as an event delivery mechanism. The reason for this is
+that the current Linux kernel signal handling code is quite complex,
+due mainly to legacy behavior and the multitude of APIs that need to
+be supported. This complexity means that the code paths that are taken
+when delivering a signal are not always optimal, and quite long
+latencies can be experienced by applications.
 
+The original motivation behind UNIX™ signals was to multiplex one
+thread of control (the process) between different "threads" of
+execution. Signals behave somewhat like operating system interrupts -
+when a signal is delivered to an application, the application's
+context is saved and it starts executing a previously registered
+signal handler. Once the signal handler has completed, the application
+returns to executing where it was when the signal was delivered. This
+can get complicated in practice.
 
+Signals are too non-deterministic to trust them in a realtime
+application. A better option is to use POSIX Threads (pthreads) to
+distribute your workload and communicate between various components.
+You can coordinate groups of threads using the pthreads mechanisms of
+mutexes, condition variables and barriers and trust that the code
+paths through these relatively new constructs are much cleaner than
+the legacy handling code for signals.
+
+*** Further Reading
+[[https://www.akkadia.org/drepper/posix-signal-model.xml][Requirements of the POSIX Signal Model]]
+** ⁠4.2. Using sched_yield and other synchronization mechanisms
+The =sched_yield= system call is used by a thread allowing other threads
+a chance to run. Often when =sched_yield= is used, the thread can go to
+the end of the run queues, taking a long time to be scheduled again,
+or it can be rescheduled straight away, creating a busy loop on the
+CPU. The scheduler is better able to determine when and if there are
+actually other threads wanting to run. Avoid using =sched_yield= on any
+RT task.
+
+For more information, see Arnaldo Carvalho de Melo's paper on
+[[http://vger.kernel.org/~acme/unbehaved.txt][Earthquaky kernel interfaces]].
+** ⁠4.4. =TCP_NODELAY= and small buffer writes
+By default TCP uses Nagle's algorithm to collect small outgoing
+packets to send all at once. This can have a detrimental effect on
+latency.
+*** Procedure 4.3. Using =TCP_NODELAY= and =TCP_CORK= to improve network latency
+1. Applications that require lower latency on every packet sent must
+   be run on sockets with =TCP_NODELAY= enabled. It can be enabled
+   through the setsockopt command with the sockets API:
+   #+begin_src sh
+     # int one = 1;
+     # setsockopt(descriptor, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+   #+end_src
+2. For this to be used effectively, applications must avoid doing
+   small, logically related buffer writes. Because =TCP_NODELAY= is
+   enabled, these small writes will make TCP send these multiple
+   buffers as individual packets, which can result in poor overall
+   performance.
+
+   If applications have several buffers that are logically related, and
+   are to be sent as one packet, it is possible to build a contiguous
+   packet in memory and then send the logical packet to TCP on a
+   socket configured with =TCP_NODELAY=.
+3. Another option is to use =TCP_CORK=, which tells TCP to wait for the
+   application to remove the cork before sending any packets. This
+   command will cause the buffers it receives to be appended to the
+   existing buffers. This allows applications to build a packet in
+   kernel space, which can be required when using different libraries
+   that provides abstractions for layers. To enable =TCP_CORK=, set it
+   to a value of 1 using the =setsockopt= sockets API (this is known as
+   "corking the socket"):
+   #+begin_src sh
+     # int one = 1;
+     # setsockopt(descriptor, SOL_TCP, TCP_CORK, &one, sizeof(one));
+   #+end_src
+4. When the logical packet has been built in the kernel by the various
+   components in the application, tell TCP to remove the cork. TCP
+   will send the accumulated logical packet right away, without
+   waiting for any further packets from the application.
+   
+   #+begin_src sh
+     # int zero = 0;
+     # setsockopt(descriptor, SOL_TCP, TCP_CORK, &zero, sizeof(zero));
+   #+end_src
+** ⁠4.6. Loading dynamic libraries
+Dynamic Libraries can be instructed to load at system startup by
+setting the =LD_BIND_NOW= variable with ld.so, the dynamic
+=linker/loader=.
+
+The following is an example shell script. This script exports the
+=LD_BIND_NOW= variable with a non-null value of 1, then runs a program
+with a scheduler policy of FIFO and a priority of =1=.
+
+#+begin_src sh
+#!/bin/sh
+	
+LD_BIND_NOW=1
+export LD_BIND_NOW
+	
+chrt --fifo 1 /opt/myapp/myapp-server &
+#+end_src
+** ⁠4.7. Using _COARSE POSIX clocks for application timestamping
+To illustrate that concept, imagine using a clock, inside a drawer, to
+time events being observed. If every time one has to open the drawer,
+get the clock and only then read the time, the cost of reading the
+clock is too high and can lead to missing events or incorrectly
+timestamping them.
+
+Conversely, a clock on the wall would be faster to read, and
+timestamping would produce less interference to the observed events.
+Standing right in front of that wall clock would make it even faster
+to obtain time readings.
+
+The function used to read a given POSIX clock is =clock_gettime()=,
+which is defined at =<time.h>=. =clock_gettime()= has a counterpart in the
+kernel, in the form of a system call. When the user process calls
+=clock_gettime()=, the corresponding C library (glibc) calls the
+=sys_clock_gettime()= system call which performs the requested operation
+and then returns the result to the user program.
+
+However, this context switch from the user application to the kernel
+has a cost. Even though this cost is very low, if the operation is
+repeated thousands of times, the accumulated cost can have an impact
+on the overall performance of the application. To avoid that context
+switch to the kernel, thus making it faster to read the clock, support
+for the =CLOCK_MONOTONIC_COARSE= and =CLOCK_REALTIME_COARSE= POSIX clocks
+was created in the form of a VDSO library function.
+
+Time readings performed by =clock_gettime()=, using one of the =_COARSE=
+clock variants, do not require kernel intervention and are executed
+entirely in user space, which yields a significant performance gain.
+Time readings for =_COARSE= clocks have a millisecond (ms) resolution,
+meaning that time intervals smaller than 1ms will not be recorded. The
+=_COARSE= variants of the POSIX clocks are suitable for any application
+that can accommodate millisecond clock resolution, and the benefits
+are more evident on systems which use hardware clocks with high
+reading costs.
+
+Usually the only required change is to replace =CLOCK_MONOTONIC= with
+ =CLOCK_MONOTONIC_COARSE= on the =clock_gettime()= calls in the source
+ code, for example:
+#+begin_src c++
+  #include <time.h>
+  main() {
+    int rc;
+    long i;
+    struct timespec ts;
+    
+    for (i=0; i<10000000; i++) {
+      rc = clock_gettime(CLOCK_MONOTONIC_COARSE, &ts);
+    }
+  }
+#+end_src
+
+Programs using the =clock_gettime()= function must be linked with the =rt=
+library by adding '-lrt' to the gcc command line.
+#+begin_src sh
+cc clock_timing.c -o clock_timing -lrt
+#+end_src
+** ⁠4.8. About Perf
+Perf is included in Linux kernels 2.6 and above as a performance
+analysis tool. It presents a simple command line interface and
+separates the CPU hardware difference in Linux performance
+measurements. Perf is based on the =perf_events= interface exported by
+the kernel.
+
+One advantage of perf is that it is both kernel and architecture
+neutral. The analysis data can be reviewed without requiring specific
+system configuration.
 * ⁠Appendix A. Event Tracing
 #+begin_src sh
 Event Tracing
@@ -3698,17 +3863,3 @@ the man pages:
   trace-cmd-stack
 #+end_src
 
-* cc
-
-#+begin_src sh
-
-#+end_src
-
-#+begin_src c++
-
-#+end_src
-
-#+begin_html
-<p class="warning">
-</p>
-#+end_html
