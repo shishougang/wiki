@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>TCP Bypass Notes</title>
-<!-- 2016-01-23 Sat 22:40 -->
+<!-- 2016-01-26 Tue 21:42 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -67,7 +67,19 @@ for the JavaScript code in this tag.
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">Linux TCP/IP - Send flow (simplified)</a></li>
-<li><a href="#sec-2">cc</a></li>
+<li><a href="#sec-2">Linux TCP/IP – receive flow (simplified)</a></li>
+<li><a href="#sec-3">Linux TCP/IP stack – Tx Call Flow</a></li>
+<li><a href="#sec-4">Linux TCP/IP stack – Rx Call Flow</a></li>
+<li><a href="#sec-5">TCP/IP optimizations</a>
+<ul>
+<li><a href="#sec-5-1">Zero copy</a></li>
+<li><a href="#sec-5-2">NIC optimizations</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">By passing TCP/IP</a></li>
+<li><a href="#sec-7">By passing TCP/IP – Four options today</a></li>
+<li><a href="#sec-8">OFED (Open Fabric Enterprise Distribution) Software Stack</a></li>
+<li><a href="#sec-9">More</a></li>
 </ul>
 </div>
 </div>
@@ -84,29 +96,163 @@ for the JavaScript code in this tag.
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">cc</h2>
+<h2 id="sec-2">Linux TCP/IP – receive flow (simplified)</h2>
 <div class="outline-text-2" id="text-2">
-<div class="org-src-container">
 
-<pre class="src src-python"></pre>
+<div class="figure">
+<p><img src="./files/linux-tcp-receive-flow.jpg" alt="linux-tcp-receive-flow.jpg" />
+</p>
+</div>
+</div>
 </div>
 
-<div class="org-src-container">
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Linux TCP/IP stack – Tx Call Flow</h2>
+<div class="outline-text-2" id="text-3">
 
-<pre class="src src-c++"></pre>
+<div class="figure">
+<p><img src="./files/linux-tcp-stack-tx-call-flow.jpg" alt="linux-tcp-stack-tx-call-flow.jpg" />
+</p>
+</div>
+</div>
 </div>
 
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Linux TCP/IP stack – Rx Call Flow</h2>
+<div class="outline-text-2" id="text-4">
 
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
+<div class="figure">
+<p><img src="./files/linux-tcp-stack-rx-call-flow.jpg" alt="linux-tcp-stack-rx-call-flow.jpg" />
+</p>
 </div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">TCP/IP optimizations</h2>
+<div class="outline-text-2" id="text-5">
+</div><div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Zero copy</h3>
+<div class="outline-text-3" id="text-5-1">
+<ul class="org-ul">
+<li>Avoid copy from User space to kernel space, DMA from/to User space.
+Issues with holding onto buffers to support TCP retransmission
+requests, no current API/signalling to tell User space code when it
+can discard buffer. Implementations available but not in mainstream
+distributions.
+</li>
+
+<li>Only the webserver Use case of Filecopy write to socket available in
+mainstream since this can DMA from the file buffer cache and can be
+called directly from the TCP code to release the buffer. Note syntax
+differences between UNIX implementations cause portability issues.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">NIC optimizations</h3>
+<div class="outline-text-3" id="text-5-2">
+<ul class="org-ul">
+<li>Interrupt coalescing. Reduces CPU load and can therefore increase
+throughput where this is a constraint but adversely impacts latency
+</li>
+<li>NAPI support lowers CPU load by disabling RX interrupts and only
+polling under high load. Adaptive; resorts back to RX interrupts
+when load is lowered
+</li>
+<li>Scatter gather I/O transfers from multiple blocks in a single DMA
+operation avoiding a kernel memory copy up to the 64K allowed for an
+IP packet
+</li>
+<li>Offloads for TCP Segmentation, checksums, Large Receive
+</li>
+<li>Receive Side Scaling (RSS) spreads RX load across multiple CPUs
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">By passing TCP/IP</h2>
+<div class="outline-text-2" id="text-6">
+<ul class="org-ul">
+<li>TCP provides error detection and correction, in-order delivery of
+data, flow control and congestion management
+</li>
+<li>IP provides routing, packet chopping and aggregation, error
+detection and a address namespace
+</li>
+<li>IP allows us to scale by routing across multiple L2 subnets
+</li>
+<li>We can only replace TCP/IP by finding alternatives to these
+</li>
+<li>By limiting to Layer2 networks we can drop IP but need to provide
+a namespace and still need to overcome any scalability issues
+</li>
+<li>But Ethernet has no guaranteed delivery and is permitted to
+arbitrarily drop packets
+</li>
+<li>Ethernet subnets are rarely extended beyond 1024 addresses due to
+broadcast issues
+</li>
+<li>FibreChannel provides error detection, reliable in-order delivery,
+credit based flow control and a namespace but error recovery is very
+expensive and it is lacking multicast support
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">By passing TCP/IP – Four options today</h2>
+<div class="outline-text-2" id="text-7">
+<ul class="org-ul">
+<li>iWARP - RDMA over Ethernet
+</li>
+<li>Converged Ethernet – Data Centre Enhanced Ethernet
+</li>
+<li>GAMMA – Genoa Active Message Machine
+</li>
+<li>Open-MX – Myricom API
+</li>
+<li>InfiniBand – Converged interconnect
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">OFED (Open Fabric Enterprise Distribution) Software Stack</h2>
+<div class="outline-text-2" id="text-8">
+
+<div class="figure">
+<p><img src="./files/OFED-Software-Stack.jpg" alt="OFED-Software-Stack.jpg" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">More</h2>
+<div class="outline-text-2" id="text-9">
+<ul class="org-ul">
+<li>www.openfabrics.org
+</li>
+<li>www.infinibandta.org
+</li>
+<li>“RDMA Aware Programming Manual”, www.mellanox.com
+</li>
+<li>“TCP/IP Architecture, Design and Implementation in Linux”, S. Seth
+</li>
+<li>“Understanding Linux network internals”, Christian Benvenuti
+</li>
+</ul>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-01-23 Sat 22:40</p>
+<p class="date">Created: 2016-01-26 Tue 21:42</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
