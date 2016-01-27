@@ -3,7 +3,7 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<title>strace</title>
+<title>ltrace and latrace</title>
 <!-- 2016-01-27 Wed 22:34 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
@@ -78,66 +78,121 @@ for the JavaScript code in this tag.
 </head>
 <body>
 <div id="content">
-<h1 class="title">strace</h1>
+<h1 class="title">ltrace and latrace</h1>
 <div id="table-of-contents">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">Trace a program</a></li>
-<li><a href="#sec-2">Trace a running, real-world process</a></li>
-<li><a href="#sec-3">count the system calls</a></li>
-<li><a href="#sec-4">time the execution of each system call</a></li>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">Trace shared library calls with ltrace</a></li>
+<li><a href="#sec-3">Trace shared library calls with latrace</a></li>
 </ul>
 </div>
 </div>
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">Trace a program</h2>
+<h2 id="sec-1">Overview</h2>
 <div class="outline-text-2" id="text-1">
-<div class="org-src-container">
-
-<pre class="src src-sh">strace -s 2000 -f ./program
-</pre>
-</div>
+<p>
+Similar to strace, which can be used to trace system calls, ltrace can
+be used to trace <b>shared library calls</b>.
+</p>
 </div>
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">Trace a running, real-world process</h2>
+<h2 id="sec-2">Trace shared library calls with ltrace</h2>
 <div class="outline-text-2" id="text-2">
 <div class="org-src-container">
 
-<pre class="src src-sh">$ sudo strace -o /tmp/strace.out -s 2000  -fp pid
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">hello.c</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Print</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">s</span>) {
+  printf(<span style="color: #ffa07a;">"%s"</span>, s);
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">hello.h</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Print</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span>* <span style="color: #eedd82;">s</span>);
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">hello_main.c</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">"hello.h"</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  Print(<span style="color: #ffa07a;">"Hello World\n"</span>);
+  <span style="color: #00ffff;">return</span> 0;
+}
 </pre>
 </div>
+
+<p>
+makefile
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">all:
+        gcc -fPIC --shared -o libhello.so hello.c
+        gcc -o hello hello_main.c -lhello -L.
+</pre>
+</div>
+
+<p>
+Use <b>ltrace</b> to see which library calls are called:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ export <span style="color: #eedd82;">LD_LIBRARY_PATH</span>=.
+$ ltrace ./hello
+<span style="color: #87cefa;">__libc_start_main</span>(0x804852c, 1, 0xbfbc7864, 0x8048550, 0x80485c0 &lt;unfinished ...&gt;
+<span style="color: #87cefa;">Print</span>(0x80485e8, 0, 0x8048559, 0xb7722ff4, 0x8048550Hello World
+)                   = 12
++++ exited (status 0) +++
+</pre>
+</div>
+<p>
+One drawback with ltrace is that it only traces calls from the
+executable to the libraries the executable is linked against - it does
+<b>not trace calls between libraries</b>.
+</p>
 </div>
 </div>
+
 
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">count the system calls</h2>
+<h2 id="sec-3">Trace shared library calls with latrace</h2>
 <div class="outline-text-2" id="text-3">
 <p>
-use the “-c” flag to tell strace to count the system calls it observes
+On Ubuntu, it can be installed with
 </p>
 <div class="org-src-container">
 
-<pre class="src src-sh">sudo strace -c -p pid
+<pre class="src src-sh">$ sudo apt-get install latrace
 </pre>
 </div>
-</div>
-</div>
 
-<div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">time the execution of each system call</h2>
-<div class="outline-text-2" id="text-4">
-<p>
-use “-T” flag to ask it to time the execution of each system call
-during tracing
-</p>
+<ul class="org-ul">
+<li><b>latrace</b> also traces <b>library calls between shared libraries</b>, so the
+output includes the <code>printf</code> call executed from our own shared
+library.
+</li>
+
+<li>the <b>shared library name</b> which contains the symbol is printed after
+each function call:
+</li>
+</ul>
 
 <div class="org-src-container">
 
-<pre class="src src-sh">$ strace -T ./program
+<pre class="src src-sh">$ latrace ./hello
+ 6432     __libc_start_main [/lib/i386-linux-gnu/libc.so.6]  
+ 6432       Print [./libhello.so]  
+Hello World
+ 6432         printf [/lib/i386-linux-gnu/libc.so.6]  
+ 6432           free [/lib/i386-linux-gnu/libc.so.6]  
+ 6432           free [/lib/i386-linux-gnu/libc.so.6]  
+ 6432       __cxa_finalize [/lib/i386-linux-gnu/libc.so.6]  
+
+./hello finished - exited, <span style="color: #eedd82;">status</span>=0
 </pre>
 </div>
 </div>

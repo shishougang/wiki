@@ -1,0 +1,77 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: ltrace and latrace
+#+OPTIONS: num:nil H:2
+
+* Overview
+Similar to strace, which can be used to trace system calls, ltrace can
+be used to trace *shared library calls*.
+
+* Trace shared library calls with ltrace
+#+begin_src c
+// hello.c
+#include <stdio.h>
+
+void Print(const char* s) {
+  printf("%s", s);
+}
+
+// hello.h
+void Print(const char* s);
+
+// hello_main.c
+#include "hello.h"
+
+int main() {
+  Print("Hello World\n");
+  return 0;
+}
+#+end_src
+
+makefile
+#+begin_src sh
+all:
+	gcc -fPIC --shared -o libhello.so hello.c
+	gcc -o hello hello_main.c -lhello -L.
+#+end_src
+
+Use *ltrace* to see which library calls are called:
+#+begin_src sh
+$ export LD_LIBRARY_PATH=.
+$ ltrace ./hello
+__libc_start_main(0x804852c, 1, 0xbfbc7864, 0x8048550, 0x80485c0 <unfinished ...>
+Print(0x80485e8, 0, 0x8048559, 0xb7722ff4, 0x8048550Hello World
+)                   = 12
++++ exited (status 0) +++
+#+end_src
+One drawback with ltrace is that it only traces calls from the
+executable to the libraries the executable is linked against - it does
+*not trace calls between libraries*.
+
+
+* Trace shared library calls with latrace
+On Ubuntu, it can be installed with
+#+begin_src sh
+$ sudo apt-get install latrace
+#+end_src
+
++ *latrace* also traces *library calls between shared libraries*, so the
+  output includes the =printf= call executed from our own shared
+  library.
+
++ the *shared library name* which contains the symbol is printed after
+  each function call:
+
+#+begin_src sh
+$ latrace ./hello
+ 6432     __libc_start_main [/lib/i386-linux-gnu/libc.so.6]  
+ 6432       Print [./libhello.so]  
+Hello World
+ 6432         printf [/lib/i386-linux-gnu/libc.so.6]  
+ 6432           free [/lib/i386-linux-gnu/libc.so.6]  
+ 6432           free [/lib/i386-linux-gnu/libc.so.6]  
+ 6432       __cxa_finalize [/lib/i386-linux-gnu/libc.so.6]  
+
+./hello finished - exited, status=0
+#+end_src
+
+
