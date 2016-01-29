@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Valgrind</title>
-<!-- 2016-01-28 Thu 21:51 -->
+<!-- 2016-01-30 Sat 00:41 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -86,12 +86,14 @@ for the JavaScript code in this tag.
 <li><a href="#sec-1">Overview</a></li>
 <li><a href="#sec-2">Usage</a>
 <ul>
-<li><a href="#sec-2-1">Running your program under Memcheck</a></li>
-<li><a href="#sec-2-2">Analysing memory use with Massif</a></li>
+<li><a href="#sec-2-1">Maunual</a></li>
+<li><a href="#sec-2-2">Profiling Memory Usage with Memcheck</a></li>
+<li><a href="#sec-2-3">Profiling Cache Usage with Cachegrind</a></li>
+<li><a href="#sec-2-4">Profiling Heap and Stack Space with Massif</a></li>
 </ul>
 </li>
 <li><a href="#sec-3">Caveats</a></li>
-<li><a href="#sec-4">cc</a></li>
+<li><a href="#sec-4">More</a></li>
 </ul>
 </div>
 </div>
@@ -112,10 +114,11 @@ detail.<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
 <li><a href="http://www.network-theory.co.uk/valgrind/manual/">Valgrind 3.3 — Advanced Debugging and Profiling for GNU/Linux
 applications</a>
 </li>
+<li><a href="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Performance_Tuning_Guide/s-memory-valgrind.html">RedHat Using Valgrind to Profile Memory Usage</a>
+</li>
 </ul>
 </div>
 </div>
-
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">Usage</h2>
 <div class="outline-text-2" id="text-2">
@@ -124,34 +127,179 @@ If you don't understand an error message, please consult <a href="http://valgrin
 of error messages from Memcheck</a> in the <a href="http://valgrind.org/docs/manual/manual.html">Valgrind User Manual</a> which has
 examples of all the error messages Memcheck produces.
 </p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">valgrind --tool=toolname program
+</pre>
+</div>
+<p>
+Replace toolname with the name of the tool you wish to use:
+</p>
+
+<ul class="org-ul">
+<li>Memcheck is a memory error detector. It helps you make your
+programs, particularly those written in C and C++, more correct.
+</li>
+<li>Cachegrind is a cache and branch-prediction profiler. It helps you
+make your programs run faster.
+</li>
+<li>Callgrind is a call-graph generating cache profiler. It has some
+overlap with Cachegrind, but also gathers some information that
+Cachegrind does not.
+</li>
+<li>Helgrind is a thread error detector. It helps you make your
+multi-threaded programs more correct.
+</li>
+<li>DRD is also a thread error detector. It is similar to Helgrind but
+uses different analysis techniques and so may find different
+problems.
+</li>
+<li>Massif is a heap profiler. It helps you make your programs use less
+memory.
+</li>
+<li>DHAT is a different kind of heap profiler. It helps you understand
+issues of block lifetimes, block utilisation, and layout
+inefficiencies.
+</li>
+<li>SGcheck is an experimental tool that can detect overruns of stack
+and global arrays. Its functionality is complementary to that of
+Memcheck: SGcheck finds problems that Memcheck can’t, and vice
+versa..
+</li>
+<li>BBV is an experimental SimPoint basic block vector generator. It is
+useful to people doing computer architecture research and
+development.
+</li>
+</ul>
 </div>
 
-
-
 <div id="outline-container-sec-2-1" class="outline-3">
-<h3 id="sec-2-1">Running your program under Memcheck</h3>
+<h3 id="sec-2-1">Maunual</h3>
 <div class="outline-text-3" id="text-2-1">
+<ul class="org-ul">
+<li><code>/usr/share/doc/valgrind-version/valgrind_manual.pdf</code>
+</li>
+<li><code>/usr/share/doc/valgrind-version/html/index.html</code>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">Profiling Memory Usage with Memcheck</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+Memcheck is the default Valgrind tool, and can be run with <code>valgrind
+program</code>, without specifying <code>--tool=memcheck</code>. 
+</p>
+
 <div class="org-src-container">
 
 <pre class="src src-sh">valgrind --leak-check=full myprog arg1 arg2
 valgrind --leak-check=full --log-file=<span style="color: #ffa07a;">"logfile.out"</span> -v myprog arg1
 </pre>
 </div>
+<p>
+Some of the options available are:
+</p>
+<ul class="org-ul">
+<li>&#x2013;leak-check
+When enabled, Memcheck searches for memory leaks when the client
+program finishes. The default value is summary, which outputs the
+number of leaks found. Other possible values are yes and full, both
+of which give details of each individual leak, and no, which
+disables memory leak checking.
+</li>
+<li>&#x2013;undef-value-errors
+When enabled (set to yes), Memcheck reports errors when undefined
+values are used. When disabled (set to no), undefined value errors
+are not reported. This is enabled by default. Disabling it speeds up
+Memcheck slightly.
+</li>
+<li>&#x2013;ignore-ranges
+Allows the user to specify one or more ranges that Memcheck should
+ignore when checking for addressability. Multiple ranges are
+delimited by commas, for example,
+<code>--ignore-ranges=0xPP-0xQQ,0xRR-0xSS</code>.
+</li>
+</ul>
 </div>
 </div>
-<div id="outline-container-sec-2-2" class="outline-3">
-<h3 id="sec-2-2">Analysing memory use with Massif</h3>
-<div class="outline-text-3" id="text-2-2">
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">Profiling Cache Usage with Cachegrind</h3>
+<div class="outline-text-3" id="text-2-3">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">valgrind --tool=cachegrind program</span>
+</pre>
+</div>
+<p>
+Cachegrind can gather the following statistics for the entire program,
+and for each function in the program:
+</p>
+<ul class="org-ul">
+<li>first-level instruction cache reads (or instructions executed) and
+read misses, and last-level cache instruction read misses;
+</li>
+<li>data cache reads (or memory reads), read misses, and last-level
+cache data read misses;
+</li>
+<li>data cache writes (or memory writes), write misses, and last-level
+cache write misses;
+</li>
+<li>conditional branches executed and mispredicted; and
+</li>
+<li>indirect branches executed and mispredicted.
+</li>
+</ul>
+
+<p>
+his file can be further processed by the accompanying cg<sub>annotate</sub>
+tool, like so:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">cg_annotate cachegrind.out.pid</span>
+</pre>
+</div>
+
+<p>
+You can also compare the profile files created by Cachegrind to make
+it simpler to chart program performance before and after a change. 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">cg_diff first second</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">Profiling Heap and Stack Space with Massif</h3>
+<div class="outline-text-3" id="text-2-4">
 <div class="org-src-container">
 
 <pre class="src src-sh">valgrind --tool=massif  myprog
 </pre>
 </div>
 <p>
-Once the execution is finished, Valgrind will generate an output file
-called massif.out.XXXX (where XXXX is your process' id) that registers
-the memory used by the code at different times, organized by the
-object (and line of code) that wrote it. 
+Profiling data gathered by Massif is written to a file, which by
+default is called <code>massif.out.pid</code>, where pid is the process ID of the
+specified program.
+</p>
+
+<p>
+This profiling data can also be graphed with the ms<sub>print</sub> command,
+like so:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">ms_print massif.out.pid</span>
+</pre>
+</div>
+<p>
+This produces a graph showing memory consumption over the program's execution, 
 </p>
 
 <p>
@@ -159,9 +307,43 @@ massiftool is used to present it in a graphical form, which can be
 downloaded from <a href="http://sourceforge.net/projects/massiftool/">http://sourceforge.net/projects/massiftool/</a>. Note that
 massiftool requries version 4.6 or higher of the Qt library.
 </p>
+
+<p>
+Some of the available options are:
+</p>
+<ul class="org-ul">
+<li>&#x2013;heap
+Specifies whether to perform heap profiling. The default value is
+yes. Heap profiling can be disabled by setting this option to no.
+</li>
+<li>&#x2013;heap-admin
+Specifies the number of bytes per block to use for administration
+when heap profiling is enabled. The default value is 8 bytes per
+block.
+</li>
+<li>&#x2013;stacks
+Specifies whether to perform stack profiling. The default value is
+no (disabled). To enable stack profiling, set this option to yes,
+but be aware that doing so will greatly slow Massif. Also note that
+Massif assumes that the main stack has size zero at start-up in
+order to better indicate the size of the stack portion over which
+the program being profiled has control.
+</li>
+<li>&#x2013;time-unit
+Specifies the unit of time used for the profiling. There are three
+valid values for this option: instructions executed (i), the default
+value, which is useful in most cases; real time (ms, in
+milliseconds), which can be useful in certain instances; and bytes
+allocated/deallocated on the heap and/or stack (B), which is useful
+for very short-run programs, and for testing purposes, because it is
+the most reproducible across different machines. This option is
+useful when graphing Massif output with ms<sub>print</sub>.
+</li>
+</ul>
 </div>
 </div>
 </div>
+
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">Caveats</h2>
 <div class="outline-text-2" id="text-3">
@@ -183,17 +365,14 @@ OpenOffice.org and Firefox are Memcheck-clean, or very close to it.
 </div>
 </div>
 
-
-
-
-
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">cc</h2>
+<h2 id="sec-4">More</h2>
 <div class="outline-text-2" id="text-4">
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
-</div>
+<ul class="org-ul">
+<li><a href="https://computing.llnl.gov/code/memcheck/">Using Valgrind's Memcheck Tool to Find Memory Errors and Leaks in
+MPI and Serial Applications on Linux</a>
+</li>
+</ul>
 </div>
 </div>
 <div id="footnotes">
@@ -209,7 +388,7 @@ OpenOffice.org and Firefox are Memcheck-clean, or very close to it.
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-01-28 Thu 21:51</p>
+<p class="date">Created: 2016-01-30 Sat 00:41</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
