@@ -2,7 +2,6 @@
 #+TITLE: Shell Scrap
 #+OPTIONS: num:nil H:2
 
-
 * Flow Control
 ** if
 *** syntax
@@ -268,10 +267,6 @@ $ cat temp.txt
 inet addr:192.168.0.1  Bcast:192.168.0.255  Mask:255.255.255.0
 #+end_src
 
-
-
-
-
 ** use debug hook
 使用DEBUG宏来控制是否要输出调试信息，在shell脚本中我们同样可以使用这样
 的机制，如下列代码所示： 
@@ -291,8 +286,6 @@ fi
   a=1
   DEBUG echo "a=$a"
 #+end_src
-
-
 ** command
 -n 只读取shell脚本，但不实际执行
 -x 进入跟踪方式，显示所执行的每一条命令
@@ -316,9 +309,6 @@ fi
 #+begin_src sh
 $ export PS4='+{$LINENO:${FUNCNAME[0]}} '
 #+end_src
-
-
-
 
 * Parameter expansion
 ** Simple usage
@@ -346,35 +336,6 @@ ${PARAMETER~~}
 #+begin_src sh
 ${!PREFIX*} #This expands to a list of all set variable names beginning with the string PREFIX. 
 ${!PREFIX@}
-#+end_src
-** Substring removal
-#+begin_src sh
-${PARAMETER#PATTERN}  #The operator "#" will try to remove the shortest text matching the pattern, while "##" tries to do it with the longest text matching. 
-${PARAMETER##PATTERN}
-${PARAMETER%PATTERN} #except that Bash now tries to match the pattern from the end of the string
-${PARAMETER%%PATTERN}
-#+end_src
-** Search and replace
-#+begin_src sh
-${PARAMETER/PATTERN/STRING}
-${PARAMETER//PATTERN/STRING}
-${PARAMETER/PATTERN} #removed
-${PARAMETER//PATTERN}
-
-Anchoring Additionally you can "anchor" an expression: A # (hashmark) will indicate that your expression is matched against the beginning portion of the string, a % (percent-sign) will do it for the end portion.
-
-MYSTRING=xxxxxxxxxx
-echo ${MYSTRING/#x/y}  # RESULT: yxxxxxxxxx
-echo ${MYSTRING/%x/y}  # RESULT: xxxxxxxxxy
-#+end_src
-** String length
-#+begin_src sh
-${#PARAMETER}
-#+end_src
-** Substring expansion
-#+begin_src sh
-${PARAMETER:OFFSET}
-${PARAMETER:OFFSET:LENGTH}
 #+end_src
 ** Use a default value
 If the parameter PARAMETER is unset (never was defined) or null
@@ -441,11 +402,147 @@ $( COMMAND )
 {........}<POSTSCRIPT>
 <PREAMBLE>{........}<POSTSCRIPT>
 #+end_src
-** aa
-#+begin_src sh
-
-#+end_src
 * String Operators
+** String length
+#+begin_src sh
+${#PARAMETER}
+#+end_src
+The second is to use builtin function =expr=,
+#+begin_src sh
+expr length $string
+# or
+expr "$string" : '.*'
+#+end_src
+
+For checking if length of the string is zero you can use =-n STRING=
+operator.
+
+#+begin_src sh
+stringZ=abcABC123ABCabc
+
+echo ${#stringZ}                 # 15
+echo `expr length $stringZ`      # 15
+echo `expr "$stringZ" : '.*'`    # 15
+#+end_src
+
+** Determining the Length of Matching Substring at Beginning of String
+#+begin_src sh
+expr match "$string" '$substring'
+#+end_src
++ =$substring= is a regular expression.
+
+#+begin_src sh
+my_regex=abcABC123ABCabc
+echo `expr match "$my_regex" 'abc[A-Z]*.2'`   # 8
+echo `expr "$my_regex" : 'abc[A-Z]*.2'`       # 8
+#+end_src
+
+** Index
+Function =index= return the position of substring in string counting
+from one and 0 if substring is not found.
+#+begin_src sh
+expr index $string $substring
+#+end_src
+
+#+begin_src sh
+stringZ=abcABC123ABCabc
+echo `expr index "$stringZ" C12`             # 6
+                                             # C position.
+#+end_src
+** Substr
+#+begin_src sh
+expr substr $string $position $length
+#Extracts $length characters from $string  starting at $position.
+stringZ=abcABC123ABCabc
+#       1-based indexing.
+echo `expr substr $stringZ 1 2`              # ab
+#+end_src
+substring function is also available as a part of pattern matching operators
+#+begin_src sh
+${string:position}
+${string:position:length}
+#+end_src
+
+#+begin_src sh
+stringZ=abcABC123ABCabc
+#       0-based indexing.
+echo ${stringZ:0}                            # abcABC123ABCabc
+echo ${stringZ:1}                            # bcABC123ABCabc
+echo ${stringZ:7:3}                          # 23A
+#+end_src
+** Search and Replace
+#+begin_src sh
+${var:pos[:len]} # extract substr from pos (0-based) for len
+${var/substr/repl} # replace first match
+${var//substr/repl} # replace all matches
+${var/#substr/repl} # replace if matches at beginning (non-greedy)
+${var/##substr/repl} # replace if matches at beginning (greedy)
+${var/%substr/repl} # replace if matches at end (non-greedy)
+${var/%%substr/repl} # replace if matches at end (greedy)
+${#var} # returns length of $var
+${!var} # indirect expansion
+#+end_src
+** Concatenation
+Strings can be concatenated by juxtaposition and using double quoted
+strings. For example
+#+begin_src sh
+PATH="$PATH:/usr/games"
+#+end_src
+** Trimming from left and right
+Using the wildcard character =(?)=:
+#+begin_src sh
+test="~/bin/"
+trimmed_last=${test%?}
+trimmed_first=${test#?}
+echo "original='$test,timmed_first='$trimmed_first', trimmed_last='$trimmed_last'"
+# original='~/bin/,timmed_first='/bin/', trimmed_last='~/bin'
+#+end_src
+** Assignment of default value for undefined variables
+Operator: =${var:-bar}= is useful for assigning a variable a default value.
+#+begin_src sh
+$ export var=""
+$ echo ${var:-one}
+one
+$ echo $var
+#+end_src
+set variable if it is not defined with the operator =${var:=bar}=
+#+begin_src sh
+$ export var=""
+$ echo ${var:=one}
+one
+echo $var
+one
+#+end_src
+** Pattern Matching
+#+begin_src sh
+${var#t*is}
+# Deletes the shortest possible match from the left
+export $var="this is a test"
+echo ${var#t*is}
+is a test
+#+end_src
+
+#+begin_src sh
+${var##t*is}
+# Deletes the longest possible match from the left
+export $var="this is a test"
+echo ${var##t*is}
+a test
+#+end_src
+
+#+begin_src sh
+${var%t*st}
+# Deletes the shortest possible match from the right
+export $var="this is a test"
+echo ${var%t*st}
+this is a
+#+end_src
+
+#+begin_src sh
+${var%%t*st}
+# Deletes the longest possible match from the right
+export $var="this is a test" echo ${var%%t*is}
+#+end_src
 * Command
 !$
 !$是一个特殊的环境变量，它代表了上一个命令的最后一个字符串。如：你可能会这样：
@@ -687,4 +784,41 @@ find . -maxdepth 1 -mindepth 1 -type d -exec touch {} \+
 find * -exec touch {} \;
 # set time to 29th of Feb 2012.
 find * -exec touch -t 201202291000 {} \;
+#+end_src
+* the path of  directory in which a Bash script is located
+#+begin_src sh
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+#+end_src
+ If you want to also resolve any links to the script itself, you need
+ a multi-line solution:
+#+begin_src sh
+#!/bin/bash
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  TARGET="$(readlink "$SOURCE")"
+  if [[ $TARGET == /* ]]; then
+    echo "SOURCE '$SOURCE' is an absolute symlink to '$TARGET'"
+    SOURCE="$TARGET"
+  else
+    DIR="$( dirname "$SOURCE" )"
+    echo "SOURCE '$SOURCE' is a relative symlink to '$TARGET' (relative to '$DIR')"
+    SOURCE="$DIR/$TARGET" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+  fi
+done
+echo "SOURCE is '$SOURCE'"
+RDIR="$( dirname "$SOURCE" )"
+DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+if [ "$DIR" != "$RDIR" ]; then
+  echo "DIR '$RDIR' resolves to '$DIR'"
+fi
+echo "DIR is '$DIR'"
+#+end_src
+
+And it will print something like:
+#+begin_src sh
+SOURCE './scriptdir.sh' is a relative symlink to 'sym2/scriptdir.sh' (relative to '.')
+SOURCE is './sym2/scriptdir.sh'
+DIR './sym2' resolves to '/home/ubuntu/dotfiles/fo fo/real/real1/real2'
+DIR is '/home/ubuntu/dotfiles/fo fo/real/real1/real2'
 #+end_src
