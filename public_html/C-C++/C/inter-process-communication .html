@@ -1,0 +1,485 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>inter-process communication</title>
+<!-- 2016-02-02 Tue 22:43 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+<script type="text/javascript">
+    function rpl(expr,a,b) {
+      var i=0
+      while (i!=-1) {
+         i=expr.indexOf(a,i);
+         if (i>=0) {
+            expr=expr.substring(0,i)+b+expr.substring(i+a.length);
+            i+=b.length;
+         }
+      }
+      return expr
+    }
+
+    function show_org_source(){
+       document.location.href = rpl(document.location.href,"html","org.html");
+    }
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">inter-process communication</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">IPC Shared Memory</a>
+<ul>
+<li><a href="#sec-1-1">Accessing a Shared Memory Segment</a></li>
+<li><a href="#sec-1-2">Attaching and Detaching a Shared Memory Segment</a></li>
+<li><a href="#sec-1-3">Example</a></li>
+<li><a href="#sec-1-4">POSIX Shared Memory</a></li>
+<li><a href="#sec-1-5">More</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">cc</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">IPC Shared Memory</h2>
+<div class="outline-text-2" id="text-1">
+</div><div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">Accessing a Shared Memory Segment</h3>
+<div class="outline-text-3" id="text-1-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">shmget</span>(<span style="color: #98fb98;">key_t</span> <span style="color: #eedd82;">key</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmflg</span>);
+</pre>
+</div>
+<p>
+is used to obtain access to a shared memory segment. 
+</p>
+
+<ul class="org-ul">
+<li>The <code>key</code> argument is a access value associated with the semaphore ID.
+</li>
+<li>The <code>size</code> argument is the size in bytes of the requested shared memory.
+</li>
+<li>The <code>shmflg</code> argument specifies the initial access permissions and
+creation control flags.
+</li>
+<li>When the call succeeds, it returns the shared memory segment ID.
+This call is also used to get the ID of an existing shared segment
+(from a process requesting sharing of some existing memory portion).
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/types.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/ipc.h&gt;</span> 
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/shm.h&gt;</span> 
+... 
+key_t key; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">key to be passed to shmget() </span><span style="color: #ff7f24;">*/</span> 
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmflg</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">shmflg to be passed to shmget() </span><span style="color: #ff7f24;">*/</span> 
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmid</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">return value from shmget() </span><span style="color: #ff7f24;">*/</span> 
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">size to be passed to shmget() </span><span style="color: #ff7f24;">*/</span> 
+... 
+key = ... 
+size = ...
+shmflg) = ... 
+<span style="color: #00ffff;">if</span> ((shmid = shmget (key, size, shmflg)) == -1) {
+   perror(<span style="color: #ffa07a;">"shmget: shmget failed"</span>); exit(1); } <span style="color: #00ffff;">else</span> {
+   (<span style="color: #98fb98;">void</span>) fprintf(stderr, <span style="color: #ffa07a;">"shmget: shmget returned %d\n"</span>, shmid);
+   exit(0);
+}
+</pre>
+</div>
+</div>
+
+<ul class="org-ul"><li><a id="sec-1-1-1" name="sec-1-1-1"></a>Controlling a Shared Memory Segment<br  /><div class="outline-text-4" id="text-1-1-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">shmctl</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmid</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">cmd</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">shmid_ds</span> *<span style="color: #eedd82;">buf</span>);
+</pre>
+</div>
+<p>
+is used to alter the permissions and other characteristics of a shared
+memory segment.
+</p>
+
+<p>
+The cmd argument is one of following control commands:
+</p>
+
+<ul class="org-ul">
+<li>SHM<sub>LOCK</sub>
+&#x2013; Lock the specified shared memory segment in memory. The process
+must have the effective ID of superuser to perform this command.
+</li>
+
+<li>SHM<sub>UNLOCK</sub>
+&#x2013; Unlock the shared memory segment. The process must have the
+effective ID of superuser to perform this command.
+</li>
+
+<li>IPC<sub>STAT</sub>
+&#x2013; Return the status information contained in the control structure
+and place it in the buffer pointed to by buf. The process must have
+read permission on the segment to perform this command.
+</li>
+
+<li>IPC<sub>SET</sub>
+&#x2013; Set the effective user and group identification and access
+permissions. The process must have an effective ID of owner, creator
+or superuser to perform this command.
+</li>
+
+<li>IPC<sub>RMID</sub>
+  &#x2013; Remove the shared memory segment.
+</li>
+</ul>
+
+<p>
+The <code>buf</code> is a sructure of type <code>struct shmid_ds</code> which is defined in
+<code>&lt;sys/shm.h&gt;</code>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/types.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/ipc.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/shm.h&gt;</span>
+...
+<span style="color: #98fb98;">int</span> cmd; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">command code for shmctl() </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmid</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">segment ID </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">shmid_ds</span> <span style="color: #eedd82;">shmid_ds</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">shared memory data structure to </span>
+<span style="color: #ff7f24;">                             hold results </span><span style="color: #ff7f24;">*/</span> 
+...
+shmid = ...
+cmd = ...
+<span style="color: #00ffff;">if</span> ((rtrn = shmctl(shmid, cmd, shmid_ds)) == -1) {
+    perror(<span style="color: #ffa07a;">"shmctl: shmctl failed"</span>);
+    exit(1);
+}
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2">Attaching and Detaching a Shared Memory Segment</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+<code>shmat()</code> and <code>shmdt()</code> are used to attach and detach shared memory
+segments.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">shmat</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmid</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">shmaddr</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmflg</span>);
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">shmdt</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">shmaddr</span>);
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>shmat()</code> returns a pointer, shmaddr, to the head of the shared
+segment associated with a valid shmid. 
+</li>
+<li><code>shmdt()</code> detaches the shared memory segment located at the address
+indicated by shmaddr.
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/types.h&gt;</span> 
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/ipc.h&gt;</span> 
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/shm.h&gt;</span> 
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">state</span> { <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Internal record of attached segments. </span><span style="color: #ff7f24;">*/</span> 
+          <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmid</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">shmid of attached segment </span><span style="color: #ff7f24;">*/</span> 
+          <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">shmaddr</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">attach point </span><span style="color: #ff7f24;">*/</span> 
+          <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmflg</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">flags used on attach </span><span style="color: #ff7f24;">*/</span>
+         } <span style="color: #eedd82;">ap</span>[MAXnap]; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">State of current attached segments. </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">nap</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Number of currently attached segments. </span><span style="color: #ff7f24;">*/</span>
+...
+<span style="color: #98fb98;">char</span> *addr; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">address work variable </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">register</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">work area </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">register</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">state</span> *<span style="color: #eedd82;">p</span>; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ptr to current state entry </span><span style="color: #ff7f24;">*/</span>
+...
+p = &amp;ap[nap++];
+p-&gt;shmid = ...
+p-&gt;shmaddr = ...
+p-&gt;shmflg = ...
+
+p-&gt;shmaddr = shmat(p-&gt;shmid, p-&gt;shmaddr, p-&gt;shmflg);
+<span style="color: #00ffff;">if</span>(p-&gt;shmaddr == (<span style="color: #98fb98;">char</span> *)-1) {
+     perror(<span style="color: #ffa07a;">"shmop: shmat failed"</span>);
+     nap--;
+    } <span style="color: #00ffff;">else</span>
+    (<span style="color: #98fb98;">void</span>) fprintf(stderr, <span style="color: #ffa07a;">"shmop: shmat returned %#8.8x\n"</span>,
+p-&gt;shmaddr);
+... 
+i = shmdt(addr);
+<span style="color: #00ffff;">if</span>(i == -1) {
+    perror(<span style="color: #ffa07a;">"shmop: shmdt failed"</span>);
+    } <span style="color: #00ffff;">else</span> {
+  (<span style="color: #98fb98;">void</span>) fprintf(stderr, <span style="color: #ffa07a;">"shmop: shmdt returned %d\n"</span>, i);
+
+<span style="color: #00ffff;">for</span> (p = ap, i = nap; i--; p++)   
+  <span style="color: #00ffff;">if</span> (p-&gt;shmaddr == addr) *p = ap[--nap];
+
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-1-3" class="outline-3">
+<h3 id="sec-1-3">Example</h3>
+<div class="outline-text-3" id="text-1-3">
+<ul class="org-ul">
+<li><code>shm_server.c</code>
+   &#x2013; simply creates the string and shared memory portion.
+</li>
+<li><code>shm_client.c</code>
+ &#x2013; attaches itself to the created shared memory portion and uses
+the string
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">After running the Server you can see the attached Shared Memory </span>
+$<span style="color: #eedd82;">ipcs</span> -m
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status    
+0x0000162e 4292614    xxx        666        27         1                       
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">After running the client the memory is freed.</span>
+$<span style="color: #eedd82;">ipcs</span> -m
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status    
+0x0000162e 4292614    xxx        666        27         0
+</pre>
+</div>
+
+<p>
+<code>shm_server.c</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/types.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/ipc.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/shm.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">SHMSZ</span>     27
+
+<span style="color: #87cefa;">main</span>()
+{
+  <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">c</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmid</span>;
+  <span style="color: #98fb98;">key_t</span> <span style="color: #eedd82;">key</span>;
+  <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">shm</span>, *<span style="color: #eedd82;">s</span>;
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * We'll name our shared memory segment</span>
+<span style="color: #ff7f24;">   * "5678".</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  key = 5678;
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * Create the segment.</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">if</span> ((shmid = shmget(key, SHMSZ, IPC_CREAT | 0666)) &lt; 0) {
+    perror(<span style="color: #ffa07a;">"shmget"</span>);
+    exit(1);
+  }
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * Now we attach the segment to our data space.</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">if</span> ((shm = shmat(shmid, <span style="color: #7fffd4;">NULL</span>, 0)) == (<span style="color: #98fb98;">char</span> *) -1) {
+    perror(<span style="color: #ffa07a;">"shmat"</span>);
+    exit(1);
+  }
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * Now put some things into the memory for the</span>
+<span style="color: #ff7f24;">   * other process to read.</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  s = shm;
+  <span style="color: #00ffff;">for</span> (c = <span style="color: #ffa07a;">'a'</span>; c &lt;= <span style="color: #ffa07a;">'z'</span>; c++)
+    *s++ = c;
+  *s = <span style="color: #7fffd4;">NULL</span>;
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * Finally, we wait until the other process </span>
+<span style="color: #ff7f24;">   * changes the first character of our memory</span>
+<span style="color: #ff7f24;">   * to '*', indicating that it has read what </span>
+<span style="color: #ff7f24;">   * we put there.</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">while</span> (*shm != <span style="color: #ffa07a;">'*'</span>)
+    sleep(1);
+  exit(0);
+}
+</pre>
+</div>
+
+<p>
+<code>shm_client.c</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/types.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/ipc.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;sys/shm.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">SHMSZ</span>     27
+
+<span style="color: #87cefa;">main</span>()
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">shmid</span>;
+  <span style="color: #98fb98;">key_t</span> <span style="color: #eedd82;">key</span>;
+  <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">shm</span>, *<span style="color: #eedd82;">s</span>;
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * We need to get the segment named</span>
+<span style="color: #ff7f24;">   * "5678", created by the server.</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  key = 5678;
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * Locate the segment.</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">if</span> ((shmid = shmget(key, SHMSZ, 0666)) &lt; 0) {
+    perror(<span style="color: #ffa07a;">"shmget"</span>);
+    exit(1);
+  }
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * Now we attach the segment to our data space.</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">if</span> ((shm = shmat(shmid, <span style="color: #7fffd4;">NULL</span>, 0)) == (<span style="color: #98fb98;">char</span> *) -1) {
+    perror(<span style="color: #ffa07a;">"shmat"</span>);
+    exit(1);
+  }
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * Now read what the server put in the memory.</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">for</span> (s = shm; *s != <span style="color: #7fffd4;">NULL</span>; s++)
+    putchar(*s);
+  putchar(<span style="color: #ffa07a;">'\n'</span>);
+  <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">   * Finally, change the first character of the </span>
+<span style="color: #ff7f24;">   * segment to '*', indicating we have read </span>
+<span style="color: #ff7f24;">   * the segment.</span>
+<span style="color: #ff7f24;">   </span><span style="color: #ff7f24;">*/</span>
+  *shm = <span style="color: #ffa07a;">'*'</span>;
+  exit(0);
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-1-4" class="outline-3">
+<h3 id="sec-1-4">POSIX Shared Memory</h3>
+<div class="outline-text-3" id="text-1-4">
+<p>
+POSIX shared memory is actually a variation of mapped memory. The
+major differences are to use <code>shm_open()</code> to open the shared memory
+object (instead of calling <code>open()</code>) and use <code>shm_unlink()</code> to close and
+delete the object (instead of calling <code>close()</code> which does not remove
+the object). 
+</p>
+</div>
+</div>
+
+
+<div id="outline-container-sec-1-5" class="outline-3">
+<h3 id="sec-1-5">More</h3>
+<div class="outline-text-3" id="text-1-5">
+<ul class="org-ul">
+<li><a href="https://www.cs.cf.ac.uk/Dave/C/node27.html#SECTION002760000000000000000">Some further example(shmget,shmctl,shmop)</a>
+</li>
+<li><a href="http://www.ibm.com/developerworks/aix/library/au-concurrent_boost/">Concurrent programming with Boost using IPC and MPI libraries</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+
+
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">cc</h2>
+<div class="outline-text-2" id="text-2">
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
+</div>
+
+
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2016-02-02 Tue 22:43</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

@@ -1,0 +1,292 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: inter-process communication 
+#+OPTIONS: num:nil H:2
+
+* IPC Shared Memory
+** Accessing a Shared Memory Segment
+#+begin_src c
+int shmget(key_t key, size_t size, int shmflg);
+#+end_src
+is used to obtain access to a shared memory segment. 
+
++ The =key= argument is a access value associated with the semaphore ID.
++ The =size= argument is the size in bytes of the requested shared memory.
++ The =shmflg= argument specifies the initial access permissions and
+  creation control flags.
++ When the call succeeds, it returns the shared memory segment ID.
+  This call is also used to get the ID of an existing shared segment
+  (from a process requesting sharing of some existing memory portion).
+
+#+begin_src c
+  #include <sys/types.h>
+  #include <sys/ipc.h> 
+  #include <sys/shm.h> 
+  ... 
+  key_t key; /* key to be passed to shmget() */ 
+  int shmflg; /* shmflg to be passed to shmget() */ 
+  int shmid; /* return value from shmget() */ 
+  int size; /* size to be passed to shmget() */ 
+  ... 
+  key = ... 
+  size = ...
+  shmflg) = ... 
+  if ((shmid = shmget (key, size, shmflg)) == -1) {
+     perror("shmget: shmget failed"); exit(1); } else {
+     (void) fprintf(stderr, "shmget: shmget returned %d\n", shmid);
+     exit(0);
+  }
+#+end_src
+
+*** Controlling a Shared Memory Segment
+#+begin_src c
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+#+end_src
+is used to alter the permissions and other characteristics of a shared
+memory segment.
+
+The cmd argument is one of following control commands:
+
++ SHM_LOCK
+  -- Lock the specified shared memory segment in memory. The process
+  must have the effective ID of superuser to perform this command.
+
++ SHM_UNLOCK
+  -- Unlock the shared memory segment. The process must have the
+  effective ID of superuser to perform this command.
+
++ IPC_STAT
+  -- Return the status information contained in the control structure
+  and place it in the buffer pointed to by buf. The process must have
+  read permission on the segment to perform this command.
+
++ IPC_SET
+  -- Set the effective user and group identification and access
+  permissions. The process must have an effective ID of owner, creator
+  or superuser to perform this command.
+
++ IPC_RMID
+  -- Remove the shared memory segment.
+
+The =buf= is a sructure of type =struct shmid_ds= which is defined in
+=<sys/shm.h>=.
+
+#+begin_src c
+  #include <sys/types.h>
+  #include <sys/ipc.h>
+  #include <sys/shm.h>
+  ...
+  int cmd; /* command code for shmctl() */
+  int shmid; /* segment ID */
+  struct shmid_ds shmid_ds; /* shared memory data structure to 
+                               hold results */ 
+  ...
+  shmid = ...
+  cmd = ...
+  if ((rtrn = shmctl(shmid, cmd, shmid_ds)) == -1) {
+      perror("shmctl: shmctl failed");
+      exit(1);
+  }
+#+end_src
+
+** Attaching and Detaching a Shared Memory Segment
+=shmat()= and =shmdt()= are used to attach and detach shared memory
+segments.
+#+begin_src c
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+int shmdt(const void *shmaddr);
+#+end_src
+
++ =shmat()= returns a pointer, shmaddr, to the head of the shared
+  segment associated with a valid shmid. 
++ =shmdt()= detaches the shared memory segment located at the address
+  indicated by shmaddr.
+
+#+begin_src c
+#include <sys/types.h> 
+#include <sys/ipc.h> 
+#include <sys/shm.h> 
+
+static struct state { /* Internal record of attached segments. */ 
+          int shmid; /* shmid of attached segment */ 
+          char *shmaddr; /* attach point */ 
+          int shmflg; /* flags used on attach */
+         } ap[MAXnap]; /* State of current attached segments. */
+int nap; /* Number of currently attached segments. */
+...
+char *addr; /* address work variable */
+register int i; /* work area */
+register struct state *p; /* ptr to current state entry */
+...
+p = &ap[nap++];
+p->shmid = ...
+p->shmaddr = ...
+p->shmflg = ...
+
+p->shmaddr = shmat(p->shmid, p->shmaddr, p->shmflg);
+if(p->shmaddr == (char *)-1) {
+     perror("shmop: shmat failed");
+     nap--;
+    } else
+    (void) fprintf(stderr, "shmop: shmat returned %#8.8x\n",
+p->shmaddr);
+... 
+i = shmdt(addr);
+if(i == -1) {
+    perror("shmop: shmdt failed");
+    } else {
+  (void) fprintf(stderr, "shmop: shmdt returned %d\n", i);
+
+for (p = ap, i = nap; i--; p++)   
+  if (p->shmaddr == addr) *p = ap[--nap];
+  
+}
+#+end_src
+
+** Example
++ =shm_server.c=
+   -- simply creates the string and shared memory portion.
++ =shm_client.c=
+   -- attaches itself to the created shared memory portion and uses
+  the string
+
+#+begin_src sh
+# After running the Server you can see the attached Shared Memory 
+$ipcs -m
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status    
+0x0000162e 4292614    xxx        666        27         1                       
+# After running the client the memory is freed.
+$ipcs -m
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status    
+0x0000162e 4292614    xxx        666        27         0               
+#+end_src
+
+=shm_server.c=
+#+begin_src c
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <stdio.h>
+
+#define SHMSZ     27
+
+main()
+{
+  char c;
+  int shmid;
+  key_t key;
+  char *shm, *s;
+  /*
+   * We'll name our shared memory segment
+   * "5678".
+   */
+  key = 5678;
+  /*
+   * Create the segment.
+   */
+  if ((shmid = shmget(key, SHMSZ, IPC_CREAT | 0666)) < 0) {
+    perror("shmget");
+    exit(1);
+  }
+  /*
+   * Now we attach the segment to our data space.
+   */
+  if ((shm = shmat(shmid, NULL, 0)) == (char *) -1) {
+    perror("shmat");
+    exit(1);
+  }
+  /*
+   * Now put some things into the memory for the
+   * other process to read.
+   */
+  s = shm;
+  for (c = 'a'; c <= 'z'; c++)
+    *s++ = c;
+  *s = NULL;
+  /*
+   * Finally, we wait until the other process 
+   * changes the first character of our memory
+   * to '*', indicating that it has read what 
+   * we put there.
+   */
+  while (*shm != '*')
+    sleep(1);
+  exit(0);
+}
+#+end_src
+
+=shm_client.c=
+#+begin_src c
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <stdio.h>
+
+#define SHMSZ     27
+
+main()
+{
+  int shmid;
+  key_t key;
+  char *shm, *s;
+  /*
+   * We need to get the segment named
+   * "5678", created by the server.
+   */
+  key = 5678;
+  /*
+   * Locate the segment.
+   */
+  if ((shmid = shmget(key, SHMSZ, 0666)) < 0) {
+    perror("shmget");
+    exit(1);
+  }
+  /*
+   * Now we attach the segment to our data space.
+   */
+  if ((shm = shmat(shmid, NULL, 0)) == (char *) -1) {
+    perror("shmat");
+    exit(1);
+  }
+  /*
+   * Now read what the server put in the memory.
+   */
+  for (s = shm; *s != NULL; s++)
+    putchar(*s);
+  putchar('\n');
+  /*
+   * Finally, change the first character of the 
+   * segment to '*', indicating we have read 
+   * the segment.
+   */
+  *shm = '*';
+  exit(0);
+}
+#+end_src
+
+** POSIX Shared Memory
+POSIX shared memory is actually a variation of mapped memory. The
+major differences are to use =shm_open()= to open the shared memory
+object (instead of calling =open()=) and use =shm_unlink()= to close and
+delete the object (instead of calling =close()= which does not remove
+the object). 
+
+
+** More
++ [[https://www.cs.cf.ac.uk/Dave/C/node27.html#SECTION002760000000000000000][Some further example(shmget,shmctl,shmop)]]
++ [[http://www.ibm.com/developerworks/aix/library/au-concurrent_boost/][Concurrent programming with Boost using IPC and MPI libraries]]
+
+
+
+
+* cc
+
+#+begin_src c
+
+#+end_src
+
+
+#+begin_src sh
+
+#+end_src
