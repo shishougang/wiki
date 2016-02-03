@@ -46,25 +46,25 @@ memory segment.
 
 The cmd argument is one of following control commands:
 
-+ SHM_LOCK
++ =SHM_LOCK=
   -- Lock the specified shared memory segment in memory. The process
   must have the effective ID of superuser to perform this command.
 
-+ SHM_UNLOCK
++ =SHM_UNLOCK=
   -- Unlock the shared memory segment. The process must have the
   effective ID of superuser to perform this command.
 
-+ IPC_STAT
++ =IPC_STAT=
   -- Return the status information contained in the control structure
   and place it in the buffer pointed to by buf. The process must have
   read permission on the segment to perform this command.
 
-+ IPC_SET
++ =IPC_SET=
   -- Set the effective user and group identification and access
   permissions. The process must have an effective ID of owner, creator
   or superuser to perform this command.
 
-+ IPC_RMID
++ =IPC_RMID=
   -- Remove the shared memory segment.
 
 The =buf= is a sructure of type =struct shmid_ds= which is defined in
@@ -270,23 +270,389 @@ POSIX shared memory is actually a variation of mapped memory. The
 major differences are to use =shm_open()= to open the shared memory
 object (instead of calling =open()=) and use =shm_unlink()= to close and
 delete the object (instead of calling =close()= which does not remove
-the object). 
+the object).
 
-
-** More
-+ [[https://www.cs.cf.ac.uk/Dave/C/node27.html#SECTION002760000000000000000][Some further example(shmget,shmctl,shmop)]]
-+ [[http://www.ibm.com/developerworks/aix/library/au-concurrent_boost/][Concurrent programming with Boost using IPC and MPI libraries]]
-
-
-
-
-* cc
-
+*** Create the memory segment
+Create shared memory segment by using =shm_open()=. The =shm_open()= call
+establishes a connection between a shared memory object and a file
+descriptor. It creates an open file description that refers to the
+shared memory object and a file descriptor that refers to that open
+file description.
 #+begin_src c
-
+#include <sys/mman.h>
+int shm_open(const char *name, int oflag, mode_t mode);
 #+end_src
 
++ The name argument points to a string naming a shared memory object.
++ If successful, =shm_open()= returns a file descriptor for the shared
+  memory object that is the lowest numbered file descriptor not
+  currently open for that process.
++ oflag: file access modes
+  + =O_RDONLY= will create a read-only segment.
+  + =O_RDWR= will create a segment that we can read and write from/to
+    the memory segment.
+  + =O_CREAT= creates the segment if it does not exist or a handle to
+    it if it does exist.
+  + =O_EXCL= will return an error if the segment already exists.
++ The last parameters are the file access permissions.
+
+*** Set the size of the memory segment
+#+begin_src c
+#include <unistd.h>
+int ftruncate(int file_descriptor, off_t length);  
+#+end_src
+
+*** Map the shared memory region 
+#+begin_src c
+#include <sys/mman.h>
+void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
+#+end_src
+The =mmap()= function establishes a mapping between the address space of
+the process for len bytes to the memory object represented by the file
+descriptor fd at offset off for len bytes.
+
+The =mmap()= returns a pointer to the shared memory segment. After the
+process finished, it can unmap it from the address space of the
+process using =munmap()= call:
+#+begin_src c
+#include <sys/mman.h>
+int munmap(void *addr, size_t len)
+#+end_src
+The shared memory can be removed from the system using =shm_unlink()=.
+It causes the shared memory to be deleted when the last process
+detaches from it.
+#+begin_src c
+#include <sys/mman.h>
+int shm_unlink(const char *name)
+#+end_src
+
+*** Example
+#+begin_src c
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
+#include <pthread.h>
+
+int main()
+{
+  pthread_mutexattr_t attributes;
+  pthread_mutexattr_init(&attributes);
+  pthread_mutexattr_setpshared(&attributes, PTHREAD_PROCESS_SHARED);
+  int handle = shm_open("/shm", O_CREAT | O_RDWR, 0777);
+  ftruncate(handle, 2048*sizeof(int));
+  char *memory = (char *)mmap(0, 2048*sizeof(int), PROT_READ | PROT_WRITE,
+                              MAP_SHARED, handle, 0);
+  // mutex share
+  pthread_mutex_t *mutex = (pthread_mutex_t*)memory;
+  pthread_mutex_init(mutex, &attributes);
+  pthread_mutexattr_destroy(&attributes);
+  // variable share
+  int *count = (int*)(memory + sizeof(pthread_mutex_t));
+  *count = 0;
+  printf("Initial count = %d\n", *count);
+
+  int value_returned_from_child = 0;
+  pid_t pid = fork();
+  if (pid == 0) {
+    pthread_mutex_lock(mutex);
+    (*count)++;
+    printf("Child process increased the count to %d\n", *count);
+    pthread_mutex_unlock(mutex);
+    value_returned_from_child = 99;
+  } else {
+    int status;
+    // waiting for the child process to finish
+    waitpid(pid, &status, 0);
+    value_returned_from_child = WEXITSTATUS(status);
+    printf("value_returned_from_child = %d\n", value_returned_from_child);
+    pthread_mutex_lock(mutex);
+    (*count)++;
+    printf("Parent process increased the count to %d\n", *count);
+    pthread_mutex_unlock(mutex);
+  }
+  munmap(memory, 2048*sizeof(int));
+  shm_unlink("/shm");
+  return value_returned_from_child;
+}
+#+end_src
 
 #+begin_src sh
-
+g++ -o ipc ipc.cc -Wall -lpthread -lrt
 #+end_src
+
+The parent process sets up a mutex that's shared with its child
+process. Then, the parent forks a child, and wait for the child to
+complete (=waitpid()=).
+
+ The macro =WEXITSTATUS= does the conversion of the exit status from
+ =waitpid()= into the return value from the child process.
+
+* Sharing semaphores between processes
+#+begin_src c
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <semaphore.h>
+
+int main()
+{
+  int status;
+  sem_t *semaphore =  sem_open("/sema", O_CREAT,  0777, 1);
+
+  pid_t pid = fork();
+  if (pid == 0) {
+    printf("child\n");
+    sem_post(semaphore);
+    sem_close(semaphore);
+  } else {
+    sem_wait(semaphore);
+    printf("parent\n");
+    sem_close(semaphore);
+    sem_unlink("/sema");
+  }
+  return 0;
+}
+#+end_src
+* Message queues
+#+begin_src c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <mqueue.h>
+
+#define PMODE 0655
+
+int main()
+{
+  int status;
+  struct mq_attr attr;
+  attr.mq_maxmsg = 10;
+  attr.mq_msgsize = 20;
+  pid_t pid = fork();
+  // child process - sending message
+  if (pid == 0) {
+    char message[20];
+    strncpy(message, "Hello Parent!", 13);
+    // write/create - attr needed because of O_CREAT
+    mqd_t mqfd = mq_open("/test1", O_WRONLY|O_CREAT, PMODE, &attr);
+    if(mqfd == -1) {
+      perror("Child mq_open failure");
+      exit(0);
+    }
+    status = mq_send(mqfd, message, strlen(message)+1, 0);
+    if (status == -1) {
+      perror("mq_send failure\n");
+    }
+    else {
+      printf("Child is sending message: %s\n", message);
+      printf("mq_send successful\n");
+    }
+    mq_close(mqfd);
+    printf("Child process done\n");
+  } else {
+    // parent - receiving message
+    // read only
+    mqd_t mqfd = mq_open("/test1", O_RDONLY|O_CREAT, PMODE, &attr);
+    if (mqfd == -1) {
+      perror("Parent mq_open failure");
+      exit(0);
+    }
+    // Parent is waiting for the child process to finish
+    waitpid(pid, &status, 0);
+    char buf[100];
+    status = mq_receive(mqfd, buf, 100, 0);
+    if (status == -1) {
+      perror("mq_receive failure\n");
+    } else {
+      printf("mq_receive successful\n");
+      printf("Parent received message: %s\n", buf);
+    }
+    mq_close(mqfd);
+    mq_unlink("/test1");
+    printf("Parent process done\n");
+  }
+  return 0;
+}
+#+end_src
+* Socket
+=server.c=
+#+begin_src c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <pthread.h>
+
+void error(const char *msg)
+{
+  perror(msg);
+  exit(1);
+}
+
+void* echo(void* param)
+{
+  char buf[1024];
+  int count;
+  pthread_detach(pthread_self());
+  int s = (int)param;
+  while (count = read(s, buf, 1023) > 0) {
+    printf("Server received %s\n", buf);
+    printf("Server sending it back\n");
+    write(s, buf, strlen(buf));
+  }
+  close(s);
+}
+
+int main(int argc, char *argv[])
+{
+  int sockfd, newsockfd, portno = 9999;
+  // create a TCP/IP socket
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (sockfd < 0)
+    error("ERROR opening socket");
+
+  struct sockaddr_in serv_addr;
+  // clear address structure
+  bzero((char *) &serv_addr, sizeof(serv_addr));
+  /* setup the host_addr structure for use in bind call */
+  // server byte order
+  serv_addr.sin_family = AF_INET;
+  // automatically be filled with current host's IP address
+  serv_addr.sin_addr.s_addr = INADDR_ANY;
+  // port number to bind to
+  serv_addr.sin_port = htons(portno);
+  // This bind() call will bind  the socket to the current IP address on port
+  if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+    error("ERROR on binding");
+  }
+  // This listen() call tells the socket to listen to the incoming connections.
+  // The listen() function places all incoming connection into a backlog queue
+  // until accept() call accepts the connection.
+  // Here, we set the maximum size for the backlog queue to 5.
+  listen(sockfd, 5);
+  while (newsockfd = accept(sockfd, 0, 0)) {
+    pthread_t t;
+    pthread_create(&t, 0, echo, (void*)newsockfd);
+  }
+  return 0;
+}
+#+end_src
+=client.c=
+#+begin_src c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+
+void error(const char *msg)
+{
+  perror(msg);
+  exit(0);
+}
+
+int main(int argc, char *argv[])
+{
+  int sockfd, portno = 9999;
+  struct sockaddr_in serv_addr;
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  if (sockfd < 0)
+    error("ERROR opening socket");
+  bzero(&serv_addr, sizeof(serv_addr));
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+  serv_addr.sin_port = htons(portno);
+
+  if (connect(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) == 0) {
+    printf("Client sending 'hello server!' to server\n");
+    char buf[1024];
+    strncpy(buf, "hello server!", 20);
+    write(sockfd, buf, strlen(buf));
+    int count = read(sockfd, buf, 1024);
+    printf("Got echo of %s from server\n", buf);
+    shutdown(sockfd, SHUT_RDWR);
+  } else
+    error("ERROR connecting");
+  return 0;
+}
+#+end_src
+* Pipes
+** Anonymous Pipes
+#+begin_src c
+#include <stdio.h>
+#include <unistd.h>
+
+int main()
+{
+  int status, myPipe[2];
+  pipe(myPipe);  // create the pipe
+  pid_t pid = fork();
+  /* child process */
+  if (pid == 0) {
+    close(myPipe[0]);  // close unused read end
+    write(myPipe[1], "a", 1);
+    printf("Child process sent 'a'\n");
+    close(myPipe[1]);
+  } else {
+    /* parent process */
+    char buffer[21];
+    close(myPipe[1]);  // close unused write end
+    int pid_child = wait(&status);
+    int length = read(myPipe[0], buffer, 20);
+    buffer[length] = '\0';
+    printf("Parent process received '%s'\n", buffer);
+    close(myPipe[0]);
+  }
+  return 0;
+}
+#+end_src
+
+** Named Pipes
+#+begin_src c
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+int main()
+{
+  int status;
+  mknod("/tmp/pipefile", S_IFIFO | S_IRUSR | S_IWUSR, 0);
+  pid_t pid = fork();
+  /* child process */
+  if (pid == 0) {
+    int myPipe = open("/tmp/pipefile", O_WRONLY);
+    write(myPipe, "a", 1);
+    printf("Child process sent 'a'\n");
+    close(myPipe);
+  } else {
+    /* parent process */
+    int myPipe = open("/tmp/pipefile", O_RDONLY);
+    char buffer[21];
+    int pid_child = wait(&status);
+    int length = read(myPipe, buffer, 20);
+    buffer[length] = '\0';
+    printf("Parent process received '%s'\n", buffer);
+    close(myPipe);
+  }
+  unlink("/tmp/pipefile");
+  return 0;
+}
+#+end_src
+
+* More
++ [[https://www.cs.cf.ac.uk/Dave/C/node27.html#SECTION002760000000000000000][Some further example(shmget,shmctl,shmop)]]
++ [[http://www.ibm.com/developerworks/aix/library/au-concurrent_boost/][Concurrent programming with Boost using IPC and MPI libraries]]
++ [[http://www.bogotobogo.com/cplusplus/multithreading_ipc.php][MultiThreading/Parallel Programming IPC]]
+
