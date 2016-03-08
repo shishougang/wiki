@@ -1,0 +1,180 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Protobuf
+#+OPTIONS: num:nil H:2
+
+* Homepage
++ Protocol Buffers - Google's data interchange format
+  https://developers.google.com/protocol-buffers/
++ https://github.com/google/protobuf
+
+* Install
+1. On Ubuntu, install need tools
+  #+begin_src sh
+    $ sudo apt-get install autoconf automake libtool curl
+  #+end_src
+2. Install
+  #+begin_src sh
+    $ ./autogen.sh
+    $ ./configure
+    $ make
+    $ make check
+    $ sudo make install
+    $ sudo ldconfig # refresh shared library cache.
+  #+end_src
+** Compiling dependent packages
+#+begin_src sh
+pkg-config --cflags protobuf         # print compiler flags
+pkg-config --libs protobuf           # print linker flags
+pkg-config --cflags --libs protobuf  # print both
+c++ my_program.cc my_proto.pb.cc `pkg-config --cflags --libs protobuf`
+#+end_src
+* Third-Party Add-ons for Protocol Buffers
++ [[https://github.com/google/protobuf/wiki/Third-Party-Add-ons][third-party add-ons wiki page]]
+
+* Protobuf examples
+A [[./Files/protobuf-example.tar.gz][example]] of transmitting a personal info from a server to a client.
+** Define message formats in a .proto file.
+=person.proto=
+#+begin_src sh
+syntax = "proto3";
+package example;
+
+message Person {
+  string name = 1;
+  int32 id = 2;  // Unique ID number for this person.
+  string email = 3;
+}
+#+end_src
+** A server to send the personal info
+#+begin_src c++
+#include <string.h>  // for bzero
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string>
+#include <cstdlib>
+#include <iostream>
+#include <google/protobuf/message_lite.h>
+#include "person.pb.h"
+using namespace std;
+
+#define SERVER_PORT 9999
+#define LISTEN_COUNT 5
+
+void error(const char *msg) {
+  perror(msg);
+  exit(1);
+}
+
+int main() {
+  struct sockaddr_in server_addr;
+  bzero(&server_addr, sizeof(server_addr));
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_addr.s_addr = htons(INADDR_ANY);
+  server_addr.sin_port = htons(SERVER_PORT);
+  int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+  if (server_socket < 0) {
+    error("Open socket failed");
+  }
+  int enable = 1;
+  if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &enable,
+                 sizeof(enable)) < 0) {
+    error("setsockopt(SO_REUSEADDR) failed");
+  }
+  if (bind(server_socket, (struct sockaddr *)&server_addr,
+           sizeof(server_addr)) < 0) {
+    error("Server bind port failed");
+  }
+  listen(server_socket, LISTEN_COUNT);
+  while (true) {
+    struct sockaddr_in client_addr;
+    int new_socket = accept(server_socket, 0, 0);
+    if (new_socket < 0) {
+      error("Server accept failed");
+    }
+    
+    example::Person person;
+    person.set_name("example");
+    person.set_id(1);
+    person.set_email("example@gmail.com");
+
+    int len = person.ByteSize();
+    char *buffer = new char[len];
+    person.SerializeToArray(buffer, len);
+    if (write(new_socket, buffer, len) < 0) {
+      delete buffer;
+      cout << "Send Failed" << endl;
+      break;
+    }
+    close(new_socket);
+    delete buffer;
+  }
+  close(server_socket);
+  return 0;
+}
+#+end_src
+** A client to receive the personal info
+#+begin_src c++
+#include <string.h>  // for bzero
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <string>
+#include <cstdlib>
+#include <iostream>
+#include <google/protobuf/message_lite.h>
+#include "person.pb.h"
+using namespace std;
+
+
+void error(const char *msg) {
+  perror(msg);
+  exit(1);
+}
+
+#define SERVER_PORT 9999
+
+int main() {
+  int client_socket = socket(AF_INET, SOCK_STREAM, 0);
+  if (client_socket < 0) {
+    error("Open socket failed");
+  }
+  struct sockaddr_in server_addr;
+  bzero(&server_addr, sizeof(server_addr));
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+  server_addr.sin_port = htons(SERVER_PORT);
+
+  if (connect(client_socket, (struct sockaddr *) &server_addr,
+  	sizeof(server_addr)) == 0)  {
+  	char buf[1024];
+  	int count = read(client_socket, buf, 1024);
+  	example::Person person;
+  	person.ParseFromArray(buf, count);
+  	cout << "name:" << person.name() << endl;
+  	cout << "id:" << person.id() << endl;
+  	cout << "email:" << person.email() << endl;
+  }
+}
+#+end_src
+** Compiling
+#+begin_src sh
+protoc --cpp_out=. person.proto
+
+c++ server.cc person.pb.cc -o server `pkg-config --cflags --libs protobuf`
+
+c++ client.cc person.pb.cc -o client `pkg-config --cflags --libs protobuf`
+#+end_src
+** Run
+#+begin_src sh
+$ ./server 
+$ ./client 
+name:example
+id:1
+email:example@gmail.com
+#+end_src
+
