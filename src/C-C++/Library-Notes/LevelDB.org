@@ -5,17 +5,84 @@
 * Overview
 LevelDB is a fast key-value storage library written at Google that
 provides an ordered mapping from string keys to string values.
++ git: https://github.com/google/leveldb
++ doc: https://rawgit.com/google/leveldb/master/doc/index.html
+** Features
++ Keys and values are arbitrary byte arrays.
++ Data is stored sorted by key.
++ Callers can provide a custom comparison function to override the sort order.
++ The basic operations are Put(key,value), Get(key), Delete(key).
++ Multiple changes can be made in one atomic batch.
++ Users can create a transient snapshot to get a consistent view of data.
++ Forward and backward iteration is supported over the data.
++ Data is automatically compressed using the Snappy compression library.
++ External activity (file system operations etc.) is relayed through a
+  virtual interface so users can customize the operating system
+  interactions.
 
+* Install on Ubuntu
+1. Install git and snappy (don’t neccessarily need snappy as LevelDB
+   will work without it but you would need to recompile if you don’t
+   install it before compiling)
+  #+begin_src sh
+    sudo apt-get install git-core libsnappy-dev
+  #+end_src
+2. Clone
+   #+begin_src sh
+     git clone  https://github.com/google/leveldb.git
+   #+end_src
+3. Compile
+   #+begin_src sh
+     cd leveldb
+     make
+   #+end_src
+4. Install
+   #+begin_src sh
+     cd out-shared
+     sudo cp --preserve=links libleveldb.* /usr/local/lib
+     cd ../include
+     sudo cp -R leveldb /usr/local/include/
+     sudo ldconfig
+   #+end_src
+* Example
+Write and Read back.
+#+begin_src c++
+#include <cassert>
+#include <leveldb/db.h>
+#include <iostream>
+#include <string>
+using namespace std;
 
-* cc
-#+begin_src python
-
+int main() {
+  leveldb::DB* db;
+  leveldb::Options options;
+  options.create_if_missing = true;
+  leveldb::Status status = leveldb::DB::Open(options, "/tmp/testdb", &db);
+  assert(status.ok());
+  string key = "foo";
+  string value = "bar";
+  cout << "write Key:" << key << " and value:" << value << endl;
+  status = db->Put(leveldb::WriteOptions(), key, value);
+  assert(status.ok());
+  string value_back;
+  status = db->Get(leveldb::ReadOptions(), key, &value_back);
+  cout << "Read back:" << value_back << endl;
+  assert(status.ok());
+  assert(value == value_back);
+  delete db;
+  return 0;
+}
 #+end_src
 
+#+begin_src sh
+g++ -o test test.cpp  -lleveldb
+#+end_src
+* 
+
+* cc
 #+begin_src c++
 
 #+end_src
-
 
 #+begin_src sh
 

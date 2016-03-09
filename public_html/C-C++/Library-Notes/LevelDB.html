@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>LevelDB</title>
-<!-- 2016-03-08 Tue 23:15 -->
+<!-- 2016-03-09 Wed 21:55 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -66,8 +66,15 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">Overview</a></li>
-<li><a href="#sec-2">cc</a></li>
+<li><a href="#sec-1">Overview</a>
+<ul>
+<li><a href="#sec-1-1">Features</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">Install on Ubuntu</a></li>
+<li><a href="#sec-3">Example</a></li>
+<li><a href="#sec-4"></a></li>
+<li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
 </div>
@@ -79,23 +86,138 @@ for the JavaScript code in this tag.
 LevelDB is a fast key-value storage library written at Google that
 provides an ordered mapping from string keys to string values.
 </p>
+<ul class="org-ul">
+<li>git: <a href="https://github.com/google/leveldb">https://github.com/google/leveldb</a>
+</li>
+<li>doc: <a href="https://rawgit.com/google/leveldb/master/doc/index.html">https://rawgit.com/google/leveldb/master/doc/index.html</a>
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">Features</h3>
+<div class="outline-text-3" id="text-1-1">
+<ul class="org-ul">
+<li>Keys and values are arbitrary byte arrays.
+</li>
+<li>Data is stored sorted by key.
+</li>
+<li>Callers can provide a custom comparison function to override the sort order.
+</li>
+<li>The basic operations are Put(key,value), Get(key), Delete(key).
+</li>
+<li>Multiple changes can be made in one atomic batch.
+</li>
+<li>Users can create a transient snapshot to get a consistent view of data.
+</li>
+<li>Forward and backward iteration is supported over the data.
+</li>
+<li>Data is automatically compressed using the Snappy compression library.
+</li>
+<li>External activity (file system operations etc.) is relayed through a
+virtual interface so users can customize the operating system
+interactions.
+</li>
+</ul>
 </div>
 </div>
-
+</div>
 
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">cc</h2>
+<h2 id="sec-2">Install on Ubuntu</h2>
 <div class="outline-text-2" id="text-2">
+<ol class="org-ol">
+<li>Install git and snappy (don’t neccessarily need snappy as LevelDB
+will work without it but you would need to recompile if you don’t
+install it before compiling)
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
+<pre class="src src-sh">sudo apt-get install git-core libsnappy-dev
+</pre>
+</div>
+</li>
+<li>Clone
+<div class="org-src-container">
+
+<pre class="src src-sh">git clone  https://github.com/google/leveldb.git
+</pre>
+</div>
+</li>
+<li>Compile
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #b0c4de;">cd</span> leveldb
+make
+</pre>
+</div>
+</li>
+<li>Install
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #b0c4de;">cd</span> out-shared
+sudo cp --preserve=links libleveldb.* /usr/local/lib
+<span style="color: #b0c4de;">cd</span> ../include
+sudo cp -R leveldb /usr/local/include/
+sudo ldconfig
+</pre>
+</div>
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Example</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+Write and Read back.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cassert&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;leveldb/db.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #7fffd4;">leveldb</span>::<span style="color: #98fb98;">DB</span>* <span style="color: #eedd82;">db</span>;
+  <span style="color: #7fffd4;">leveldb</span>::<span style="color: #98fb98;">Options</span> <span style="color: #eedd82;">options</span>;
+  options.create_if_missing = <span style="color: #7fffd4;">true</span>;
+  <span style="color: #7fffd4;">leveldb</span>::<span style="color: #98fb98;">Status</span> <span style="color: #eedd82;">status</span> = <span style="color: #7fffd4;">leveldb</span>::<span style="color: #7fffd4;">DB</span>::Open(options, <span style="color: #ffa07a;">"/tmp/testdb"</span>, &amp;db);
+  assert(status.ok());
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">key</span> = <span style="color: #ffa07a;">"foo"</span>;
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">value</span> = <span style="color: #ffa07a;">"bar"</span>;
+  cout &lt;&lt; <span style="color: #ffa07a;">"write Key:"</span> &lt;&lt; key &lt;&lt; <span style="color: #ffa07a;">" and value:"</span> &lt;&lt; value &lt;&lt; endl;
+  status = db-&gt;Put(<span style="color: #7fffd4;">leveldb</span>::WriteOptions(), key, value);
+  assert(status.ok());
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">value_back</span>;
+  status = db-&gt;Get(<span style="color: #7fffd4;">leveldb</span>::ReadOptions(), key, &amp;value_back);
+  cout &lt;&lt; <span style="color: #ffa07a;">"Read back:"</span> &lt;&lt; value_back &lt;&lt; endl;
+  assert(status.ok());
+  assert(value == value_back);
+  <span style="color: #00ffff;">delete</span> db;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
 
+<div class="org-src-container">
+
+<pre class="src src-sh">g++ -o test test.cpp  -lleveldb
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4"></h2>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">cc</h2>
+<div class="outline-text-2" id="text-5">
 <div class="org-src-container">
 
 <pre class="src src-c++"></pre>
 </div>
-
 
 <div class="org-src-container">
 
@@ -106,7 +228,7 @@ provides an ordered mapping from string keys to string values.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-03-08 Tue 23:15</p>
+<p class="date">Created: 2016-03-09 Wed 21:55</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
