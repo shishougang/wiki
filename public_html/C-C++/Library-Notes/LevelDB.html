@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>LevelDB</title>
-<!-- 2016-03-09 Wed 21:55 -->
+<!-- 2016-03-10 Thu 22:26 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -68,13 +68,22 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-1">Overview</a>
 <ul>
-<li><a href="#sec-1-1">Features</a></li>
+<li><a href="#sec-1-1">Durability</a></li>
+<li><a href="#sec-1-2">LSM-Tree</a></li>
+<li><a href="#sec-1-3">Features</a></li>
 </ul>
 </li>
 <li><a href="#sec-2">Install on Ubuntu</a></li>
 <li><a href="#sec-3">Example</a></li>
-<li><a href="#sec-4"></a></li>
-<li><a href="#sec-5">cc</a></li>
+<li><a href="#sec-4">Deeper into LevelDB</a></li>
+<li><a href="#sec-5">Performance</a>
+<ul>
+<li><a href="#sec-5-1">Comparison to others</a></li>
+<li><a href="#sec-5-2">Comparison to TokyoCabinet</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">More</a></li>
+<li><a href="#sec-7">cc</a></li>
 </ul>
 </div>
 </div>
@@ -93,9 +102,42 @@ provides an ordered mapping from string keys to string values.
 </li>
 </ul>
 </div>
+
 <div id="outline-container-sec-1-1" class="outline-3">
-<h3 id="sec-1-1">Features</h3>
+<h3 id="sec-1-1">Durability</h3>
 <div class="outline-text-3" id="text-1-1">
+<p>
+<a href="http://news.ycombinator.com/item?id=2526311">Sanjay commented</a> on HN about the durability of LevelDB. And what
+exactly it means that <a href="http://news.ycombinator.com/item?id=2526758">writes may be lost</a> (for asynchronous writes),
+namely that the database is not corrupted following a crash, but
+merely result in incomplete data files:
+</p>
+
+<p>
+Merely an incomplete one. Leveldb never writes in place: it always
+appends to a log file, or merges existing files together to produce
+new ones. So an OS crash will cause a partially written log record (or
+a few partially written log records). Leveldb recovery code uses
+checksums to detect this and will skip the incomplete records.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2">LSM-Tree</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+An <a href="http://nosqlsummer.org/paper/lsm-tree">LSM-Tree</a> is used to increase write-throughput. This makes LevelDB
+more suitable for random writes-heavy workloads. In contrast
+KyotoCabinet implements ordered keys using a B-Tree, which is more
+suitable for read-heavy workloads.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-3" class="outline-3">
+<h3 id="sec-1-3">Features</h3>
+<div class="outline-text-3" id="text-1-3">
 <ul class="org-ul">
 <li>Keys and values are arbitrary byte arrays.
 </li>
@@ -208,12 +250,98 @@ Write and Read back.
 </div>
 </div>
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4"></h2>
+<h2 id="sec-4">Deeper into LevelDB</h2>
 </div>
 
+
+
+
+
 <div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">cc</h2>
+<h2 id="sec-5">Performance</h2>
 <div class="outline-text-2" id="text-5">
+<ul class="org-ul">
+<li><a href="http://www.cnblogs.com/lulu/p/4231810.html">leveldb 性能、使用场景评估</a>
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Comparison to others</h3>
+<div class="outline-text-3" id="text-5-1">
+<p>
+Sanjay Ghemawat talked on YCombinator/HackerNews about the <a href="http://news.ycombinator.com/item?id=2526394">difference
+between Leveldb and BitCask</a>:
+</p>
+
+<ol class="org-ol">
+<li>LevelDB is a persistent ordered map; bitcask is a persistent hash
+table (no ordered iteration).
+</li>
+<li>Bitcask stores a fixed size record in memory for every key. So for
+databases with large number of keys, it may use too much memory for
+some applications. bitcask can guarantee at most one disk seek per
+lookup I think. leveldb may have to do a small handful of disk
+seeks.
+</li>
+<li>To clarify, leveldb stores data in a sequence of levels. Each level
+stores approximately ten times as much data as the level before it.
+A read needs one disk seek per level. So if 10% of the db fits in
+memory, leveldb will need to do one seek (for the last level since
+all of the earlier levels should end up cached in the OS buffer
+cache). If 1% fits in memory, leveldb will need two seeks.
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">Comparison to TokyoCabinet</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+LevelDB is optimized for writes, and TokyoCabinet for reads. <a href="http://news.ycombinator.com/item?id=2526123">Comments
+by Sanjay:</a>
+</p>
+
+<p>
+TokyoCabinet is something we seriously considered using instead of
+writing leveldb. TokyoCabinet has great performance usually. I
+haven’t done a careful head-to-head comparison, but it wouldn’t
+surprise me if it was somewhat faster than leveldb for many workloads.
+Plus TokyoCabinet is more mature, has matching server code etc. and
+may therefore be a better fit for many projects. 
+</p>
+
+<p>
+However because of a fundamental difference in data structures
+(TokyoCabinet uses btrees for ordered storage; leveldb uses log
+structured merge trees), random write performance (which is important
+for our needs) is significantly better in leveldb. This part we did
+measure. IIRC, we could fill TokyoCabinet with a million 100-byte
+writes in less than two seconds if writing sequentially, but the time
+ballooned to ~2000 seconds if we wrote randomly. The corresponding
+slowdown for leveldb is from ~1.5 seconds (sequential) to ~2.5 seconds
+(random). 
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">More</h2>
+<div class="outline-text-2" id="text-6">
+<ul class="org-ul">
+<li><a href="https://github.com/ideawu/ssdb">SSDB</a> A fast NoSQL database, an alternative to Redis, the Redis
+protocol wrapper of LevelDB.
+</li>
+<li><a href="http://supertech.csail.mit.edu/cacheObliviousBTree.html">Cache-oblivious B-trees</a> are LSM-trees with faster searches.
+</li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">cc</h2>
+<div class="outline-text-2" id="text-7">
 <div class="org-src-container">
 
 <pre class="src src-c++"></pre>
@@ -228,7 +356,7 @@ Write and Read back.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-03-09 Wed 21:55</p>
+<p class="date">Created: 2016-03-10 Thu 22:26</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

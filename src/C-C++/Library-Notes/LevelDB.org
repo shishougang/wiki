@@ -7,6 +7,25 @@ LevelDB is a fast key-value storage library written at Google that
 provides an ordered mapping from string keys to string values.
 + git: https://github.com/google/leveldb
 + doc: https://rawgit.com/google/leveldb/master/doc/index.html
+
+** Durability
+[[http://news.ycombinator.com/item?id=2526311][Sanjay commented]] on HN about the durability of LevelDB. And what
+exactly it means that [[http://news.ycombinator.com/item?id=2526758][writes may be lost]] (for asynchronous writes),
+namely that the database is not corrupted following a crash, but
+merely result in incomplete data files:
+
+Merely an incomplete one. Leveldb never writes in place: it always
+appends to a log file, or merges existing files together to produce
+new ones. So an OS crash will cause a partially written log record (or
+a few partially written log records). Leveldb recovery code uses
+checksums to detect this and will skip the incomplete records.
+
+** LSM-Tree
+An [[http://nosqlsummer.org/paper/lsm-tree][LSM-Tree]] is used to increase write-throughput. This makes LevelDB
+more suitable for random writes-heavy workloads. In contrast
+KyotoCabinet implements ordered keys using a B-Tree, which is more
+suitable for read-heavy workloads.
+
 ** Features
 + Keys and values are arbitrary byte arrays.
 + Data is stored sorted by key.
@@ -77,7 +96,57 @@ int main() {
 #+begin_src sh
 g++ -o test test.cpp  -lleveldb
 #+end_src
-* 
+* Deeper into LevelDB
+
+
+
+
+
+* Performance
++ [[http://www.cnblogs.com/lulu/p/4231810.html][leveldb 性能、使用场景评估]]
+** Comparison to others
+Sanjay Ghemawat talked on YCombinator/HackerNews about the [[http://news.ycombinator.com/item?id=2526394][difference
+between Leveldb and BitCask]]:
+
+1. LevelDB is a persistent ordered map; bitcask is a persistent hash
+   table (no ordered iteration).
+2. Bitcask stores a fixed size record in memory for every key. So for
+   databases with large number of keys, it may use too much memory for
+   some applications. bitcask can guarantee at most one disk seek per
+   lookup I think. leveldb may have to do a small handful of disk
+   seeks.
+3. To clarify, leveldb stores data in a sequence of levels. Each level
+   stores approximately ten times as much data as the level before it.
+   A read needs one disk seek per level. So if 10% of the db fits in
+   memory, leveldb will need to do one seek (for the last level since
+   all of the earlier levels should end up cached in the OS buffer
+   cache). If 1% fits in memory, leveldb will need two seeks.
+** Comparison to TokyoCabinet
+LevelDB is optimized for writes, and TokyoCabinet for reads. [[http://news.ycombinator.com/item?id=2526123][Comments
+by Sanjay:]]
+
+TokyoCabinet is something we seriously considered using instead of
+writing leveldb. TokyoCabinet has great performance usually. I
+haven’t done a careful head-to-head comparison, but it wouldn’t
+surprise me if it was somewhat faster than leveldb for many workloads.
+Plus TokyoCabinet is more mature, has matching server code etc. and
+may therefore be a better fit for many projects. 
+
+However because of a fundamental difference in data structures
+(TokyoCabinet uses btrees for ordered storage; leveldb uses log
+structured merge trees), random write performance (which is important
+for our needs) is significantly better in leveldb. This part we did
+measure. IIRC, we could fill TokyoCabinet with a million 100-byte
+writes in less than two seconds if writing sequentially, but the time
+ballooned to ~2000 seconds if we wrote randomly. The corresponding
+slowdown for leveldb is from ~1.5 seconds (sequential) to ~2.5 seconds
+(random). 
+
+* More
++ [[https://github.com/ideawu/ssdb][SSDB]] A fast NoSQL database, an alternative to Redis, the Redis
+  protocol wrapper of LevelDB.
++ [[http://supertech.csail.mit.edu/cacheObliviousBTree.html][Cache-oblivious B-trees]] are LSM-trees with faster searches.
+
 
 * cc
 #+begin_src c++
