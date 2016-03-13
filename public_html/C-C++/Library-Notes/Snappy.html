@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Snappy</title>
-<!-- 2016-03-10 Thu 22:26 -->
+<!-- 2016-03-13 Sun 22:15 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -68,7 +68,8 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-1">Overview</a></li>
 <li><a href="#sec-2">Compile and install</a></li>
-<li><a href="#sec-3">cc</a></li>
+<li><a href="#sec-3">Use</a></li>
+<li><a href="#sec-4">Example</a></li>
 </ul>
 </div>
 </div>
@@ -83,9 +84,28 @@ for the JavaScript code in this tag.
 <li>git: <a href="https://github.com/google/snappy">https://github.com/google/snappy</a>
 </li>
 </ul>
-</div>
-</div>
 
+<p>
+Snappy is a compression/decompression library. It does not aim for maximum
+compression, or compatibility with any other compression library; instead,
+it aims for very high speeds and reasonable compression
+</p>
+
+<ul class="org-ul">
+<li>Fast: Compression speeds at 250 MB/sec and beyond, with no assembler code.
+See "Performance" below.
+</li>
+<li>Stable: Over the last few years, Snappy has compressed and
+decompressed petabytes of data in Google's production environment.
+The Snappy bitstream format is stable and will not change between
+versions.
+</li>
+<li>Robust: The Snappy decompressor is designed not to crash in the face of
+corrupted or malicious input.
+</li>
+</ul>
+</div>
+</div>
 
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">Compile and install</h2>
@@ -95,31 +115,81 @@ for the JavaScript code in this tag.
 <pre class="src src-sh">./autogen.sh
 ./configure
 make
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">to static library</span>
+ar rcs libsnappy.a ./*.o
 </pre>
 </div>
 </div>
 </div>
 
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">cc</h2>
+<h2 id="sec-3">Use</h2>
 <div class="outline-text-2" id="text-3">
+<p>
+To use Snappy from your own C++ program, include the file "snappy.h"
+from your calling file, and link against the compiled library.
+</p>
+
+<p>
+There are many ways to call Snappy, but the simplest possible is
+</p>
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c++"><span style="color: #7fffd4;">snappy</span>::Compress(input.data(), input.size(), &amp;output);
+<span style="color: #7fffd4;">snappy</span>::Uncompress(input.data(), input.size(), &amp;output);
+</pre>
+</div>
+<p>
+where "input" and "output" are both instances of <code>std::string</code>.
+</p>
+</div>
 </div>
 
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Example</h2>
+<div class="outline-text-2" id="text-4">
+<div class="org-src-container">
 
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;snappy.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">input</span> = <span style="color: #ffa07a;">"Hello World"</span>;
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">output</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; 5; ++i) {
+    input += input;
+  }
+  <span style="color: #7fffd4;">snappy</span>::Compress(input.data(), input.size(), &amp;output);
+  cout &lt;&lt; <span style="color: #ffa07a;">"input size:"</span> &lt;&lt; input.size() &lt;&lt; <span style="color: #ffa07a;">" output size:"</span>
+       &lt;&lt; output.size() &lt;&lt; endl;
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">output_uncom</span>;
+  <span style="color: #7fffd4;">snappy</span>::Uncompress(output.data(), output.size(), &amp;output_uncom);
+  <span style="color: #00ffff;">if</span> (input == output_uncom) {
+    cout &lt;&lt; <span style="color: #ffa07a;">"Equal"</span> &lt;&lt; endl;
+  } <span style="color: #00ffff;">else</span> {
+    cout &lt;&lt; <span style="color: #ffa07a;">"ERROR: not equal"</span> &lt;&lt; endl;
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
 
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-sh">$ g++ -o example ./snappy-example.cc -I. -L. -lsnappy
+$ ./example 
+input size:352 output size:32
+Equal
+</pre>
 </div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-03-10 Thu 22:26</p>
+<p class="date">Created: 2016-03-13 Sun 22:15</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

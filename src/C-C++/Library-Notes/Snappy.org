@@ -7,21 +7,69 @@
 + homepage: http://google.github.io/snappy/
 + git: https://github.com/google/snappy
 
+Snappy is a compression/decompression library. It does not aim for maximum
+compression, or compatibility with any other compression library; instead,
+it aims for very high speeds and reasonable compression
+
++ Fast: Compression speeds at 250 MB/sec and beyond, with no assembler code.
+   See "Performance" below.
++ Stable: Over the last few years, Snappy has compressed and
+  decompressed petabytes of data in Google's production environment.
+  The Snappy bitstream format is stable and will not change between
+  versions.
++ Robust: The Snappy decompressor is designed not to crash in the face of
+   corrupted or malicious input.
 
 * Compile and install
 #+begin_src sh
 ./autogen.sh
 ./configure
 make
+# to static library
+ar rcs libsnappy.a ./*.o 
 #+end_src
 
-* cc
+* Use
+To use Snappy from your own C++ program, include the file "snappy.h"
+from your calling file, and link against the compiled library.
+
+There are many ways to call Snappy, but the simplest possible is
 #+begin_src c++
-
+  snappy::Compress(input.data(), input.size(), &output);
+  snappy::Uncompress(input.data(), input.size(), &output);
 #+end_src
+where "input" and "output" are both instances of =std::string=.
 
+* Example
+#+begin_src c++
+#include <snappy.h>
+#include <string>
+#include <iostream>
+using namespace std;
 
+int main() {
+  string input = "Hello World";
+  string output;
+  for (int i = 0; i < 5; ++i) {
+    input += input;
+  }
+  snappy::Compress(input.data(), input.size(), &output);
+  cout << "input size:" << input.size() << " output size:"
+       << output.size() << endl;
+  string output_uncom;
+  snappy::Uncompress(output.data(), output.size(), &output_uncom);
+  if (input == output_uncom) {
+    cout << "Equal" << endl;
+  } else {
+    cout << "ERROR: not equal" << endl;
+  }
+  return 0;
+}
+#+end_src
 
 #+begin_src sh
-
+$ g++ -o example ./snappy-example.cc -I. -L. -lsnappy
+$ ./example 
+input size:352 output size:32
+Equal
 #+end_src
