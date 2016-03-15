@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>HDF5 Notes</title>
-<!-- 2016-03-11 Fri 23:56 -->
+<!-- 2016-03-15 Tue 21:18 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -67,13 +67,20 @@ for the JavaScript code in this tag.
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">Overview</a></li>
-<li><a href="#sec-2">Install</a>
+<li><a href="#sec-2">Install and Test</a>
 <ul>
 <li><a href="#sec-2-1">Ubuntu</a></li>
-<li><a href="#sec-2-2">Compile and install from source codes</a></li>
+<li><a href="#sec-2-2">Compile and install with CMake from source codes</a></li>
+<li><a href="#sec-2-3">Test Example</a></li>
 </ul>
 </li>
-<li><a href="#sec-3">cc</a></li>
+<li><a href="#sec-3">Inspection Tools</a>
+<ul>
+<li><a href="#sec-3-1">HDFVie</a></li>
+<li><a href="#sec-3-2">ViTables</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">More</a></li>
 </ul>
 </div>
 </div>
@@ -93,7 +100,7 @@ for the JavaScript code in this tag.
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">Install</h2>
+<h2 id="sec-2">Install and Test</h2>
 <div class="outline-text-2" id="text-2">
 </div><div id="outline-container-sec-2-1" class="outline-3">
 <h3 id="sec-2-1">Ubuntu</h3>
@@ -108,17 +115,13 @@ $ sudo apt-get install libhdf5-mpich-dev
 </div>
 </div>
 <div id="outline-container-sec-2-2" class="outline-3">
-<h3 id="sec-2-2">Compile and install from source codes</h3>
+<h3 id="sec-2-2">Compile and install with CMake from source codes</h3>
 <div class="outline-text-3" id="text-2-2">
-<p>
+<ol class="org-ol">
+<li>download CMake-hdf5-1.8.16.tar.gz 
 <a href="https://www.hdfgroup.org/HDF5/release/cmakebuild.html">https://www.hdfgroup.org/HDF5/release/cmakebuild.html</a>
-</p>
-
-
-<p>
-<a href="http://micro.stanford.edu/wiki/Install_HDF5">http://micro.stanford.edu/wiki/Install_HDF5</a>
-</p>
-
+</li>
+<li>Build
 <div class="org-src-container">
 
 <pre class="src src-sh">./build-unix.sh
@@ -132,29 +135,108 @@ $ sudo apt-get install libhdf5-mpich-dev
 Total Test time (real) =  93.46 sec
 </pre>
 </div>
+</li>
+</ol>
 </div>
 </div>
-</div>
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">Test Example</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+The SDS.h5 is in a compressed binary format, which means that it can
+not be read directly. However there exists a bunch of HDF5 utilities
+(external programs) that allows humans to see what is contained in the
+files:
+</p>
 
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #b0c4de;">cd</span> ./build/bin
+./h5dump ../examples/SDS.h5 
+HDF5 <span style="color: #ffa07a;">"../examples/SDS.h5"</span> {
+GROUP <span style="color: #ffa07a;">"/"</span> {
+   DATASET <span style="color: #ffa07a;">"IntArray"</span> {
+      DATATYPE  H5T_STD_I32LE
+      DATASPACE  SIMPLE { ( 5, 6 ) / ( 5, 6 ) }
+      DATA {
+      (0,0): 0, 1, 2, 3, 4, 5,
+      (1,0): 1, 2, 3, 4, 5, 6,
+      (2,0): 2, 3, 4, 5, 6, 7,
+      (3,0): 3, 4, 5, 6, 7, 8,
+      (4,0): 4, 5, 6, 7, 8, 9
+      }
+   }
+}
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
 
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">cc</h2>
+<h2 id="sec-3">Inspection Tools</h2>
 <div class="outline-text-2" id="text-3">
+<p>
+Note that last quoted code is not the real content of the file but
+just a human readable translation, that was accessed by means of one
+of the tools installed in <code>~/usr/bin</code>. There are even graphical programs
+to visualize the contents of HDF5 file. These programs that read HDF5
+have the advantage that they do not load the data into memory. You can
+inspect the contents of a 40GB file without hanging the system.
+</p>
+</div>
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">HDFVie</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+The official viewer is <a href="http://www.hdfgroup.org/hdf-java-html/hdfview/">HDFView</a>.
+</p>
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-sh"><span style="color: #b0c4de;">cd</span> ~/soft
+wget http://www.hdfgroup.org/ftp/HDF5/hdf-java/hdfview/hdfview_install_linux32.bin
+sudo sh ./hdfview_install_linux32.bin
+/usr/local/hdfveiw/bin/hdfview.sh
+</pre>
+</div>
+</div>
 </div>
 
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">ViTables</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+An alternative program is <a href="http://vitables.berlios.de/">ViTables</a>.
+</p>
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-sh">sudo apt-get install python-tables python-qt4
+<span style="color: #b0c4de;">cd</span> ~/soft
+wget http://download.berlios.de/vitables/ViTables-2.0.tar.gz
+tar -zxvf ViTables-2.0.tar.gz
+<span style="color: #b0c4de;">cd</span> ViTables-2.0
+sudo python setup.py install
+vitables
+</pre>
 </div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">More</h2>
+<div class="outline-text-2" id="text-4">
+<ul class="org-ul">
+<li><a href="http://micro.stanford.edu/wiki/Install_HDF5">http://micro.stanford.edu/wiki/Install_HDF5</a>
+</li>
+</ul>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-03-11 Fri 23:56</p>
+<p class="date">Created: 2016-03-15 Tue 21:18</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

@@ -8,38 +8,82 @@
 + 中文文档:
   http://www.nsmc.cma.gov.cn/NSMC_EN/CMACast/docs/HDF5.0_chinese.pdf
 
-* Install
+* Install and Test
 ** Ubuntu
 #+begin_src sh
 $ sudo apt-get install libhdf5-serial-dev
 # The MPI version with C and Fortran interfaces
 $ sudo apt-get install libhdf5-mpich-dev
 #+end_src
-** Compile and install from source codes
+** Compile and install with CMake from source codes
+1. download CMake-hdf5-1.8.16.tar.gz 
+   https://www.hdfgroup.org/HDF5/release/cmakebuild.html
+2. Build
+   #+begin_src sh
+     ./build-unix.sh
+     ...
+     ...
+     1978/1979 Test #1895: PERFORM_iopipe ............................................   Passed    8.34 sec
+     1979/1979 Test  #42: H5TEST-fheap ..............................................   Passed   72.96 sec
 
-https://www.hdfgroup.org/HDF5/release/cmakebuild.html
+     100% tests passed, 0 tests failed out of 1979
 
-
-http://micro.stanford.edu/wiki/Install_HDF5
-
-#+begin_src sh
-./build-unix.sh
-...
-...
-1978/1979 Test #1895: PERFORM_iopipe ............................................   Passed    8.34 sec
-1979/1979 Test  #42: H5TEST-fheap ..............................................   Passed   72.96 sec
-
-100% tests passed, 0 tests failed out of 1979
-
-Total Test time (real) =  93.46 sec
-#+end_src
-
-
-* cc
-#+begin_src c++
-
-#+end_src
+     Total Test time (real) =  93.46 sec
+   #+end_src
+** Test Example
+The SDS.h5 is in a compressed binary format, which means that it can
+not be read directly. However there exists a bunch of HDF5 utilities
+(external programs) that allows humans to see what is contained in the
+files:
 
 #+begin_src sh
-
+cd ./build/bin
+./h5dump ../examples/SDS.h5 
+HDF5 "../examples/SDS.h5" {
+GROUP "/" {
+   DATASET "IntArray" {
+      DATATYPE  H5T_STD_I32LE
+      DATASPACE  SIMPLE { ( 5, 6 ) / ( 5, 6 ) }
+      DATA {
+      (0,0): 0, 1, 2, 3, 4, 5,
+      (1,0): 1, 2, 3, 4, 5, 6,
+      (2,0): 2, 3, 4, 5, 6, 7,
+      (3,0): 3, 4, 5, 6, 7, 8,
+      (4,0): 4, 5, 6, 7, 8, 9
+      }
+   }
+}
+}
 #+end_src
+
+* Inspection Tools
+Note that last quoted code is not the real content of the file but
+just a human readable translation, that was accessed by means of one
+of the tools installed in =~/usr/bin=. There are even graphical programs
+to visualize the contents of HDF5 file. These programs that read HDF5
+have the advantage that they do not load the data into memory. You can
+inspect the contents of a 40GB file without hanging the system.
+** HDFVie
+The official viewer is [[http://www.hdfgroup.org/hdf-java-html/hdfview/][HDFView]].
+#+begin_src sh
+cd ~/soft
+wget http://www.hdfgroup.org/ftp/HDF5/hdf-java/hdfview/hdfview_install_linux32.bin
+sudo sh ./hdfview_install_linux32.bin
+/usr/local/hdfveiw/bin/hdfview.sh
+#+end_src
+
+** ViTables
+An alternative program is [[http://vitables.berlios.de/][ViTables]].
+#+begin_src sh
+sudo apt-get install python-tables python-qt4
+cd ~/soft
+wget http://download.berlios.de/vitables/ViTables-2.0.tar.gz
+tar -zxvf ViTables-2.0.tar.gz
+cd ViTables-2.0
+sudo python setup.py install
+vitables
+#+end_src
+
+* More
++ http://micro.stanford.edu/wiki/Install_HDF5
+
