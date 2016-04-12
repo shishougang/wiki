@@ -2,12 +2,60 @@
 #+TITLE: Emacs Markdown Mode
 #+OPTIONS: num:nil
 
+
 * install markdown software tool
 #+begin_src sh
-brew install markdown
+sudo apt-get install markdown
 #+end_src
 
-http://jblevins.org/projects/markdown-mode/
-http://linuxtoy.org/archives/emacs-markdown-mode.html
+* configure emacs
+将下载的 [[http://jblevins.org/projects/markdown-mode/markdown-mode.el][markdown-mode.el]] 文件置于 Emacs 可找到的路径,在 =.emacs= 中添
+加:
+#+begin_src emacs-lisp
+(autoload 'markdown-mode "markdown-mode"
+   "Major mode for editing Markdown files" t)
+(add-to-list 'auto-mode-alist '("\\.text\\'" . markdown-mode))
+(add-to-list 'auto-mode-alist '("\\.markdown\\'" . markdown-mode))
+(add-to-list 'auto-mode-alist '("\\.md\\'" . markdown-mode))
+#+end_src
 
+* Commands
+#+begin_src sh
+C-c C-t n 插入 hash 样式的标题，其中 n 为 1~5，表示从第一级标题到第五级标题。
+C-c C-t t 插入 underline 样式的标题，这是一级。
+C-c C-t s 同上，这是二级。
+C-c C-a l 插入链接，格式为 [text](url)。
+C-c C-i i 插入图像，格式为 ![text](url)。
+C-c C-s b 插入引用内容。
+C-c C-s c 插入代码。
+C-c C-p b 加粗。
+C-c C-p i 斜体。
+C-c - 插入水平线。
+#+end_src
 
+* Preview
+#+begin_src sh
+C-c C-c m 在当前缓冲运行 Markdown，并在另一个缓冲预览。
+C-c C-c p 同上，但在浏览器中预览。
+#+end_src
+* More
++ Emacs Markdown Mode: http://jblevins.org/projects/markdown-mode/
+* Using yasnippets in markdown mode
+If using markdown-mode yasnippets’s =TAB= completion doesn’t work, it’s
+just because =TAB= key is bind to =markdown-cycle= function.
+
+#+begin_src emacs-lisp
+;; This goes into my .emacs file
+(defun markdown-unset-tab ()
+  "markdown-mode-hook"
+  (define-key markdown-mode-map (kbd "<tab>") nil))
+(add-hook 'markdown-mode-hook '(lambda() (markdown-unset-tab)))
+#+end_src
+or
+#+begin_src emacs-lisp
+(add-hook 'markdown-mode-hook
+          '(lambda ()
+             (auto-complete-mode t)
+             (local-unset-key [tab])
+             (setq-local yas-fallback-behavior '(apply auto-complete))))
+#+end_src
