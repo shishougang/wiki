@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Symas Lightning Memory-Mapped Database (LMDB) Notes</title>
-<!-- 2016-04-20 Wed 23:56 -->
+<!-- 2016-04-23 Sat 20:57 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -67,7 +67,7 @@ for the JavaScript code in this tag.
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">Overview</a></li>
-<li><a href="#sec-2">LMDB 基本架构</a></li>
+<li><a href="#sec-2">LMDB基本架构</a></li>
 <li><a href="#sec-3">Memory Map原理</a></li>
 <li><a href="#sec-4">B-tree/B+tree/B*tree</a></li>
 <li><a href="#sec-5">COW and MVCC</a></li>
@@ -132,18 +132,27 @@ system's buffer cache.
 </div>
 </div>
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">LMDB 基本架构</h2>
+<h2 id="sec-2">LMDB基本架构</h2>
 <div class="outline-text-2" id="text-2">
+<p>
+lmdb的基本架构如下:
+<img src="./Files/lmdb-arch.svg" alt="lmdb-arch.svg" />
+</p>
 
-<div class="figure">
-<p><img src="./Files/lmdb-arch.svg" alt="lmdb-arch.svg" />
+<p>
+lmdb的基本做法是使用mmap文件映射，不管这个文件存储实在内存上还是在持久存储上。lmdb的所有读取操作都是通过mmap将要访问的文件只读的映射到虚拟内存中，直接访问相应的地址.因为使用了read-only的mmap，同样避免了程序错误将存储结构写坏的风险。并且IO的调度由操作系统的页调度机制完成。而写操作，则是通过write系统调用进行的，这主要是为了利用操作系统的文件系统一致性，避免在被访问的地址上进行同步。
+</p>
+
+<p>
+lmdb把整个虚拟存储组织成B+Tree存储,索引和值读存储在B+Tree的页面上.对外提供了关于B+Tree的操作方式，利用cursor游标进行。可以进行增删改查。
 </p>
 </div>
 </div>
-</div>
+
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">Memory Map原理</h2>
 </div>
+
 <div id="outline-container-sec-4" class="outline-2">
 <h2 id="sec-4">B-tree/B+tree/B*tree</h2>
 <div class="outline-text-2" id="text-4">
@@ -175,28 +184,330 @@ system's buffer cache.
 <div id="outline-container-sec-8" class="outline-2">
 <h2 id="sec-8">LMDB 核心数据结构</h2>
 <div class="outline-text-2" id="text-8">
+<ol class="org-ol">
+<li><code>MDB_env</code>
+</li>
+</ol>
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c++"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MDB_env</span> {
+        <span style="color: #98fb98;">HANDLE</span>          <span style="color: #eedd82;">me_fd</span>;          <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; The main data file */</span>
+        <span style="color: #98fb98;">HANDLE</span>          <span style="color: #eedd82;">me_lfd</span>;         <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; The lock file */</span>
+        <span style="color: #98fb98;">HANDLE</span>          <span style="color: #eedd82;">me_mfd</span>;                 <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; just for writing the meta pages */</span>
+        <span style="color: #98fb98;">uint32_t</span>        <span style="color: #eedd82;">me_flags</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; @ref mdb_env */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">me_psize</span>;       <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; DB page size, inited from me_os_psize */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">me_os_psize</span>;    <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; OS page size, from #GET_PAGESIZE */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">me_maxreaders</span>;  <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; size of the reader table */</span>
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Max #MDB_txninfo.%mti_numreaders of interest to #mdb_env_close() */</span>
+        <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">me_close_readers</span>;
+        <span style="color: #98fb98;">MDB_dbi</span>         <span style="color: #eedd82;">me_numdbs</span>;              <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; number of DBs opened */</span>
+        <span style="color: #98fb98;">MDB_dbi</span>         <span style="color: #eedd82;">me_maxdbs</span>;              <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; size of the DB table */</span>
+        <span style="color: #98fb98;">MDB_PID_T</span>       <span style="color: #eedd82;">me_pid</span>;         <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; process ID of this env */</span>
+        <span style="color: #98fb98;">char</span>            *<span style="color: #eedd82;">me_path</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; path to the DB files */</span>
+        <span style="color: #98fb98;">char</span>            *<span style="color: #eedd82;">me_map</span>;                <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; the memory map of the data file */</span>
+        <span style="color: #98fb98;">MDB_txninfo</span>     *<span style="color: #eedd82;">me_txns</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; the memory map of the lock file or NULL */</span>
+        MDB_meta        *me_metas[NUM_METAS];   <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; pointers to the two meta pages */</span>
+        <span style="color: #98fb98;">void</span>            *<span style="color: #eedd82;">me_pbuf</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; scratch area for DUPSORT put() */</span>
+        <span style="color: #98fb98;">MDB_txn</span>         *<span style="color: #eedd82;">me_txn</span>;                <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; current write transaction */</span>
+        <span style="color: #98fb98;">MDB_txn</span>         *<span style="color: #eedd82;">me_txn0</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; prealloc'd write transaction */</span>
+        <span style="color: #98fb98;">mdb_size_t</span>      <span style="color: #eedd82;">me_mapsize</span>;             <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; size of the data memory map */</span>
+        <span style="color: #98fb98;">off_t</span>           <span style="color: #eedd82;">me_size</span>;                <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; current file size */</span>
+        <span style="color: #98fb98;">pgno_t</span>          <span style="color: #eedd82;">me_maxpg</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; me_mapsize / me_psize */</span>
+        <span style="color: #98fb98;">MDB_dbx</span>         *<span style="color: #eedd82;">me_dbxs</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; array of static DB info */</span>
+        <span style="color: #98fb98;">uint16_t</span>        *<span style="color: #eedd82;">me_dbflags</span>;    <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; array of flags from MDB_db.md_flags */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    *<span style="color: #eedd82;">me_dbiseqs</span>;    <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; array of dbi sequence numbers */</span>
+        <span style="color: #98fb98;">pthread_key_t</span>   <span style="color: #eedd82;">me_txkey</span>;       <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; thread-key for readers */</span>
+        <span style="color: #98fb98;">txnid_t</span>         <span style="color: #eedd82;">me_pgoldest</span>;    <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; ID of oldest reader last time we looked */</span>
+        <span style="color: #98fb98;">MDB_pgstate</span>     <span style="color: #eedd82;">me_pgstate</span>;             <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; state of old pages from freeDB */</span>
+<span style="color: #b0c4de;">#       define</span>          <span style="color: #eedd82;">me_pglast</span>       me_pgstate.mf_pglast
+<span style="color: #b0c4de;">#       define</span>          <span style="color: #eedd82;">me_pghead</span>       me_pgstate.mf_pghead
+        <span style="color: #98fb98;">MDB_page</span>        *<span style="color: #eedd82;">me_dpages</span>;             <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; list of malloc'd blocks for re-use */</span>
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">IDL of pages that became unused in a write txn */</span>
+        <span style="color: #98fb98;">MDB_IDL</span>         <span style="color: #eedd82;">me_free_pgs</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">ID2L of pages written during a write txn. Length MDB_IDL_UM_SIZE. */</span>
+        <span style="color: #98fb98;">MDB_ID2L</span>        <span style="color: #eedd82;">me_dirty_list</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Max number of freelist items that can fit in a single overflow page */</span>
+        <span style="color: #98fb98;">int</span>                     <span style="color: #eedd82;">me_maxfree_1pg</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Max size of a node on a page */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">me_nodemax</span>;
+<span style="color: #b0c4de;">#if</span> !(MDB_MAXKEYSIZE)
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">me_maxkey</span>;      <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; max size of a key */</span>
+<span style="color: #b0c4de;">#endif</span>
+        <span style="color: #98fb98;">int</span>             <span style="color: #eedd82;">me_live_reader</span>;         <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; have liveness lock in reader table */</span>
+<span style="color: #b0c4de;">#       define</span>          <span style="color: #eedd82;">me_rmutex</span>       me_txns-&gt;mti_rmutex <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; Shared reader lock */</span>
+<span style="color: #b0c4de;">#       define</span>          <span style="color: #eedd82;">me_wmutex</span>       me_txns-&gt;mti_wmutex <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; Shared writer lock */</span>
+        <span style="color: #98fb98;">void</span>            *<span style="color: #eedd82;">me_userctx</span>;     <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; User-settable context */</span>
+        <span style="color: #98fb98;">MDB_assert_func</span> *<span style="color: #eedd82;">me_assert_func</span>; <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; Callback for assertion failures */</span>
+};
+</pre>
 </div>
 
+<ul class="org-ul">
+<li><code>me_rmutext</code> ， <code>me_wmutex</code> : 锁表互斥所，lmdb可以支持多线程、多进程。多进程之间的同步访问通过系统级的互斥来达到。其mutex本身存在于系统的共享内存当中而非进程本身的内存，因此在进行读写页面时，首先访问锁表看看对应的资源是否有别的进程、线程在进行，有的话需要根据事务规则要求进行排队等待。
+</li>
+<li><code>me_txn</code>, <code>me_txns</code>: 目前环境中使用的事务列表，一个env对象归属于一个进程，一个进程可能有多个线程使用同一个env，每个线程可以开启一个事务，因此在一个进程级的env对象需要维护txn列表以了解目前多少个线程及事务在进行工作。
+</li>
+<li>me<sub>flags</sub>: 标志,标志控制的数据库的许多行为，每次使用env之前必须设置，应用程序应该用一致的方式使用flags，否则数据库可能会出现不可预知的错误。
+</li>
+<li>me<sub>dbxs</sub>: 数据库对象
+</li>
+</ul>
+
+
+<ol class="org-ol">
+<li><code>MDB_envinfo</code>
+</li>
+</ol>
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c++"><span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MDB_envinfo</span> {
+        <span style="color: #98fb98;">void</span>    *<span style="color: #eedd82;">me_mapaddr</span>;                    <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; Address of map, if fixed */</span>
+        <span style="color: #98fb98;">mdb_size_t</span>      <span style="color: #eedd82;">me_mapsize</span>;                             <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; Size of the data memory map */</span>
+        <span style="color: #98fb98;">mdb_size_t</span>      <span style="color: #eedd82;">me_last_pgno</span>;                   <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; ID of the last used page */</span>
+        <span style="color: #98fb98;">mdb_size_t</span>      <span style="color: #eedd82;">me_last_txnid</span>;                  <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; ID of the last committed transaction */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">me_maxreaders</span>;             <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; max reader slots in the environment */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">me_numreaders</span>;             <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; max reader slots used in the environment */</span>
+} <span style="color: #98fb98;">MDB_envinfo</span>;
+</pre>
 </div>
 
+<ol class="org-ol">
+<li><code>MDB_meta</code>
+</li>
+</ol>
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c++">        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Meta page content.</span>
+<span style="color: #ff7f24;">         *      A meta page is the start point for accessing a database snapshot.</span>
+<span style="color: #ff7f24;">         *      Pages 0-1 are meta pages. Transaction N writes meta page #(N % 2).</span>
+<span style="color: #ff7f24;">         */</span>
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MDB_meta</span> {
+                <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Stamp identifying this as an LMDB file. It must be set</span>
+<span style="color: #ff7f24;">                 *      to #MDB_MAGIC. */</span>
+        <span style="color: #98fb98;">uint32_t</span>        <span style="color: #eedd82;">mm_magic</span>;
+                <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Version number of this file. Must be set to #MDB_DATA_VERSION. */</span>
+        <span style="color: #98fb98;">uint32_t</span>        <span style="color: #eedd82;">mm_version</span>;
+        <span style="color: #98fb98;">void</span>            *<span style="color: #eedd82;">mm_address</span>;            <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; address for fixed mapping */</span>
+        <span style="color: #98fb98;">pgno_t</span>          <span style="color: #eedd82;">mm_mapsize</span>;                     <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; size of mmap region */</span>
+        <span style="color: #98fb98;">MDB_db</span>          <span style="color: #eedd82;">mm_dbs</span>[CORE_DBS];       <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; first is free space, 2nd is main db */</span>
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">The size of pages used in this DB */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">mm_psize</span>        mm_dbs[FREE_DBI].md_pad
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Any persistent environment flags. @ref mdb_env */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">mm_flags</span>        mm_dbs[FREE_DBI].md_flags
+        <span style="color: #98fb98;">pgno_t</span>          <span style="color: #eedd82;">mm_last_pg</span>;                     <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; last used page in file */</span>
+        <span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">txnid_t</span>        <span style="color: #eedd82;">mm_txnid</span>;       <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; txnid that committed this page */</span>
+} <span style="color: #98fb98;">MDB_meta</span>;
+</pre>
 </div>
 
+<ul class="org-ul">
+<li>meta页面循环使用，即id为1，修改页面1，id为2，修改页面0.
+</li>
+<li><code>mm_dbs[CORE_DBS]</code> 数据库B+Tree根，同时保存两个: <code>FREE_DBI</code> 和
+<code>MAIN_DBI</code>.
+</li>
+
+<li><code>MDB_page</code>
+</li>
+</ul>
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c++"><span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MDB_page</span> {
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">mp_pgno</span> mp_p.p_pgno
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">mp_next</span> mp_p.p_next
+        <span style="color: #00ffff;">union</span> {
+                <span style="color: #98fb98;">pgno_t</span>          <span style="color: #eedd82;">p_pgno</span>; <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; page number */</span>
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MDB_page</span> *<span style="color: #eedd82;">p_next</span>; <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; for in-memory list of freed pages */</span>
+        } <span style="color: #eedd82;">mp_p</span>;
+        <span style="color: #98fb98;">uint16_t</span>        <span style="color: #eedd82;">mp_pad</span>;
+        <span style="color: #98fb98;">uint16_t</span>        <span style="color: #eedd82;">mp_flags</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; @ref mdb_page */</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">mp_lower</span>        mp_pb.pb.pb_lower
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">mp_upper</span>        mp_pb.pb.pb_upper
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">mp_pages</span>        mp_pb.pb_pages
+        <span style="color: #00ffff;">union</span> {
+                <span style="color: #00ffff;">struct</span> {
+                        <span style="color: #98fb98;">indx_t</span>          <span style="color: #eedd82;">pb_lower</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; lower bound of free space */</span>
+                        <span style="color: #98fb98;">indx_t</span>          <span style="color: #eedd82;">pb_upper</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; upper bound of free space */</span>
+                } <span style="color: #eedd82;">pb</span>;
+                <span style="color: #98fb98;">uint32_t</span>        <span style="color: #eedd82;">pb_pages</span>;       <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; number of overflow pages */</span>
+        } <span style="color: #eedd82;">mp_pb</span>;
+        <span style="color: #98fb98;">indx_t</span>          <span style="color: #eedd82;">mp_ptrs</span>[1];             <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; dynamic size */</span>
+} <span style="color: #98fb98;">MDB_page</span>;
+</pre>
 </div>
-</div>
-</div>
+<ul class="org-ul">
+<li>page描述了不同页面的头。不管是树中的root、还是branch、leaf页面，都是用它描述。
+</li>
+<li>对于overflow页面来说，只有第一页使用头进行描述，其后的连续页面不使用，仅仅使用指针将页面关联起来.
+</li>
+<li><code>mp_flags</code>: 代表是什么类型的页面
+</li>
+<li><code>mp_pb</code>: overflow页数或者当前页的可用空间
+</li>
 
+<li><code>MDB_node</code>
+</li>
+</ul>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MDB_node</span> {
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">lo and hi are used for data size on leaf nodes and for</span>
+<span style="color: #ff7f24;">         * child pgno on branch nodes. On 64 bit platforms, flags</span>
+<span style="color: #ff7f24;">         * is also used for pgno. (Branch nodes have no flags).</span>
+<span style="color: #ff7f24;">         * They are in host byte order in case that lets some</span>
+<span style="color: #ff7f24;">         * accesses be optimized into a 32-bit word access.</span>
+<span style="color: #ff7f24;">         */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>  <span style="color: #eedd82;">mn_lo</span>, <span style="color: #eedd82;">mn_hi</span>;   <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; part of data size or pgno */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>  <span style="color: #eedd82;">mn_flags</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; @ref mdb_node */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>  <span style="color: #eedd82;">mn_ksize</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; key size */</span>
+        <span style="color: #98fb98;">char</span>            <span style="color: #eedd82;">mn_data</span>[1];                     <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; key and data are appended here */</span>
+} <span style="color: #98fb98;">MDB_node</span>;
+</pre>
+</div>
+<ul class="org-ul">
+<li>node代表key/value对的描述，是对branch、leaf页中的数据的描述
+</li>
+<li><code>mn_flags</code>: 标志：是否重复、子数据库、overflow等
+</li>
+<li><code>mn_hi.lo</code>: 数据大小或者页码
+</li>
+<li><code>mn_data</code>: 数据指针
+</li>
+
+<li><code>MDB_db</code>
+</li>
+</ul>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Information about a single database in the environment. */</span>
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MDB_db</span> {
+        <span style="color: #98fb98;">uint32_t</span>        <span style="color: #eedd82;">md_pad</span>;         <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; also ksize for LEAF2 pages */</span>
+        <span style="color: #98fb98;">uint16_t</span>        <span style="color: #eedd82;">md_flags</span>;       <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; @ref mdb_dbi_open */</span>
+        <span style="color: #98fb98;">uint16_t</span>        <span style="color: #eedd82;">md_depth</span>;       <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; depth of this tree */</span>
+        <span style="color: #98fb98;">pgno_t</span>          <span style="color: #eedd82;">md_branch_pages</span>;        <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; number of internal pages */</span>
+        <span style="color: #98fb98;">pgno_t</span>          <span style="color: #eedd82;">md_leaf_pages</span>;          <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; number of leaf pages */</span>
+        <span style="color: #98fb98;">pgno_t</span>          <span style="color: #eedd82;">md_overflow_pages</span>;      <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; number of overflow pages */</span>
+        <span style="color: #98fb98;">mdb_size_t</span>      <span style="color: #eedd82;">md_entries</span>;             <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; number of data items */</span>
+        <span style="color: #98fb98;">pgno_t</span>          <span style="color: #eedd82;">md_root</span>;                <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; the root page of this tree */</span>
+} <span style="color: #98fb98;">MDB_db</span>;
+</pre>
+</div>
+<ul class="org-ul">
+<li>mdb<sub>db描述了一颗单独的b</sub>+tree树，主要包含了一些相关的信息和根节点页码
+</li>
+
+<li><code>MDB_txn</code>
+</li>
+</ul>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MDB_txn</span> {
+        <span style="color: #98fb98;">MDB_txn</span>         *<span style="color: #eedd82;">mt_parent</span>;             <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; parent of a nested txn */</span>
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Nested txn under this txn, set together with flag #MDB_TXN_HAS_CHILD */</span>
+        <span style="color: #98fb98;">MDB_txn</span>         *<span style="color: #eedd82;">mt_child</span>;
+        <span style="color: #98fb98;">pgno_t</span>          <span style="color: #eedd82;">mt_next_pgno</span>;   <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; next unallocated page */</span>
+        <span style="color: #98fb98;">txnid_t</span>         <span style="color: #eedd82;">mt_txnid</span>;
+        <span style="color: #98fb98;">MDB_env</span>         *<span style="color: #eedd82;">mt_env</span>;                <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; the DB environment */</span>
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">The list of pages that became unused during this transaction.</span>
+<span style="color: #ff7f24;">         */</span>
+        <span style="color: #98fb98;">MDB_IDL</span>         <span style="color: #eedd82;">mt_free_pgs</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">The list of loose pages that became unused and may be reused</span>
+<span style="color: #ff7f24;">         *      in this transaction, linked through #NEXT_LOOSE_PAGE(page).</span>
+<span style="color: #ff7f24;">         */</span>
+        <span style="color: #98fb98;">MDB_page</span>        *<span style="color: #eedd82;">mt_loose_pgs</span>;
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">#Number of loose pages (#mt_loose_pgs) */</span>
+        <span style="color: #98fb98;">int</span>                     <span style="color: #eedd82;">mt_loose_count</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">The sorted list of dirty pages we temporarily wrote to disk</span>
+<span style="color: #ff7f24;">         *      because the dirty list was full. page numbers in here are</span>
+<span style="color: #ff7f24;">         *      shifted left by 1, deleted slots have the LSB set.</span>
+<span style="color: #ff7f24;">         */</span>
+        <span style="color: #98fb98;">MDB_IDL</span>         <span style="color: #eedd82;">mt_spill_pgs</span>;
+        <span style="color: #00ffff;">union</span> {
+                <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">For write txns: Modified pages. Sorted when not MDB_WRITEMAP. */</span>
+                <span style="color: #98fb98;">MDB_ID2L</span>        <span style="color: #eedd82;">dirty_list</span>;
+                <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">For read txns: This thread/txn's reader table slot, or NULL. */</span>
+                <span style="color: #98fb98;">MDB_reader</span>      *<span style="color: #eedd82;">reader</span>;
+        } <span style="color: #eedd82;">mt_u</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Array of records for each DB known in the environment. */</span>
+        <span style="color: #98fb98;">MDB_dbx</span>         *<span style="color: #eedd82;">mt_dbxs</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Array of MDB_db records for each known DB */</span>
+        <span style="color: #98fb98;">MDB_db</span>          *<span style="color: #eedd82;">mt_dbs</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Array of sequence numbers for each DB handle */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    *<span style="color: #eedd82;">mt_dbiseqs</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">In write txns, array of cursors for each DB */</span>
+        <span style="color: #98fb98;">MDB_cursor</span>      **<span style="color: #eedd82;">mt_cursors</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Array of flags for each DB */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>   *<span style="color: #eedd82;">mt_dbflags</span>;
+        <span style="color: #ff7f24;">/**     </span><span style="color: #ff7f24;">Number of DB records in use, or 0 when the txn is finished.</span>
+<span style="color: #ff7f24;">         *      This number only ever increments until the txn finishes; we</span>
+<span style="color: #ff7f24;">         *      don't decrement it when individual DB handles are closed.</span>
+<span style="color: #ff7f24;">         */</span>
+        <span style="color: #98fb98;">MDB_dbi</span>         <span style="color: #eedd82;">mt_numdbs</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">mt_flags</span>;               <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; @ref mdb_txn */</span>
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">#dirty_list room: Array size - \#dirty pages visible to this txn.</span>
+<span style="color: #ff7f24;">         *      Includes ancestor txns' dirty pages not hidden by other txns'</span>
+<span style="color: #ff7f24;">         *      dirty/spilled pages. Thus commit(nested txn) has room to merge</span>
+<span style="color: #ff7f24;">         *      dirty_list into mt_parent after freeing hidden mt_parent pages.</span>
+<span style="color: #ff7f24;">         */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">mt_dirty_room</span>;
+};
+</pre>
+</div>
+<ul class="org-ul">
+<li><code>mdb_txn</code> 描述了数据库的事务结构,mdb中的事务支持嵌套事务。支持完全ACID
+属性，但是只支持serializable事务隔离级别,通过同一个env对应的数据库只允许一个事务写来控制。
+</li>
+<li><code>mt_child,parent</code> ：事务嵌套父子关系
+</li>
+<li><code>mt_cursor</code> : 写事务中每个数据库中已经打开的游标。
+</li>
+
+<li><code>MDB_cursor</code>
+</li>
+</ul>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MDB_cursor</span> {
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Next cursor on this DB in this txn */</span>
+        <span style="color: #98fb98;">MDB_cursor</span>      *<span style="color: #eedd82;">mc_next</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Backup of the original cursor if this cursor is a shadow */</span>
+        <span style="color: #98fb98;">MDB_cursor</span>      *<span style="color: #eedd82;">mc_backup</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">Context used for databases with #MDB_DUPSORT, otherwise NULL */</span>
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">MDB_xcursor</span>      *<span style="color: #eedd82;">mc_xcursor</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">The transaction that owns this cursor */</span>
+        <span style="color: #98fb98;">MDB_txn</span>         *<span style="color: #eedd82;">mc_txn</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">The database handle this cursor operates on */</span>
+        <span style="color: #98fb98;">MDB_dbi</span>         <span style="color: #eedd82;">mc_dbi</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">The database record for this cursor */</span>
+        <span style="color: #98fb98;">MDB_db</span>          *<span style="color: #eedd82;">mc_db</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">The database auxiliary record for this cursor */</span>
+        <span style="color: #98fb98;">MDB_dbx</span>         *<span style="color: #eedd82;">mc_dbx</span>;
+        <span style="color: #ff7f24;">/** </span><span style="color: #ff7f24;">The @ref mt_dbflag for this database */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>   *<span style="color: #eedd82;">mc_dbflag</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>  <span style="color: #eedd82;">mc_snum</span>;        <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; number of pushed pages */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>  <span style="color: #eedd82;">mc_top</span>;         <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; index of top page, normally mc_snum-1 */</span>
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">mc_flags</span>;       <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; @ref mdb_cursor */</span>
+        MDB_page        *mc_pg[CURSOR_STACK];   <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; stack of pushed pages */</span>
+        <span style="color: #98fb98;">indx_t</span>          <span style="color: #eedd82;">mc_ki</span>[CURSOR_STACK];    <span style="color: #ff7f24;">/**</span><span style="color: #ff7f24;">&lt; stack of page indices */</span>
+};
+</pre>
+</div>
+<ul class="org-ul">
+<li>游标对象是进行所有数据库操作的对象，读写都是基于游标进行。进行读写操作时，首先需要根据条件确定页面位置，从而获得一个游标，应用程序根据游标对象操作数据库。
+</li>
+<li><code>mc_next</code>: 同一个事务中关于同一个db的游标组成一个列表。next指向下一个游标
+</li>
+<li><code>mc_top</code>: 最上层页面id
+</li>
+<li><code>mc_xcursor</code>: 用于key可重复b+tree。
+</li>
+<li><code>mc_pg</code>: cursor打开的页面组成一个堆栈
+</li>
+<li><code>mc_ki</code>:  打开页面的索引的堆栈
+</li>
+</ul>
+</div>
+</div>
 
 <div id="outline-container-sec-9" class="outline-2">
 <h2 id="sec-9">xx</h2>
@@ -238,7 +549,7 @@ system's buffer cache.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-04-20 Wed 23:56</p>
+<p class="date">Created: 2016-04-23 Sat 20:57</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
