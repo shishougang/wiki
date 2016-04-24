@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Symas Lightning Memory-Mapped Database (LMDB) Notes</title>
-<!-- 2016-04-23 Sat 20:57 -->
+<!-- 2016-04-24 Sun 23:18 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -68,7 +68,13 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-1">Overview</a></li>
 <li><a href="#sec-2">LMDB基本架构</a></li>
-<li><a href="#sec-3">Memory Map原理</a></li>
+<li><a href="#sec-3">使用Memory Map</a>
+<ul>
+<li><a href="#sec-3-1">Memory Map原理</a></li>
+<li><a href="#sec-3-2">Linux下mmap的实现过程与普通文件io操作</a></li>
+<li><a href="#sec-3-3">lmdb使用mmap过程</a></li>
+</ul>
+</li>
 <li><a href="#sec-4">B-tree/B+tree/B*tree</a></li>
 <li><a href="#sec-5">COW and MVCC</a></li>
 <li><a href="#sec-6">事务控制</a></li>
@@ -150,7 +156,81 @@ lmdb把整个虚拟存储组织成B+Tree存储,索引和值读存储在B+Tree的
 </div>
 
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">Memory Map原理</h2>
+<h2 id="sec-3">使用Memory Map</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">Memory Map原理</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+内存映射就是把物理内存映射到进程的地址空间之内，这些应用程序就可以直接使用输入输出的地址空间.由此可以看出，使用内存映射文件处理存储于磁盘上的文件时，将不需要由应用程序对文件执行I/O操作，这意味着在对文件进行处理时将不必再为文件申请并分配缓存，所有的文件缓存操作均由系统直接管理，由于取消了将文件数据加载到内存、数据从内存到文件的回写以及释放内存块等步骤，使得内存映射文件在处理大数据量的文件时能起到相当重要的作用。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">Linux下mmap的实现过程与普通文件io操作</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+mmap映射原理与过程<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>:
+<img src="./Files/mmap-linux.gif" alt="mmap-linux.gif" />
+</p>
+
+<p>
+一般文件io操作方式:
+<img src="./Files/normal-file-io.gif" alt="normal-file-io.gif" />
+</p>
+
+<p>
+通过内存映射的方法访问硬盘上的文件，效率要比read和write系统调用高，
+read()是系统调用，其中进行了数据拷贝，它首先将文件内容从硬盘拷贝到内核空间的一个缓冲区，然后再将这些数据拷贝到用户空间，在这个过程中，实际上完成了 <b>两次数据拷贝</b> ；而mmap()也是系统调用，如前所述，mmap()中没有进行数据拷贝，真正的数据拷贝是在缺页中断处理时进行的，由于mmap()将文件直接映射到用户空间，所以中断处理函数根据这个映射关系，直接将文件从硬盘拷贝到用户空间，只进行了 <b>一次数据拷贝</b> 。因此，内存映射的效率要比
+read/write效率高。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">lmdb使用mmap过程</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+lmdb创建完env对象,打开时,会做data file和lock file的mmap映射:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++">env-&gt;me_lfd = open(lpath, O_RDWR|O_CREAT|MDB_CLOEXEC, mode);
+<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">m</span> = mmap(<span style="color: #7fffd4;">NULL</span>, rsize, PROT_READ|PROT_WRITE, MAP_SHARED,
+                        env-&gt;me_lfd, 0);
+env-&gt;me_txns = m;
+
+env-&gt;me_fd = open(dpath, oflags, mode);
+
+env-&gt;me_map = mmap(addr, env-&gt;me_mapsize, prot, MAP_SHARED,
+                env-&gt;me_fd, 0);
+</pre>
+</div>
+
+<p>
+其他时刻都直接使用内存指针，通过系统级别的缺页异常获取对应的数据。页面内数据的获取和使用 <code>MDB_CURSOR_GET</code> 进行。页面的获取和key查询通过
+<code>mdb_page_get/mdb_page_search</code> 完成.
+</p>
+
+<p>
+页面头部大小及内容是固定的，具体的含义代表根据flags决定，在头部之后紧接的是node，真正的key-value值对所在位置的索引，因此访问这些node时通过指针计算即可得到对应的位置。
+</p>
+
+<p>
+lmdb 之后是如何将页面给映射进进程地址空间呢.lmdb通过 <code>mdb_page_get</code> 函数以 pgno 为主要参数获得页面并返回页面指针。若仅仅是只读事务且环境对象是以只读方式打开的，page的获取很简单，根据 <code>page= (MDB_page
+*)(env-&gt;me_map + env-&gt;me_psize * pgno);</code> 获得。
+</p>
+
+<p>
+在lmdb中B+Tree的是基于append-only B+Tree改造的。对于数据增加、修改、删除导致页面增加时，pageno也增加，当旧页面(数据旧版本）被重用时，pageno
+保持不变，因此pageno保持了在数据文件中的顺序性，从而在获取页面时，只需要进行简单计算即可以。同时在创建env对象时，数据库已经被整个映射进整个进程空间，因此系统在映射时，会给数据库文件保留全部地址空间，从而在根据上述算法获取真实数据库，系统触发缺页错误，进而从数据文件中获取整个页面内容。此为最简单有效方式，否则不将全部数据映射进地址空间，对于未映射部分还需要在访问页面时判断是否已经被映射，未被映射时进行映射。
+</p>
+
+<p>
+在需要时在通过文件方式写入。lmdb保证任意时刻只有一个写操作在进行，从而避免了并发时数据被破坏。
+</p>
+</div>
+</div>
 </div>
 
 <div id="outline-container-sec-4" class="outline-2">
@@ -169,9 +249,11 @@ lmdb把整个虚拟存储组织成B+Tree存储,索引和值读存储在B+Tree的
 </p>
 </div>
 </div>
+
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">COW and MVCC</h2>
 </div>
+
 
 <div id="outline-container-sec-6" class="outline-2">
 <h2 id="sec-6">事务控制</h2>
@@ -531,25 +613,24 @@ lmdb把整个虚拟存储组织成B+Tree存储,索引和值读存储在B+Tree的
 <div class="outline-text-2" id="text-10">
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
-</div>
-
-<div class="org-src-container">
-
 <pre class="src src-c++"></pre>
 </div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://blog.csdn.net/joejames/article/details/37958017">http://blog.csdn.net/joejames/article/details/37958017</a>
+</p></div>
 
 
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
 </div>
-</div>
-</div>
-</div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-04-23 Sat 20:57</p>
+<p class="date">Created: 2016-04-24 Sun 23:18</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
