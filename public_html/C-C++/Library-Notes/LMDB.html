@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Symas Lightning Memory-Mapped Database (LMDB) Notes</title>
-<!-- 2016-04-24 Sun 23:18 -->
+<!-- 2016-04-25 Mon 23:35 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -75,7 +75,15 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3-3">lmdb使用mmap过程</a></li>
 </ul>
 </li>
-<li><a href="#sec-4">B-tree/B+tree/B*tree</a></li>
+<li><a href="#sec-4">B-tree/B+tree/B*tree</a>
+<ul>
+<li><a href="#sec-4-1">B-tree</a></li>
+<li><a href="#sec-4-2">B+tree</a></li>
+<li><a href="#sec-4-3">B*tree</a></li>
+<li><a href="#sec-4-4">More</a></li>
+<li><a href="#sec-4-5">lmdb中的使用</a></li>
+</ul>
+</li>
 <li><a href="#sec-5">COW and MVCC</a></li>
 <li><a href="#sec-6">事务控制</a></li>
 <li><a href="#sec-7">核心代码流程</a></li>
@@ -236,17 +244,122 @@ lmdb 之后是如何将页面给映射进进程地址空间呢.lmdb通过 <code>
 <div id="outline-container-sec-4" class="outline-2">
 <h2 id="sec-4">B-tree/B+tree/B*tree</h2>
 <div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">B-tree</h3>
+<div class="outline-text-3" id="text-4-1">
 <p>
-<a href="https://en.wikipedia.org/wiki/B-tree">https://en.wikipedia.org/wiki/B-tree</a>
+B-tree又叫平衡多路查找树。一棵m阶的B-tree (m叉树)的特性如下：<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup>
+</p>
+<ol class="org-ol">
+<li>树中每个结点至多有m个孩子；
+</li>
+<li>除根结点和叶子结点外，其它每个结点至少有有ceil(m / 2)个孩子；
+</li>
+<li>若根结点不是叶子结点，则至少有2个孩子（特殊情况：没有孩子的根结点，即根结点为叶子结点，整棵树只有一个根节点）；
+</li>
+<li>所有叶子结点都出现在同一层，叶子结点不包含任何关键字信息(可以看做是外部结点或查询失败的结点，实际上这些结点不存在，指向这些结点的指针都为null)；
+</li>
+<li>每个非终端结点中包含有n个关键字信息： (n，P0，K1，P1，K2，
+P2，&#x2026;&#x2026;，Kn，Pn)。其中：
+<ul class="org-ul">
+<li>Ki (i=1&#x2026;n)为关键字，且关键字按顺序排序K(i-1)&lt; Ki。
+</li>
+<li>Pi为指向子树根的接点，且指针P(i-1)指向子树种所有结点的关键字均小于Ki，但都大于K(i-1)。
+</li>
+<li>关键字的个数n必须满足： ceil(m / 2)-1 &lt;= n &lt;= m-1。
+</li>
+</ul>
+</li>
+</ol>
+
+
+<div class="figure">
+<p><img src="./Files/b-tree.gif" alt="b-tree.gif" />
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">B+tree</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+B+-tree：是应文件系统所需而产生的一种B-tree的变形树。一棵m阶的B+-tree和m阶的B-tree的差异在于：       
+</p>
+<ol class="org-ol">
+<li>有n棵子树的结点中含有n个关键字； (B-tree是n棵子树有n-1个关键字)
+</li>
+<li>所有的叶子结点中包含了全部关键字的信息，及指向含有这些关键字记录的指针，且叶子结点本身依关键字的大小自小而大的顺序链接。 (B-tree的叶子节点并没有包括全部需要查找的信息)
+</li>
+<li>所有的非终端结点可以看成是索引部分，结点中仅含有其子树根结点中最大（或最小）关键字。 (B-tree的非终节点也包含需要查找的有效信息)
+</li>
+</ol>
+
+
+<div class="figure">
+<p><img src="./Files/b+tree.gif" alt="b+tree.gif" />
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3">B*tree</h3>
+<div class="outline-text-3" id="text-4-3">
+<p>
+B*-tree是B+-tree的变体，在B+-tree的非根和非叶子结点再增加指向兄弟的指针；B*-tree定义了非叶子结点关键字个数至少为(2/3)*M，即块的最低使用率为
+2/3（代替B+树的1/2）。如下图所示
 </p>
 
-<p>
-<a href="https://en.wikipedia.org/wiki/B+_tree">https://en.wikipedia.org/wiki/B+_tree</a>
-</p>
 
-<p>
-<a href="https://www.cs.usfca.edu/~galles/visualization/BTree.html">https://www.cs.usfca.edu/~galles/visualization/BTree.html</a>
+<div class="figure">
+<p><img src="./Files/b*tree.gif" alt="b*tree.gif" />
 </p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4">More</h3>
+<div class="outline-text-3" id="text-4-4">
+<ul class="org-ul">
+<li><a href="http://cis.stvincent.edu/html/tutorials/swd/btree/btree.html">Software Design Using C++(include source codes</a>
+</li>
+<li><a href="https://www.cs.usfca.edu/~galles/visualization/BTree.html">B-Trees动画</a>
+</li>
+<li><a href="https://en.wikipedia.org/wiki/B-tree">B-tree wiki</a>
+</li>
+<li><a href="https://en.wikipedia.org/wiki/B+_tree">B+ tree wiki</a>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-4-5" class="outline-3">
+<h3 id="sec-4-5">lmdb中的使用</h3>
+<div class="outline-text-3" id="text-4-5">
+<p>
+lmdb代码主要分为page管理和cursor操作两块实现b-tree结构.
+</p>
+</div>
+<ul class="org-ul"><li><a id="sec-4-5-1" name="sec-4-5-1"></a>page管理<br  /><div class="outline-text-4" id="text-4-5-1">
+<ul class="org-ul">
+<li><code>mdb_page_malloc</code>: 为新页面分配内存,从操作系统中申请1个或者n个页面，一般为一个页面，n个页面为overflow页面
+</li>
+<li><code>mdb_page_alloc</code>: 分配页面分配一个或n个页面，若分配n个，则n个页面是连续页面。若事务中可用脏空间没有了，则分配失败，可用脏空间是指存储脏页ID的数组大小. LMDB中所有可用的脏页同样被维护成一颗B-Tree， <code>FREE_DBI</code> 中记录了最后一次放入页面的事务ID，每次分配时都从freedb中寻找足够大重用空间，一般分配一个页面能满足，连续页面，可能需要尝试多次，因此多个页面一般是overflow 页面，必须是连续页面才能满足要求。
+</li>
+<li><code>mdb_page_new</code>: 新建页面首先调用 <code>mdb_page_alloc</code> 分配页面，然后初始化页面，新建一个页面时，认为这个页面是一个全新的页面，因此需要其整个空间可用，初始化设置将体现这点。
+</li>
+<li><code>mdb_page_free</code>: 释放单个页面,将它放入可重用页面列表。
+</li>
+<li><code>mdb_page_copy</code>: 复制页面将页面内容从一个页面复制到另外一个页面，此功能主要用于COW.
+</li>
+</ul>
+</div>
+</li>
+
+
+
+
+
+<li><a id="sec-4-5-2" name="sec-4-5-2"></a>cursor操作<br  /></li></ul>
 </div>
 </div>
 
@@ -625,12 +738,16 @@ lmdb 之后是如何将页面给映射进进程地址空间呢.lmdb通过 <code>
 <a href="http://blog.csdn.net/joejames/article/details/37958017">http://blog.csdn.net/joejames/article/details/37958017</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="http://blog.csdn.net/hbhhww/article/details/8206846">http://blog.csdn.net/hbhhww/article/details/8206846</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-04-24 Sun 23:18</p>
+<p class="date">Created: 2016-04-25 Mon 23:35</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

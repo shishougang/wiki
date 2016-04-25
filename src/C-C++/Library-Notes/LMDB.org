@@ -107,14 +107,70 @@ lmdb 之后是如何将页面给映射进进程地址空间呢.lmdb通过 =mdb_p
 避免了并发时数据被破坏。
 
 * B-tree/B+tree/B*tree
+** B-tree
+B-tree又叫平衡多路查找树。一棵m阶的B-tree (m叉树)的特性如下：[fn:2]
+1) 树中每个结点至多有m个孩子；
+2)  除根结点和叶子结点外，其它每个结点至少有有ceil(m / 2)个孩子；
+3)  若根结点不是叶子结点，则至少有2个孩子（特殊情况：没有孩子的根结点，
+    即根结点为叶子结点，整棵树只有一个根节点）；
+4)  所有叶子结点都出现在同一层，叶子结点不包含任何关键字信息(可以看做
+    是外部结点或查询失败的结点，实际上这些结点不存在，指向这些结点的指
+    针都为null)；
+5)  每个非终端结点中包含有n个关键字信息： (n，P0，K1，P1，K2，
+    P2，......，Kn，Pn)。其中：
+    + Ki (i=1...n)为关键字，且关键字按顺序排序K(i-1)< Ki。
+    + Pi为指向子树根的接点，且指针P(i-1)指向子树种所有结点的关键字均小
+      于Ki，但都大于K(i-1)。
+    + 关键字的个数n必须满足： ceil(m / 2)-1 <= n <= m-1。
+
+[[./Files/b-tree.gif]]
+** B+tree
+B+-tree：是应文件系统所需而产生的一种B-tree的变形树。一棵m阶的B+-tree和m阶的B-tree的差异在于：       
+1. 有n棵子树的结点中含有n个关键字； (B-tree是n棵子树有n-1个关键字)
+2. 所有的叶子结点中包含了全部关键字的信息，及指向含有这些关键字记录的
+   指针，且叶子结点本身依关键字的大小自小而大的顺序链接。 (B-tree的叶
+   子节点并没有包括全部需要查找的信息)
+3. 所有的非终端结点可以看成是索引部分，结点中仅含有其子树根结点中最大
+   （或最小）关键字。 (B-tree的非终节点也包含需要查找的有效信息)
+
+[[./Files/b+tree.gif]]
+** B*tree
+B*-tree是B+-tree的变体，在B+-tree的非根和非叶子结点再增加指向兄弟的指
+针；B*-tree定义了非叶子结点关键字个数至少为(2/3)*M，即块的最低使用率为
+2/3（代替B+树的1/2）。如下图所示
+
+[[./Files/b*tree.gif]]
+
+** More
++ [[http://cis.stvincent.edu/html/tutorials/swd/btree/btree.html][Software Design Using C++(include source codes]]
++ [[https://www.cs.usfca.edu/~galles/visualization/BTree.html][B-Trees动画]]
++ [[https://en.wikipedia.org/wiki/B-tree][B-tree wiki]]
++ [[https://en.wikipedia.org/wiki/B%2B_tree][B+ tree wiki]]
+** lmdb中的使用
+lmdb代码主要分为page管理和cursor操作两块实现b-tree结构.
+*** page管理
++ =mdb_page_malloc=: 为新页面分配内存,从操作系统中申请1个或者n个页面，
+  一般为一个页面，n个页面为overflow页面
++ =mdb_page_alloc=: 分配页面
+  分配一个或n个页面，若分配n个，则n个页面是连续页面。若事务中可用脏空
+  间没有了，则分配失败，可用脏空间是指存储脏页ID的数组大小. LMDB中所有
+  可用的脏页同样被维护成一颗B-Tree， =FREE_DBI= 中记录了最后一次放入页面的事
+  务ID，每次分配时都从freedb中寻找足够大重用空间，一般分配一个页面能满
+  足，连续页面，可能需要尝试多次，因此多个页面一般是overflow 页面，必
+  须是连续页面才能满足要求。
++ =mdb_page_new=: 新建页面
+  首先调用 =mdb_page_alloc= 分配页面，然后初始化页面，新建一个页面
+  时，认为这个页面是一个全新的页面，因此需要其整个空间可用，初始化设置
+  将体现这点。
++ =mdb_page_free=: 释放单个页面,将它放入可重用页面列表。
++ =mdb_page_copy=: 复制页面
+  将页面内容从一个页面复制到另外一个页面，此功能主要用于COW.
 
 
 
-https://en.wikipedia.org/wiki/B-tree
 
-https://en.wikipedia.org/wiki/B%2B_tree
 
-https://www.cs.usfca.edu/~galles/visualization/BTree.html
+*** cursor操作
 
 * COW and MVCC
 
@@ -411,5 +467,7 @@ http://gridmix.blog.51cto.com/4764051/1693699
 * Footnotes
 
 [fn:1] http://blog.csdn.net/joejames/article/details/37958017
+
+[fn:2] http://blog.csdn.net/hbhhww/article/details/8206846
 
 
