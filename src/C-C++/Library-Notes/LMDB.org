@@ -6,6 +6,7 @@
 * Overview
 + homepage: http://symas.com/mdb/
 + https://github.com/LMDB/lmdb
++ source codes doc: http://symas.com/mdb/doc/starting.html
 + official repo on openldap.org:
   http://www.openldap.org/software/repo.html
 
@@ -148,7 +149,7 @@ B*-tree是B+-tree的变体，在B+-tree的非根和非叶子结点再增加指�
 + [[https://en.wikipedia.org/wiki/B%2B_tree][B+ tree wiki]]
 ** lmdb中的使用
 lmdb代码主要分为page管理和cursor操作两块实现b-tree结构.
-*** page管理
+*** page管理[fn:3]
 + =mdb_page_malloc=: 为新页面分配内存,从操作系统中申请1个或者n个页面，
   一般为一个页面，n个页面为overflow页面
 + =mdb_page_alloc=: 分配页面
@@ -165,15 +166,123 @@ lmdb代码主要分为page管理和cursor操作两块实现b-tree结构.
 + =mdb_page_free=: 释放单个页面,将它放入可重用页面列表。
 + =mdb_page_copy=: 复制页面
   将页面内容从一个页面复制到另外一个页面，此功能主要用于COW.
-
-
-
-
++ =mdb_page_split=: 页面分裂
+  实现了B-Tree的操作过程，考虑了仅有一个节点时、append模式、
+  braches/leaf/leaf2等不同页面的处理过程，基本流程就是根据一定的算法确
+  定分裂点，根据B-Tree的定义，在分裂时，不一定需要保证平分，只需要保证
+  页面节点保持半满即可。分裂点确定之后，就进行数据的移动并插入导致分裂
+  的数据以及修改指针以维持B-Tree结构，同时再决定是否会导致上层分裂以及
+  root分裂，若会则进行递归处理。
++ =mdb_page_merge=: 页面合并
+  同样是实现了上述因为节点删除导致的merge过程。基本过程是，将合并的目
+  标页面置为脏页，然后根据上述理论情况进行节点的一个个复制，或者对于内
+  部节点而言进行页面指针调整以及进行上下节点的移动，对于本页完成之后进
+  行平衡操作，其中平衡操作可能会又导致merge操作，直到B-Tree重新满足定
+  义为止。
++ =mdb_page_spill=: 将脏页写回磁盘，
+  这是为了嵌套长事务进行的设计，有些嵌套长事务会使用大
+  量的页，为了避免耗光内存，可以将脏页写回磁盘，写回磁盘如同commit一样，
+  因为多个进程、线程之间将只会存在一个写事务，因此在未提交之间前写回磁
+  盘没有任何问题。而且只要能有空间，页面就不会刷入磁盘。在执行时，先计
+  算是否空间足够，不够的将id存入idl数组，然后刷入磁盘，再根据环境变量
+  决定是否保留p_dirty标记。
++ =mdb_page_unspill=: 将spill的页面重新读回,
+  这就不需要进行touch，直接设置dirty标志就可以了。lmdb支持嵌套事务，因
+  此在查找页面是否属于已经被spilled的页面需要查找整个嵌套路径，从叶子
+  到跟,找到之后确认midl列表（脏空间）是否有足够空间，没有的提示事务空
+  间已满，否则加载页面并设置脏页标记。
++ =mdb_page_dirty=: 设置脏页标记，并将脏页加入到事务中的脏页列表当中。
++ =mdb_page_flush=: 用在事务提交时，当清除页面脏页标记后，将数据更新到
+  磁盘(通过写文件方式).
++ =mdb_page_touch=: 实现COW的技术，复制一个页面，并将更新过B-Tree指针
+  关系的页面插入到B-Tree当中，这样意味着在修改时是在复制的页面上进行修
+  改，别的事务在本事务没有提交之前看到还是以前的数据，提交之后的新事物
+  看到的才是修改之后的数据。
++ =mdb_page_search_root=: 从B-Tree根节点检索，根据key的值，从根节点开
+  始遍历子树获取每一层对应的page，在page之内检索key，再根据B-Tree查找
+  方法确定下一层子节点的page，层层遍历，从而最终确定key的位置或者判断
+  B-Tree中没有对应的key。同时将页面存放到cursor页堆栈中。这样cursor将
+  可以重用对应的页面，为后续进行更新等操作提供便利。
++ =mdb_page_search/mdb_page_search_lowest= 都将调用
+  =mdb_page_search_root= 以完成检索
+  + =mdb_page_search= ,除了完成检索为的附加工作是确保所使用的B-Tree在本事
+    务可见范围内是最新版本，同时在需要时将页面置为脏页。
+  + =mdb_page_search_lowest=: 从当前分支页开始，检索第一个符合条件的值。
++ =mdb_page_get= 获取页面，本来根据MMAP原则，读取对应的页面非常简单，
+  计算下地址即可，但lmdb中，考虑到事务可能使用大量的页面，事务可用空间
+  满时，将一部分页面spill/flush到磁盘中，因此需要在get时判断是否在
+  spill列表中，在的话从中获取，否则直接计算获取。
++ =mdb_page_list= 显示页面中的所有key，是个工具方法。 
 
 *** cursor操作
+ cursor操作实现了B-Tree节点操作，cursor指向当前需要进行操作的B-Tree节
+ 点，然后依据提供的操作方式（insert、del）进行数据操作，然后进行一系列
+ 复杂的操作流程以维持B-Tree结构。
++ 游标遍历(
+  =mdb_cursor_sibling,mdb_cursor_next,mdb_cursor_prev,mdb_cursor_first
+  ,mdb_cursor_last= )
+  + =mdb_cursor_first=: 将游标定位至B-Tree的最小叶子节点（第一个），而
+    非根据key查询时得到第一个结果位置。若支持重复数据，还要特殊处理，
+    移动到重复数据第一个。
+  + =mdb_cursor_last=:与first类似，只不过定位至最大叶子节点（最后一个）
+  + =mdb_cursor_next=: 游标移动至下一个节点
+  + =mdb_cursor_prev=: 游标移动至前一个节点
+  + =mdb_cursor_sibling=: 将游标移动至兄弟节点，可以是前一个页面或者下
+    一个页面。若当前页有key，则行为与next、prev类似，否则移动到下一个
+    页面的对应key位置。
++ 增删改查( =mdb_cursor_get ,mdb_cursor_set ,mdb_cursor_del
+  ,mdb_cursor_del0 ，mdb_cursor_put ,mdb_cursor_count= )
+  + =mdb_cursor_get= ：根据游标位置和条件获取值，最常用：MDB_GET_CURRENT，
+    获取游标所指节点的值，基本思路是看页面中索引是否已经大于key个数，
+    大于则说明游标已经需要指向下一页，对于取当前值的不重复key来说，这
+    不可能，因此获取失败。
+  + =mdb_cursor_set= ：将游标设置（定位）到指定key位置，假如已经在正确页
+    面，只需要判断key是否在页面key的范围之内，判断最大、最小值可以确定。
+    然后根据相应标志，如同get中所说，进行判断以及读取或设置某些变量。
+    否则话进行页面查找先定位key所在页面（ =mdb_page_search= ),然后定位页面
+    中位置(=mdb_node_search=),然后再设置相关变量。
+  + =mdb_cursor_count= ：返回游标代表的结果数，唯一key返回一，重复key
+    返回重复个数。
+  + =mdb_cursor_put= :将key、value对存放到数据库中，默认是新增加，若key已
+    经存在则是更新，基本流程是：判断前提cursor、key非空，确认各种标志
+    是否合法，比如多个value，但是数据库不支持重复key这种情形就不合法，
+    标志合适之后，判断是否为空树，非空时将cursor指向正确的位置，比如
+    append模式指向数据库最大节点之后，正常指向应该插入的位置。然后
+    touch所有页面使所有页面可写。若为leaf2类型页面，说明key、value完全
+    重复，增加key就OK了，然后再判断value值是否太大，太大则转换为子树进
+    行存储。转化为subdb/subpage时，首先根据各种标志设置各种变量，包括
+    申请新页等，然后其余的就是根据各种标志完成上述理论描述的节点插入动
+    作，将值放置对应位置、进行分页等，需要时进行unspill，放置到
+    overflow页面等，若一次插入多条数据还需要多次重复进行一次一条的插入。
+  + =mdb_cursor_del,mdb_cursor_del0= :删除指定key、value。首先是根据各种
+    标志设置各种变量，其次设置页面为脏页，其次若删除之后，
+    subdb/subpage,overflowpage 等受到影响，则需要将对应页面回收到
+    free-list，比如subdb删除最后一个节点时，需要删除整棵子树。真正的
+    key删除在del0中，它从页面中删除对应的key，删除完成后对整个B-Tree进
+    行rebalance,然后修正所有指向当前删除页的同一事务内的其他cursor，通
+    知其他cursor此页面已经被删除。
++ 打开、关闭、重用、初始化
+  + =mdb_cursor_touch=:将数据库以及在cursor堆栈中的所有页面设置为脏页。
+    这样可能会有少量页面实际不需要设置为脏页实际设置为脏页的情形，但这
+    样为实现COW提供最大的便利，只需要修改root页面指针即可，否则需要跟
+    踪很多页面。 
+  + =mdb_cursor_open= ：打开游标，首先判断标志是否合法，合法就申请内存并调用init初始化 
+  + =mdb_cursor_renew= ：重用游标，当本游标已经不再使用，可以renew重用。 
+  + =mdb_cursor_close= ：关闭游标，从事务的cursor列表中删除，释放内存。
+  + =mdb_cursor_copy= ：复制游标，将所有内容从一个复制到新游标。
+  + =mdb_cursor_shadow= ：备份cursor对应事务的游标
+  + =mdb_cursor_init= ：设置各种变量，若数据库状态为 =DB_STALE= ,则需获取
+    最新的root节点。
++ 页面操作
+  + =mdb_cursor_pop= ：从cursor堆栈中弹出一个页面 
+  + =mdb_cursor_push=: 将一个页面压入堆栈，一般会将整个search路径上的
+    所有页面压入堆栈。
++ 状态
+  =mdb_cursor_chk= ：检查cursor是否正确 
+  =mdb_cursor_txn= : 获取cursor对应事务 
+  =mdb_cursor_dbi= ：获取cursor对应数据库 
 
 * COW and MVCC
-
 
 * 事务控制
 
@@ -448,16 +557,6 @@ struct MDB_cursor {
 + =mc_pg=: cursor打开的页面组成一个堆栈
 + =mc_ki=:  打开页面的索引的堆栈
 
-* xx
-
-http://symas.com/mdb/doc/starting.html
-
-
-
-
-http://gridmix.blog.51cto.com/4764051/1693699
-
-
 * cc
 
 #+begin_src c++
@@ -469,5 +568,7 @@ http://gridmix.blog.51cto.com/4764051/1693699
 [fn:1] http://blog.csdn.net/joejames/article/details/37958017
 
 [fn:2] http://blog.csdn.net/hbhhww/article/details/8206846
+
+[fn:3] http://gridmix.blog.51cto.com/4764051/1698055
 
 

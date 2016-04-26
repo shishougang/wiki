@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Symas Lightning Memory-Mapped Database (LMDB) Notes</title>
-<!-- 2016-04-25 Mon 23:35 -->
+<!-- 2016-04-26 Tue 22:39 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -88,8 +88,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-6">事务控制</a></li>
 <li><a href="#sec-7">核心代码流程</a></li>
 <li><a href="#sec-8">LMDB 核心数据结构</a></li>
-<li><a href="#sec-9">xx</a></li>
-<li><a href="#sec-10">cc</a></li>
+<li><a href="#sec-9">cc</a></li>
 </ul>
 </div>
 </div>
@@ -102,6 +101,8 @@ for the JavaScript code in this tag.
 <li>homepage: <a href="http://symas.com/mdb/">http://symas.com/mdb/</a>
 </li>
 <li><a href="https://github.com/LMDB/lmdb">https://github.com/LMDB/lmdb</a>
+</li>
+<li>source codes doc: <a href="http://symas.com/mdb/doc/starting.html">http://symas.com/mdb/doc/starting.html</a>
 </li>
 <li>official repo on openldap.org:
 <a href="http://www.openldap.org/software/repo.html">http://www.openldap.org/software/repo.html</a>
@@ -339,7 +340,7 @@ B*-tree是B+-tree的变体，在B+-tree的非根和非叶子结点再增加指�
 lmdb代码主要分为page管理和cursor操作两块实现b-tree结构.
 </p>
 </div>
-<ul class="org-ul"><li><a id="sec-4-5-1" name="sec-4-5-1"></a>page管理<br  /><div class="outline-text-4" id="text-4-5-1">
+<ul class="org-ul"><li><a id="sec-4-5-1" name="sec-4-5-1"></a>page管理<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup><br  /><div class="outline-text-4" id="text-4-5-1">
 <ul class="org-ul">
 <li><code>mdb_page_malloc</code>: 为新页面分配内存,从操作系统中申请1个或者n个页面，一般为一个页面，n个页面为overflow页面
 </li>
@@ -351,22 +352,128 @@ lmdb代码主要分为page管理和cursor操作两块实现b-tree结构.
 </li>
 <li><code>mdb_page_copy</code>: 复制页面将页面内容从一个页面复制到另外一个页面，此功能主要用于COW.
 </li>
+<li><code>mdb_page_split</code>: 页面分裂实现了B-Tree的操作过程，考虑了仅有一个节点时、append模式、
+braches/leaf/leaf2等不同页面的处理过程，基本流程就是根据一定的算法确定分裂点，根据B-Tree的定义，在分裂时，不一定需要保证平分，只需要保证页面节点保持半满即可。分裂点确定之后，就进行数据的移动并插入导致分裂的数据以及修改指针以维持B-Tree结构，同时再决定是否会导致上层分裂以及
+root分裂，若会则进行递归处理。
+</li>
+<li><code>mdb_page_merge</code>: 页面合并同样是实现了上述因为节点删除导致的merge过程。基本过程是，将合并的目标页面置为脏页，然后根据上述理论情况进行节点的一个个复制，或者对于内部节点而言进行页面指针调整以及进行上下节点的移动，对于本页完成之后进行平衡操作，其中平衡操作可能会又导致merge操作，直到B-Tree重新满足定义为止。
+</li>
+<li><code>mdb_page_spill</code>: 将脏页写回磁盘，这是为了嵌套长事务进行的设计，有些嵌套长事务会使用大量的页，为了避免耗光内存，可以将脏页写回磁盘，写回磁盘如同commit一样，因为多个进程、线程之间将只会存在一个写事务，因此在未提交之间前写回磁盘没有任何问题。而且只要能有空间，页面就不会刷入磁盘。在执行时，先计算是否空间足够，不够的将id存入idl数组，然后刷入磁盘，再根据环境变量决定是否保留p<sub>dirty标记。</sub>
+</li>
+<li><code>mdb_page_unspill</code>: 将spill的页面重新读回,
+这就不需要进行touch，直接设置dirty标志就可以了。lmdb支持嵌套事务，因此在查找页面是否属于已经被spilled的页面需要查找整个嵌套路径，从叶子到跟,找到之后确认midl列表（脏空间）是否有足够空间，没有的提示事务空间已满，否则加载页面并设置脏页标记。
+</li>
+<li><code>mdb_page_dirty</code>: 设置脏页标记，并将脏页加入到事务中的脏页列表当中。
+</li>
+<li><code>mdb_page_flush</code>: 用在事务提交时，当清除页面脏页标记后，将数据更新到磁盘(通过写文件方式).
+</li>
+<li><code>mdb_page_touch</code>: 实现COW的技术，复制一个页面，并将更新过B-Tree指针关系的页面插入到B-Tree当中，这样意味着在修改时是在复制的页面上进行修改，别的事务在本事务没有提交之前看到还是以前的数据，提交之后的新事物看到的才是修改之后的数据。
+</li>
+<li><code>mdb_page_search_root</code>: 从B-Tree根节点检索，根据key的值，从根节点开始遍历子树获取每一层对应的page，在page之内检索key，再根据B-Tree查找方法确定下一层子节点的page，层层遍历，从而最终确定key的位置或者判断
+B-Tree中没有对应的key。同时将页面存放到cursor页堆栈中。这样cursor将可以重用对应的页面，为后续进行更新等操作提供便利。
+</li>
+<li><code>mdb_page_search/mdb_page_search_lowest</code> 都将调用
+<code>mdb_page_search_root</code> 以完成检索
+<ul class="org-ul">
+<li><code>mdb_page_search</code> ,除了完成检索为的附加工作是确保所使用的B-Tree在本事务可见范围内是最新版本，同时在需要时将页面置为脏页。
+</li>
+<li><code>mdb_page_search_lowest</code>: 从当前分支页开始，检索第一个符合条件的值。
+</li>
+</ul>
+</li>
+<li><code>mdb_page_get</code> 获取页面，本来根据MMAP原则，读取对应的页面非常简单，计算下地址即可，但lmdb中，考虑到事务可能使用大量的页面，事务可用空间满时，将一部分页面spill/flush到磁盘中，因此需要在get时判断是否在
+spill列表中，在的话从中获取，否则直接计算获取。
+</li>
+<li><code>mdb_page_list</code> 显示页面中的所有key，是个工具方法。 
+</li>
 </ul>
 </div>
 </li>
 
-
-
-
-
-<li><a id="sec-4-5-2" name="sec-4-5-2"></a>cursor操作<br  /></li></ul>
+<li><a id="sec-4-5-2" name="sec-4-5-2"></a>cursor操作<br  /><div class="outline-text-4" id="text-4-5-2">
+<p>
+cursor操作实现了B-Tree节点操作，cursor指向当前需要进行操作的B-Tree节点，然后依据提供的操作方式（insert、del）进行数据操作，然后进行一系列复杂的操作流程以维持B-Tree结构。
+</p>
+<ul class="org-ul">
+<li>游标遍历(
+<code>mdb_cursor_sibling,mdb_cursor_next,mdb_cursor_prev,mdb_cursor_first
+  ,mdb_cursor_last</code> )
+<ul class="org-ul">
+<li><code>mdb_cursor_first</code>: 将游标定位至B-Tree的最小叶子节点（第一个），而非根据key查询时得到第一个结果位置。若支持重复数据，还要特殊处理，移动到重复数据第一个。
+</li>
+<li><code>mdb_cursor_last</code>:与first类似，只不过定位至最大叶子节点（最后一个）
+</li>
+<li><code>mdb_cursor_next</code>: 游标移动至下一个节点
+</li>
+<li><code>mdb_cursor_prev</code>: 游标移动至前一个节点
+</li>
+<li><code>mdb_cursor_sibling</code>: 将游标移动至兄弟节点，可以是前一个页面或者下一个页面。若当前页有key，则行为与next、prev类似，否则移动到下一个页面的对应key位置。
+</li>
+</ul>
+</li>
+<li>增删改查( <code>mdb_cursor_get ,mdb_cursor_set ,mdb_cursor_del
+  ,mdb_cursor_del0 ，mdb_cursor_put ,mdb_cursor_count</code> )
+<ul class="org-ul">
+<li><code>mdb_cursor_get</code> ：根据游标位置和条件获取值，最常用：MDB<sub>GET</sub><sub>CURRENT，</sub>
+获取游标所指节点的值，基本思路是看页面中索引是否已经大于key个数，大于则说明游标已经需要指向下一页，对于取当前值的不重复key来说，这不可能，因此获取失败。
+</li>
+<li><code>mdb_cursor_set</code> ：将游标设置（定位）到指定key位置，假如已经在正确页面，只需要判断key是否在页面key的范围之内，判断最大、最小值可以确定。然后根据相应标志，如同get中所说，进行判断以及读取或设置某些变量。否则话进行页面查找先定位key所在页面（ <code>mdb_page_search</code> ),然后定位页面中位置(<code>mdb_node_search</code>),然后再设置相关变量。
+</li>
+<li><code>mdb_cursor_count</code> ：返回游标代表的结果数，唯一key返回一，重复key
+返回重复个数。
+</li>
+<li><code>mdb_cursor_put</code> :将key、value对存放到数据库中，默认是新增加，若key已经存在则是更新，基本流程是：判断前提cursor、key非空，确认各种标志是否合法，比如多个value，但是数据库不支持重复key这种情形就不合法，标志合适之后，判断是否为空树，非空时将cursor指向正确的位置，比如
+append模式指向数据库最大节点之后，正常指向应该插入的位置。然后
+touch所有页面使所有页面可写。若为leaf2类型页面，说明key、value完全重复，增加key就OK了，然后再判断value值是否太大，太大则转换为子树进行存储。转化为subdb/subpage时，首先根据各种标志设置各种变量，包括申请新页等，然后其余的就是根据各种标志完成上述理论描述的节点插入动作，将值放置对应位置、进行分页等，需要时进行unspill，放置到
+overflow页面等，若一次插入多条数据还需要多次重复进行一次一条的插入。
+</li>
+<li><code>mdb_cursor_del,mdb_cursor_del0</code> :删除指定key、value。首先是根据各种标志设置各种变量，其次设置页面为脏页，其次若删除之后，
+subdb/subpage,overflowpage 等受到影响，则需要将对应页面回收到
+free-list，比如subdb删除最后一个节点时，需要删除整棵子树。真正的
+key删除在del0中，它从页面中删除对应的key，删除完成后对整个B-Tree进行rebalance,然后修正所有指向当前删除页的同一事务内的其他cursor，通知其他cursor此页面已经被删除。
+</li>
+</ul>
+</li>
+<li>打开、关闭、重用、初始化
+<ul class="org-ul">
+<li><code>mdb_cursor_touch</code>:将数据库以及在cursor堆栈中的所有页面设置为脏页。这样可能会有少量页面实际不需要设置为脏页实际设置为脏页的情形，但这样为实现COW提供最大的便利，只需要修改root页面指针即可，否则需要跟踪很多页面。 
+</li>
+<li><code>mdb_cursor_open</code> ：打开游标，首先判断标志是否合法，合法就申请内存并调用init初始化 
+</li>
+<li><code>mdb_cursor_renew</code> ：重用游标，当本游标已经不再使用，可以renew重用。 
+</li>
+<li><code>mdb_cursor_close</code> ：关闭游标，从事务的cursor列表中删除，释放内存。
+</li>
+<li><code>mdb_cursor_copy</code> ：复制游标，将所有内容从一个复制到新游标。
+</li>
+<li><code>mdb_cursor_shadow</code> ：备份cursor对应事务的游标
+</li>
+<li><code>mdb_cursor_init</code> ：设置各种变量，若数据库状态为 <code>DB_STALE</code> ,则需获取最新的root节点。
+</li>
+</ul>
+</li>
+<li>页面操作
+<ul class="org-ul">
+<li><code>mdb_cursor_pop</code> ：从cursor堆栈中弹出一个页面 
+</li>
+<li><code>mdb_cursor_push</code>: 将一个页面压入堆栈，一般会将整个search路径上的所有页面压入堆栈。
+</li>
+</ul>
+</li>
+<li>状态
+<code>mdb_cursor_chk</code> ：检查cursor是否正确 
+<code>mdb_cursor_txn</code> : 获取cursor对应事务 
+<code>mdb_cursor_dbi</code> ：获取cursor对应数据库 
+</li>
+</ul>
+</div>
+</li></ul>
 </div>
 </div>
 
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">COW and MVCC</h2>
 </div>
-
 
 <div id="outline-container-sec-6" class="outline-2">
 <h2 id="sec-6">事务控制</h2>
@@ -705,25 +812,8 @@ lmdb代码主要分为page管理和cursor操作两块实现b-tree结构.
 </div>
 
 <div id="outline-container-sec-9" class="outline-2">
-<h2 id="sec-9">xx</h2>
+<h2 id="sec-9">cc</h2>
 <div class="outline-text-2" id="text-9">
-<p>
-<a href="http://symas.com/mdb/doc/starting.html">http://symas.com/mdb/doc/starting.html</a>
-</p>
-
-
-
-
-<p>
-<a href="http://gridmix.blog.51cto.com/4764051/1693699">http://gridmix.blog.51cto.com/4764051/1693699</a>
-</p>
-</div>
-</div>
-
-
-<div id="outline-container-sec-10" class="outline-2">
-<h2 id="sec-10">cc</h2>
-<div class="outline-text-2" id="text-10">
 <div class="org-src-container">
 
 <pre class="src src-c++"></pre>
@@ -742,12 +832,16 @@ lmdb代码主要分为page管理和cursor操作两块实现b-tree结构.
 <a href="http://blog.csdn.net/hbhhww/article/details/8206846">http://blog.csdn.net/hbhhww/article/details/8206846</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.3" name="fn.3" class="footnum" href="#fnr.3">3</a></sup> <p class="footpara">
+<a href="http://gridmix.blog.51cto.com/4764051/1698055">http://gridmix.blog.51cto.com/4764051/1698055</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-04-25 Mon 23:35</p>
+<p class="date">Created: 2016-04-26 Tue 22:39</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
