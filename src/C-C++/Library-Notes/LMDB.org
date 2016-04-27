@@ -283,10 +283,181 @@ lmdb代码主要分为page管理和cursor操作两块实现b-tree结构.
   =mdb_cursor_dbi= ：获取cursor对应数据库 
 
 * COW and MVCC
+** COW(Copy-on-write)
+写入时复制（Copy-on-write，COW）是一种计算机程序设计领域的优化策略。其
+核心思想是，如果有多个调用者（callers）同时要求相同资源（如内存或磁盘
+上的数据存储），他们会共同获取相同的指针指向相同的资源，直到某个调用者
+试图修改资源的内容时，系统才会真正复制一份专用副本（private copy）给该
+调用者，而其他调用者所见到的最初的资源仍然保持不变。这过程对其他的调用
+者都是透明的（transparently）。此作法主要的优点是如果调用者没有修改该
+资源，就不会有副本（private copy）被创建，因此多个调用者只是读取操作时
+可以共享同一份资源。[fn:4]
+** MVCC（Multiversion concurrency control）
+Multiversion concurrency control (MCC or MVCC), is a concurrency
+control method commonly used by database management systems to provide
+concurrent access to the database and in programming languages to
+implement transactional memory.
+
+If someone is reading from a database at the same time as someone else
+is writing to it, it is possible that the reader will see a
+half-written or inconsistent piece of data. There are several ways of
+solving this problem, known as concurrency control methods. The
+simplest way is to make all readers wait until the writer is done,
+which is known as a lock. This can be very slow, so MVCC takes a
+different approach: each user connected to the database sees a
+snapshot of the database at a particular instant in time. Any changes
+made by a writer will not be seen by other users of the database until
+the changes have been completed (or, in database terms: until the
+transaction has been committed.)
+
+When an MVCC database needs to update an item of data, it will not
+overwrite the old data with new data, but instead mark the old data as
+obsolete and add the newer version elsewhere. Thus there are multiple
+versions stored, but only one is the latest. This allows readers to
+access the data that was there when they began reading, even if it was
+modified or deleted part way through by someone else. It also allows
+the database to avoid the overhead of filling in holes in memory or
+disk structures but requires (generally) the system to periodically
+sweep through and delete the old, obsolete data objects. For a
+document-oriented database it also allows the system to optimize
+documents by writing entire documents onto contiguous sections of
+disk—when updated, the entire document can be re-written rather than
+bits and pieces cut out or maintained in a linked, non-contiguous
+database structure.
+
+MVCC provides point in time consistent views. Read transactions under
+MVCC typically use a timestamp or transaction ID to determine what
+state of the DB to read, and read these versions of the data. Read and
+write transactions are thus isolated from each other without any need
+for locking. Writes create a newer version, while concurrent reads
+access the older version.[fn:5]
+** MVCC/COW在LMDB中的实现
+LMDB对MVCC加了一个限制，即只允许一个写线程存在，从根源上避免了写写冲突，
+当然代价就是写入的并发性能下降。因为只有一个写线程，所以不会不需要wal
+日志、读写依赖队列、锁队列等一系列控制并发、事务回滚、数据恢复的基础工
+具。
+
+MVCC的基础就是COW，对于不同的用户来说，若其在整个操作过程中不进行任何
+的数据改变，其就使用同一份数据即可，若需要进行改变，比如增加、删除、修
+改等，就需要在私有数据版本上进行，修改完成提交之后才给其他事务可见。
+
+LMDB中,数据操作的基本单元是页，因此COW也是以页为单位，对应函数是
+=mdb_page_touch=, =mdb_page_copy= ,copy真正实现页面复制，touch调用copy完成复
+制，然后修改pgno后插入到B+Tree当中，这样对于此次事务，后续的操作访问的
+数据页就是最新的数据页面，而非事务启动时对应的数据页面，且此页面与其他
+页面的关联关系仅在本事务页面列表中可见，对其他事务不可见。
+
+实际上通过以上两个函数实现了MVCC的核心，对于读写的控制，通过
+=mdb_txn_begin= 控制，在其中，事务启动时会检查读写锁的情况，若事务需要更
+新数据，则会被阻止，若只是读数据，则不管是否有写事务存在，读锁都可以获
+得。
+
+MVCC的一个副作用就是对于存在大量写的应用，其数据版本很多，因此旧数据会
+占用大量空间，LMDB中通过freedb解决，即将不再使用的旧的数据页面空间插入
+到一棵B+Tree当中，这样旧空间在所有事务不再访问之后就可以被LMDB使用，从
+而避免了需要定期执行清理操作。当然其副作用是数据只能保持最新不能恢复到
+任意时刻，
 
 * 事务控制
+** 事务的基本特征
+事务是恢复和并发控制的基本单位。它是一个操作序列，这些操作要么都执行，
+要么都不执行，它是一个不可分割的工作单位。事务是数据库维护数据一致性的
+单位，在每个事务结束时，都能保持数据一致性。
 
-* 核心代码流程
+事务应该具有4个属性：原子性、一致性、隔离性、持久性。这四个属性通常称
+为ACID特性。
+
++ 原子性（atomicity）。一个事务是一个不可分割的工作单位，事务中包括的
+  诸操作要么都做，要么都不做。
++ 一致性（consistency）。事务必须是使数据库从一个一致性状态变到另一个
+  一致性状态。一致性与原子性是密切相关的。
++ 隔离性（isolation）。一个事务的执行不能被其他事务干扰。即一个事务内
+  部的操作及使用的数据对并发的其他事务是隔离的，并发执行的各个事务之间
+  不能互相干扰。
++ 持久性（durability）。持久性也称永久性（permanence），指一个事务一旦
+  提交，它对数据库中数据的改变就应该是永久性的。接下来的其他操作或故障
+  不应该对其有任何影响。
+** LMDB 中的实现基本思路
++ Atom（A）: LMDB中通过txn数据结构和cursor数据结构的控制，通过将脏页列表放入
+  dirtylist中，当txn进行提交时再一次性统一刷新到磁盘中或者abort时都不
+  提交保证事务要不全成功、要不全失败。对于长事务，若页面spill到磁盘，
+  因为COW技术，这些页面未与整棵B-Tree的rootpage产生关联，因此后续的事
+  务还是不能访问到这些页面，同样保证了事务的原子性。
++ Consistency(C): 有如上的操作,保证其数据就是一致的，不存在因为多线程
+  同时写数据导致数据产生错误的情况。
++ Isolation（I）：事务隔离通过锁控制（MUTEX），LMDB支持的锁互斥是进程
+  级别/线程级别，支持的隔离方式为锁表支持，读读之间不锁，写等待读完成
+  之后开始，读等待写完成后开始.
++ Duration（D）:LMDB中，没有使用WAL、undo/redo log等技术来保证系统崩溃
+  时数据库的可用性，其保证数据持续可用的技术是COW技术和只有一线程写技
+  术。假如LMDB或者系统崩溃时，只有读操作，那么数据本来就没有发生变化，
+  因此数据将不可能遭到破坏。假如崩溃时，有一个线程在进行写操作，则只需
+  要判断最后的页面号与成功提交到数据库中的页面号是否一致，若不一致则说
+  明写操作没有完成，则最后一个事务写失败，数据在最后一个成功的页面前的
+  是正确的，后续的属于崩溃事务的，不能用，这样就保证了数据只要序列化到
+  磁盘则一定可用，要不其就是还没有遵循ACI原则序列化到磁盘
+
+* Example
+#+begin_src c
+#include <stdio.h>
+#include "lmdb.h"
+
+int main(int argc,char * argv[])
+{
+  int rc;
+  MDB_env *env;
+  MDB_dbi dbi;
+  MDB_val key, data;
+  MDB_txn *txn;
+  MDB_cursor *cursor;
+  char sval[32];
+
+  /* Note: Most error checking omitted for simplicity */
+  rc = mdb_env_create(&env);
+  rc = mdb_env_open(env, "./testdb", 0, 0664);
+  rc = mdb_txn_begin(env, NULL, 0, &txn);
+  rc = mdb_dbi_open(txn, NULL, 0, &dbi);
+  key.mv_size = sizeof(int);
+  key.mv_data = sval;
+  data.mv_size = sizeof(sval);
+  data.mv_data = sval;
+
+  sprintf(sval, "%03x %d foo bar", 32, 3141592);
+  rc = mdb_put(txn, dbi, &key, &data, 0);
+  rc = mdb_txn_commit(txn);
+  if (rc) {
+    fprintf(stderr, "mdb_txn_commit: (%d) %s\n", rc, mdb_strerror(rc));
+    goto leave;
+  }
+  rc = mdb_txn_begin(env, NULL, MDB_RDONLY, &txn);
+  rc = mdb_cursor_open(txn, dbi, &cursor);
+  while ((rc = mdb_cursor_get(cursor, &key, &data, MDB_NEXT)) == 0) {
+    printf("key: %p %.*s, data: %p %.*s\n",
+           key.mv_data,  (int) key.mv_size,  (char *) key.mv_data,
+           data.mv_data, (int) data.mv_size, (char *) data.mv_data);
+  }
+  mdb_cursor_close(cursor);
+  mdb_txn_abort(txn);
+leave:
+  mdb_dbi_close(env, dbi);
+  mdb_env_close(env);
+  return 0;
+}
+#+end_src
+
+Run the example:
+
+#+begin_src sh
+mkdir testdb
+./sample
+
+key: 0x7f1435f678a4 020 , data: 0x7f1435f678a8 020 3141592 foo bar
+key: 0x7f1435f67fdc 1bd , data: 0x7f1435f67fe0 1bd 445 foo bar
+key: 0x7f1435f67fb0 1dc , data: 0x7f1435f67fb4 1dc 476 foo bar
+key: 0x7f1435f67f84 1e2 , data: 0x7f1435f67f88 1e2 482 foo bar
+key: 0x7f1435f67f58 1f9 , data: 0x7f1435f67f5c 1f9 505 foo bar
+key: 0x7f1435f67f2c 1ff , data: 0x7f1435f67f30 1ff 511 foo bar
+#+end_src
 
 * LMDB 核心数据结构
 1. =MDB_env=
@@ -557,12 +728,6 @@ struct MDB_cursor {
 + =mc_pg=: cursor打开的页面组成一个堆栈
 + =mc_ki=:  打开页面的索引的堆栈
 
-* cc
-
-#+begin_src c++
-
-#+end_src
-
 * Footnotes
 
 [fn:1] http://blog.csdn.net/joejames/article/details/37958017
@@ -570,5 +735,10 @@ struct MDB_cursor {
 [fn:2] http://blog.csdn.net/hbhhww/article/details/8206846
 
 [fn:3] http://gridmix.blog.51cto.com/4764051/1698055
+
+[fn:4] https://en.wikipedia.org/wiki/Copy-on-write
+
+[fn:5] https://en.wikipedia.org/wiki/Multiversion_concurrency_control
+
 
 
