@@ -1,0 +1,1623 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Multi-Threading Questions</title>
+<!-- 2016-05-25 Wed 23:22 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Multi-Threading Questions</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">What is the difference between a thread and a process?</a>
+<ul>
+<li><a href="#sec-1-1">heavyweight vs lightweight</a></li>
+<li><a href="#sec-1-2">create</a></li>
+<li><a href="#sec-1-3">Sharing Resources</a></li>
+<li><a href="#sec-1-4">Communication</a></li>
+<li><a href="#sec-1-5">similarities</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">primary benefits to multithreading</a></li>
+<li><a href="#sec-3">What synchronization primitives do you know, tell difference between them</a></li>
+<li><a href="#sec-4">What is the best way to terminate a thread.</a></li>
+<li><a href="#sec-5">Why you shouldn't use TerminateThread-esque functions.</a></li>
+<li><a href="#sec-6">thread-safe producer/consumer</a></li>
+<li><a href="#sec-7">When might you choose to use threads on a single CPU system?</a></li>
+<li><a href="#sec-8">How would you measure the context switch overhead between threads?</a></li>
+<li><a href="#sec-9">MT-safe hash table</a></li>
+<li><a href="#sec-10">write thread code</a></li>
+<li><a href="#sec-11">What is the atomic operation and why do they matter?</a></li>
+<li><a href="#sec-12">Name three thread design patterns</a></li>
+<li><a href="#sec-13">Explain how a thread pool works</a></li>
+<li><a href="#sec-14">Define: critical section</a></li>
+<li><a href="#sec-15">What are four mutex types?</a></li>
+<li><a href="#sec-16">Define: deadlock and Banker's Algorithm</a>
+<ul>
+<li><a href="#sec-16-1">Banker's Algorithm</a></li>
+</ul>
+</li>
+<li><a href="#sec-17">How can you prevent deadlocking from occurring?</a></li>
+<li><a href="#sec-18">Define: race condition</a></li>
+<li><a href="#sec-19">How can you prevent race conditions from occurring?</a></li>
+<li><a href="#sec-20">Define: priority inversion</a></li>
+<li><a href="#sec-21">Define: Condition Variable</a></li>
+<li><a href="#sec-22">Define: (thread) barriers</a></li>
+<li><a href="#sec-23">Semaphores</a></li>
+<li><a href="#sec-24">Spinlocks</a></li>
+<li><a href="#sec-25">Six synchronization primitives</a></li>
+<li><a href="#sec-26">livelock</a></li>
+<li><a href="#sec-27">What does the term 'lock-free' mean?</a></li>
+<li><a href="#sec-28">"Busy waiting" and how it can be avoided</a></li>
+<li><a href="#sec-29">IPC</a></li>
+<li><a href="#sec-30">How would you maintain concurrency on a shared page</a></li>
+<li><a href="#sec-31">Write a multi threaded C code with one thread printing all even numbers</a></li>
+<li><a href="#sec-32">Difference between concurrency and parallelism</a></li>
+<li><a href="#sec-33">If two threads are incrementing a variable 100 times each</a></li>
+<li><a href="#sec-34">How would a mutex lock be implemented by the system?</a></li>
+<li><a href="#sec-35">What is a Executer in threads?</a></li>
+<li><a href="#sec-36">what do threads share amongst themselves and what they dont share?</a></li>
+<li><a href="#sec-37">Drawbacks of using mutexes in threads.</a></li>
+<li><a href="#sec-38">A program has two functions 'reader<sub>func'</sub> and 'writer<sub>func'</sub>.</a></li>
+<li><a href="#sec-39">What is deadlock and what are the 4 conditions that creates a deadlock?</a></li>
+<li><a href="#sec-40">Memory is an array R[1..n]. And a Block is essentially</a></li>
+<li><a href="#sec-41">What are the implications of doing a fork()</a></li>
+<li><a href="#sec-42">Implement a semaphore using a mutex</a></li>
+<li><a href="#sec-43">different between exec and fork.</a></li>
+<li><a href="#sec-44">context switching</a></li>
+<li><a href="#sec-45">spinlock vs mutex</a>
+<ul>
+<li><a href="#sec-45-1">The Theory</a></li>
+<li><a href="#sec-45-2">The Problem</a></li>
+<li><a href="#sec-45-3">The Solution</a></li>
+<li><a href="#sec-45-4">The Practice</a></li>
+<li><a href="#sec-45-5">Summary</a></li>
+</ul>
+</li>
+<li><a href="#sec-46">thread and fork</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">What is the difference between a thread and a process?</h2>
+<div class="outline-text-2" id="text-1">
+</div><div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">heavyweight vs lightweight</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+Processes are always used to execute "heavyweight" jobs such as
+running different applications, while threads are always used to
+execute smaller "lightweight" jobs such as auto saving.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2">create</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+New threads are easily created, whereas new processes require
+duplication of the parent process.
+</p>
+
+<p>
+Creating a new process can be expensive. It takes time. (A call into
+the operating system is needed, and if the process creation triggers
+process rescheduling activity, the operating system's
+context-switching mechanism will become involved.) IT takes memory.
+(The entire process must be replicated.) 
+</p>
+
+<p>
+Threads can be created without replicating an entire process.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-1-3" class="outline-3">
+<h3 id="sec-1-3">Sharing Resources</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+Independent processes share nothing. Each process runs in a separate
+address space. Changes made to the parent processes donot affect the
+child processes.
+</p>
+
+<p>
+Threads share such process resources and global variables and file
+descriptions.  If one thread
+changes the value of any such resource, the change will be evident to
+any other thread in the process, if anyone cares to look. The sharing
+of process resources among threads is one of the multithreaded
+programming model's major performance advantages, as well as one of
+its most difficult programming aspects. Having all of this context
+available to all threads in the same memory facilitates communication
+between threads. However, at the same time, it makes it easy to
+introduce errors of the sort in which one thread affects the value of
+a variable used by another thread in ways the other thread did not
+expect.
+</p>
+
+<p>
+Then switching between threads is much simpler and faster then
+switching between processes.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-1-4" class="outline-3">
+<h3 id="sec-1-4">Communication</h3>
+<div class="outline-text-3" id="text-1-4">
+<p>
+Threads can directly communicate with other threads of its process;
+processes must use inter-process communication mechanisms to
+communicate with sibling processes.
+</p>
+
+<p>
+Multiple processes can use any of the many other UNIX Interprocess
+Communication (IPC) mechanisms: sockets, shared memory, and messages,
+to name a few. The multiprocess version of our program uses shared
+memory, but the other methods are equally valid. Even the waitpid call
+in our program could be used to exchange information, if the program
+checked its return value. However, in the multiprocess world, all
+types of IPC involve a call into the operating system—to initialize
+shared memory or a message structure, for instance. This makes
+communication between processes more expensive than communication
+between threads. Add to this the cost of
+interprocess communication and synchronization of shared data, which
+also may involve calls into the operating system kernel.
+</p>
+
+<p>
+When processes
+synchronize, they usually have to issue system calls, a relatively
+expensive operation that involves trapping into the kernel. But
+threads can synchronize by simply monitoring a variable—in other
+words, staying within the user address space of the program.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-1-5" class="outline-3">
+<h3 id="sec-1-5">similarities</h3>
+<div class="outline-text-3" id="text-1-5">
+<p>
+A thread can do anything that a process can do. They are both able to
+reproduce(Processes create child process and threads create more
+threads.), and they both have ID, priority and etc.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">primary benefits to multithreading</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+<a href="http://www.quora.com/What-is-the-difference-between-a-process-and-a-thread">http://www.quora.com/What-is-the-difference-between-a-process-and-a-thread</a>
+</p>
+
+<p>
+There are four primary benefits to multithreading:
+</p>
+
+<ul class="org-ul">
+<li>Programming abstraction. Dividing up work and assigning each
+division to a unit of execution (a thread) is a natural approach to
+many problems. Programming patterns that utilize this approach
+include the reactor, thread-per-connection, and thread pool
+patterns. Some, however, view threads as an anti-pattern. The
+inimitable Alan Cox summed this up well with the quote, "threads are
+for people who can't program state machines."
+</li>
+
+<li>Parallelism. In machines with multiple processors, threads provide
+an efficient way to achieve true parallelism. As each thread
+receives its own virtualized processor and is an
+independently-schedulable entity, multiple threads may run on
+multiple processors at the same time, improving a system's
+throughput. To the extent that threads are used to achieve
+parallelism—that is, there are no more threads than processors—the
+"threads are for people who can't program state machines" quote does
+not apply.
+</li>
+
+<li>Blocking I/O. Without threads, blocking I/O halts the whole process.
+This can be detrimental to both throughput and latency. In a
+multithreaded process, individual threads may block, waiting on I/O,
+while other threads make forward progress. Asynchronous &amp;
+non-blocking I/O are alternative solutions to threads for this
+issue.
+</li>
+
+<li>Memory savings. Threads provide an efficient way to share memory yet
+utilize multiple units of execution. In this manner they are an
+alternative to multiple processes.
+</li>
+</ul>
+
+<p>
+The cost of these benefits of threading are increased complexity in
+the form of needing to manage concurrency through mechanisms such as
+mutexes and condition variables. Given the growing trend toward
+processors sporting multiple cores and systems sporting multiple
+processors, threading is only going to become a more important tool in
+system programming.
+</p>
+
+
+<p>
+Advantages and Disadvantages
+</p>
+
+<p>
+Thread Advantages
+</p>
+
+<ul class="org-ul">
+<li>Threads are memory efficient. Many threads can be efficiently contained within a single EXE, while each process can incur the overhead of an entire EXE.
+</li>
+<li>Threads share a common program space, which among other things, means that messages can be passed by queuing only a pointer to the message. Since processes do not share a common program space, the kernel must either copy the entire message from process A's program space to process B's program space - a tremendous disadvantage for large messages, or provide some mechanism by which process B can access the message.
+</li>
+<li>Thread task switching time is faster, since a thread has less context to save than a process.
+</li>
+<li>With threads the kernel is linked in with the user code to create a single EXE. This means that all the kernel data structures like the ready queue are available for viewing with a debugger. This is not the case with a process, since the process is an autonomous application and the kernel is separate, which makes for a less flexible environment.
+</li>
+</ul>
+
+<p>
+Thread Disadvantages
+</p>
+
+<ul class="org-ul">
+<li>Threads are typically not loadable. That is, to add a new thread, you must add the new thread to the source code, then compile and link to create the new executable. Processes are loadable, thus allowing a multi-tasking system to be characterized dynamically. For example, depending upon system conditions, certain processes can be loaded and run to characterize the system. However, the same can be accomplished with threads by linking in all the possible threads required by the system, but only activating those that are needed, given the conditions. The really big advantage of loadability is that the process concept allows processes (applications) to be developed by different companies and offered as tools to be loaded and used by others in their multi-tasking applications.
+</li>
+<li>Threads can walk over the data space of other threads. This cannot
+happen with processes. If an attempt is made to walk on another
+process an exception error will occur.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">What synchronization primitives do you know, tell difference between them</h2>
+<div class="outline-text-2" id="text-3">
+<ol class="org-ol">
+<li>Mutex
+</li>
+<li>Join
+</li>
+<li>Condition variable
+</li>
+<li>Barriers
+</li>
+<li>Spinlock
+</li>
+<li>Semaphore
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">What is the best way to terminate a thread.</h2>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Why you shouldn't use TerminateThread-esque functions.</h2>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">thread-safe producer/consumer</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+Write a thread-safe producer/consumer buffer that can be accessed by
+one or more producer/consumers
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">When might you choose to use threads on a single CPU system?</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+IO read/write, buffer and such time-consuming processes.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">How would you measure the context switch overhead between threads?</h2>
+</div>
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">MT-safe hash table</h2>
+<div class="outline-text-2" id="text-9">
+<p>
+How would you make a MT-safe hash table, while allowing for maximal
+concurrency?
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10">write thread code</h2>
+<div class="outline-text-2" id="text-10">
+<p>
+What can go wrong when you write thread code and how can you guard
+against them?
+</p>
+
+<p>
+Basically, the big three of threading problems are deadlock, races and
+starvation. 
+</p>
+
+<p>
+The simplest deadlock condition is when there are two threads and
+thread A can't progress until thread B finishes, while thread B can't
+progress until thread A finishes. This is usually because both need
+the same two resources to progress, A has one and B has the other.
+Various symmetry breaking algorithms can prevent this in the two
+thread or larger circle cases. 
+</p>
+
+<p>
+Races happen when one thread changes the state of some resource when
+another thread is not expecting it (such as changing the contents of a
+memory location when another thread is part way through reading, or
+writing to that memory). Locking methods are the key here. (Some lock
+free methods and containers are also good choices for this. As are
+atomic operations, or transaction based operations.) 
+</p>
+
+<p>
+Starvation happens when a thread needs a resource to proceed, but
+can't get it. The resource is constantly tied up by other threads and
+the one that needs it can't get in. The scheduling algorithm is the
+problem when this happens. Look at algorithms that ass
+</p>
+</div>
+</div>
+
+
+
+
+<div id="outline-container-sec-11" class="outline-2">
+<h2 id="sec-11">What is the atomic operation and why do they matter?</h2>
+<div class="outline-text-2" id="text-11">
+<p>
+Atomic operations are operations that can't lose control of the
+resources they have while executing. Functionally, they are equivalent
+to operations that happen in a single clock tick on a simple
+non-pipelined processor. In reality, most take more than a tick but
+are protected while they execute. They are immune to race conditions,
+and that makes them useful. 
+</p>
+</div>
+</div>
+
+
+<div id="outline-container-sec-12" class="outline-2">
+<h2 id="sec-12">Name three thread design patterns<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-12">
+<ol class="org-ol">
+<li>Thread pool
+</li>
+<li>Peer
+</li>
+<li>Pipeline
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-13" class="outline-2">
+<h2 id="sec-13">Explain how a thread pool works</h2>
+<div class="outline-text-2" id="text-13">
+<p>
+One thread dispatches other threads to do useful work which are
+usually part of a worker thread pool. This thread pool is usually
+pre-allocated before the boss(or master) begins dispatching threads to
+work. Although threads are lightweight, they still incur overhead when
+they are created.
+</p>
+
+<p>
+If the boss thread becomes a worker thread once it's done starting
+other worker threads then this is a Peer Thread Design Pattern.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-14" class="outline-2">
+<h2 id="sec-14">Define: critical section</h2>
+<div class="outline-text-2" id="text-14">
+<p>
+critical section is a piece of code that accesses a shared resource
+(data structure or device) that must not be concurrently accessed by
+more than one thread of execution. A critical section will usually
+terminate in fixed time, and a thread, task or process will have to
+wait a fixed time to enter it (aka bounded waiting). Some
+synchronization mechanism is required at the entry and exit of the
+critical section to ensure exclusive use, for example a semaphore.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-15" class="outline-2">
+<h2 id="sec-15">What are four mutex types?</h2>
+<div class="outline-text-2" id="text-15">
+<ul class="org-ul">
+<li>Recursive: allows a thread holding the lock to acquire the same lock
+again which may be necessary for recursive algorithms.
+</li>
+<li>Queuing: allows for fairness in lock acquisition by providing FIFO
+ordering to the arrival of lock requests. Such mutexes may be slower
+due to increased overhead and the possibility of having to wake
+threads next in line that may be sleeping.
+</li>
+<li>Reader/Writer: allows for multiple readers to acquire the lock
+simultaneously. If existing readers have the lock, a writer request
+on the lock will block until all readers have given up the lock.
+This can lead to writer starvation.
+</li>
+<li>Scoped: RAII-style semantics regarding lock acquisition and
+unlocking.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-16" class="outline-2">
+<h2 id="sec-16">Define: deadlock and Banker's Algorithm</h2>
+<div class="outline-text-2" id="text-16">
+<p>
+Two (or more) threads have stopped execution or are spinning
+permanently. For example, a simple deadlock situation: thread 1 locks
+lock A, thread 2 locks lock B, thread 1 wants lock B and thread 2
+wants lock A.
+</p>
+</div>
+
+<div id="outline-container-sec-16-1" class="outline-3">
+<h3 id="sec-16-1">Banker's Algorithm<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup></h3>
+<div class="outline-text-3" id="text-16-1">
+</div><ul class="org-ul"><li><a id="sec-16-1-1" name="sec-16-1-1"></a>Resources<br  /><div class="outline-text-4" id="text-16-1-1">
+<p>
+For the Banker's algorithm to work, it needs to know three things:
+</p>
+<ul class="org-ul">
+<li>How much of each resource each process could possibly request[CLAIMS]
+</li>
+<li>How much of each resource each process is currently holding[ALLOCATED]
+</li>
+<li>How much of each resource the system currently has available[AVAILABLE]
+</li>
+</ul>
+
+<p>
+Resources may be allocated to a process only if it satisfies the
+following conditions:
+</p>
+<ul class="org-ul">
+<li>request ≤ max, else set error condition as process has crossed
+maximum claim made by it.
+</li>
+<li>request ≤ available, else process waits until resources are
+available.
+</li>
+</ul>
+
+<p>
+Let n be the number of processes in the system and m be the number of resource types. Then we need the following data structures:
+</p>
+
+<ul class="org-ul">
+<li>Available: A vector of length m indicates the number of available
+resources of each type. If Available[j] = k, there are k
+instances of resource type Rj available.
+</li>
+<li>Max: An n×m matrix defines the maximum demand of each process.
+If Max[i,j] = k, then Pi may request at most k instances of
+resource type Rj.
+</li>
+
+<li>Allocation: An n×m matrix defines the number of resources of
+each type currently allocated to each process. If Allocation[i,j]
+= k, then process Pi is currently allocated k instances of
+resource type Rj.
+</li>
+
+<li>Need: An n×m matrix indicates the remaining resource need of
+each process. If Need[i,j] = k, then Pi may need k more instances
+of resource type Rj to complete the task.
+</li>
+</ul>
+<p>
+Note: Need[i,j] = Max[i,j] - Allocation[i,j].
+</p>
+</div>
+</li>
+<li><a id="sec-16-1-2" name="sec-16-1-2"></a>Safe and Unsafe States<br  /><div class="outline-text-4" id="text-16-1-2">
+<p>
+Given that assumption, the algorithm determines if a state is <b>safe</b> by
+trying to find a hypothetical set of requests by the processes that
+would allow each to acquire its maximum resources and then terminate
+(returning its resources to the system). Any state where no such set
+exists is an <b>unsafe</b> state.
+</p>
+</div>
+</li>
+<li><a id="sec-16-1-3" name="sec-16-1-3"></a>Limitations<br  /><div class="outline-text-4" id="text-16-1-3">
+<ol class="org-ol">
+<li>Specifically, it needs to know how much of each resource a process
+could possibly request. In most systems, this information is
+unavailable, making it impossible to implement the Banker's
+algorithm. 
+</li>
+<li>Also, it is unrealistic to assume that the number of processes is
+static since in most systems the number of processes varies
+dynamically.
+</li>
+<li>Moreover, the requirement that a process will eventually release
+all its resources (when the process terminates) is sufficient for
+the correctness of the algorithm, however it is not sufficient for
+a practical system. Waiting for hours (or even days) for resources
+to be released is usually not acceptable.
+</li>
+</ol>
+</div>
+</li></ul>
+</div>
+</div>
+
+<div id="outline-container-sec-17" class="outline-2">
+<h2 id="sec-17">How can you prevent deadlocking from occurring?</h2>
+<div class="outline-text-2" id="text-17">
+<p>
+You can prevent deadlocks from happening by making sure threads
+acquire locks in an agreed order(i.e. preservation of lock ordering).
+Deadlock can also happen if threads do not unlock mutexes properly.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-18" class="outline-2">
+<h2 id="sec-18">Define: race condition</h2>
+<div class="outline-text-2" id="text-18">
+<p>
+A race condition is when non-deterministic behavior results from
+threads accessing shared data or resources without following a defined
+synchronization protocol for serializing such access.
+</p>
+
+<p>
+when a piece of code is shared between 2 threads
+and when output of the code is different depending on the order in
+which that 2 threads execute that code&#x2026;is race condition. 
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-19" class="outline-2">
+<h2 id="sec-19">How can you prevent race conditions from occurring?</h2>
+<div class="outline-text-2" id="text-19">
+<p>
+Take steps within your program to enforce serial access to shared file
+descriptors and other external resources.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-20" class="outline-2">
+<h2 id="sec-20">Define: priority inversion</h2>
+<div class="outline-text-2" id="text-20">
+<p>
+A higher priority thread can wait behind a lower priority thread if
+the lower priority thread holds a lock for which the higher priority
+thread is waiting.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-21" class="outline-2">
+<h2 id="sec-21">Define: Condition Variable</h2>
+<div class="outline-text-2" id="text-21">
+<p>
+Condition variables allow threads to synchronize to a value of a
+shared resource. Typically, condition variables are used as a
+notification system between threads.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-22" class="outline-2">
+<h2 id="sec-22">Define: (thread) barriers</h2>
+<div class="outline-text-2" id="text-22">
+<p>
+Barriers are a method to synchronize a set of threads at some point in
+time by having all participating threads in the barrier wait until all
+threads have called the said barrier function. This, in essence,
+blocks all threads participating in the barrier until the slowest
+participating thread reaches the barrier call.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-23" class="outline-2">
+<h2 id="sec-23">Semaphores</h2>
+<div class="outline-text-2" id="text-23">
+<p>
+Semaphores are another type of synchronization primitive that come in
+two flavors: binary and counting. Binary semaphores act much like
+simple mutexes, while counting semaphores can behave as recursive
+mutexes. Counting semaphores can be initialized to any arbitrary value
+which should depend on how many resources you have available for that
+particular shared data. Many threads can obtain the lock
+simultaneously until the limit is reached. This is referred to as lock
+depth.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-24" class="outline-2">
+<h2 id="sec-24">Spinlocks</h2>
+<div class="outline-text-2" id="text-24">
+<p>
+Spinlocks are locks which spin on mutexes. Spinning refers to
+continuously polling until a condition has been met. In the case of
+spinlocks, if a thread cannot obtain the mutex, it will keep polling
+the lock until it is free. The advantage of a spinlock is that the
+thread is kept active and does not enter a sleep-wait for mutex to
+become available, thus can perform better in certain cases than
+typical blocking-sleep-wait style mutexes. Mutexes which are heavily
+contended are poor candidates for spinlocks.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-25" class="outline-2">
+<h2 id="sec-25">Six synchronization primitives</h2>
+<div class="outline-text-2" id="text-25">
+<ol class="org-ol">
+<li>Mutex
+</li>
+<li>Join
+</li>
+<li>Condition variable
+</li>
+<li>Barriers
+</li>
+<li>Spinlock
+</li>
+<li>Semaphore
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-26" class="outline-2">
+<h2 id="sec-26">livelock</h2>
+<div class="outline-text-2" id="text-26">
+<p>
+A livelock is simliar to a deadlock, except that the states of the
+processes involved in the livelock constantly change with regard to
+one another, none progressing.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-27" class="outline-2">
+<h2 id="sec-27">What does the term 'lock-free' mean?</h2>
+<div class="outline-text-2" id="text-27">
+<p>
+Multithreaded code written such that the threads can never permanently
+lock up.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-28" class="outline-2">
+<h2 id="sec-28">"Busy waiting" and how it can be avoided</h2>
+<div class="outline-text-2" id="text-28">
+<p>
+When one thread is waiting for another thread using an active looping
+structure that doesn't do anything. This can be avoided using mutexes.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-29" class="outline-2">
+<h2 id="sec-29">IPC<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup></h2>
+<div class="outline-text-2" id="text-29">
+<ul class="org-ul">
+<li>File
+</li>
+<li>Signal
+</li>
+<li>Socket
+</li>
+<li>Message queue
+</li>
+<li>Pipe
+</li>
+<li>Shared memory
+</li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-30" class="outline-2">
+<h2 id="sec-30">How would you maintain concurrency on a shared page</h2>
+<div class="outline-text-2" id="text-30">
+<p>
+How would you maintain concurrency on a shared page being edited by multiple users simultaneously. 
+What if the page is being shared using a client- server mechanism.
+Represent the classes and explain the thread safety mechnism to avoid
+editing conflicts.
+</p>
+
+<p>
+Use <a href="http://en.wikipedia.org/wiki/Optimistic_concurrency_control">Optimistic concurrency control(OCC)</a>. OCC assumes that multiple
+transactions can frequently complete without interfering with each
+other. While running, transactions use data resources without
+acquiring locks on those resources. Before committing, each
+transaction verifies that no other transaction has modified the data
+it has read. If the check reveals conflicting modifications, the
+committing transaction rolls back and can be restarted.
+</p>
+
+<ul class="org-ul">
+<li>Divide the page into multiple segments. Assign each segment a
+version number which increments on every update.
+</li>
+<li>The list of version numbers is communicated to the clients as well.
+</li>
+<li>Before updating a segment, the client gets the latest page and its
+versions from the server. Updates the page and sends it across to
+the server along with the versions.
+</li>
+<li>f any part of the page is updated, the version on the server would
+change. If so, reject the clients request along with the latest page
+and the changed versions.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-31" class="outline-2">
+<h2 id="sec-31">Write a multi threaded C code with one thread printing all even numbers</h2>
+<div class="outline-text-2" id="text-31">
+<p>
+Write a multi threaded C code with one thread printing all even numbers 
+and the other all odd numbers. The output should always be in sequence
+ie. 0,1,2,3,4&#x2026;.etc
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;pthread.h&gt;</span>
+
+<span style="color: #98fb98;">pthread_t</span> <span style="color: #eedd82;">odd_thread</span>, <span style="color: #eedd82;">even_thread</span>;
+<span style="color: #98fb98;">pthread_mutex_t</span> <span style="color: #eedd82;">lock</span>;
+<span style="color: #98fb98;">pthread_cond_t</span> <span style="color: #eedd82;">cond</span>;
+
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">is_even</span>;
+
+<span style="color: #98fb98;">void</span>* <span style="color: #87cefa;">even_print</span>(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>) {
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">max</span> = data;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt; *max; i += 2) {
+    pthread_mutex_lock(&amp;lock);
+    <span style="color: #00ffff;">while</span> (is_even != 1) {
+      pthread_cond_wait(&amp;cond, &amp;lock);
+    }
+    is_even = 0;
+    printf(<span style="color: #ffa07a;">"%d, "</span>, i);
+    pthread_cond_signal(&amp;cond);
+    pthread_mutex_unlock(&amp;lock);
+  }
+  pthread_exit(0);
+}
+
+<span style="color: #98fb98;">void</span>* <span style="color: #87cefa;">odd_print</span>(<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>) {
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">max</span> = data;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #00ffff;">for</span> (i = 1; i &lt; *max; i += 2) {
+    pthread_mutex_lock(&amp;lock);
+    <span style="color: #00ffff;">while</span> (is_even != 0) {
+      pthread_cond_wait(&amp;cond, &amp;lock);
+    }
+    is_even = 1;
+    printf(<span style="color: #ffa07a;">"%d, "</span>, i);
+    pthread_cond_signal(&amp;cond);
+    pthread_mutex_unlock(&amp;lock);
+  }
+  pthread_exit(0);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">max</span> = 100;
+  is_even = 1;
+  pthread_cond_init(&amp;cond, <span style="color: #7fffd4;">NULL</span>);
+  pthread_mutex_init(&amp;lock, <span style="color: #7fffd4;">NULL</span>);
+  pthread_create(&amp;even_thread, <span style="color: #7fffd4;">NULL</span>, &amp;even_print, &amp;max);
+  pthread_create(&amp;odd_thread, <span style="color: #7fffd4;">NULL</span>, &amp;odd_print, &amp;max);
+  pthread_join(even_thread, <span style="color: #7fffd4;">NULL</span>);
+  pthread_join(odd_thread, <span style="color: #7fffd4;">NULL</span>);
+  pthread_mutex_destroy(&amp;lock);
+  pthread_cond_destroy(&amp;cond);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-32" class="outline-2">
+<h2 id="sec-32">Difference between concurrency and parallelism</h2>
+<div class="outline-text-2" id="text-32">
+<ul class="org-ul">
+<li>Concurrency is the programming concept where multiple threads are
+spawned by same process under same process space. The threads may or
+may not contest for the same resource. If they do contest for same
+resource then synchronization may be needs to avoid situations like
+deadlocks.
+</li>
+
+<li>Parallelism is the concept of dividing a particular computation into
+independent parallel processes which do not share the same process
+space. Parallelism requires multiple CPUs or a processor with
+multiple core.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-33" class="outline-2">
+<h2 id="sec-33">If two threads are incrementing a variable 100 times each</h2>
+<div class="outline-text-2" id="text-33">
+<p>
+If two threads are incrementing a variable 100 times each without
+synchronization, what would be the possible min and maximum value.
+</p>
+
+<p>
+max value: var + 200 (it is simple. so explaining only the below)
+min value: var + 2
+</p>
+<ol class="org-ol">
+<li>P1 &amp; P2 copy var
+</li>
+<li>P1 increments 99 times. so var becomes var + 99
+</li>
+<li>P2 increments once. so var becomes var + 1
+</li>
+<li>P1 copies var (value is var + 1)
+</li>
+<li>P2 increments 99 times. so var becomes var + 100
+</li>
+<li>P1 increments once. so var becomes var + 2
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-34" class="outline-2">
+<h2 id="sec-34">How would a mutex lock be implemented by the system?</h2>
+<div class="outline-text-2" id="text-34">
+<p>
+t is both complicated and differs from Unix to Unix variant.
+</p>
+
+<p>
+In Linux, for example, a system called <a href="http://en.wikipedia.org/wiki/Futex">Futex</a> (Short for Fast Userspace
+Mutex) is used.
+</p>
+
+<p>
+In this system an atomic increment and test operation is performed on
+the mutex variable in user space.
+</p>
+
+<p>
+If the result of the operation indicates that there was no contention
+on the lock, the call to pthread<sub>mutex</sub><sub>lock</sub> returns without ever
+context switching into the kernel, so the operation of taking a mutex
+can be very fast.
+</p>
+
+<p>
+Only if contention was detected does a system call (called futex) and
+context switch into the kernel occurs that puts the calling process to
+sleep until the mutex is released.
+</p>
+
+<p>
+There are many many more details, especially for reliable and/or
+priority inhertience mutexes, but this is the essence of it.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-35" class="outline-2">
+<h2 id="sec-35">What is a Executer in threads?</h2>
+<div class="outline-text-2" id="text-35">
+<p>
+Executer is kind of Theread Pool which keeps the number of thread in a
+process finite. It is very efficient as it controls process creating
+too many threads.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-36" class="outline-2">
+<h2 id="sec-36">what do threads share amongst themselves and what they dont share?</h2>
+<div class="outline-text-2" id="text-36">
+<p>
+Shared: 
+</p>
+<ul class="org-ul">
+<li>code 
+</li>
+<li>data 
+</li>
+<li>heap memory and memory address 
+</li>
+<li>memory management information (base/relocation &amp; limit registers,
+page tables 
+</li>
+<li>process state (new, ready, running, waiting, halted, etc) 
+</li>
+<li>I/O status information (opened file descriptors, etc) 
+</li>
+<li>signals 
+</li>
+<li>environment variables 
+</li>
+</ul>
+
+<p>
+Not shared: 
+</p>
+<ul class="org-ul">
+<li>registers 
+</li>
+<li>stack 
+</li>
+<li>thread specific data
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-37" class="outline-2">
+<h2 id="sec-37">Drawbacks of using mutexes in threads.</h2>
+<div class="outline-text-2" id="text-37">
+<p>
+mutex have property that only owner can release it. So in a threading
+environment if some thread sets mutex on some shared address and it
+goes for long time I/O sleep or not scheduled for a long time (may be
+cause of lower priority) then other threads needy of that locked
+address will have to wait (may be infinitely causing deadlock).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-38" class="outline-2">
+<h2 id="sec-38">A program has two functions 'reader<sub>func'</sub> and 'writer<sub>func'</sub>.</h2>
+<div class="outline-text-2" id="text-38">
+<p>
+A program has two functions '<code>reader_func</code>' and '<code>writer_func</code>'. The
+<code>reader_func</code> reads shared data and contains a critical section. The
+<code>writer_func</code> writes to shared data and contains a critical section.
+</p>
+
+<p>
+Reader threads call <code>reader_func</code>. Writer threads call <code>writer_func</code>.
+</p>
+
+<p>
+The condition is multiple reader threads can access the critical
+section at the same time as long as they don't access the critical
+section along with a writer. Only a single writer thread can access
+the critical section, i.e. no reader or other writer threads are
+allowed.
+</p>
+
+<p>
+Give the code segment, add code that uses mutexes that controls access
+to the critical sections so that the shared data is not corrupted and
+satisfies the give conditions. You can create as many mutexes and
+global variables as you want. Don't emphasize too much on syntax as to
+how to acquire and release locks on mutexes. Just use mutex.acquire()
+and mutex.release() .
+</p>
+
+<p>
+Code segment:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">reader_func</span>()
+{
+   <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">critical section</span>
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">writer_func</span>()
+{
+   <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">critical section</span>
+}
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">reader_count</span> = 0;  <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Keeps track of reader count</span>
+<span style="color: #98fb98;">Mutex</span> <span style="color: #eedd82;">csMutex</span>;         <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Mutex for the critical section.</span>
+<span style="color: #98fb98;">Mutex</span> <span style="color: #eedd82;">readerMutex</span>;     <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Mutex for the reader_count access. If you don't have this the reader_count will get corrupted.</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">reader_func</span>()
+{
+    readerMutex.acquire();
+    <span style="color: #00ffff;">if</span>(reader_count == 0)
+           csMutex.acquire();
+     reader_count++;
+  readerMutex.release();
+
+ <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">critical section</span>
+
+    readerMutex.acquire();
+   reader_count--;
+   <span style="color: #00ffff;">if</span>(reader_count == 0)
+        csMutex.release();
+   readerMutex.release();
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">writer_func</span>()
+{
+   csMutex.acquire();
+   <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">critical section</span>
+   csMutex.release();
+}
+</pre>
+</div>
+<ul class="org-ul">
+<li>Given a scenario where there will be lots of readers and few
+writers, the writers might not acquire a lock on csMutex at all
+give the way the code is written. There will always be bunch of
+readers accessing the critical section and all writers will have to
+most likely wait forever. So the above code favors the readers. 
+</li>
+<li>How would you change the above code to favor the writers? Whenever a
+writer is waiting, come up with a mechanism that won't allow any
+more readers into the critical section or acquire the lock. The
+existing readers will be allowed to finish and the last reader will
+release the lock. Once this is done the waiting writer will acquire
+the lock and do its task.
+</li>
+<li>You can also put a limit on the number of readers that can access
+the critical section. Once in a while or when a writer is waiting,
+change the limit to 0 so that no new reader can acquire the lock
+thereby allowing a writer to acquire the lock on the mutex. 
+</li>
+</ul>
+
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">MAX_READERS</span> = 10 <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">max readers 10*/</span> , <span style="color: #eedd82;">cSem</span> = 0 <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">counting semaphore*/</span>;
+<span style="color: #00ffff;">volatile</span> <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">requestCS</span> = <span style="color: #7fffd4;">false</span>;  <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">this flag is used by writer to request CS.</span>
+<span style="color: #98fb98;">WaitCondition</span> <span style="color: #eedd82;">waitForReadersExit</span>; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">condition variable which is invoked when readers==0.</span>
+<span style="color: #98fb98;">Mutex</span> <span style="color: #eedd82;">semMtx</span>;   <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">mutex for atomically operating on cSem variable</span>
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">reader_func</span>()
+{
+   <span style="color: #00ffff;">if</span>(!requestCS){ <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">if writer thread not waiting then proceed</span>
+        <span style="color: #00ffff;">if</span>(testAndIncrement(cSem,MAX_READERS)){ <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">if cSem less than MAX_READERS then increment it atomically proceed</span>
+                <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Critical Section processing</span>
+                semMtx.acquire();
+                        --cSem;
+                        <span style="color: #00ffff;">if</span>(requestCS &amp;&amp; cSem==0)                 <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">if writer requested CS and no readers are in CS then</span>
+                                waitForReadersExit.notify(semMtx);<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">unlock semMtx and notify writer</span>
+                        <span style="color: #00ffff;">else</span>
+                                semMtx.release();
+        }<span style="color: #00ffff;">else</span>{
+                <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">max readers in CS.  Try later</span>
+        }
+  }<span style="color: #00ffff;">else</span>{
+       <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">writer has placed request, wait till writer is done.</span>
+  }
+}
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">writer_func</span>()
+{
+   semMtx.acquire();
+           <span style="color: #00ffff;">if</span>(cSem!=0){
+                requestCS = <span style="color: #7fffd4;">true</span>; 
+                waitForReadersExit.wait(semMtx) <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">unlocks 'semMtx' and waits on the condition variable</span>
+           }
+           <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">critical section</span>
+           requestCS = <span style="color: #7fffd4;">false</span>;
+   semMtx.release();
+}
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">atomically test and increment semaphore variable</span>
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">testAndIncrement</span>(semVar,MAX_READERS){
+        semMtx.acquire();
+        <span style="color: #00ffff;">if</span>(MAX_READERS&gt;semVar){
+                ++semVar; semMtx.release(); <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+        }semMtx.release();
+        <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+}
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">pthread implementation of 1st reader/writer problem</span>
+<span style="color: #ff7f24;"> *  based on mutex and conditional variable</span>
+<span style="color: #ff7f24;">*/</span>
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">read_write_lock_s</span> {
+   <span style="color: #98fb98;">pthread_mutex_t</span> <span style="color: #eedd82;">mutex</span>;
+   <span style="color: #98fb98;">pthread_cond_t</span> <span style="color: #eedd82;">cv</span>;
+   <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">read_ctr</span>;
+   <span style="color: #98fb98;">it</span>  <span style="color: #eedd82;">write_ctr</span>;
+}<span style="color: #98fb98;">read_write_lock</span>;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">rw_lock_init</span>(<span style="color: #98fb98;">read_write_lock</span> *<span style="color: #eedd82;">rw_lock</span>)
+{
+  rw_lock-&gt;read_ctr = 0;
+  rw_lock-&gt;write_ctr = 0;
+  pthread_cond_init(&amp;rw_lock-&gt;cv);
+  pthread_mutex_init(&amp;rw_lock-&gt;mutex);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">rw_lock_acquire_read</span>(<span style="color: #98fb98;">read_write_lock</span> *<span style="color: #eedd82;">rw_lock</span>)
+{
+  pthread_mutex_lock(&amp;rw_lock-&gt;mutex);
+  <span style="color: #00ffff;">while</span>(rw_lock-&gt;write_ctr != 0) {  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">wait for writer */</span>
+    pthread_cond_wait(&amp;rw_lock-&gt;cv, &amp;rw_lock-&gt;mutex);
+  }
+  rw_lock-&gt;read_ctr++;
+  pthread_mutex_unlock(&amp;rw_lock-&gt;mutex);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">rw_lock_acquire_write</span>(<span style="color: #98fb98;">read_write_lock</span> *<span style="color: #eedd82;">rw_lock</span>)
+{
+  pthread_mutex_lock(&amp;rw_lock-&gt;mutex);
+  <span style="color: #00ffff;">while</span>(rw_lock-&gt;write_ctr !=0 || rw_lock-&gt;read_ctr&gt;;0) {
+    pthread_cond_wait(&amp;rw_lock-&gt;cv, &amp;rw_lock-&gt;mutex);
+    rw_lock-&gt;write_ctr=1;
+  }
+  pthread_mutex_unlock(&amp;rw_lock-&gt;mutex);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">rw_lock_release_read</span>(<span style="color: #98fb98;">read_write_lock</span> *<span style="color: #eedd82;">rw_lock</span>)
+{
+  pthread_mutex_lock(&amp;rw_lock-&gt;mutex);
+  <span style="color: #00ffff;">if</span>(--rw_lock-&gt;read_ctr == 0) { <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">no one is reading now; writer please hurry! */</span>
+    pthread_cond_broadcast(&amp;rw_lock-&gt;cv);
+  }
+  pthread_mutex_unlock(&amp;rw_lock-&gt;mutex);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">rw_lock_release_write</span>(<span style="color: #98fb98;">read_write_lock</span> *<span style="color: #eedd82;">rw_lock</span>)
+{
+  pthread_mutex_lock(&amp;rw_lock-&gt;mutex);
+  rw_lock-&gt;write_ctr = 0;
+  pthread_cond_broadcast(&amp;rw_lock-&gt;cv); <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">writer is done; readers in... */</span>
+  pthread_mutex_unlock(&amp;rw_lock-&gt;mutex);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-39" class="outline-2">
+<h2 id="sec-39">What is deadlock and what are the 4 conditions that creates a deadlock?</h2>
+<div class="outline-text-2" id="text-39">
+<ol class="org-ol">
+<li>Mutual exclusion condition: a resource that cannot be used by more
+than one process at a time
+</li>
+
+<li>Hold and wait condition: processes already holding resources may
+request new resources
+</li>
+
+<li>No preemption condition: No resource can be forcibly removed from a
+process holding it, resources can be released only by the explicit
+action of the process
+</li>
+
+<li>Circular wait condition: two or more processes form a circular
+chain where each process waits for a resource that the next process
+in the chain holds
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-40" class="outline-2">
+<h2 id="sec-40">Memory is an array R[1..n]. And a Block is essentially</h2>
+<div class="outline-text-2" id="text-40">
+<p>
+Memory is an array R[1..n]. And a Block is essentially all memory
+between two indexes i, and j. Now, each application uses some blocks.
+And blocks can be contained within one another or can be disjoint, but
+they cannot be intersecting otherwise. So in this scenario, write an
+algorithm to lock or unlock a block. if a block is locked, none of its
+child blocks should be allowed to be locked and none of its parent
+blocks should be allowed to be locked.
+</p>
+
+<p>
+Store the blocks in the form of a n-ary tree structure. ( i.e. every sub block of a block stored as a child).
+</p>
+
+<p>
+1.Initially a block( say Block1) is locked.
+2.Next when another block( say Block2) needs to be locked, find the common ancestor(say Block3) of Block1 and Block2.
+</p>
+<ol class="org-ol">
+<li>If (Block3==Block1) or (Block3==Block2)
+then dont grant lock to Block2.
+else
+grant lock to Block2.
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-41" class="outline-2">
+<h2 id="sec-41">What are the implications of doing a fork()</h2>
+<div class="outline-text-2" id="text-41">
+<p>
+What are the implications of doing a fork() from one of the threads of
+a multi-threaded process? Does child process get all threads of parent
+process?
+</p>
+
+<p>
+In linux, no, the "parent thread" that generated child process was
+obtained by child process, ignoring other threads in parent process.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-42" class="outline-2">
+<h2 id="sec-42">Implement a semaphore using a mutex</h2>
+<div class="outline-text-2" id="text-42">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Semaphore</span>()
+{
+<span style="color: #00ffff;">private</span>:
+  innerValue;
+  <span style="color: #98fb98;">Mutex</span> <span style="color: #eedd82;">mutex</span>;
+
+<span style="color: #00ffff;">public</span>:
+  <span style="color: #eedd82;">Semaphore</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">_v</span>)
+  {
+    innerValue=_v;
+  };
+
+  <span style="color: #98fb98;">void</span> <span style="color: #eedd82;">post</span>()
+  {
+    mutex.lock();
+    ++innerValue;
+    mutex.unlock();
+  };
+
+  <span style="color: #98fb98;">void</span> <span style="color: #eedd82;">wait</span>()
+  {
+    mutex.lock();
+    <span style="color: #00ffff;">while</span>(innerValue&lt;=0)
+    {
+      mutex.unlock;
+      sleep();
+      mutex.lock();
+    }
+
+    mutex.unlock();
+  };
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-43" class="outline-2">
+<h2 id="sec-43">different between exec and fork.</h2>
+<div class="outline-text-2" id="text-43">
+<p>
+Fork : The fork call basically makes a duplicate of the current
+process, identical in almost every way (not everything is copied over,
+for example, resource limits in some implementations but the idea is
+to create as close a copy as possible).
+</p>
+
+<p>
+The new process (child) gets a different process ID (PID) and has the
+the PID of the old process (parent) as its parent PID (PPID). Because
+the two processes are now running exactly the same code, they can tell
+which is which by the return code of fork - the child gets 0, the
+parent gets the PID of the child. This is all, of course, assuming the
+fork call works - if not, no child is created and the parent gets an
+error code.
+</p>
+
+<p>
+Exec : The exec call is a way to basically replace the entire current
+process with a new program. It loads the program into the current
+process space and runs it from the entry point. exec() replaces the
+current process with a the executable pointed by the function. Control
+never returns to the original program unless there is an exec() error.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-44" class="outline-2">
+<h2 id="sec-44">context switching</h2>
+<div class="outline-text-2" id="text-44">
+<p>
+asked simple question about context switching, advantage/disadvantage
+of process vs thread etc
+</p>
+
+<p>
+A process contains two kinds of information: resources that are
+available to the entire process such as program instructions, global
+data and working directory, and schedulable entities, which include
+program counters and stacks. A thread is an entity within a process
+that consists of the schedulable part of the process.
+</p>
+
+<p>
+A thread (an example of a lightweight process) which has the following
+properties:
+</p>
+
+<ol class="org-ol">
+<li>Resources and data can be shared between threads
+</li>
+<li>Each thread has its own stack
+</li>
+<li>Context switching is fast
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-45" class="outline-2">
+<h2 id="sec-45">spinlock vs mutex</h2>
+<div class="outline-text-2" id="text-45">
+</div><div id="outline-container-sec-45-1" class="outline-3">
+<h3 id="sec-45-1">The Theory</h3>
+<div class="outline-text-3" id="text-45-1">
+<p>
+In theory, when a thread tries to lock a mutex and it does not
+succeed, because the mutex is already locked, it will go to sleep,
+immediately allowing another thread to run. It will continue to sleep
+until being woken up, which will be the case once the mutex is being
+unlocked by whatever thread was holding the lock before. When a thread
+tries to lock a spinlock and it does not succeed, it will continuously
+re-try locking it, until it finally succeeds; thus it will not allow
+another thread to take its place (however, the operating system will
+forcefully switch to another thread, once the CPU runtime quantum of
+the current thread has been exceeded, of course).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-45-2" class="outline-3">
+<h3 id="sec-45-2">The Problem</h3>
+<div class="outline-text-3" id="text-45-2">
+<p>
+The problem with mutexes is that putting threads to sleep and waking
+them up again are both rather expensive operations, they'll need quite
+a lot of CPU instructions and thus also take some time. If now the
+mutex was only locked for a very short amount of time, the time spent
+in putting a thread to sleep and waking it up again might exceed the
+time the thread has actually slept by far and it might even exceed the
+time the thread would have wasted by constantly polling on a spinlock.
+On the other hand, polling on a spinlock will constantly waste CPU
+time and if the lock is held for a longer amount of time, this will
+waste a lot more CPU time and it would have been much better if the
+thread was sleeping instead.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-45-3" class="outline-3">
+<h3 id="sec-45-3">The Solution</h3>
+<div class="outline-text-3" id="text-45-3">
+<p>
+Using spinlocks on a single-core/single-CPU system makes usually no
+sense, since as long as the spinlock polling is blocking the only
+available CPU core, no other thread can run and since no other thread
+can run, the lock won't be unlocked either. IOW, a spinlock wastes
+only CPU time on those systems for no real benefit. If the thread was
+put to sleep instead, another thread could have ran at once, possibly
+unlocking the lock and then allowing the first thread to continue
+processing, once it woke up again.
+</p>
+
+<p>
+On a multi-core/multi-CPU systems, with plenty of locks that are held
+for a very short amount of time only, the time wasted for constantly
+putting threads to sleep and waking them up again might decrease
+runtime performance noticeably. When using spinlocks instead, threads
+get the chance to take advantage of their full runtime quantum (always
+only blocking for a very short time period, but then immediately
+continue their work), leading to much higher processing throughput.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-45-4" class="outline-3">
+<h3 id="sec-45-4">The Practice</h3>
+<div class="outline-text-3" id="text-45-4">
+<p>
+Since very often programmers cannot know in advance if mutexes or
+spinlocks will be better (e.g. because the number of CPU cores of the
+target architecture is unknown), nor can operating systems know if a
+certain piece of code has been optimized for single-core or multi-core
+environments, most systems don't strictly distinguish between mutexes
+and spinlocks. In fact, most modern operating systems have hybrid
+mutexes and hybrid spinlocks. What does that actually mean?
+</p>
+
+<p>
+A hybrid mutex behaves like a spinlock at first on a multi-core
+system. If a thread cannot lock the mutex, it won't be put to sleep
+immediately, since the mutex might get unlocked pretty soon, so
+instead the mutex will first behave exactly like a spinlock. Only if
+the lock has still not been obtained after a certain amount of time
+(or retries or any other measuring factor), the thread is really put
+to sleep. If the same system runs on a system with only a single core,
+the mutex will not spinlock, though, as, see above, that would not be
+beneficial.
+</p>
+
+<p>
+A hybrid spinlock behaves like a normal spinlock at first, but to
+avoid wasting too much CPU time, it may have a back-off strategy. It
+will usually not put the thread to sleep (since you don't want that to
+happen when using a spinlock), but it may decide to stop the thread
+(either immediately or after a certain amount of time) and allow
+another thread to run, thus increasing chances that the spinlock is
+unlocked (a pure thread switch is usually less expensive than one that
+involves putting a thread to sleep and waking it up again later on,
+though not by far).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-45-5" class="outline-3">
+<h3 id="sec-45-5">Summary</h3>
+<div class="outline-text-3" id="text-45-5">
+<p>
+If in doubt, use mutexes, they are usually the better choice and most
+modern systems will allow them to spinlock for a very short amount of
+time, if this seems beneficial. Using spinlocks can sometimes improve
+performance, but only under certain conditions and the fact that you
+are in doubt rather tells me, that you are not working on any project
+currently where a spinlock might be beneficial. You might consider
+using your own "lock object", that can either use a spinlock or a
+mutex internally (e.g. this behavior could be configurable when
+creating such an object), initially use mutexes everywhere and if you
+think that using a spinlock somewhere might really help, give it a try
+and compare the results (e.g. using a profiler), but be sure to test
+both cases, a single-core and a multi-core system before you jump to
+conclusions (and possibly different operating systems, if your code
+will be cross-platform).
+</p>
+
+<p>
+Spin-locks are best used when a piece of code cannot go to sleep
+state. Best example of such code would be interrupts request handlers.
+</p>
+
+<p>
+Mutexes are best used in user space program where sleeping of process
+does not affect the system in catastrophic way.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-46" class="outline-2">
+<h2 id="sec-46">thread and fork</h2>
+<div class="outline-text-2" id="text-46">
+<p>
+<a href="http://www.linuxprogrammingblog.com/threads-and-fork-think-twice-before-using-them">http://www.linuxprogrammingblog.com/threads-and-fork-think-twice-before-using-them</a>
+</p>
+
+<p>
+Lock-Free Queues
+<a href="http://www.drdobbs.com/parallel/lock-free-queues/208801974?pgno=1">http://www.drdobbs.com/parallel/lock-free-queues/208801974?pgno=1</a>
+</p>
+
+
+<p>
+<a href="http://udrepper.livejournal.com/20407.html">http://udrepper.livejournal.com/20407.html</a>
+</p>
+
+<p>
+<a href="http://www.linuxprogrammingblog.com/all-about-linux-signals?page=3#Signalsafe_functions">http://www.linuxprogrammingblog.com/all-about-linux-signals?page=3#Signalsafe_functions</a>
+</p>
+
+<p>
+<a href="http://www.linuxprogrammingblog.com/multi-thread-specific-bugs">http://www.linuxprogrammingblog.com/multi-thread-specific-bugs</a>
+</p>
+
+<p>
+<a href="http://unix.derkeiler.com/Newsgroups/comp.unix.programmer/2003-09/0672.html">http://unix.derkeiler.com/Newsgroups/comp.unix.programmer/2003-09/0672.html</a>
+</p>
+
+<p>
+<a href="http://jfdube.wordpress.com/">http://jfdube.wordpress.com/</a>
+</p>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://quizlet.com/24524062/c-multithreading-practice-interview-questions-flash-cards/">http://quizlet.com/24524062/c-multithreading-practice-interview-questions-flash-cards/</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="http://en.wikipedia.org/wiki/Banker's_algorithm">http://en.wikipedia.org/wiki/Banker's_algorithm</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.3" name="fn.3" class="footnum" href="#fnr.3">3</a></sup> <p class="footpara">
+<a href="http://en.wikipedia.org/wiki/Inter-process_communication">http://en.wikipedia.org/wiki/Inter-process_communication</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2016-05-25 Wed 23:22</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
