@@ -1,26 +1,6 @@
 #+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
-#+TITLE: Docker
+#+TITLE: Docker Notes
 #+OPTIONS: num:nil H:2
-
-* 基本概念
-Docker 包括三个基本概念
-+ 镜像（Image）
-+ 容器（Container）
-+ 仓库（Repository）
-** Docker 镜像
-Docker 镜像（Image） 就是一个只读的模板。
-*** 镜像的实现原理
-每个镜像都由很多层次构成，
-Docker 使用 [[https://en.wikipedia.org/wiki/UnionFS][Union FS]] 将这些不同的层结合到一个镜像中去.
-
-** Docker 容器
-Docker利用容器（Container）来运行应用。容器是独立运行的一个或一组应用，
-以及它们的运行态环境。对应的，虚拟机可以理解为模拟运行的一整套操作系统
-（提供了运行态环境和其他系统环境）和跑在上面的应用。
-
-
-** Docker 仓库
-仓库（Repository） 是集中存放镜像文件的场所。
 
 
 * Install
@@ -36,19 +16,219 @@ $ sudo apt-get install -y linux-image-extra-$(uname -r)
 $ sudo apt-get install apparmor
 $ sudo apt-get install -y docker-engine
 #+end_src
-* 
 
-
-* cc
-#+begin_src python
-
+* 基本概念
+Docker 包括三个基本概念
++ 镜像（Image）
++ 容器（Container）
++ 仓库（Repository）
+** Docker 镜像
+Docker 镜像（Image） 就是一个只读的模板。
+*** 镜像的实现原理
+每个镜像都由很多层次构成，
+Docker 使用 [[https://en.wikipedia.org/wiki/UnionFS][Union FS]] 将这些不同的层结合到一个镜像中去.
+*** Commands
+#+begin_src sh
+# 获取镜像
+$ sudo docker pull ubuntu:12.04
+# 列出本地镜像
+$ sudo docker images
+# 创建镜像
+$ sudo docker commit -m "Added json gem" -a "Docker Newbee" 0b2616b0e5a8 ouruser/sinatra:v2
 #+end_src
-
-#+begin_src c++
-
+利用 Dockerfile 来创建镜像
+#+begin_src sh
+# This is a comment
+FROM ubuntu:14.04
+MAINTAINER Docker Newbee <newbee@docker.com>
+RUN apt-get -qq update
+RUN apt-get -qqy install ruby ruby-dev
+RUN gem install sinatra
 #+end_src
-
+完成 Dockerfile 后可以使用 =docker build= 来生成镜像。
 
 #+begin_src sh
-
+# 从本地文件系统导入
+$ sudo cat ubuntu-14.04-x86_64-minimal.tar.gz |docker import - ubuntu:14.04
+# 上传镜像
+$ sudo docker push ouruser/sinatra
+# 存出镜像
+$ sudo docker save -o ubuntu_14.04.tar ubuntu:14.04
+# 载入镜像
+$ sudo docker load --input ubuntu_14.04.tar
+# or
+$ sudo docker load < ubuntu_14.04.tar
+# 移除本地镜像
+$ sudo docker rmi training/sinatra
+# 清理所有未打过标签的本地镜像
+$ sudo docker rmi $(docker images -q -f "dangling=true")
 #+end_src
+
+** Docker 容器
+Docker利用容器（Container）来运行应用。容器是独立运行的一个或一组应用，
+以及它们的运行态环境。对应的，虚拟机可以理解为模拟运行的一整套操作系统
+（提供了运行态环境和其他系统环境）和跑在上面的应用。
+
+#+begin_src sh
+# 新建并启动
+$ sudo docker run ubuntu:14.04 /bin/echo 'Hello world'
+$ sudo docker run -t -i ubuntu:14.04 /bin/bash
+# 后台(background)运行
+$ sudo docker run -d ubuntu:14.04 /bin/sh -c "while true; do echo hello world; sleep 1; done"
+# 终止容器
+$ docker stop
+# 进入容器
+$sudo docker attach nostalgic_hypatia
+# 导出容器
+$ sudo docker export 7691a814370e > ubuntu.tar
+# 导入容器快照
+$ cat ubuntu.tar | sudo docker import - test/ubuntu:v1.0
+# 删除容器
+$ sudo docker rm trusting_newton
+#+end_src
+
+** Docker 仓库
+仓库（Repository） 是集中存放镜像文件的场所。一个容易混淆的概念是注册
+服务器（Registry） 。实际上注册服务器是管理仓库的具体服务器，每个服务
+器上可以有多个仓库，而每个仓库下面有多个镜像。例如对于仓库地址
+dl.dockerpool.com/ubuntu来说， dl.dockerpool.com是注册服务器地
+址， ubuntu 是仓库名。例如对于仓库地址
+dl.dockerpool.com/ubuntu 来说， dl.dockerpool.com是注册服务器地
+址， ubuntu 是仓库名。
+
+* Docker 数据管理
+在容器中管理数据主要有两种方式：
++ 数据卷（Data volumes）
++ 数据卷容器（Data volume containers）
+** 数据卷
+数据卷是一个可供一个或多个容器使用的特殊目录，它绕过 UFS，可以提供很多有用的特性：
++ 数据卷可以在容器之间共享和重用
++ 对数据卷的修改会立马生效
++ 对数据卷的更新，不会影响镜像
++ 数据卷默认会一直存在，即使容器被删除
+
+#+begin_src sh
+# 创建一个数据卷
+$ sudo docker run -d -P --name web -v /webapp training/webapp python app.py
+# 删除数据卷
+$ docker rm -v
+# 挂载一个主机目录作为数据卷
+$ sudo docker run -d -P --name web -v /src/webapp:/opt/webapp training/webapp python app.py
+# 查看数据卷的具体信息
+$ docker inspect web
+# 挂载一个本地主机文件作为数据卷
+$ sudo docker run --rm -it -v ~/.bash_history:/.bash_history ubuntu /bin/bash
+#+end_src
+** 数据卷容器
+
+* 底层实现
+Docker 底层的核心技术包括 Linux 上的名字空间（amespaces） 、控制组
+（Control groups） 、Union 文件系统（Union file systems） 和容器格式
+（Container format）。
+
+传统的虚拟机通过在宿主主机中运行 hypervisor 来模拟一整套完整的硬
+件环境提供给虚拟机的操作系统。虚拟机系统看到的环境是可限制的，也是彼此隔
+离的。 这种直接的做法实现了对资源最完整的封装，但很多时候往往意味着系统资
+源的浪费。 例如，以宿主机和虚拟机系统都为 Linux 系统为例，虚拟机中运行的应
+用其实可以利用宿主机系统中的运行环境。
+
+在操作系统中，包括内核、文件系统、网络、PID、UID、IPC、内存、
+硬盘、CPU 等等，所有的资源都是应用进程直接共享的。 要想实现虚拟化，除了
+要实现对内存、CPU、网络IO、硬盘IO、存储空间等的限制外，还要实现文件系
+统、网络、PID、UID、IPC等等的相互隔离。 前者相对容易实现一些，后者则需要
+宿主机系统的深入支持。
+
+随着 Linux 系统对于名字空间功能的完善实现，程序员已经可以实现上面的所有需
+求，让某些进程在彼此隔离的名字空间中运行。大家虽然都共用一个内核和某些运
+行时环境（ 例如一些系统命令和系统库） ，但是彼此却看不到，都以为系统中只有
+自己的存在。这种机制就是容器（ Container） ，利用名字空间来做权限的隔离控
+制，利用 cgroups 来做资源分配。
+
+** 基本架构
+Docker 采用了 C/S架构，包括客户端和服务端。 Docker daemon 作为服务端接受
+来自客户的请求，并处理这些请求（创建、运行、分发容器） 。 客户端和服务端既
+可以运行在一个机器上，也可通过 socket 或者 RESTful API 来进行通信。
+
+Docker daemon 一般在宿主主机后台运行，等待接收来自客户端的消息。 Docker
+客户端则为用户提供一系列可执行命令，用户用这些命令实现跟 Docker daemon
+交互。
+
+** 名字空间
+名字空间是 Linux 内核一个强大的特性。每个容器都有自己单独的名字空间，运行
+在其中的应用都像是在独立的操作系统中运行一样。名字空间保证了容器之间彼此
+互不影响。
+
+*** pid 名字空间
+不同用户的进程就是通过 pid 名字空间隔离开的，且不同名字空间中可以有相同
+pid。所有的 LXC 进程在 Docker 中的父进程为Docker进程，每个 LXC 进程具有不
+同的名字空间。同时由于允许嵌套，因此可以很方便的实现嵌套的 Docker 容器。
+*** net 名字空间
+有了 pid 名字空间, 每个名字空间中的 pid 能够相互隔离，但是网络端口还是共享
+host 的端口。网络隔离是通过 net 名字空间实现的， 每个 net 名字空间有独立的
+网络设备, IP 地址, 路由表, /proc/net 目录。这样每个容器的网络就能隔离开来。
+Docker 默认采用 veth 的方式，将容器中的虚拟网卡同 host 上的一 个Docker 网桥
+docker0 连接在一起。
+*** ipc 名字空间
+容器中进程交互还是采用了 Linux 常见的进程间交互方法(interprocess
+communication - IPC), 包括信号量、消息队列和共享内存等。然而同 VM 不同的
+是，容器的进程间交互实际上还是 host 上具有相同 pid 名字空间中的进程间交互，
+因此需要在 IPC 资源申请时加入名字空间信息，每个 IPC 资源有一个唯一的 32 位
+id。
+*** mnt 名字空间
+类似 chroot，将一个进程放到一个特定的目录执行。mnt 名字空间允许不同名字空
+间的进程看到的文件结构不同，这样每个名字空间 中的进程所看到的文件目录就被
+隔离开了。同 chroot 不同，每个名字空间中的容器在 /proc/mounts 的信息只包含
+所在名字空间的 mount point。
+*** uts 名字空间
+UTS("UNIX Time-sharing System") 名字空间允许每个容器拥有独立的 hostname
+和 domain name, 使其在网络上可以被视作一个独立的节点而非 主机上的一个进
+程。
+*** user 名字空间
+每个容器可以有不同的用户和组 id, 也就是说可以在容器内用容器内部的用户
+执行程序而非主机上的用户。
+** 控制组
+控制组（ cgroups） 是 Linux 内核的一个特性，主要用来对共享资源进行隔离、限
+制、审计等。只有能控制分配到容器的资源，才能避免当多个容器同时运行时的对
+系统资源的竞争。
+
+** UnionFS
+联合文件系统（ UnionFS） 是一种分层、轻量级并且高性能的文件系统，它支持对
+文件系统的修改作为一次提交来一层层的叠加，同时可以将不同目录挂载到同一个
+虚拟文件系统下(unite several directories into a single virtual
+filesystem)。
+
+联合文件系统是 Docker 镜像的基础。镜像可以通过分层来进行继承，基于基础镜
+像（没有父镜像） ，可以制作各种具体的应用镜像。
+
+Docker 中使用的 AUFS（ AnotherUnionFS） 就是一种联合文件系统。 AUFS 支持
+为每一个成员目录（ 类似 Git 的分支） 设定只读（ readonly） 、读写（ readwrite）
+和写出（ whiteout-able） 权限, 同时 AUFS 里有一个类似分层的概念, 对只读权限的
+分支可以逻辑上进行增量地修改(不影响只读部分的)。
+** 容器格式
+最初，Docker 采用了 LXC 中的容器格式。自 1.20 版本开始，Docker 也开始支持
+新的 libcontainer 格式，并作为默认选项。
+** 网络实现
+Docker 的网络实现其实就是利用了 Linux 上的网络名字空间和虚拟网络设备
+（特别是 veth pair）。
+
+* Docker 其他项目
++ Docker Compose 项目: 负责快速在集群中部署分布式应用。
++ Docker Machine 项目: 负责在多种平台上快速安装 Docker 环境。
++ Docker Swarm 项目: 负责对 Docker 集群进行管理。
++ etcd: etcd 是 CoreOS 团队发起的一个管理配置信息和服务发现（ service
+  discovery） 的项目，
++ CoreOS: CoreOS的设计是为你提供能够像谷歌一样的大型互联网公司一样的基
+  础设施管理能力来动态扩展和管理的计算能力。
++ Kubernetes: Kubernetes 是 Google 团队发起并维护的基于Docker的开源容
+  器集群管理系统，它不仅支持常见的云平台，而且支持内部数据中心。
++ Mesos 项目: Mesos 是一个集群资源的自动调度平台，Apache 开源项目，它
+  的定位是要做数据中心操作系统的内核。
+
+* More reference
++ Docker 主站点: https://www.docker.io
++ Docker 注册中心API: http://docs.docker.com/reference/api/registry_api/
++ Docker Hub API: http://docs.docker.com/reference/api/docker-io_api/
++ Docker 远端应用API: http://docs.docker.com/reference/api/docker_remote_api/
++ Dockerfile 参考：https://docs.docker.com/reference/builder/
++ Dockerfile 最佳实践：https://docs.docker.com/articles/dockerfile_bestpractices/
+
