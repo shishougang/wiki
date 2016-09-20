@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Linux Kernel Things</title>
+<!-- 2016-09-21 Wed 00:09 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Linux Kernel Things</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">GFP<sub>KERNEL</sub> and GFP<sub>ATOMIC</sub></a></li>
+<li><a href="#sec-2">Linking to a kernel module a precompiled object file</a></li>
+<li><a href="#sec-3">Kernel Timers</a></li>
+<li><a href="#sec-4">cc</a></li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">GFP<sub>KERNEL</sub> and GFP<sub>ATOMIC</sub></h2>
+<div class="outline-text-2" id="text-1">
+<p>
+GFP<sub>ATOMIC</sub> is used when (a) you are inside a completion handler, an
+interrupt, bottom half, tasklet or timer, or (b) you are holding a
+spinlock or rwlock (does not apply to semaphores), or (c)
+current-&gt;state != TASK<sub>RUNNING</sub>, this is the case only after you've
+changed it.
+</p>
+
+<p>
+Changed to GPF<sub>ATOMIC</sub> and syslog is quiet!!! 
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Linking to a kernel module a precompiled object file</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+build a shipped object file(3.3 Binary Blobs in
+Document/kbuild/modules.txt and  3. Creating a Kbuild File for an
+External Module)
+</p>
+
+<ol class="org-ol">
+<li>build the obj file
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #87cefa;">ifneq</span> ($(KERNELRELEASE),)
+obj-y   := xxxx.o <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">your obj files goes here.</span>
+<span style="color: #00ffff;">else</span>
+KERNELDIR ?= /lib/modules/$(shell uname -r)/build
+PWD       := $(shell pwd)
+
+default:
+       $(MAKE) -C $(KERNELDIR) <span style="color: #eedd82;">M</span>=$(PWD)
+
+endif
+
+clean:
+       rm -rf *.o *~ core .depend .*.cmd *.ko *.mod.c .tmp_versions
+
+depend .depend dep:
+       $(CC) $(CFLAGS) -M *.c &gt; .depend
+
+
+<span style="color: #87cefa;">ifeq</span> (.depend,$(wildcard .depend))
+include .depend
+endif
+</pre>
+</div>
+</li>
+<li>rename the shipped .o file to .o<sub>shipped</sub>
+<div class="org-src-container">
+
+<pre class="src src-sh">mv ex_obj.o ex_obj.o_shipped
+</pre>
+</div>
+</li>
+<li>build
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-sh">test-y := ex_obj.o
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">=== 3. Creating a Kbuild File for an External Module
+
+In the last section we saw the command to build a module for the
+running kernel. The module is not actually built, however, because a
+build file is required. Contained<span style="color: #00ffff;"> in</span> this file will be the name of
+the module(s) being built, along with the list of requisite source
+files. The file may be as simple as a single line:
+
+        obj-m := &lt;module_name&gt;.o
+
+The kbuild system will build &lt;module_name&gt;.o from &lt;module_name&gt;.c,
+and, after linking, will result<span style="color: #00ffff;"> in</span> the kernel module &lt;module_name&gt;.ko.
+The above line can be put<span style="color: #00ffff;"> in</span> either a <span style="color: #ffa07a;">"Kbuild"</span> file or a <span style="color: #ffa07a;">"Makefile."</span>
+When the module is built from multiple sources, an additional line is
+needed listing the files:
+
+        &lt;module_name&gt;-y := &lt;src1&gt;.o &lt;src2&gt;.o ...
+
+NOTE: Further documentation describing the syntax used by kbuild is
+located<span style="color: #00ffff;"> in</span> Documentation/kbuild/makefiles.txt.
+
+The examples below demonstrate how to create a build file for the
+module 8123.ko, which is built from the following files:
+
+        8123_if.c
+        8123_if.h
+        8123_pci.c
+        8123_bin.o_shipped      &lt;= Binary blob
+
+--- 3.1 Shared Makefile
+
+        An external module always includes a wrapper makefile that
+        supports building the module using <span style="color: #ffa07a;">"make"</span> with no arguments.
+        This target is not used by kbuild; it is only for convenience.
+        Additional functionality, such as test targets, can be included
+        but should be filtered out from kbuild due to possible name
+        clashes.
+
+        Example 1:
+                --&gt; filename: Makefile
+                ifneq ($(KERNELRELEASE),)
+                <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">kbuild part of makefile</span>
+                obj-m  := 8123.o
+                8123-y := 8123_if.o 8123_pci.o 8123_bin.o
+
+                <span style="color: #00ffff;">else</span>
+                <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">normal makefile</span>
+                KDIR ?= /lib/modules/<span style="color: #fa8072;">`uname -r`</span>/build
+
+                default:
+                        $(MAKE) -C $(KDIR) <span style="color: #eedd82;">M</span>=$<span style="color: #eedd82;">$PWD</span>
+
+                <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Module specific targets</span>
+                genbin:
+                        <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"X"</span> &gt; 8123_bin.o_shipped
+
+                endif
+
+        The check for KERNELRELEASE is used to separate the two parts
+        of the makefile. In the example, kbuild will only see the two
+        assignments, whereas <span style="color: #ffa07a;">"make"</span> will see everything except these
+        two assignments. This is due to two passes made on the file:
+        the first pass is by the <span style="color: #ffa07a;">"make"</span> instance run on the command
+        line; the second pass is by the kbuild system, which is
+        initiated by the parameterized <span style="color: #ffa07a;">"make"</span><span style="color: #00ffff;"> in</span> the default target.
+
+--- 3.2 Separate Kbuild File and Makefile
+
+        In newer versions of the kernel, kbuild will first look for a
+        file named <span style="color: #ffa07a;">"Kbuild,"</span> and only if that is not found, will it
+        <span style="color: #00ffff;">then</span> look for a makefile. Utilizing a <span style="color: #ffa07a;">"Kbuild"</span> file allows us
+        to split up the makefile from example 1 into two files:
+
+        Example 2:
+                --&gt; filename: Kbuild
+                obj-m  := 8123.o
+                8123-y := 8123_if.o 8123_pci.o 8123_bin.o
+
+                --&gt; filename: Makefile
+                KDIR ?= /lib/modules/<span style="color: #fa8072;">`uname -r`</span>/build
+
+                default:
+                        $(MAKE) -C $(KDIR) <span style="color: #eedd82;">M</span>=$<span style="color: #eedd82;">$PWD</span>
+
+                <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Module specific targets</span>
+                genbin:
+                        <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"X"</span> &gt; 8123_bin.o_shipped
+
+        The split<span style="color: #00ffff;"> in</span> example 2 is questionable due to the simplicity of
+        each file; however, some external modules use makefiles
+        consisting of several hundred lines, and here it really pays
+        off to separate the kbuild part from the rest.
+
+        The next example shows a backward compatible version.
+
+        Example 3:
+                --&gt; filename: Kbuild
+                obj-m  := 8123.o
+                8123-y := 8123_if.o 8123_pci.o 8123_bin.o
+
+                --&gt; filename: Makefile
+                ifneq ($(KERNELRELEASE),)
+                <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">kbuild part of makefile</span>
+                include Kbuild
+
+                <span style="color: #00ffff;">else</span>
+                <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">normal makefile</span>
+                KDIR ?= /lib/modules/<span style="color: #fa8072;">`uname -r`</span>/build
+
+                default:
+                        $(MAKE) -C $(KDIR) <span style="color: #eedd82;">M</span>=$<span style="color: #eedd82;">$PWD</span>
+
+                <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Module specific targets</span>
+                genbin:
+                        <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"X"</span> &gt; 8123_bin.o_shipped
+
+                endif
+
+        Here the <span style="color: #ffa07a;">"Kbuild"</span> file is included from the makefile. This
+        allows an older version of kbuild, which only knows of
+        makefiles, to be used when the <span style="color: #ffa07a;">"make"</span> and kbuild parts are
+        split into separate files.
+
+--- 3.3 Binary Blobs
+
+        Some external modules need to include an object file as a blob.
+        kbuild has support for this, but requires the blob file to be
+        named &lt;filename&gt;_shipped. When the kbuild rules kick<span style="color: #00ffff;"> in</span>, a copy
+        of &lt;filename&gt;_shipped is created with _shipped stripped off,
+        giving us &lt;filename&gt;. This shortened filename can be used<span style="color: #00ffff;"> in</span>
+        the assignment to the module.
+
+        Throughout this section, 8123_bin.o_shipped has been used to
+        build the kernel module 8123.ko; it has been included as
+        8123_bin.o.
+
+                8123-y := 8123_if.o 8123_pci.o 8123_bin.o
+
+        Although there is no distinction between the ordinary source
+        files and the binary file, kbuild will pick up different rules
+        when creating the object file for the module.
+
+--- 3.4 Building Multiple Modules
+
+        kbuild supports building multiple modules with a single build
+        file. For example, if you wanted to build two modules, foo.ko
+        and bar.ko, the kbuild lines would be:
+
+                obj-m := foo.o bar.o
+                foo-y := &lt;foo_srcs&gt;
+                bar-y := &lt;bar_srcs&gt;
+
+        It is that simple!
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Kernel Timers</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+example:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">timer_list</span>       <span style="color: #eedd82;">mac_phy_timer</span>;
+init_timer(&amp;mac-&gt;mac_phy_timer);
+mac-&gt;mac_phy_timer.data     = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>)mac;
+mac-&gt;mac_phy_timer.function = (<span style="color: #98fb98;">void</span> *)athr_gmac_timer_func;
+athr_gmac_timer_func(mac);
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">start 1</span>
+mac-&gt;mac_phy_timer.expires = jiffies + mac-&gt;timer_freq;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">start 2</span>
+mod_timer(&amp;mac-&gt;mac_phy_timer,(jiffies + mac-&gt;timer_freq));
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">del</span>
+del_timer(&amp;mac-&gt;mac_phy_timer);
+</pre>
+</div>
+
+<p>
+<code>mod_timer(timer, expires)</code> is equivalent to:
+<code>del_timer(timer); timer-&gt;expires = expires; add_timer(timer);</code>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">cc</h2>
+<div class="outline-text-2" id="text-4">
+<div class="org-src-container">
+
+<pre class="src src-c++"></pre>
+</div>
+
+
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2016-09-21 Wed 00:09</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
