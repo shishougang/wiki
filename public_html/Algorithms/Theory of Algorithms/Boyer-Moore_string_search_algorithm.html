@@ -1,0 +1,592 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Boyer–Moore string search algorithm</title>
+<!-- 2016-09-28 Wed 22:01 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+<script type="text/javascript" src="http://orgmode.org/mathjax/MathJax.js"></script>
+<script type="text/javascript">
+<!--/*--><![CDATA[/*><!--*/
+    MathJax.Hub.Config({
+        // Only one of the two following lines, depending on user settings
+        // First allows browser-native MathML display, second forces HTML/CSS
+        //  config: ["MMLorHTML.js"], jax: ["input/TeX"],
+            jax: ["input/TeX", "output/HTML-CSS"],
+        extensions: ["tex2jax.js","TeX/AMSmath.js","TeX/AMSsymbols.js",
+                     "TeX/noUndefined.js"],
+        tex2jax: {
+            inlineMath: [ ["\\(","\\)"] ],
+            displayMath: [ ['$$','$$'], ["\\[","\\]"], ["\\begin{displaymath}","\\end{displaymath}"] ],
+            skipTags: ["script","noscript","style","textarea","pre","code"],
+            ignoreClass: "tex2jax_ignore",
+            processEscapes: false,
+            processEnvironments: true,
+            preview: "TeX"
+        },
+        showProcessingMessages: true,
+        displayAlign: "center",
+        displayIndent: "2em",
+
+        "HTML-CSS": {
+             scale: 100,
+             availableFonts: ["STIX","TeX"],
+             preferredFont: "TeX",
+             webFont: "TeX",
+             imageFont: "TeX",
+             showMathMenu: true,
+        },
+        MMLorHTML: {
+             prefer: {
+                 MSIE:    "MML",
+                 Firefox: "MML",
+                 Opera:   "HTML",
+                 other:   "HTML"
+             }
+        }
+    });
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Boyer–Moore string search algorithm</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">Shift Rules</a>
+<ul>
+<li><a href="#sec-2-1">The Bad Character Rule</a></li>
+<li><a href="#sec-2-2">The Good Suffix Rule[edit]</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">The Galil Rule</a></li>
+<li><a href="#sec-4">Implementations</a>
+<ul>
+<li><a href="#sec-4-1">Source codes</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Overview</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+The Boyer–Moore string search algorithm<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup> is a particularly efficient
+string searching algorithm, and it has been the standard benchmark for
+the practical string search literature. The Boyer-Moore algorithm was
+invented by Bob Boyer and J. Strother Moore, and published in the
+October 1977 issue of the Communications of the ACM , and a copy of
+that article is available at
+<a href="http://www.cs.utexas.edu/~moore/publications/fstrpos.pdf">http://www.cs.utexas.edu/~moore/publications/fstrpos.pdf</a>.
+</p>
+
+<p>
+The Boyer-Moore algorithm uses two precomputed tables to give better
+performance than a naive search. These tables depend on the pattern
+being searched for, and give the Boyer-Moore algorithm larger a memory
+footprint and startup costs than a simpler algorithm, but these costs
+are recovered quickly during the searching process, especially if the
+pattern is longer than a few elements.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Shift Rules</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+A shift is calculated by applying two rules: <b>the bad character rule</b>
+and <b>the good suffix rule</b>. The actual shifting offset is the <b>maximum
+of the shifts</b> calculated by these rules.
+</p>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">The Bad Character Rule</h3>
+<div class="outline-text-3" id="text-2-1">
+
+<div class="figure">
+<p><img src="./files/bad_character_rule.jpg" alt="bad_character_rule.jpg" />
+</p>
+</div>
+
+<ol class="org-ol">
+<li>comparison failed, two shift
+</li>
+<li>The next occurrence of that character to the left in P is found:
+shift to that
+</li>
+<li>mismatched character does not occur: shift the entirety of P past
+the point of mismatch
+</li>
+</ol>
+</div>
+<ul class="org-ul"><li><a id="sec-2-1-1" name="sec-2-1-1"></a>Preprocessing<br  /><div class="outline-text-4" id="text-2-1-1">
+<p>
+create a 2D table which is indexed first by the index of the character
+c in the alphabet and second by the index i in the pattern
+</p>
+
+<p>
+This lookup will return the occurrence of c in P with the next-highest
+index  j&lt;i  or -1 if there is no such occurrence.
+</p>
+
+<p>
+array[c] return the left occurrence character.
+</p>
+
+<p>
+The proposed shift will then be {\displaystyle i-j} i-j, with
+O(1) lookup time and O(kn) space (a finite alphabet of length k).
+</p>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">The Good Suffix Rule[edit]</h3>
+<div class="outline-text-3" id="text-2-2">
+
+<div class="figure">
+<p><img src="./files/good_suffix_rule.jpg" alt="good_suffix_rule.jpg" />
+</p>
+</div>
+
+<p>
+change a character into substring
+</p>
+</div>
+<ul class="org-ul"><li><a id="sec-2-2-1" name="sec-2-2-1"></a>Preprocessing<br  /><div class="outline-text-4" id="text-2-2-1">
+<p>
+The good suffix rule requires two tables: one for use in the general
+case, and another for use when either the general case returns no
+meaningful result or a match occurs. These tables will be designated L
+and H respectively. 
+</p>
+
+<p>
+For each i, L[i] is the largest position less than n such that string
+P[i..n] matches a suffix of P[1..L[i]] and such that the character
+preceding that suffix is not equal to  P[i-1]. L[i] is defined to be
+zero if there is no position satisfying the condition.
+</p>
+
+<p>
+Let H[i] denote the length of the largest suffix of P[i..n] that is
+also a prefix of P, if one exists. If none exists, let H[i] be zero.
+</p>
+
+<p>
+Both of these tables are constructible in  O(n) time and use O(n)
+ space. The alignment shift for index i in P is given by n-L[i] or
+ n-H[i]. H should only be used if L[i] is zero or a match has been
+ found.
+</p>
+</div>
+</li></ul>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">The Galil Rule</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+As opposed to shifting, the Galil rule deals with speeding up the
+actual comparisons done at each alignment by skipping sections that
+are known to match. Suppose that at an alignment k1, P is compared
+with T down to character c of T. Then if P is shifted to k2 such that
+its left end is between c and k1, in the next comparison phase a
+prefix of P must match the substring T[(k2 - n)..k1]. Thus if the
+comparisons get down to position k1 of T, an occurrence of P can be
+recorded without explicitly comparing past k1.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Implementations</h2>
+<div class="outline-text-2" id="text-4">
+<ul class="org-ul">
+<li>In C++, Boost provides the generic <a href="http://www.boost.org/doc/libs/1_58_0/libs/algorithm/doc/html/algorithm/Searching.html#the_boost_algorithm_library.Searching.BoyerMoore">Boyer–Moore search</a> implementation
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">Source codes</h3>
+<div class="outline-text-3" id="text-4-1">
+</div><ul class="org-ul"><li><a id="sec-4-1-1" name="sec-4-1-1"></a>Python<br  /><div class="outline-text-4" id="text-4-1-1">
+<div class="org-src-container">
+
+<pre class="src src-python"><span style="color: #00ffff;">def</span> <span style="color: #87cefa;">alphabet_index</span>(c):
+    <span style="color: #ffa07a;">"""</span>
+<span style="color: #ffa07a;">    Returns the index of the given character in the English alphabet, counting from 0.</span>
+<span style="color: #ffa07a;">    """</span>
+    <span style="color: #00ffff;">return</span> <span style="color: #b0c4de;">ord</span>(c.lower()) - 97 <span style="color: #ff7f24;"># 'a' is ASCII character 97</span>
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">match_length</span>(S, idx1, idx2):
+    <span style="color: #ffa07a;">"""</span>
+<span style="color: #ffa07a;">    Returns the length of the match of the substrings of S beginning at idx1 and idx2.</span>
+<span style="color: #ffa07a;">    """</span>
+    <span style="color: #00ffff;">if</span> idx1 == idx2:
+        <span style="color: #00ffff;">return</span> <span style="color: #b0c4de;">len</span>(S) - idx1
+    <span style="color: #ffebcd; background-color: #2f4f4f;">match_count</span> = 0
+    <span style="color: #00ffff;">while</span> idx1 &lt; <span style="color: #b0c4de;">len</span>(S) <span style="color: #00ffff;">and</span> idx2 &lt; <span style="color: #b0c4de;">len</span>(S) <span style="color: #00ffff;">and</span> S[idx1] == S[idx2]:
+        <span style="color: #ffebcd; background-color: #2f4f4f;">match_count</span> += 1
+        <span style="color: #ffebcd; background-color: #2f4f4f;">idx1</span> += 1
+        <span style="color: #ffebcd; background-color: #2f4f4f;">idx2</span> += 1
+    <span style="color: #00ffff;">return</span> match_count
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">fundamental_preprocess</span>(S):
+    <span style="color: #ffa07a;">"""</span>
+<span style="color: #ffa07a;">    Returns Z, the Fundamental Preprocessing of S. Z[i] is the length of the substring </span>
+<span style="color: #ffa07a;">    beginning at i which is also a prefix of S. This pre-processing is done in O(n) time,</span>
+<span style="color: #ffa07a;">    where n is the length of S.</span>
+<span style="color: #ffa07a;">    """</span>
+    <span style="color: #00ffff;">if</span> <span style="color: #b0c4de;">len</span>(S) == 0: <span style="color: #ff7f24;"># Handles case of empty string</span>
+        <span style="color: #00ffff;">return</span> []
+    <span style="color: #00ffff;">if</span> <span style="color: #b0c4de;">len</span>(S) == 1: <span style="color: #ff7f24;"># Handles case of single-character string</span>
+        <span style="color: #00ffff;">return</span> [1]
+    z = [0 <span style="color: #00ffff;">for</span> x <span style="color: #00ffff;">in</span> S]
+    z[0] = <span style="color: #b0c4de;">len</span>(S)
+    z[1] = match_length(S, 0, 1)
+    <span style="color: #00ffff;">for</span> i <span style="color: #00ffff;">in</span> <span style="color: #b0c4de;">range</span>(2, 1+z[1]): <span style="color: #ff7f24;"># Optimization from exercise 1-5</span>
+        z[i] = z[1]-i+1
+    <span style="color: #ff7f24;"># Defines lower and upper limits of z-box</span>
+    l = 0
+    r = 0
+    <span style="color: #00ffff;">for</span> i <span style="color: #00ffff;">in</span> <span style="color: #b0c4de;">range</span>(2+z[1], <span style="color: #b0c4de;">len</span>(S)):
+        <span style="color: #00ffff;">if</span> i &lt;= r: <span style="color: #ff7f24;"># i falls within existing z-box</span>
+            k = i-l
+            b = z[k]
+            a = r-i+1
+            <span style="color: #00ffff;">if</span> b &lt; a: <span style="color: #ff7f24;"># b ends within existing z-box</span>
+                z[i] = b
+            <span style="color: #00ffff;">else:</span> <span style="color: #ff7f24;"># b ends at or after the end of the z-box, we need to do an explicit match to the right of the z-box</span>
+                z[i] = a+match_length(S, a, r+1)
+                l = i
+                r = i+z[i]-1
+        <span style="color: #00ffff;">else:</span> <span style="color: #ff7f24;"># i does not reside within existing z-box</span>
+            z[i] = match_length(S, 0, i)
+            <span style="color: #00ffff;">if</span> z[i] &gt; 0:
+                l = i
+                r = i+z[i]-1
+    <span style="color: #00ffff;">return</span> z
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">bad_character_table</span>(S):
+    <span style="color: #ffa07a;">"""</span>
+<span style="color: #ffa07a;">    Generates R for S, which is an array indexed by the position of some character c in the </span>
+<span style="color: #ffa07a;">    English alphabet. At that index in R is an array of length |S|+1, specifying for each</span>
+<span style="color: #ffa07a;">    index i in S (plus the index after S) the next location of character c encountered when</span>
+<span style="color: #ffa07a;">    traversing S from right to left starting at i. This is used for a constant-time lookup</span>
+<span style="color: #ffa07a;">    for the bad character rule in the Boyer-Moore string search algorithm, although it has</span>
+<span style="color: #ffa07a;">    a much larger size than non-constant-time solutions.</span>
+<span style="color: #ffa07a;">    """</span>
+    <span style="color: #00ffff;">if</span> <span style="color: #b0c4de;">len</span>(S) == 0:
+        <span style="color: #00ffff;">return</span> [[] <span style="color: #00ffff;">for</span> a <span style="color: #00ffff;">in</span> <span style="color: #b0c4de;">range</span>(26)]
+    R = [[-1] <span style="color: #00ffff;">for</span> a <span style="color: #00ffff;">in</span> <span style="color: #b0c4de;">range</span>(26)]
+    <span style="color: #ffebcd; background-color: #2f4f4f;">alpha</span> = [-1 <span style="color: #00ffff;">for</span> a <span style="color: #00ffff;">in</span> <span style="color: #b0c4de;">range</span>(26)]
+    <span style="color: #00ffff;">for</span> i, c <span style="color: #00ffff;">in</span> <span style="color: #b0c4de;">enumerate</span>(S):
+        alpha[alphabet_index(c)] = i
+        <span style="color: #00ffff;">for</span> j, a <span style="color: #00ffff;">in</span> <span style="color: #b0c4de;">enumerate</span>(alpha):
+            R[j].append(a)
+    <span style="color: #00ffff;">return</span> R
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">good_suffix_table</span>(S):
+    <span style="color: #ffa07a;">"""</span>
+<span style="color: #ffa07a;">    Generates L for S, an array used in the implementation of the strong good suffix rule.</span>
+<span style="color: #ffa07a;">    L[i] = k, the largest position in S such that S[i:] (the suffix of S starting at i) matches</span>
+<span style="color: #ffa07a;">    a suffix of S[:k] (a substring in S ending at k). Used in Boyer-Moore, L gives an amount to</span>
+<span style="color: #ffa07a;">    shift P relative to T such that no instances of P in T are skipped and a suffix of P[:L[i]]</span>
+<span style="color: #ffa07a;">    matches the substring of T matched by a suffix of P in the previous match attempt.</span>
+<span style="color: #ffa07a;">    Specifically, if the mismatch took place at position i-1 in P, the shift magnitude is given</span>
+<span style="color: #ffa07a;">    by the equation len(P) - L[i]. In the case that L[i] = -1, the full shift table is used.</span>
+<span style="color: #ffa07a;">    Since only proper suffixes matter, L[0] = -1.</span>
+<span style="color: #ffa07a;">    """</span>
+    L = [-1 <span style="color: #00ffff;">for</span> c <span style="color: #00ffff;">in</span> S]
+    N = fundamental_preprocess(S[::-1]) <span style="color: #ff7f24;"># S[::-1] reverses S</span>
+    N.reverse()
+    <span style="color: #00ffff;">for</span> j <span style="color: #00ffff;">in</span> <span style="color: #b0c4de;">range</span>(0, <span style="color: #b0c4de;">len</span>(S)-1):
+        i = <span style="color: #b0c4de;">len</span>(S) - N[j]
+        <span style="color: #00ffff;">if</span> i != <span style="color: #b0c4de;">len</span>(S):
+            L[i] = j
+    <span style="color: #00ffff;">return</span> L
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">full_shift_table</span>(S):
+    <span style="color: #ffa07a;">"""</span>
+<span style="color: #ffa07a;">    Generates F for S, an array used in a special case of the good suffix rule in the Boyer-Moore</span>
+<span style="color: #ffa07a;">    string search algorithm. F[i] is the length of the longest suffix of S[i:] that is also a</span>
+<span style="color: #ffa07a;">    prefix of S. In the cases it is used, the shift magnitude of the pattern P relative to the</span>
+<span style="color: #ffa07a;">    text T is len(P) - F[i] for a mismatch occurring at i-1.</span>
+<span style="color: #ffa07a;">    """</span>
+    F = [0 <span style="color: #00ffff;">for</span> c <span style="color: #00ffff;">in</span> S]
+    Z = fundamental_preprocess(S)
+    <span style="color: #ffebcd; background-color: #2f4f4f;">longest</span> = 0
+    <span style="color: #00ffff;">for</span> i, zv <span style="color: #00ffff;">in</span> <span style="color: #b0c4de;">enumerate</span>(reversed(Z)):
+        <span style="color: #ffebcd; background-color: #2f4f4f;">longest</span> = <span style="color: #b0c4de;">max</span>(zv, longest) <span style="color: #00ffff;">if</span> zv == i+1 <span style="color: #00ffff;">else</span> longest
+        F[-i-1] = longest
+    <span style="color: #00ffff;">return</span> F
+
+<span style="color: #00ffff;">def</span> <span style="color: #87cefa;">string_search</span>(P, T):
+    <span style="color: #ffa07a;">"""</span>
+<span style="color: #ffa07a;">    Implementation of the Boyer-Moore string search algorithm. This finds all occurrences of P</span>
+<span style="color: #ffa07a;">    in T, and incorporates numerous ways of pre-processing the pattern to determine the optimal </span>
+<span style="color: #ffa07a;">    amount to shift the string and skip comparisons. In practice it runs in O(m) (and even </span>
+<span style="color: #ffa07a;">    sublinear) time, where m is the length of T. This implementation performs a case-insensitive</span>
+<span style="color: #ffa07a;">    search on ASCII alphabetic characters, spaces not included.</span>
+<span style="color: #ffa07a;">    """</span>
+    <span style="color: #00ffff;">if</span> <span style="color: #b0c4de;">len</span>(P) == 0 <span style="color: #00ffff;">or</span> <span style="color: #b0c4de;">len</span>(T) == 0 <span style="color: #00ffff;">or</span> <span style="color: #b0c4de;">len</span>(T) &lt; <span style="color: #b0c4de;">len</span>(P):
+        <span style="color: #00ffff;">return</span> []
+
+    <span style="color: #ffebcd; background-color: #2f4f4f;">matches</span> = []
+
+    <span style="color: #ff7f24;"># Preprocessing</span>
+    R = bad_character_table(P)
+    L = good_suffix_table(P)
+    F = full_shift_table(P)
+
+    k = <span style="color: #b0c4de;">len</span>(P) - 1      <span style="color: #ff7f24;"># Represents alignment of end of P relative to T</span>
+    <span style="color: #ffebcd; background-color: #2f4f4f;">previous_k</span> = -1     <span style="color: #ff7f24;"># Represents alignment in previous phase (Galil's rule)</span>
+    <span style="color: #00ffff;">while</span> k &lt; <span style="color: #b0c4de;">len</span>(T):
+        i = <span style="color: #b0c4de;">len</span>(P) - 1  <span style="color: #ff7f24;"># Character to compare in P</span>
+        h = k           <span style="color: #ff7f24;"># Character to compare in T</span>
+        <span style="color: #00ffff;">while</span> i &gt;= 0 <span style="color: #00ffff;">and</span> h &gt; previous_k <span style="color: #00ffff;">and</span> P[i] == T[h]:   <span style="color: #ff7f24;"># Matches starting from end of P</span>
+            i -= 1
+            h -= 1
+        <span style="color: #00ffff;">if</span> i == -1 <span style="color: #00ffff;">or</span> h == previous_k:  <span style="color: #ff7f24;"># Match has been found (Galil's rule)</span>
+            matches.append(k - <span style="color: #b0c4de;">len</span>(P) + 1)
+            k += <span style="color: #b0c4de;">len</span>(P)-F[1] <span style="color: #00ffff;">if</span> <span style="color: #b0c4de;">len</span>(P) &gt; 1 <span style="color: #00ffff;">else</span> 1
+        <span style="color: #00ffff;">else:</span>   <span style="color: #ff7f24;"># No match, shift by max of bad character and good suffix rules</span>
+            <span style="color: #ffebcd; background-color: #2f4f4f;">char_shift</span> = i - R[alphabet_index(T[h])][i]
+            <span style="color: #00ffff;">if</span> i+1 == <span style="color: #b0c4de;">len</span>(P):   <span style="color: #ff7f24;"># Mismatch happened on first attempt</span>
+                <span style="color: #ffebcd; background-color: #2f4f4f;">suffix_shift</span> = 1
+            <span style="color: #00ffff;">elif</span> L[i+1] == -1:   <span style="color: #ff7f24;"># Matched suffix does not appear anywhere in P</span>
+                <span style="color: #ffebcd; background-color: #2f4f4f;">suffix_shift</span> = <span style="color: #b0c4de;">len</span>(P) - F[i+1]
+            <span style="color: #00ffff;">else:</span>               <span style="color: #ff7f24;"># Matched suffix appears in P</span>
+                <span style="color: #ffebcd; background-color: #2f4f4f;">suffix_shift</span> = <span style="color: #b0c4de;">len</span>(P) - L[i+1]
+            <span style="color: #ffebcd; background-color: #2f4f4f;">shift</span> = <span style="color: #b0c4de;">max</span>(char_shift, suffix_shift)
+            <span style="color: #ffebcd; background-color: #2f4f4f;">previous_k</span> = k <span style="color: #00ffff;">if</span> shift &gt;= i+1 <span style="color: #00ffff;">else</span> previous_k  <span style="color: #ff7f24;"># Galil's rule</span>
+            k += shift
+    <span style="color: #00ffff;">return</span> matches
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-4-1-2" name="sec-4-1-2"></a>C<br  /><div class="outline-text-4" id="text-4-1-2">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdint.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">ALPHABET_LEN</span> 256
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NOT_FOUND</span> patlen
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">max</span>(<span style="color: #eedd82;">a</span>, <span style="color: #eedd82;">b</span>) ((a &lt; b) ? b : a)
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">delta1 table: delta1[c] contains the distance between the last</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">character of pat and the rightmost occurrence of c in pat.</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If c does not occur in pat, then delta1[c] = patlen.</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If c is at string[i] and c != pat[patlen-1], we can</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">safely shift i over by delta1[c], which is the minimum distance</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">needed to shift pat forward to get string[i] lined up </span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">with some character in pat.</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">this algorithm runs in alphabet_len+patlen time.</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">make_delta1</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">delta1</span>, <span style="color: #98fb98;">uint8_t</span> *<span style="color: #eedd82;">pat</span>, <span style="color: #98fb98;">int32_t</span> <span style="color: #eedd82;">patlen</span>) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+    <span style="color: #00ffff;">for</span> (i=0; i &lt; ALPHABET_LEN; i++) {
+        delta1[i] = NOT_FOUND;
+    }
+    <span style="color: #00ffff;">for</span> (i=0; i &lt; patlen-1; i++) {
+        delta1[pat[i]] = patlen-1 - i;
+    }
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">true if the suffix of word starting from word[pos] is a prefix </span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">of word</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">is_prefix</span>(<span style="color: #98fb98;">uint8_t</span> *<span style="color: #eedd82;">word</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">wordlen</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pos</span>) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">suffixlen</span> = wordlen - pos;
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">could also use the strncmp() library function here</span>
+    <span style="color: #00ffff;">for</span> (i = 0; i &lt; suffixlen; i++) {
+        <span style="color: #00ffff;">if</span> (word[i] != word[pos+i]) {
+            <span style="color: #00ffff;">return</span> 0;
+        }
+    }
+    <span style="color: #00ffff;">return</span> 1;
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">length of the longest suffix of word ending on word[pos].</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">suffix_length("dddbcabc", 8, 4) = 2</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">suffix_length</span>(<span style="color: #98fb98;">uint8_t</span> *<span style="color: #eedd82;">word</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">wordlen</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pos</span>) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">increment suffix length i to the first mismatch or beginning</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">of the word</span>
+    <span style="color: #00ffff;">for</span> (i = 0; (word[pos-i] == word[wordlen-1-i]) &amp;&amp; (i &lt; pos); i++);
+    <span style="color: #00ffff;">return</span> i;
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">delta2 table: given a mismatch at pat[pos], we want to align </span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">with the next possible full match could be based on what we</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">know about pat[pos+1] to pat[patlen-1].</span>
+<span style="color: #ff7f24;">//</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">In case 1:</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">pat[pos+1] to pat[patlen-1] does not occur elsewhere in pat,</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">the next plausible match starts at or after the mismatch.</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If, within the substring pat[pos+1 .. patlen-1], lies a prefix</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">of pat, the next plausible match is here (if there are multiple</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">prefixes in the substring, pick the longest). Otherwise, the</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">next plausible match starts past the character aligned with </span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">pat[patlen-1].</span>
+<span style="color: #ff7f24;">// </span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">In case 2:</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">pat[pos+1] to pat[patlen-1] does occur elsewhere in pat. The</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">mismatch tells us that we are not looking at the end of a match.</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">We may, however, be looking at the middle of a match.</span>
+<span style="color: #ff7f24;">// </span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">The first loop, which takes care of case 1, is analogous to</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">the KMP table, adapted for a 'backwards' scan order with the</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">additional restriction that the substrings it considers as </span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">potential prefixes are all suffixes. In the worst case scenario</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">pat consists of the same letter repeated, so every suffix is</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">a prefix. This loop alone is not sufficient, however:</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Suppose that pat is "ABYXCDBYX", and text is ".....ABYXCDEYX".</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">We will match X, Y, and find B != E. There is no prefix of pat</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">in the suffix "YX", so the first loop tells us to skip forward</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">by 9 characters.</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Although superficially similar to the KMP table, the KMP table</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">relies on information about the beginning of the partial match</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">that the BM algorithm does not have.</span>
+<span style="color: #ff7f24;">//</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">The second loop addresses case 2. Since suffix_length may not be</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">unique, we want to take the minimum value, which will tell us</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">how far away the closest potential match is.</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">make_delta2</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">delta2</span>, <span style="color: #98fb98;">uint8_t</span> *<span style="color: #eedd82;">pat</span>, <span style="color: #98fb98;">int32_t</span> <span style="color: #eedd82;">patlen</span>) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">p</span>;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">last_prefix_index</span> = patlen-1;
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">first loop</span>
+    <span style="color: #00ffff;">for</span> (p=patlen-1; p&gt;=0; p--) {
+        <span style="color: #00ffff;">if</span> (is_prefix(pat, patlen, p+1)) {
+            last_prefix_index = p+1;
+        }
+        delta2[p] = last_prefix_index + (patlen-1 - p);
+    }
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">second loop</span>
+    <span style="color: #00ffff;">for</span> (p=0; p &lt; patlen-1; p++) {
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">slen</span> = suffix_length(pat, patlen, p);
+        <span style="color: #00ffff;">if</span> (pat[p - slen] != pat[patlen-1 - slen]) {
+            delta2[patlen-1 - slen] = patlen-1 - p + slen;
+        }
+    }
+}
+
+<span style="color: #98fb98;">uint8_t</span>* <span style="color: #87cefa;">boyer_moore</span> (<span style="color: #98fb98;">uint8_t</span> *<span style="color: #eedd82;">string</span>, <span style="color: #98fb98;">uint32_t</span> <span style="color: #eedd82;">stringlen</span>, <span style="color: #98fb98;">uint8_t</span> *<span style="color: #eedd82;">pat</span>, <span style="color: #98fb98;">uint32_t</span> <span style="color: #eedd82;">patlen</span>) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">delta1</span>[ALPHABET_LEN];
+    <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">delta2</span> = (<span style="color: #98fb98;">int</span> *)malloc(patlen * <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>));
+    make_delta1(delta1, pat, patlen);
+    make_delta2(delta2, pat, patlen);
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">The empty pattern must be considered specially</span>
+    <span style="color: #00ffff;">if</span> (patlen == 0) {
+        free(delta2);
+        <span style="color: #00ffff;">return</span> string;
+    }
+
+    i = patlen-1;
+    <span style="color: #00ffff;">while</span> (i &lt; stringlen) {
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = patlen-1;
+        <span style="color: #00ffff;">while</span> (j &gt;= 0 &amp;&amp; (string[i] == pat[j])) {
+            --i;
+            --j;
+        }
+        <span style="color: #00ffff;">if</span> (j &lt; 0) {
+            free(delta2);
+            <span style="color: #00ffff;">return</span> (string + i+1);
+        }
+
+        i += max(delta1[string[i]], delta2[j]);
+    }
+    free(delta2);
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+}
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore_string_search_algorithm">https://en.wikipedia.org/wiki/Boyer%E2%80%93Moore_string_search_algorithm</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2016-09-28 Wed 22:01</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
