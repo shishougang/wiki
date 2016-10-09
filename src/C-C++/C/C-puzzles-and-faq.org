@@ -899,6 +899,69 @@ int main()
     return 0;
 }
 #+end_src
+* error: initializer element is not constant
+#+begin_src c
+#include <stdio.h>
+
+FILE * hw = stdout;
+
+int main(void)
+{
+        return 0;
+}
+#+end_src
+
+#+begin_src sh
+# cc test.c -o test
+test.c:3: error: initializer element is not constant
+#+end_src
+
+The compiler needs to know what the value is at compile time. You're
+trying to assign a value that isn't knowable to the compiler at
+compile time but knows at run time
+
+The ANSI C standard does not demand that =stderr/stdout= have to be
+constant expressions.
+
+For example, [[https://sourceware.org/glibc/wiki/FAQ#I_get_compiler_messages_.22Initializer_element_not_constant.22_with_stdin.2BAC8-stdout.2BAC8-stderr.__Why.3F][the GNU C library]] defines stderr/stdout/stdin as
+non-constant expressions.
+
+** Initialization from main
+#+begin_src c
+FILE *debugOut = NULL;
+FILE *infoOut  = NULL;
+
+int main(int argc, char **argv)
+{
+  debugOut = stderr;
+  infoOut  = stdout;
+  // [..] 
+  return 0;
+}
+#+end_src
+** Initialization from a constructor function
+On many platforms you can declare a function as constructor, meaning
+that it is called on startup before main() is called. For example when
+using GCC you can implement it like this:
+
+#+begin_src c
+FILE *debugOut = NULL;
+FILE *infoOut  = NULL;
+
+static void init_streams(void) __attribute__((constructor)); 
+static void init_streams(void)
+{
+  debugOut = stderr;
+  infoOut  = stdout;
+}
+#+end_src
+This [[https://gcc.gnu.org/onlinedocs/gcc/Function-Attributes.html#index-g_t_0040code_007bconstructor_007d-function-attribute-2844][constructor attribute]] syntax is not standardized, but since GCC
+is very widespread and other compilers strive for GCC compatibility
+this is actually quite portable.
+
+In case you need to make this portable to other compilers that does
+not have a similar declaration feature you can guard this code with
+macros like =__GNU_LIBRARY__= and/or =__GNUC__=.
 
 
 * Footnotes
