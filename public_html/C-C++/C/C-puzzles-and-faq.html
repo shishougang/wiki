@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>C puzzles and FAQ</title>
-<!-- 2016-10-09 Sun 22:17 -->
+<!-- 2016-10-25 Tue 20:55 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -129,6 +129,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-31-2">Initialization from a constructor function</a></li>
 </ul>
 </li>
+<li><a href="#sec-32">printf uint64 in 32/64 platform</a></li>
 </ul>
 </div>
 </div>
@@ -1569,6 +1570,51 @@ macros like <code>__GNU_LIBRARY__</code> and/or <code>__GNUC__</code>.
 </div>
 </div>
 </div>
+
+<div id="outline-container-sec-32" class="outline-2">
+<h2 id="sec-32">printf uint64 in 32/64 platform</h2>
+<div class="outline-text-2" id="text-32">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;inttypes.h&gt;</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {  
+  <span style="color: #98fb98;">uint64_t</span> <span style="color: #eedd82;">u64</span> = 100;
+  printf(<span style="color: #ffa07a;">"uint64: %"</span>PRIu64<span style="color: #ffa07a;">"\n"</span>, u64);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">printf("uint64: %lu\n", u64);   x86_84</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">printf("uint64: %llu\n", u64);  x86</span>
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+
+<p>
+If there is the error:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">main.cpp: In <span style="color: #00ffff;">function</span> &#8216;int main()&#8217;:
+main.cpp:9:30: error: expected &#8216;)&#8217; before &#8216;PRIu64&#8217;
+main.cpp:9:47: warning: spurious trailing &#8216;%&#8217;<span style="color: #00ffff;"> in</span> format [-Wformat]
+</pre>
+</div>
+
+<p>
+The ISO C99 standard specifies that these macros must only be defined
+if explicitly requested.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__STDC_FORMAT_MACROS</span> <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">The __STDC_FORMAT_MACROS macro is only required for inclusion in C++</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;inttypes.h&gt;</span>
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">... now PRIu64 will work</span>
+</pre>
+</div>
+</div>
+</div>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
@@ -1602,7 +1648,7 @@ The Practice of Programming page 14
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-10-09 Sun 22:17</p>
+<p class="date">Created: 2016-10-25 Tue 20:55</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
