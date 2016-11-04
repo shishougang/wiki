@@ -847,3 +847,114 @@ SOURCE is './sym2/scriptdir.sh'
 DIR './sym2' resolves to '/home/ubuntu/dotfiles/fo fo/real/real1/real2'
 DIR is '/home/ubuntu/dotfiles/fo fo/real/real1/real2'
 #+end_src
+* only one instance of a script is running at a time (mutual exclusion, locking
+1. uses a lockfile and echoes a PID into it
+#+begin_src sh
+LOCKFILE=/tmp/lock.txt
+if [ -e ${LOCKFILE} ] && kill -0 `cat ${LOCKFILE}`; then
+    echo "already running"
+    exit
+fi
+
+# make sure the lockfile is removed when we exit and then claim it
+trap "rm -f ${LOCKFILE}; exit" INT TERM EXIT
+echo $$ > ${LOCKFILE}
+
+# do stuff
+sleep 1000
+
+rm -f ${LOCKFILE}
+#+end_src
+The trick here is the =kill -0= which doesn't deliver any signal but
+just checks if a process with the given PID exists. Also the call to
+trap will ensure that the lockfile is removed even when your process
+is killed (except =kill -9=).
+
+This example does not work, because there is a RaceCondition: a time
+window between checking and creating the file, during which other
+programs may act.[fn:1]
+
+2. use =mkdir=
+We need an atomic check-and-create operation, and fortunately there is
+one: =mkdir=, the command to create a directory: 
+#+begin_src sh
+ # POSIX (maybe Bourne?)
+ lockdir=/tmp/myscript.lock
+ if mkdir "$lockdir"
+ then
+     echo >&2 "successfully acquired lock"
+
+     # Remove lockdir when the script finishes, or when it receives a signal
+     trap 'rm -rf "$lockdir"' 0    # remove directory when script finishes
+
+     # Optionally create temporary files in this directory, because
+     # they will be removed automatically:
+     tmpfile=$lockdir/filelist
+
+ else
+     echo >&2 "cannot acquire lock, giving up on $lockdir"
+     exit 0
+ fi
+#+end_src
+
+Here, even when two processes call mkdir at the same time, only one
+process can succeed at most. This atomicity of check-and-create is
+ensured at the operating system kernel level. 
+
+This example is much better. There is still the problem that a /stale/
+lock could remain when the script is terminated with a signal not
+caught (or signal 9, SIGKILL), or could be created by a user (either
+accidentally or maliciously), but it's a good step towards reliable
+mutual exclusion. Charles Duffy has [[http://mywiki.wooledge.org/BashFAQ/045/contrib][contributed an example]] that may
+remedy the "stale lock" problem. 
+
+3. use =flock(1)=
+If you're using a GNU/Linux distribution, you can also get the benefit
+of using =flock(1)=. =flock(1)= ties a FileDescriptor to a lock file.
+There are multiple ways to use it; one possibility to solve the
+multiple instance problem is: 
+#+begin_src sh
+  exec 9>/path/to/lock/file
+  if ! flock -n 9  ; then
+      echo "another instance is running";
+      exit 1
+  fi
+    # this now runs under the lock until 9 is closed (it will be closed automatically when the script ends)
+#+end_src
+flock can also be used to protect only a part of your script.
+
+4. use [[https://linux.die.net/man/1/fuser][fuser(1)]][fn:2]
+#+begin_src sh
+#       mutex file
+#
+# Open a mutual exclusion lock on the file, unless another process already owns one.
+#
+# If the file is already locked by another process, the operation fails.
+# This function defines a lock on a file as having a file descriptor open to the file.
+# This function uses FD 9 to open a lock on the file.  To release the lock, close FD 9:
+# exec 9>&-
+#
+mutex() {
+    local file=$1 pid pids 
+
+    exec 9>>"$file"
+    { pids=$(fuser -f "$file"); } 2>&- 9>&- 
+    for pid in $pids; do
+        [[ $pid = $$ ]] && continue
+
+        exec 9>&- 
+        return 1 # Locked by a pid.
+    done 
+}
+
+mutex /var/run/myscript.lock || { echo "Already running." >&2; exit 1; }
+#+end_src
+
+* Footnotes
+
+[fn:1] http://mywiki.wooledge.org/BashFAQ/045
+
+[fn:2]
+http://stackoverflow.com/questions/185451/quick-and-dirty-way-to-ensure-only-one-instance-of-a-shell-script-is-running-at
+
+

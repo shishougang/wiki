@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Shell Scrap</title>
-<!-- 2016-02-02 Tue 22:43 -->
+<!-- 2016-11-05 Sat 00:19 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -57,23 +57,6 @@ for the JavaScript code in this tag.
      target.className = elem.cacheClassTarget;
  }
 /*]]>*///-->
-</script>
-<script type="text/javascript">
-    function rpl(expr,a,b) {
-      var i=0
-      while (i!=-1) {
-         i=expr.indexOf(a,i);
-         if (i>=0) {
-            expr=expr.substring(0,i)+b+expr.substring(i+a.length);
-            i+=b.length;
-         }
-      }
-      return expr
-    }
-
-    function show_org_source(){
-       document.location.href = rpl(document.location.href,"html","org.html");
-    }
 </script>
 </head>
 <body>
@@ -166,6 +149,7 @@ for the JavaScript code in this tag.
 </ul>
 </li>
 <li><a href="#sec-16">the path of  directory in which a Bash script is located</a></li>
+<li><a href="#sec-17">only one instance of a script is running at a time (mutual exclusion, locking</a></li>
 </ul>
 </div>
 </div>
@@ -1501,6 +1485,146 @@ DIR is <span style="color: #ffa07a;">'/home/ubuntu/dotfiles/fo fo/real/real1/rea
 </div>
 </div>
 </div>
+<div id="outline-container-sec-17" class="outline-2">
+<h2 id="sec-17">only one instance of a script is running at a time (mutual exclusion, locking</h2>
+<div class="outline-text-2" id="text-17">
+<ol class="org-ol">
+<li>uses a lockfile and echoes a PID into it
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">LOCKFILE</span>=/tmp/lock.txt
+<span style="color: #00ffff;">if</span> [ -e ${<span style="color: #eedd82;">LOCKFILE</span>} ] &amp;&amp; <span style="color: #b0c4de;">kill</span> -0 <span style="color: #fa8072;">`cat ${LOCKFILE}`</span>; <span style="color: #00ffff;">then</span>
+    <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"already running"</span>
+    <span style="color: #00ffff;">exit</span>
+<span style="color: #00ffff;">fi</span>
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">make sure the lockfile is removed when we exit and then claim it</span>
+<span style="color: #00ffff;">trap</span> <span style="color: #ffa07a;">"rm -f ${LOCKFILE}; exit"</span> INT TERM EXIT
+<span style="color: #b0c4de;">echo</span> $<span style="color: #eedd82;">$</span> &gt; ${<span style="color: #eedd82;">LOCKFILE</span>}
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">do stuff</span>
+sleep 1000
+
+rm -f ${<span style="color: #eedd82;">LOCKFILE</span>}
+</pre>
+</div>
+<p>
+The trick here is the <code>kill -0</code> which doesn't deliver any signal but
+just checks if a process with the given PID exists. Also the call to
+trap will ensure that the lockfile is removed even when your process
+is killed (except <code>kill -9</code>).
+</p>
+
+<p>
+This example does not work, because there is a RaceCondition: a time
+window between checking and creating the file, during which other
+programs may act.<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup>
+</p>
+
+<ol class="org-ol">
+<li>use <code>mkdir</code>
+</li>
+</ol>
+<p>
+We need an atomic check-and-create operation, and fortunately there is
+one: <code>mkdir</code>, the command to create a directory: 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">POSIX (maybe Bourne?)</span>
+<span style="color: #eedd82;">lockdir</span>=/tmp/myscript.lock
+<span style="color: #00ffff;">if</span> mkdir <span style="color: #ffa07a;">"$lockdir"</span>
+<span style="color: #00ffff;">then</span>
+    <span style="color: #b0c4de;">echo</span> &gt;&amp;2 <span style="color: #ffa07a;">"successfully acquired lock"</span>
+
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Remove lockdir when the script finishes, or when it receives a signal</span>
+    <span style="color: #00ffff;">trap</span> <span style="color: #ffa07a;">'rm -rf "$lockdir"'</span> 0    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">remove directory when script finishes</span>
+
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Optionally create temporary files in this directory, because</span>
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">they will be removed automatically:</span>
+    <span style="color: #eedd82;">tmpfile</span>=$<span style="color: #eedd82;">lockdir</span>/filelist
+
+<span style="color: #00ffff;">else</span>
+    <span style="color: #b0c4de;">echo</span> &gt;&amp;2 <span style="color: #ffa07a;">"cannot acquire lock, giving up on $lockdir"</span>
+    <span style="color: #00ffff;">exit</span> 0
+<span style="color: #00ffff;">fi</span>
+</pre>
+</div>
+
+<p>
+Here, even when two processes call mkdir at the same time, only one
+process can succeed at most. This atomicity of check-and-create is
+ensured at the operating system kernel level. 
+</p>
+
+<p>
+This example is much better. There is still the problem that a <i>stale</i>
+lock could remain when the script is terminated with a signal not
+caught (or signal 9, SIGKILL), or could be created by a user (either
+accidentally or maliciously), but it's a good step towards reliable
+mutual exclusion. Charles Duffy has <a href="http://mywiki.wooledge.org/BashFAQ/045/contrib">contributed an example</a> that may
+remedy the "stale lock" problem. 
+</p>
+
+<ol class="org-ol">
+<li>use <code>flock(1)</code>
+</li>
+</ol>
+<p>
+If you're using a GNU/Linux distribution, you can also get the benefit
+of using <code>flock(1)</code>. <code>flock(1)</code> ties a FileDescriptor to a lock file.
+There are multiple ways to use it; one possibility to solve the
+multiple instance problem is: 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #00ffff;">exec</span> 9&gt;/path/to/lock/file
+<span style="color: #00ffff;">if</span> ! flock -n 9  ; <span style="color: #00ffff;">then</span>
+    <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"another instance is running"</span>;
+    <span style="color: #00ffff;">exit</span> 1
+<span style="color: #00ffff;">fi</span>
+  <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">this now runs under the lock until 9 is closed (it will be closed automatically when the script ends)</span>
+</pre>
+</div>
+<p>
+flock can also be used to protect only a part of your script.
+</p>
+
+<ol class="org-ol">
+<li>use <a href="https://linux.die.net/man/1/fuser">fuser(1)</a><sup><a id="fnr.4" name="fnr.4" class="footref" href="#fn.4">4</a></sup>
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#       </span><span style="color: #ff7f24;">mutex file</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Open a mutual exclusion lock on the file, unless another process already owns one.</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">If the file is already locked by another process, the operation fails.</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">This function defines a lock on a file as having a file descriptor open to the file.</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">This function uses FD 9 to open a lock on the file.  To release the lock, close FD 9:</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">exec 9&gt;&amp;-</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #87cefa;">mutex</span>() {
+    <span style="color: #b0c4de;">local</span> <span style="color: #eedd82;">file</span>=$<span style="color: #eedd82;">1</span> pid pids 
+
+    <span style="color: #00ffff;">exec</span> 9&gt;&gt;<span style="color: #ffa07a;">"$file"</span>
+    { <span style="color: #eedd82;">pids</span>=$(fuser -f <span style="color: #ffa07a;">"$file"</span>); } 2&gt;&amp;- 9&gt;&amp;- 
+    <span style="color: #00ffff;">for</span> pid<span style="color: #00ffff;"> in</span> $<span style="color: #eedd82;">pids</span>; <span style="color: #00ffff;">do</span>
+        [[ $<span style="color: #eedd82;">pid</span> = $<span style="color: #eedd82;">$</span> ]] &amp;&amp; <span style="color: #00ffff;">continue</span>
+
+        <span style="color: #00ffff;">exec</span> 9&gt;&amp;- 
+        <span style="color: #00ffff;">return</span> 1 <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Locked by a pid.</span>
+    <span style="color: #00ffff;">done</span> 
+}
+
+mutex /var/run/myscript.lock || { <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"Already running."</span> &gt;&amp;2; <span style="color: #00ffff;">exit</span> 1; }
+</pre>
+</div>
+</div>
+</div>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
@@ -1509,12 +1633,20 @@ DIR is <span style="color: #ffa07a;">'/home/ubuntu/dotfiles/fo fo/real/real1/rea
 
 <div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p>DEFINITION NOT FOUND.</p></div>
 
+<div class="footdef"><sup><a id="fn.3" name="fn.3" class="footnum" href="#fnr.3">3</a></sup> <p class="footpara">
+<a href="http://mywiki.wooledge.org/BashFAQ/045">http://mywiki.wooledge.org/BashFAQ/045</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.4" name="fn.4" class="footnum" href="#fnr.4">4</a></sup> <p class="footpara">
+<a href="http://stackoverflow.com/questions/185451/quick-and-dirty-way-to-ensure-only-one-instance-of-a-shell-script-is-running-at">http://stackoverflow.com/questions/185451/quick-and-dirty-way-to-ensure-only-one-instance-of-a-shell-script-is-running-at</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-02-02 Tue 22:43</p>
+<p class="date">Created: 2016-11-05 Sat 00:19</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
