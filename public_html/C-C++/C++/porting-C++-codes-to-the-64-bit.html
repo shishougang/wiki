@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Porting C++ codes to the 64-bit platform</title>
-<!-- 2016-11-05 Sat 00:19 -->
+<!-- 2016-11-08 Tue 00:04 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -58,6 +58,23 @@ for the JavaScript code in this tag.
  }
 /*]]>*///-->
 </script>
+<script type="text/javascript">
+    function rpl(expr,a,b) {
+      var i=0
+      while (i!=-1) {
+         i=expr.indexOf(a,i);
+         if (i>=0) {
+            expr=expr.substring(0,i)+b+expr.substring(i+a.length);
+            i+=b.length;
+         }
+      }
+      return expr
+    }
+
+    function show_org_source(){
+       document.location.href = rpl(document.location.href,"html","org.html");
+    }
+</script>
 </head>
 <body>
 <div id="content">
@@ -71,9 +88,16 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3">Magic numbers</a></li>
 <li><a href="#sec-4">Storing integers in double type</a></li>
 <li><a href="#sec-5">Bit shifting operations</a></li>
-<li><a href="#sec-6">Static analyzers</a></li>
-<li><a href="#sec-7">References</a></li>
-<li><a href="#sec-8">cc</a></li>
+<li><a href="#sec-6">Storing of pointer addresses</a></li>
+<li><a href="#sec-7">Memsize types in unions</a></li>
+<li><a href="#sec-8">Changing an array type</a></li>
+<li><a href="#sec-9">Serialization and data exchange</a></li>
+<li><a href="#sec-10">Pointer address arithmetic</a></li>
+<li><a href="#sec-11">Array indexing</a></li>
+<li><a href="#sec-12">Mixed use of simple integer types and memsize types</a></li>
+<li><a href="#sec-13">Exceptions</a></li>
+<li><a href="#sec-14">Static analyzers</a></li>
+<li><a href="#sec-15">References</a></li>
 </ul>
 </div>
 </div>
@@ -217,13 +241,528 @@ double the exact value can be lost.
 
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">Bit shifting operations</h2>
+<div class="outline-text-2" id="text-5">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">ptrdiff_t</span> <span style="color: #87cefa;">SetBitN</span>(<span style="color: #98fb98;">ptrdiff_t</span> <span style="color: #eedd82;">value</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">bitNum</span>) {
+  <span style="color: #98fb98;">ptrdiff_t</span> <span style="color: #eedd82;">mask</span> = 1 &lt;&lt; bitNum;
+  <span style="color: #00ffff;">return</span> value | mask;
+}
+</pre>
 </div>
 
+<p>
+The given code works only on the 32-bit architecture, and allows the
+definition of bits with numbers from 0 to 31. After the program is
+ported to a 64-bit platform, it becomes necessary to define bits from
+0 to 63. What value will the SetBitN(0, 32) call return? If you think
+that the value is 0x100000000, you are wrong. You'll get 0.
+</p>
 
+<p>
+Pay attention to the fact that "1" has int type and during the shift
+on 32 positions, an overflow will occur:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/overflow-bit-shift.png" alt="overflow-bit-shift.png" />
+</p>
+</div>
+
+<p>
+To correct the code, it is necessary to make the constant "1" of the
+same type as the variable mask.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">ptrdiff_t</span> <span style="color: #eedd82;">mask</span> = ptrdiff_t(1) &lt;&lt; bitNum;
+</pre>
+</div>
+
+<p>
+What will be the result of the uncorrected function SetBitN(0, 31)
+call? The right answer is 0xffffffff80000000. The result of 1 &lt;&lt; 31
+expression is negative number -2147483648. This number is formed in a
+64-bit integer variable as 0xffffffff80000000. You should keep in
+mind, and take into consideration, the effects of the shift of values
+of different types. To make you understand the stated information
+better table N4 contains interesting expressions with shifts on the
+64-bit system.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/shitfs-and-results-64bit.jpg" alt="shitfs-and-results-64bit.jpg" />
+</p>
+</div>
+</div>
+</div>
 
 <div id="outline-container-sec-6" class="outline-2">
-<h2 id="sec-6">Static analyzers</h2>
+<h2 id="sec-6">Storing of pointer addresses</h2>
 <div class="outline-text-2" id="text-6">
+<p>
+Unfortunately, the 32-bit code is based on this supposition
+everywhere. Pointers are often cast to int, unsigned int and other
+types improper to fulfill address calculations.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++">1) <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">p</span>;
+   p = (<span style="color: #98fb98;">char</span> *) ((<span style="color: #98fb98;">int</span>)p &amp; PAGEOFFSET);
+2) <span style="color: #98fb98;">DWORD</span> <span style="color: #eedd82;">tmp</span> = (<span style="color: #98fb98;">DWORD</span>)malloc(ArraySize); 
+   ...
+   <span style="color: #98fb98;">int</span> *ptr = (<span style="color: #98fb98;">int</span> *)tmp;
+</pre>
+</div>
+
+<p>
+the correct versions:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++">1) <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">p</span>;
+   p = (<span style="color: #98fb98;">char</span> *) ((<span style="color: #98fb98;">intptr_t</span>)p &amp; PAGEOFFSET);
+2) <span style="color: #98fb98;">DWORD_PTR</span> <span style="color: #eedd82;">tmp</span> = (<span style="color: #98fb98;">DWORD_PTR</span>)malloc(ArraySize); 
+   ...
+   <span style="color: #98fb98;">int</span> *ptr = (<span style="color: #98fb98;">int</span> *)tmp;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">Memsize types in unions</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+When there is a necessity to work with a pointer as an integer,
+sometimes it is convenient to use the union as it is shown in the
+example, and work with the numeric form of the type without using
+explicit conversions.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">union</span> <span style="color: #98fb98;">PtrNumUnion</span> {
+  <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">m_p</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">m_n</span>;
+} <span style="color: #eedd82;">u</span>;
+u.m_p = str;
+u.m_n += delta;
+</pre>
+</div>
+<p>
+This code is correct on 32-bit systems and is incorrect on 64-bit
+ones. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">union</span> <span style="color: #98fb98;">PtrNumUnion</span> {
+  <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">m_p</span>;
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">m_n</span>; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">type fixed</span>
+} <span style="color: #eedd82;">u</span>;
+</pre>
+</div>
+
+<p>
+Another frequent use of the union is the presentation of one member as
+a set of other smaller ones. 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">union</span> <span style="color: #98fb98;">SizetToBytesUnion</span> {
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">value</span>;
+  <span style="color: #00ffff;">struct</span> {
+    <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">b0</span>, <span style="color: #eedd82;">b1</span>, <span style="color: #eedd82;">b2</span>, <span style="color: #eedd82;">b3</span>;
+  } <span style="color: #eedd82;">bytes</span>;
+} <span style="color: #eedd82;">u</span>;
+
+<span style="color: #98fb98;">SizetToBytesUnion</span> <span style="color: #eedd82;">u</span>;
+u.value = value;
+<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">zeroBitsN</span> = TranslateTable[u.bytes.b0] +
+                   TranslateTable[u.bytes.b1] +
+                   TranslateTable[u.bytes.b2] +
+                   TranslateTable[u.bytes.b3];
+</pre>
+</div>
+<p>
+Here is a fundamental algorithmic error which consists in the
+supposition that size<sub>t</sub> type consists of 4 bytes. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">union</span> <span style="color: #98fb98;">SizetToBytesUnion</span> {
+  <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">value</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">bytes</span>[<span style="color: #00ffff;">sizeof</span>(value)];
+} <span style="color: #eedd82;">u</span>;
+
+<span style="color: #98fb98;">SizetToBytesUnion</span> <span style="color: #eedd82;">u</span>;
+u.value = value;
+<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">zeroBitsN</span> = 0;
+<span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">i</span> = 0; i != <span style="color: #00ffff;">sizeof</span>(bytes); ++i)
+  zeroBitsN += TranslateTable[bytes[i]];
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">Changing an array type</h2>
+<div class="outline-text-2" id="text-8">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">array</span>[4] = { 1, 2, 3, 4 };
+<span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">ENumbers</span> { <span style="color: #eedd82;">ZERO</span>, <span style="color: #eedd82;">ONE</span>, <span style="color: #eedd82;">TWO</span>, <span style="color: #eedd82;">THREE</span>, <span style="color: #eedd82;">FOUR</span> };
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">safe cast (for MSVC2005)</span>
+<span style="color: #98fb98;">ENumbers</span> *<span style="color: #eedd82;">enumPtr</span> = (<span style="color: #98fb98;">ENumbers</span> *)(array);
+cout &lt;&lt; enumPtr[1] &lt;&lt; <span style="color: #ffa07a;">" "</span>;
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">unsafe cast</span>
+<span style="color: #98fb98;">size_t</span> *<span style="color: #eedd82;">sizetPtr</span> = (<span style="color: #98fb98;">size_t</span> *)(array);
+cout &lt;&lt; sizetPtr[1] &lt;&lt; endl;
+
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Output on 32-bit system: 2 2</span>
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Output on 64 bit system: 2 17179869187</span>
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">Serialization and data exchange</h2>
+<div class="outline-text-2" id="text-9">
+<div class="org-src-container">
+
+<pre class="src src-c++">1) <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">PixelCount</span>;
+   fread(&amp;PixelCount, <span style="color: #00ffff;">sizeof</span>(PixelCount), 1, inFile);
+2) <span style="color: #98fb98;">__int32</span> <span style="color: #eedd82;">value_1</span>;
+   <span style="color: #98fb98;">SSIZE_T</span> <span style="color: #eedd82;">value_2</span>;
+   inputStream &gt;&gt; value_1 &gt;&gt; value_2;
+3) <span style="color: #98fb98;">time_t</span> <span style="color: #eedd82;">time</span>;
+   PackToBuffer(MemoryBuf, &amp;time, <span style="color: #00ffff;">sizeof</span>(time));
+</pre>
+</div>
+
+<p>
+The usage of such types provides data portability between programs on
+different platforms, although it needs the usage of odd ones. The
+three shown examples are written inaccurately, and this will show up
+on the changing of the capacity of some data types from 32-bit to
+64-bit. Taking into account the necessity to support old data formats,
+the correction may look as follows:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++">1) <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">PixelCount</span>;
+   <span style="color: #98fb98;">__uint32</span> <span style="color: #eedd82;">tmp</span>;
+   fread(&amp;tmp, <span style="color: #00ffff;">sizeof</span>(tmp), 1, inFile);
+   PixelCount = <span style="color: #00ffff;">static_cast</span>&lt;size_t&gt;(tmp);
+2) <span style="color: #98fb98;">__int32</span> <span style="color: #eedd82;">value_1</span>;
+   <span style="color: #98fb98;">__int32</span> <span style="color: #eedd82;">value_2</span>;
+   inputStream &gt;&gt; value_1 &gt;&gt; value_2;
+3) <span style="color: #98fb98;">time_t</span> <span style="color: #eedd82;">time</span>;
+   <span style="color: #98fb98;">__uint32</span> <span style="color: #eedd82;">tmp</span> = <span style="color: #00ffff;">static_cast</span>&lt;__uint32&gt;(time);
+   PackToBuffer(MemoryBuf, &amp;tmp, <span style="color: #00ffff;">sizeof</span>(tmp));
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10">Pointer address arithmetic</h2>
+<div class="outline-text-2" id="text-10">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span> <span style="color: #eedd82;">a16</span>, <span style="color: #eedd82;">b16</span>, <span style="color: #eedd82;">c16</span>;
+<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">pointer</span>;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+pointer += a16 * b16 * c16;
+</pre>
+</div>
+
+<p>
+This example works correctly with pointers if the value of "a16 *
+b16 * c16" expression does not exceed UINT<sub>MAX</sub> (4Gb). Such code may
+always work correctly on the 32-bit platform, as the program has never
+allocated arrays of large sizes. On the 64-bit architecture the size
+of the array exceeded UINT<sub>MAX</sub> items. 
+</p>
+
+<p>
+variables a16, b16 and c16 have values 3000, 2000 and 1000
+correspondingly. While calculating "a16 * b16 * c16" expression all
+the variables according to C++ rules will be converted to int type,
+and only then their multiplication will occur. During the process of
+multiplication an overflow will occur. 
+</p>
+
+<p>
+One should take care to avoid possible overflows in pointer arithmetic
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">short</span> <span style="color: #eedd82;">a16</span>, <span style="color: #eedd82;">b16</span>, <span style="color: #eedd82;">c16</span>;
+<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">pointer</span>;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+pointer += <span style="color: #00ffff;">static_cast</span>&lt;ptrdiff_t&gt;(a16) *
+           <span style="color: #00ffff;">static_cast</span>&lt;ptrdiff_t&gt;(b16) *
+           <span style="color: #00ffff;">static_cast</span>&lt;ptrdiff_t&gt;(c16);
+</pre>
+</div>
+
+<p>
+This example works in the 32-bit version, but not in the 64-bit
+version.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">A</span> = -2;
+<span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">B</span> = 1;
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">array</span>[5] = { 1, 2, 3, 4, 5 };
+<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">ptr</span> = array + 3;
+ptr = ptr + (A + B); <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Invalid pointer value on 64-bit platform</span>
+printf(<span style="color: #ffa07a;">"%i\n"</span>, *ptr); <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Access violation on 64-bit platform</span>
+</pre>
+</div>
+
+<p>
+Let's follow the calculation flow of the "ptr + (a + b)" expression:
+</p>
+
+<ul class="org-ul">
+<li>According to C++ rules variable A of int type is converted to unsigned type.
+</li>
+<li>Addition of A and B occurs. The result we get is value 0xFFFFFFFF of
+unsigned type.
+</li>
+</ul>
+
+<p>
+Then calculation of "ptr + 0xFFFFFFFFu" takes place, but the result of
+it depends on the pointer size on the particular architecture. If the
+addition takes place in a 32-bit program, the given expression will be
+an equivalent of "ptr - 1" and we'll successfully print number 3.
+</p>
+
+<p>
+In a 64-bit program 0xFFFFFFFFu value will be added fairly to the
+pointer and the result will be that the pointer will be outbound of
+the array. And we'll face problems while getting access to the item of
+this pointer.
+</p>
+
+<p>
+To avoid the situation shown, as well as in the first case, we advise
+you to use only memsize types in pointer arithmetic. Here are two
+variants of the code correction:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++">ptr = ptr + (ptrdiff_t(A) + ptrdiff_t(B));
+<span style="color: #98fb98;">ptrdiff_t</span> <span style="color: #eedd82;">A</span> = -2;
+<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">B</span> = 1;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">...</span>
+ptr = ptr + (A + B);
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-11" class="outline-2">
+<h2 id="sec-11">Array indexing</h2>
+<div class="outline-text-2" id="text-11">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">unsigned</span> <span style="color: #eedd82;">Index</span> = 0;
+<span style="color: #00ffff;">while</span> (MyBigNumberField[Index] != id)
+  Index++;
+</pre>
+</div>
+
+<p>
+The given code won't process an array containing more than <code>UINT_MAX</code>
+items in a 64-bit program. After the access to the item with <code>UNIT_MAX</code>
+index, an overflow of the Index variable will occur, and we'll get
+infinite loop.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Region</span> {
+  <span style="color: #98fb98;">float</span> *<span style="color: #eedd82;">array</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">Width</span>, <span style="color: #eedd82;">Height</span>, <span style="color: #eedd82;">Depth</span>;
+  <span style="color: #98fb98;">float</span> <span style="color: #7fffd4;">Region</span>::<span style="color: #87cefa;">GetCell</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">z</span>) <span style="color: #00ffff;">const</span>;
+<span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">...</span>
+};
+<span style="color: #98fb98;">float</span> <span style="color: #7fffd4;">Region</span>::<span style="color: #87cefa;">GetCell</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">z</span>) <span style="color: #00ffff;">const</span> {
+  <span style="color: #00ffff;">return</span> array[x + y * Width + z * Width * Height];
+}
+</pre>
+</div>
+
+<p>
+he given code, however, will work correctly only with arrays
+containing less than INT<sub>MAX</sub> items. The reason for this, is the use of
+32-bit <code>int</code> types for calculation of the items index.
+</p>
+
+<p>
+Programmers often make a mistake trying to correct the code in the
+following way:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">float</span> <span style="color: #7fffd4;">Region</span>::<span style="color: #87cefa;">GetCell</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">z</span>) <span style="color: #00ffff;">const</span> {
+  <span style="color: #00ffff;">return</span> array[<span style="color: #00ffff;">static_cast</span>&lt;ptrdiff_t&gt;(x) + y * Width +
+               z * Width * Height];
+}
+</pre>
+</div>
+
+<p>
+They know that according to C++ rules, the expression for calculation
+of the index will have <code>ptrdiff_t</code> type, and hope to avoid the overflow
+with its help. But the overflow may occur inside the sub-expression
+"y * Width" or "z * Width * Height" since the int type is still used
+to calculate them.
+</p>
+
+
+<p>
+If you want to correct the code without changing types of the
+variables participating in the expression, you may use explicit type
+conversion of every variable to memsize type:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">float</span> <span style="color: #7fffd4;">Region</span>::<span style="color: #87cefa;">GetCell</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">z</span>) <span style="color: #00ffff;">const</span> {
+  <span style="color: #00ffff;">return</span> array[ptrdiff_t(x) +
+               ptrdiff_t(y) * ptrdiff_t(Width) +
+               ptrdiff_t(z) * ptrdiff_t(Width) *
+               ptrdiff_t(Height)];
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-12" class="outline-2">
+<h2 id="sec-12">Mixed use of simple integer types and memsize types</h2>
+<div class="outline-text-2" id="text-12">
+<p>
+Let's provide an example of a small code fragment which shows the
+danger of inaccurate expressions with mixed types (the results are
+retrieved in Microsoft Visual C++ 2005, 64-bit compilation mode).
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span> = 100000;
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span> = 100000;
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">z</span> = 100000;
+<span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">size</span> = 1;                  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Result:</span>
+<span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">v1</span> = x * y * z;            <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">-1530494976</span>
+<span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">v2</span> = intptr_t(x) * y * z;  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">1000000000000000</span>
+<span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">v3</span> = x * y * intptr_t(z);  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">141006540800000</span>
+<span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">v4</span> = size * x * y * z;     <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">1000000000000000</span>
+<span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">v5</span> = x * y * z * size;     <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">-1530494976</span>
+<span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">v6</span> = size * (x * y * z);   <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">-1530494976</span>
+<span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">v7</span> = size * (x * y) * z;   <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">141006540800000</span>
+<span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">v8</span> = ((size * x) * y) * z; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">1000000000000000</span>
+<span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">v9</span> = size * (x * (y * z)); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">-1530494976</span>
+</pre>
+</div>
+
+<p>
+The right variant:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">intptr_t</span> <span style="color: #eedd82;">v2</span> = intptr_t(x) + intptr_t(y) * intptr_t(z); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">OK!</span>
+</pre>
+</div>
+
+<p>
+Mixed use of types may cause changes in program logic.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">ptrdiff_t</span> <span style="color: #eedd82;">val_1</span> = -1;
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">val_2</span> = 1;
+<span style="color: #00ffff;">if</span> (val_1 &gt; val_2)
+  printf (<span style="color: #ffa07a;">"val_1 is greater than val_2\n"</span>);
+<span style="color: #00ffff;">else</span>
+  printf (<span style="color: #ffa07a;">"val_1 is not greater than val_2\n"</span>);
+
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Output on 32-bit system: "val_1 is greater than val_2"</span>
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Output on 64-bit system: "val_1 is not greater than val_2"</span>
+</pre>
+</div>
+
+<p>
+On the 32-bit system the variable <code>val_1</code> according to C++ rules was
+extended to unsigned int, and became value 0xFFFFFFFFu. As a result
+the condition "0xFFFFFFFFu &gt; 1" was executed. On the 64&#x2013;bit system,
+it's the other way around - the variable <code>val_2</code> is extended to
+<code>ptrdiff_t</code> type. In this case the expression "-1 &gt; 1" is checked. On
+picture 6 the occurring changes are shown sketchy.
+</p>
+
+<p>
+If you need to return the previous behavior, you should change the
+<code>val_2</code> variable type.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">ptrdiff_t</span> <span style="color: #eedd82;">val_1</span> = -1;
+<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">val_2</span> = 1;
+<span style="color: #00ffff;">if</span> (val_1 &gt; val_2)
+  printf (<span style="color: #ffa07a;">"val_1 is greater than val_2\n"</span>);
+<span style="color: #00ffff;">else</span>
+  printf (<span style="color: #ffa07a;">"val_1 is not greater than val_2\n"</span>);
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-13" class="outline-2">
+<h2 id="sec-13">Exceptions</h2>
+<div class="outline-text-2" id="text-13">
+<p>
+Throwing and handling exceptions using integer types is not a good
+programming practice for the C++ language.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">ptr1</span>;
+<span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">ptr2</span>;
+<span style="color: #00ffff;">try</span> {
+  <span style="color: #00ffff;">try</span> {
+    <span style="color: #00ffff;">throw</span> <span style="color: #98fb98;">ptr2</span> - ptr1;
+  }
+  <span style="color: #00ffff;">catch</span> (<span style="color: #98fb98;">int</span>) {
+    <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"catch 1: on x86"</span> &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+  }
+}
+<span style="color: #00ffff;">catch</span> (ptrdiff_t) {
+  <span style="color: #7fffd4;">std</span>::cout &lt;&lt; <span style="color: #ffa07a;">"catch 2: on x64"</span> &lt;&lt; <span style="color: #7fffd4;">std</span>::endl;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-14" class="outline-2">
+<h2 id="sec-14">Static analyzers</h2>
+<div class="outline-text-2" id="text-14">
 <ol class="org-ol">
 <li>Gimpel Software PC-Lint (<a href="http://www.gimpel.com">http://www.gimpel.com</a>). This analyzer has
 a large list of supported platforms and a general purpose static
@@ -242,9 +781,9 @@ into the development environment Visual Studio 2005.
 </div>
 </div>
 
-<div id="outline-container-sec-7" class="outline-2">
-<h2 id="sec-7">References</h2>
-<div class="outline-text-2" id="text-7">
+<div id="outline-container-sec-15" class="outline-2">
+<h2 id="sec-15">References</h2>
+<div class="outline-text-2" id="text-15">
 <ol class="org-ol">
 <li>20 issues of porting C++ code to the 64-bit platform:
 <a href="http://www.viva64.com/en/a/0004/">http://www.viva64.com/en/a/0004/</a>
@@ -263,21 +802,10 @@ Consider:
 </ol>
 </div>
 </div>
-
-
-<div id="outline-container-sec-8" class="outline-2">
-<h2 id="sec-8">cc</h2>
-<div class="outline-text-2" id="text-8">
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
-</div>
-</div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-11-05 Sat 00:19</p>
+<p class="date">Created: 2016-11-08 Tue 00:04</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
