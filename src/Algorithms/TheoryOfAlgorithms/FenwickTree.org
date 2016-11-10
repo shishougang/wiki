@@ -3,9 +3,6 @@
 #+OPTIONS: num:nil H:2
 
 
-https://en.wikipedia.org/wiki/Fenwick_tree
-
-
 * The Problem
 We have an array arr[0 . . . n-1]. We should be able to[fn:1]
 1. Find the sum of first i elements.
@@ -25,28 +22,180 @@ Or:
 可以以 $O(\log n)$ 的时间得到任意前缀和
 $\sum _{i=1}^{j}a[i],1<=j<=N$ ，并同时支持在 $O(\log n)$ 时间内支持动
 态单点值的修改。空间复杂度 $O(n)$ 。
-
-
-
-
-
-
-
-* cc
-#+begin_src python
-
-#+end_src
+** Lowbit函数
+Lowbit函数，返回参数转为二进制后,最后一个1的位置所代表的数值.
+((Not I)+1) And I表明了最后一位1的值,
 
 #+begin_src c++
-
+  int lowbit(int x)
+  {
+    return x&(-x);
+  }
 #+end_src
+** 新建
+定义一个数组 BIT，用以维护 $A$ 的前缀和，则:
+$BIT_{i}=\sum _{j=i-lowbit(i)+1}^{i}A_{j}$
+
+#+begin_src c++
+  void build()
+  { 
+    for (int i=1;i<=MAX_N;i++)
+    {
+      BIT[i]=A[i];
+      for (int j=i-1; j>i-lowbit(i); j--)
+        BIT[i]+=A[j];
+    }
+  }
+#+end_src
+** 修改
+假设现在要将 $A[i]$ 的值增加delta,
+那么,需要将 $BIT[i]$ 覆盖的区间包含 $A[i]$ 的值都加上K.
+需要计算的次数与数据规模N的二进制位数有关,即这部分的时间复杂度是 $O(LogN)$
+
+#+begin_src c++
+  void edit(int i, int delta)
+  {
+    for (int j = i; j <= MAX_N; j += lowbit(j))
+      BIT[j] += delta;
+  }
+#+end_src
+** 求和
+假设我们需要计算 $\sum _{{i=1}}^{{k}}A_{i}$ 的值.
+
+#+begin_src c++
+  int sum (int k)
+  {
+    int ans = 0;
+    for (int i = k; i > 0; i -= lowbit(i))
+      ans += BIT[i];
+    return ans;
+  }
+#+end_src
+** How does Binary Indexed Tree work?
+The idea is based on the fact that all positive integers can be
+represented as sum of powers of 2. For example 12 can be represented
+as 8 + 4. Every node of BI Tree stores sum of n elements where n
+is a power of 2. For example, in the above first diagram for getSum(),
+sum of first 12 elements can be obtained by sum of last 4 elements
+(from 9 to 12) plus sum of 8 elements (from 1 to 8). The number of set
+bits in binary representation of a number n is O(Logn). 
+
+* Example[fn:2]
+#+begin_src c++
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+// Number of elements in the array
+#define N (1024*1024*16)
+
+// Number of queries to perform
+#define NQUERIES 1000
+
+// Macro to zero all except the least significant non-zero bit
+#define LSB(i) ((i) & -(i)) 
+
+// Fen_sum: returns the sum of elements from index 0 to index i
+double Fen_sum(double *a, int i) 
+{
+  double sum = 0.0;
+  i++;
+  while (i > 0)
+    {
+      sum += a[i-1];
+      i -= LSB(i);
+    }
+  return sum;
+}
+
+// Fen_add: adds k to element i
+void Fen_add(double *a, int size, double k, int i) 
+{
+  i++;
+  size++;
+  while (i < size) 
+    {
+      a[i-1] += k;
+      i += LSB(i);
+    }
+}
+
+// Fen_get: Returns the value of the element at index i
+double Fen_get(double *a, int i)
+{
+  return Fen_sum(a,i)-Fen_sum(a,i-1);
+}
+
+// Fen_set: sets the value of the element at index i
+void Fen_set(double *a, int size, double value, int i)
+{
+  Fen_add(a,size,value-Fen_get(a,i),i);
+}
 
 
-#+begin_src sh
+int main()
+{
+  double *a;
+  double asum;
+  int i,j,tmp;
+  long long seed;
+  double time1,time2,time3;
+  int queries[NQUERIES*2];
 
+  // get a random number seed based on time
+  seed = time(NULL);
+  // generate the bounds for all of the queries
+  srandom(seed);
+  for(i=0;i<NQUERIES*2;i+=2)
+    {
+      queries[i]=random()%N;   // lower bound
+      queries[i+1]=random()%N; // upper bound
+      if(queries[i]>queries[i+1]) // may need to swap them
+        {
+          tmp=queries[i];
+          queries[i]=queries[i+1];
+          queries[i+1]=tmp;
+        }
+    }
+
+  // allocate the array of doubles
+  a = malloc((N)*sizeof(double));
+  /*****************************************************************/
+  /*   FENWICK TREE METHOD                                         */
+  /*****************************************************************/
+  // get the current time 
+  time1 = clock();  
+  // Add random numbers to a Fenwick tree.  Fen_set is relatively
+  // expensive, so initialize all elements to 0.0, then use Fen_add
+  // instead of Fen_set... Much faster!
+  srand48(seed);
+  for(i=0;i<N;i++)
+    a[i]=0.0;
+  for(i=0;i<N;i++)
+    Fen_add(a,N,drand48(),i);
+  // track time required to fill the data structure        
+  time2 = clock();  
+  // perform the queries
+  for(j=0;j<NQUERIES*2;j+=2)
+    {
+      asum = Fen_sum(a,queries[j+1])-Fen_sum(a,queries[j]);
+      printf("%.3lf ",asum);
+    }
+  // track time required for the queries  
+  time3 = clock();
+  // print out the times
+  printf("\nFenwick:\n Build: %lf\n Query: %lf\n",
+         (time2-time1)/CLOCKS_PER_SEC,
+         (time3-time2)/CLOCKS_PER_SEC);
+
+  free(a);
+  return 0;
+}
 #+end_src
 
 * Footnotes
 
 [fn:1] http://www.geeksforgeeks.org/binary-indexed-tree-or-fenwick-tree-2/
+
+[fn:2] https://en.wikipedia.org/wiki/Fenwick_tree#Implementation
 

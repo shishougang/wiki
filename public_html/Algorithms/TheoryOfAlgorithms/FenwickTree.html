@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Binary Indexed Tree or Fenwick Tree</title>
-<!-- 2016-11-10 Thu 00:19 -->
+<!-- 2016-11-11 Fri 00:00 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -110,14 +110,19 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-1">The Problem</a></li>
 <li><a href="#sec-2">The simple solutions</a></li>
-<li><a href="#sec-3">Binary Indexed Tree</a></li>
-<li><a href="#sec-4">cc</a></li>
+<li><a href="#sec-3">Binary Indexed Tree</a>
+<ul>
+<li><a href="#sec-3-1">Lowbit函数</a></li>
+<li><a href="#sec-3-2">新建</a></li>
+<li><a href="#sec-3-3">修改</a></li>
+<li><a href="#sec-3-4">求和</a></li>
+<li><a href="#sec-3-5">How does Binary Indexed Tree work?</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">Example</a></li>
 </ul>
 </div>
 </div>
-<p>
-<a href="https://en.wikipedia.org/wiki/Fenwick_tree">https://en.wikipedia.org/wiki/Fenwick_tree</a>
-</p>
 
 
 <div id="outline-container-sec-1" class="outline-2">
@@ -165,31 +170,218 @@ updates.
 \(\sum _{i=1}^{j}a[i],1<=j<=N\) ，并同时支持在 \(O(\log n)\) 时间内支持动态单点值的修改。空间复杂度 \(O(n)\) 。
 </p>
 </div>
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">Lowbit函数</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+Lowbit函数，返回参数转为二进制后,最后一个1的位置所代表的数值.
+((Not I)+1) And I表明了最后一位1的值,
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">lowbit</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>)
+{
+  <span style="color: #00ffff;">return</span> x&amp;(-x);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">新建</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+定义一个数组 BIT，用以维护 \(A\) 的前缀和，则:
+\(BIT_{i}=\sum _{j=i-lowbit(i)+1}^{i}A_{j}\)
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">build</span>()
+{ 
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>=1;i&lt;=MAX_N;i++)
+  {
+    BIT[i]=A[i];
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span>=i-1; j&gt;i-lowbit(i); j--)
+      BIT[i]+=A[j];
+  }
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">修改</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+假设现在要将 \(A[i]\) 的值增加delta,
+那么,需要将 \(BIT[i]\) 覆盖的区间包含 \(A[i]\) 的值都加上K.
+需要计算的次数与数据规模N的二进制位数有关,即这部分的时间复杂度是 \(O(LogN)\)
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">edit</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">delta</span>)
+{
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = i; j &lt;= MAX_N; j += lowbit(j))
+    BIT[j] += delta;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">求和</h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+假设我们需要计算 \(\sum _{{i=1}}^{{k}}A_{i}\) 的值.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">sum</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ans</span> = 0;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = k; i &gt; 0; i -= lowbit(i))
+    ans += BIT[i];
+  <span style="color: #00ffff;">return</span> ans;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-5" class="outline-3">
+<h3 id="sec-3-5">How does Binary Indexed Tree work?</h3>
+<div class="outline-text-3" id="text-3-5">
+<p>
+The idea is based on the fact that all positive integers can be
+represented as sum of powers of 2. For example 12 can be represented
+as 8 + 4. Every node of BI Tree stores sum of n elements where n
+is a power of 2. For example, in the above first diagram for getSum(),
+sum of first 12 elements can be obtained by sum of last 4 elements
+(from 9 to 12) plus sum of 8 elements (from 1 to 8). The number of set
+bits in binary representation of a number n is O(Logn). 
+</p>
+</div>
+</div>
 </div>
 
-
-
-
-
-
-
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">cc</h2>
+<h2 id="sec-4">Example<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup></h2>
 <div class="outline-text-2" id="text-4">
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
-</div>
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;time.h&gt;</span>
 
-<div class="org-src-container">
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Number of elements in the array</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">N</span> (1024*1024*16)
 
-<pre class="src src-c++"></pre>
-</div>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Number of queries to perform</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NQUERIES</span> 1000
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Macro to zero all except the least significant non-zero bit</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">LSB</span>(<span style="color: #eedd82;">i</span>) ((i) &amp; -(i)) 
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Fen_sum: returns the sum of elements from index 0 to index i</span>
+<span style="color: #98fb98;">double</span> <span style="color: #87cefa;">Fen_sum</span>(<span style="color: #98fb98;">double</span> *<span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>) 
+{
+  <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">sum</span> = 0.0;
+  i++;
+  <span style="color: #00ffff;">while</span> (i &gt; 0)
+    {
+      sum += a[i-1];
+      i -= LSB(i);
+    }
+  <span style="color: #00ffff;">return</span> sum;
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Fen_add: adds k to element i</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Fen_add</span>(<span style="color: #98fb98;">double</span> *<span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>, <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">k</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>) 
+{
+  i++;
+  size++;
+  <span style="color: #00ffff;">while</span> (i &lt; size) 
+    {
+      a[i-1] += k;
+      i += LSB(i);
+    }
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Fen_get: Returns the value of the element at index i</span>
+<span style="color: #98fb98;">double</span> <span style="color: #87cefa;">Fen_get</span>(<span style="color: #98fb98;">double</span> *<span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>)
+{
+  <span style="color: #00ffff;">return</span> Fen_sum(a,i)-Fen_sum(a,i-1);
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Fen_set: sets the value of the element at index i</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Fen_set</span>(<span style="color: #98fb98;">double</span> *<span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>, <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">value</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>)
+{
+  Fen_add(a,size,value-Fen_get(a,i),i);
+}
 
 
-<div class="org-src-container">
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>()
+{
+  <span style="color: #98fb98;">double</span> *<span style="color: #eedd82;">a</span>;
+  <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">asum</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>,<span style="color: #eedd82;">j</span>,<span style="color: #eedd82;">tmp</span>;
+  <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">seed</span>;
+  <span style="color: #98fb98;">double</span> <span style="color: #eedd82;">time1</span>,<span style="color: #eedd82;">time2</span>,<span style="color: #eedd82;">time3</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">queries</span>[NQUERIES*2];
 
-<pre class="src src-sh"></pre>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">get a random number seed based on time</span>
+  seed = time(<span style="color: #7fffd4;">NULL</span>);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">generate the bounds for all of the queries</span>
+  srandom(seed);
+  <span style="color: #00ffff;">for</span>(i=0;i&lt;NQUERIES*2;i+=2)
+    {
+      queries[i]=random()%N;   <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">lower bound</span>
+      queries[i+1]=random()%N; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">upper bound</span>
+      <span style="color: #00ffff;">if</span>(queries[i]&gt;queries[i+1]) <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">may need to swap them</span>
+        {
+          tmp=queries[i];
+          queries[i]=queries[i+1];
+          queries[i+1]=tmp;
+        }
+    }
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">allocate the array of doubles</span>
+  a = malloc((N)*<span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">double</span>));
+  <span style="color: #ff7f24;">/*****************************************************************</span><span style="color: #ff7f24;">/</span>
+  <span style="color: #ff7f24;">/*   </span><span style="color: #ff7f24;">FENWICK TREE METHOD                                         */</span>
+  <span style="color: #ff7f24;">/*****************************************************************</span><span style="color: #ff7f24;">/</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">get the current time </span>
+  time1 = clock();  
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Add random numbers to a Fenwick tree.  Fen_set is relatively</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">expensive, so initialize all elements to 0.0, then use Fen_add</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">instead of Fen_set... Much faster!</span>
+  srand48(seed);
+  <span style="color: #00ffff;">for</span>(i=0;i&lt;N;i++)
+    a[i]=0.0;
+  <span style="color: #00ffff;">for</span>(i=0;i&lt;N;i++)
+    Fen_add(a,N,drand48(),i);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">track time required to fill the data structure        </span>
+  time2 = clock();  
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">perform the queries</span>
+  <span style="color: #00ffff;">for</span>(j=0;j&lt;NQUERIES*2;j+=2)
+    {
+      asum = Fen_sum(a,queries[j+1])-Fen_sum(a,queries[j]);
+      printf(<span style="color: #ffa07a;">"%.3lf "</span>,asum);
+    }
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">track time required for the queries  </span>
+  time3 = clock();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">print out the times</span>
+  printf(<span style="color: #ffa07a;">"\nFenwick:\n Build: %lf\n Query: %lf\n"</span>,
+         (time2-time1)/CLOCKS_PER_SEC,
+         (time3-time2)/CLOCKS_PER_SEC);
+
+  free(a);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
 </div>
 </div>
@@ -201,12 +393,16 @@ updates.
 <a href="http://www.geeksforgeeks.org/binary-indexed-tree-or-fenwick-tree-2/">http://www.geeksforgeeks.org/binary-indexed-tree-or-fenwick-tree-2/</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="https://en.wikipedia.org/wiki/Fenwick_tree#Implementation">https://en.wikipedia.org/wiki/Fenwick_tree#Implementation</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-11-10 Thu 00:19</p>
+<p class="date">Created: 2016-11-11 Fri 00:00</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
