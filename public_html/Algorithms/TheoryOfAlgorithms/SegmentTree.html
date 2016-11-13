@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Segment Tree</title>
-<!-- 2016-11-12 Sat 23:30 -->
+<!-- 2016-11-13 Sun 23:50 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -58,6 +58,48 @@ for the JavaScript code in this tag.
  }
 /*]]>*///-->
 </script>
+<script type="text/javascript" src="http://orgmode.org/mathjax/MathJax.js"></script>
+<script type="text/javascript">
+<!--/*--><![CDATA[/*><!--*/
+    MathJax.Hub.Config({
+        // Only one of the two following lines, depending on user settings
+        // First allows browser-native MathML display, second forces HTML/CSS
+        //  config: ["MMLorHTML.js"], jax: ["input/TeX"],
+            jax: ["input/TeX", "output/HTML-CSS"],
+        extensions: ["tex2jax.js","TeX/AMSmath.js","TeX/AMSsymbols.js",
+                     "TeX/noUndefined.js"],
+        tex2jax: {
+            inlineMath: [ ["\\(","\\)"] ],
+            displayMath: [ ['$$','$$'], ["\\[","\\]"], ["\\begin{displaymath}","\\end{displaymath}"] ],
+            skipTags: ["script","noscript","style","textarea","pre","code"],
+            ignoreClass: "tex2jax_ignore",
+            processEscapes: false,
+            processEnvironments: true,
+            preview: "TeX"
+        },
+        showProcessingMessages: true,
+        displayAlign: "center",
+        displayIndent: "2em",
+
+        "HTML-CSS": {
+             scale: 100,
+             availableFonts: ["STIX","TeX"],
+             preferredFont: "TeX",
+             webFont: "TeX",
+             imageFont: "TeX",
+             showMathMenu: true,
+        },
+        MMLorHTML: {
+             prefer: {
+                 MSIE:    "MML",
+                 Firefox: "MML",
+                 Opera:   "HTML",
+                 other:   "HTML"
+             }
+        }
+    });
+/*]]>*///-->
+</script>
 </head>
 <body>
 <div id="content">
@@ -66,8 +108,18 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">More</a></li>
-<li><a href="#sec-2">cc</a></li>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">Segment Tree(Sum of given range)</a></li>
+<li><a href="#sec-3">Lazy propagation</a>
+<ul>
+<li><a href="#sec-3-1">节点数据向上更新</a></li>
+<li><a href="#sec-3-2">节点懒惰标记下推</a></li>
+<li><a href="#sec-3-3">建树</a></li>
+<li><a href="#sec-3-4">更新</a></li>
+<li><a href="#sec-3-5">区间查询</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">More</a></li>
 </ul>
 </div>
 </div>
@@ -75,9 +127,373 @@ for the JavaScript code in this tag.
 
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">More</h2>
+<h2 id="sec-1">Overview</h2>
 <div class="outline-text-2" id="text-1">
+<p>
+Segment Tree is a data structure that allows efficient (ie, the
+asymptotic behavior \(O(log n)\) to implement the operation of the
+form: find the amount / minimum of the array of elements in a given
+interval (a[l..r] where land rare input to the algorithm),
+thus further possible to change the elements of the array: as a change
+in the value of one item, and change elements on a whole array of
+subsegments (ie, allowed to assign all the elements of a [l&#x2026;r] any
+value or add to all the elements of the array any number).
+</p>
+
 <ul class="org-ul">
+<li>An important feature of the segments of trees is that they consume a
+linear memory capacity.
+</li>
+<li>Leaf Nodes are the elements of the input array.
+</li>
+<li>Each internal node represents some merging of the leaf nodes. The
+merging may be different for different problems.
+</li>
+<li>For each node at index i, the left child is at index 2*i+1, right
+child at 2*i+2 and the parent is at (i-1)/2.
+</li>
+</ul>
+
+<p>
+A example of sum:
+</p>
+
+
+<div class="figure">
+<p><img src="./files/segment-tree-sum.png" alt="segment-tree-sum.png" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Segment Tree(Sum of given range)<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-2">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">C program to show segment tree operations like construction, query</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">and update</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;math.h&gt;</span>
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A utility function to get the middle index from corner indexes.</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">getMid</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">e</span>) {  <span style="color: #00ffff;">return</span> s + (e -s)/2;  }
+
+<span style="color: #ff7f24;">/*  </span><span style="color: #ff7f24;">A recursive function to get the sum of values in given range</span>
+<span style="color: #ff7f24;">    of the array. The following are parameters for this function.</span>
+
+<span style="color: #ff7f24;">    st    --&gt; Pointer to segment tree</span>
+<span style="color: #ff7f24;">    si    --&gt; Index of current node in the segment tree. Initially</span>
+<span style="color: #ff7f24;">              0 is passed as root is always at index 0</span>
+<span style="color: #ff7f24;">    ss &amp; se  --&gt; Starting and ending indexes of the segment represented</span>
+<span style="color: #ff7f24;">                 by current node, i.e., st[si]</span>
+<span style="color: #ff7f24;">    qs &amp; qe  --&gt; Starting and ending indexes of query range */</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">getSumUtil</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">st</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ss</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">se</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">qs</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">qe</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">si</span>)
+{
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If segment of this node is a part of given range, then return</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">the sum of the segment</span>
+    <span style="color: #00ffff;">if</span> (qs &lt;= ss &amp;&amp; qe &gt;= se)
+        <span style="color: #00ffff;">return</span> st[si];
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If segment of this node is outside the given range</span>
+    <span style="color: #00ffff;">if</span> (se &lt; qs || ss &gt; qe)
+        <span style="color: #00ffff;">return</span> 0;
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If a part of this segment overlaps with the given range</span>
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mid</span> = getMid(ss, se);
+    <span style="color: #00ffff;">return</span> getSumUtil(st, ss, mid, qs, qe, 2*si+1) +
+           getSumUtil(st, mid+1, se, qs, qe, 2*si+2);
+}
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">A recursive function to update the nodes which have the given </span>
+<span style="color: #ff7f24;">   index in their range. The following are parameters</span>
+<span style="color: #ff7f24;">    st, si, ss and se are same as getSumUtil()</span>
+<span style="color: #ff7f24;">    i    --&gt; index of the element to be updated. This index is </span>
+<span style="color: #ff7f24;">             in input array.</span>
+<span style="color: #ff7f24;">   diff --&gt; Value to be added to all nodes which have i in range */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">updateValueUtil</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">st</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ss</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">se</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">diff</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">si</span>)
+{
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Base Case: If the input index lies outside the range of </span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">this segment</span>
+    <span style="color: #00ffff;">if</span> (i &lt; ss || i &gt; se)
+        <span style="color: #00ffff;">return</span>;
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If the input index is in range of this node, then update </span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">the value of the node and its children</span>
+    st[si] = st[si] + diff;
+    <span style="color: #00ffff;">if</span> (se != ss)
+    {
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mid</span> = getMid(ss, se);
+        updateValueUtil(st, ss, mid, i, diff, 2*si + 1);
+        updateValueUtil(st, mid+1, se, i, diff, 2*si + 2);
+    }
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">The function to update a value in input array and segment tree.</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">It uses updateValueUtil() to update the value in segment tree</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">updateValue</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">arr</span>[], <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">st</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">new_val</span>)
+{
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Check for erroneous input index</span>
+    <span style="color: #00ffff;">if</span> (i &lt; 0 || i &gt; n-1)
+    {
+        printf(<span style="color: #ffa07a;">"Invalid Input"</span>);
+        <span style="color: #00ffff;">return</span>;
+    }
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Get the difference between new value and old value</span>
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">diff</span> = new_val - arr[i];
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Update the value in array</span>
+    arr[i] = new_val;
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Update the values of nodes in segment tree</span>
+    updateValueUtil(st, 0, n-1, i, diff, 0);
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Return sum of elements in range from index qs (quey start)</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">to qe (query end).  It mainly uses getSumUtil()</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">getSum</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">st</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">qs</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">qe</span>)
+{
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Check for erroneous input values</span>
+    <span style="color: #00ffff;">if</span> (qs &lt; 0 || qe &gt; n-1 || qs &gt; qe)
+    {
+        printf(<span style="color: #ffa07a;">"Invalid Input"</span>);
+        <span style="color: #00ffff;">return</span> -1;
+    }
+
+    <span style="color: #00ffff;">return</span> getSumUtil(st, 0, n-1, qs, qe, 0);
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A recursive function that constructs Segment Tree for array[ss..se].</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">si is index of current node in segment tree st</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">constructSTUtil</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">arr</span>[], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ss</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">se</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">st</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">si</span>)
+{
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If there is one element in array, store it in current node of</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">segment tree and return</span>
+    <span style="color: #00ffff;">if</span> (ss == se)
+    {
+        st[si] = arr[ss];
+        <span style="color: #00ffff;">return</span> arr[ss];
+    }
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If there are more than one elements, then recur for left and</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">right subtrees and store the sum of values in this node</span>
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mid</span> = getMid(ss, se);
+    st[si] =  constructSTUtil(arr, ss, mid, st, si*2+1) +
+              constructSTUtil(arr, mid+1, se, st, si*2+2);
+    <span style="color: #00ffff;">return</span> st[si];
+}
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Function to construct segment tree from given array. This function</span>
+<span style="color: #ff7f24;">   allocates memory for segment tree and calls constructSTUtil() to</span>
+<span style="color: #ff7f24;">   fill the allocated memory */</span>
+<span style="color: #98fb98;">int</span> *<span style="color: #87cefa;">constructST</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">arr</span>[], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>)
+{
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Allocate memory for segment tree</span>
+
+    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Height of segment tree</span>
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span> = (<span style="color: #98fb98;">int</span>)(ceil(log2(n))); 
+
+    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Maximum size of segment tree</span>
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">max_size</span> = 2*(<span style="color: #98fb98;">int</span>)pow(2, x) - 1; 
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Allocate memory</span>
+    <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">st</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[max_size];
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Fill the allocated memory st</span>
+    constructSTUtil(arr, 0, n-1, st, 0);
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Return the constructed segment tree</span>
+    <span style="color: #00ffff;">return</span> st;
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Driver program to test above functions</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>()
+{
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">arr</span>[] = {1, 3, 5, 7, 9, 11};
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = <span style="color: #00ffff;">sizeof</span>(arr)/<span style="color: #00ffff;">sizeof</span>(arr[0]);
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Build segment tree from given array</span>
+    <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">st</span> = constructST(arr, n);
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Print sum of values in array from index 1 to 3</span>
+    printf(<span style="color: #ffa07a;">"Sum of values in given range = %d\n"</span>, 
+            getSum(st, n, 1, 3));
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Update: set arr[1] = 10 and update corresponding </span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">segment tree nodes</span>
+    updateValue(arr, st, n, 1, 10);
+
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Find sum after the value is updated</span>
+    printf(<span style="color: #ffa07a;">"Updated sum of values in given range = %d\n"</span>,
+             getSum(st, n, 1, 3));
+    <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Lazy propagation</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+再更新一段数据时,利用lazy propagation,可以做到 \(O(logn)\) 
+</p>
+</div>
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">节点数据向上更新</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+将子节点的值更新到父节点。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">&#23545;&#20110;&#21306;&#38388;&#27714;&#21644; */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">push_up</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span>) {
+    tree[rt] = tree[rt &lt;&lt; 1] + tree[rt &lt;&lt; 1 | 1];
+}
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">&#23545;&#20110;&#21306;&#38388;&#27714;&#26368;&#22823;&#20540; */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">push_up</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span>) {
+    tree[rt] = max(tree[rt &lt;&lt; 1], tree[rt &lt;&lt; 1 | 1]);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">节点懒惰标记下推</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+对于区间求和, 原子数组值需要加上lazy标记乘以子树所统计的区间长度。 len
+为父节点统计的区间长度, 则len - (len &gt;&gt; 1)为左子树区间长度, len &gt;&gt; 1为右子树区间长度。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">push_down</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>) {
+    tree[rt &lt;&lt; 1] += lazy[rt] * (len - (len &gt;&gt; 1));
+    lazy[rt &lt;&lt; 1] += lazy[rt];
+    tree[rt &lt;&lt; 1 | 1] += lazy[rt] * (len &gt;&gt; 1);
+    lazy[rt &lt;&lt; 1 | 1] += lazy[rt];
+    lazy[rt] = 0;
+}
+</pre>
+</div>
+
+<p>
+对于区间求最大值, 子树的值不需要乘以长度, 所以不需要传递参数len。
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">push_down</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span>) {
+    tree[rt &lt;&lt; 1] += lazy[rt];
+    lazy[rt &lt;&lt; 1] += lazy[rt];
+    tree[rt &lt;&lt; 1 | 1] += lazy[rt];
+    lazy[rt &lt;&lt; 1 | 1] += lazy[rt];
+    lazy[rt] = 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">建树</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+新建一棵长度N的线段树。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">lchild</span> rt &lt;&lt; 1, l, m
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">rchild</span> rt &lt;&lt; 1 | 1, m + 1, r
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">build</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span> = 1, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span> = 1, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r</span> = N) {
+    <span style="color: #00ffff;">if</span> (l == r) { <span style="color: #7fffd4;">std</span>::cin &gt;&gt; tree[rt]; <span style="color: #00ffff;">return</span>; }
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span> = (l + r) &gt;&gt; 1;
+    build(lchild); build(rchild);
+    push_up(rt);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">更新</h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+单点更新, 不需要用到lazy标记
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">lchild</span> rt &lt;&lt; 1, l, m
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">rchild</span> rt &lt;&lt; 1 | 1, m + 1, r
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">update</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">p</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">delta</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span> = 1, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span> = 1, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r</span> = N) {
+    <span style="color: #00ffff;">if</span> (l == r) {
+        tree[rt] += delta;
+        <span style="color: #00ffff;">return</span>;
+    }
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span> = (l + r) &gt;&gt; 1;
+    <span style="color: #00ffff;">if</span> (p &lt;= m) update(p, delta, lchild);
+    <span style="color: #00ffff;">else</span> update(p, delta, rchild);
+    push_up(rt);
+}
+</pre>
+</div>
+
+<p>
+成段更新, 需要用到lazy标记来提高时间效率
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">lchild</span> rt &lt;&lt; 1, l, m
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">rchild</span> rt &lt;&lt; 1 | 1, m + 1, r
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">update</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">L</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">R</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">delta</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span> = 1, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span> = 1, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r</span> = N) {
+    <span style="color: #00ffff;">if</span> (L &lt;= l &amp;&amp; r &lt;= R) {
+        tree[rt] += delta * (r - l + 1);
+        lazy[rt] += delta;
+        <span style="color: #00ffff;">return</span>;
+    }
+    <span style="color: #00ffff;">if</span> (lazy[rt]) push_down(rt, r - l + 1);
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span> = (l + r) &gt;&gt; 1;
+    <span style="color: #00ffff;">if</span> (L &lt;= m) update(L, R, delta, lchild);
+    <span style="color: #00ffff;">if</span> (R &gt; m)  update(L, R, delta, rchild);
+    push_up(rt);
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-5" class="outline-3">
+<h3 id="sec-3-5">区间查询</h3>
+<div class="outline-text-3" id="text-3-5">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">lchild</span> rt &lt;&lt; 1, l, m
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">rchild</span> rt &lt;&lt; 1 | 1, m + 1, r
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">query</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">L</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">R</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rt</span> = 1, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span> = 1, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r</span> = N) {
+    <span style="color: #00ffff;">if</span> (L &lt;= l &amp;&amp; r &lt;= R) <span style="color: #00ffff;">return</span> tree[rt];
+    <span style="color: #00ffff;">if</span> (lazy[rt]) push_down(rt, r - l + 1);
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span> = (l + r) &gt;&gt; 1, <span style="color: #eedd82;">ret</span> = 0;
+    <span style="color: #00ffff;">if</span> (L &lt;= m) ret += query(L, R, lchild);
+    <span style="color: #00ffff;">if</span> (R &gt; m)  ret += query(L, R, rchild);
+    <span style="color: #00ffff;">return</span> ret;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">More</h2>
+<div class="outline-text-2" id="text-4">
+<ul class="org-ul">
+<li>Segment Tree(Range Minimum Query):
+<a href="http://www.geeksforgeeks.org/segment-tree-set-1-range-minimum-query/">http://www.geeksforgeeks.org/segment-tree-set-1-range-minimum-query/</a>
+</li>
 <li>segment trees basic explanation and examples:
 <a href="http://codeforces.com/blog/entry/18051">http://codeforces.com/blog/entry/18051</a> and
 <a href="http://e-maxx.ru/algo/segment_tree">http://e-maxx.ru/algo/segment_tree</a>
@@ -86,35 +502,23 @@ for the JavaScript code in this tag.
 <a href="http://codeforces.com/blog/entry/15890">http://codeforces.com/blog/entry/15890</a> and
 <a href="http://letuskode.blogspot.hk/2013/01/segtrees.html">http://letuskode.blogspot.hk/2013/01/segtrees.html</a>
 </li>
-<li></li>
 </ul>
 </div>
 </div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
 
-<div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">cc</h2>
-<div class="outline-text-2" id="text-2">
-<div class="org-src-container">
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://www.geeksforgeeks.org/segment-tree-set-1-sum-of-given-range/">http://www.geeksforgeeks.org/segment-tree-set-1-sum-of-given-range/</a>
+</p></div>
 
-<pre class="src src-python"></pre>
+
 </div>
-
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
-
-
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
-</div>
-</div>
-</div>
-</div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-11-12 Sat 23:30</p>
+<p class="date">Created: 2016-11-13 Sun 23:50</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
