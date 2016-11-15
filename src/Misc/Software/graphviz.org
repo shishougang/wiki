@@ -2,23 +2,411 @@
 #+TITLE: Drawing Graphs using Graphviz
 #+OPTIONS: num:nil H:2
 
+
 * Homepage
-http://www.graphviz.org/
++ homepage: http://www.graphviz.org/
++ dot guide: http://www.graphviz.org/pdf/dotguide.pdf
++ Output Formats: http://www.graphviz.org/doc/info/output.html
++ Command-line Invocation:
+  http://graphviz.org/content/command-line-invocation
++ Color Names: http://www.graphviz.org/content/color-names
+* Embedding Dot in Emacs
+check: http://wiki.dreamrunner.org/public_html/Emacs/org-mode.html#sec-17-1
 
-http://www.graphviz.org/pdf/dotguide.pdf
+* Dot: Hello world
+Create a file called =hello.gv= and input:
+#+begin_src sh
+  graph graphname { 
+                  a -- b; 
+                  b -- c;
+                  b -- d;
+                  d -- a;
+          }
+#+end_src
+And use the following command to generate the png file:
+#+begin_src sh
+dot -Tpng hello.gv -o hello.png
+#+end_src
 
+* Examples[fn:1]
+** Simple Graph
+#+begin_src sh
+graph graphname { 
+                a -- b; 
+                b -- c;
+                b -- d;
+                d -- a;
+        }
+#+end_src
 
-http://www.graphviz.org/doc/info/output.html
-* reference
-http://www.tonyballantyne.com/graphs.html
+#+BEGIN_SRC dot :file ./Files/simple_graph.png :cmdline -Kdot -Tpng
+graph graphname { 
+                a -- b; 
+                b -- c;
+                b -- d;
+                d -- a;
+        }
+#+END_SRC
 
-* cc
+#+RESULTS:
+[[file:./Files/simple_graph.png]]
 
-#+begin_src c++
+** Same Graph, Different Layout
+#+begin_src sh
+graph graphname {
+                rankdir=LR;  //Rank Direction Left to Right
+                a -- b; 
+                b -- c;
+                b -- d;
+                d -- a;
+        }
+#+end_src
 
+#+BEGIN_SRC dot :file ./Files/simple_lr.png :cmdline -Kdot -Tpng
+  graph graphname {
+                  rankdir=LR;  //Rank Direction Left to Right
+                  a -- b; 
+                  b -- c;
+                  b -- d;
+                  d -- a;
+          }
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/simple_lr.png]]
+
+** Simple Digraph (Directional Graph)
+#+begin_src sh
+digraph graphname{
+                a -> b;
+                b -> c;
+                a -> c;
+        }
+#+end_src
+
+#+BEGIN_SRC dot :file ./Files/direct_graph.png :cmdline -Kdot -Tpng
+digraph graphname{
+                a -> b;
+                b -> c;
+                a -> c;
+        }
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/direct_graph.png]]
+
+** Simple Digraph with Labels
+#+begin_src sh
+digraph graphname{
+
+                T [label="Teacher"]      // node T
+                P [label="Pupil"]  // node P
+
+                T->P [label="Instructions", fontcolor=darkgreen] // edge T->P
+}
+#+end_src
+
+#+BEGIN_SRC dot :file ./Files/simple_labels.png :cmdline -Kdot -Tpng
+  digraph graphname{
+
+                  T [label="Teacher"]      // node T
+                  P [label="Pupil"]  // node P
+
+                  T->P [label="Instructions", fontcolor=darkgreen] // edge T->P
+  }
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/simple_labels.png]]
+
+** Same Graph, Different Shape and Colour
+#+begin_src sh
+digraph graphname {
+                T [label="Teacher" color=Blue, fontcolor=Red, fontsize=24, shape=box]      // node T
+                P [label="Pupil" color=Blue, fontcolor=Red, fontsize=24, shape=box]  // node P
+
+                T->P [label="Instructions", fontcolor=darkgreen] // edge T->P
+}
+#+end_src
+
+#+BEGIN_SRC dot :file ./Files/diff_shape_colour.png :cmdline -Kdot -Tpng
+digraph graphname {
+                T [label="Teacher" color=Blue, fontcolor=Red, fontsize=24, shape=box]      // node T
+                P [label="Pupil" color=Blue, fontcolor=Red, fontsize=24, shape=box]  // node P
+
+                T->P [label="Instructions", fontcolor=darkgreen] // edge T->P
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/diff_shape_colour.png]]
+
+* More Advanced
+** Define first
+#+begin_src sh
+digraph hierarchy {
+
+                nodesep=1.0 // increases the separation between nodes
+                
+                node [color=Red,fontname=Courier,shape=box] //All nodes will this shape and colour
+                edge [color=Blue, style=dashed] //All the lines look like this
+
+                Headteacher->{Deputy1 Deputy2 BusinessManager}
+                Deputy1->{Teacher1 Teacher2}
+                BusinessManager->ITManager
+                {rank=same;ITManager Teacher1 Teacher2}  // Put them on the same level
+}
 #+end_src
 
 
+#+BEGIN_SRC dot :file ./Files/define_first.png :cmdline -Kdot -Tpng
+digraph hierarchy {
+
+                nodesep=1.0 // increases the separation between nodes
+                
+                node [color=Red,fontname=Courier,shape=box] //All nodes will this shape and colour
+                edge [color=Blue, style=dashed] //All the lines look like this
+
+                Headteacher->{Deputy1 Deputy2 BusinessManager}
+                Deputy1->{Teacher1 Teacher2}
+                BusinessManager->ITManager
+                {rank=same;ITManager Teacher1 Teacher2}  // Put them on the same level
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/define_first.png]]
+** Records
+You can now use HTML to define these sort of blocks. 
+
+#+begin_src sh
+digraph structs {
+        node[shape=record]
+        struct1 [label="<f0> left|<f1> mid\ dle|<f2> right"];
+        struct2 [label="{<f0> one|<f1> two\n\n\n}" shape=Mrecord];
+        struct3 [label="hello\nworld |{ b |{c|<here> d|e}| f}| g | h"];
+        struct1:f1 -> struct2:f0;
+        struct1:f0 -> struct3:f1;
+}
+#+end_src
+
+#+BEGIN_SRC dot :file ./Files/records.png :cmdline -Kdot -Tpng
+digraph structs {
+        node[shape=record]
+        struct1 [label="<f0> left|<f1> mid\ dle|<f2> right"];
+        struct2 [label="{<f0> one|<f1> two\n\n\n}" shape=Mrecord];
+        struct3 [label="hello\nworld |{ b |{c|<here> d|e}| f}| g | h"];
+        struct1:f1 -> struct2:f0;
+        struct1:f0 -> struct3:f1;
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/records.png]]
+** Finite State Machine
+#+begin_src sh
+digraph finite_state_machine {
+        rankdir=LR;
+        size="8,5"
+        node [shape = circle];
+        S0 -> S1 [ label = "Lift Nozzle" ]
+        S1 -> S0 [ label = "Replace Nozzle" ]
+        S1 -> S2 [ label = "Authorize Pump" ]
+        S2 -> S0 [ label = "Replace Nozzle" ]
+        S2 -> S3 [ label = "Pull Trigger" ]
+        S3 -> S2 [ label = "Release Trigger" ]
+}
+#+end_src
+
+#+BEGIN_SRC dot :file ./Files/fsm.png :cmdline -Kdot -Tpng
+digraph finite_state_machine {
+        rankdir=LR;
+        size="8,5"
+        node [shape = circle];
+        S0 -> S1 [ label = "Lift Nozzle" ]
+        S1 -> S0 [ label = "Replace Nozzle" ]
+        S1 -> S2 [ label = "Authorize Pump" ]
+        S2 -> S0 [ label = "Replace Nozzle" ]
+        S2 -> S3 [ label = "Pull Trigger" ]
+        S3 -> S2 [ label = "Release Trigger" ]
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/fsm.png]]
+** Data Flow Diagrams
+#+begin_src sh
+digraph dfd{    
+        node[shape=record]
+        store1 [label="<f0> left|<f1> Some data store"];
+        proc1 [label="{<f0> 1.0|<f1> Some process here\n\n\n}" shape=Mrecord];
+        enti1 [label="Customer" shape=box];
+        store1:f1 -> proc1:f0;
+        enti1-> proc1:f0;
+}
+#+end_src
+
+#+BEGIN_SRC dot :file ./Files/dfd.png :cmdline -Kdot -Tpng
+digraph dfd{    
+        node[shape=record]
+        store1 [label="<f0> left|<f1> Some data store"];
+        proc1 [label="{<f0> 1.0|<f1> Some process here\n\n\n}" shape=Mrecord];
+        enti1 [label="Customer" shape=box];
+        store1:f1 -> proc1:f0;
+        enti1-> proc1:f0;
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/dfd.png]]
+** Data Flow Diagrams 2
+#+begin_src sh
+digraph dfd2{
+        node[shape=record]
+        subgraph level0{
+        enti1 [label="Customer" shape=box];
+        enti2 [label="Manager" shape=box];
+        }
+        subgraph cluster_level1{
+                        label ="Level 1";
+                        proc1 [label="{<f0> 1.0|<f1> One process here\n\n\n}" shape=Mrecord];
+                        proc2 [label="{<f0> 2.0|<f1> Other process here\n\n\n}" shape=Mrecord];
+                        store1 [label="<f0>    |<f1> Data store one"];
+                        store2 [label="<f0>   |<f1> Data store two"];
+                        {rank=same; store1, store2}
+
+        }
+        enti1 -> proc1
+        enti2 -> proc2
+        store1 -> proc1
+        store2 -> proc2
+        proc1 -> store2
+        store2 -> proc1 
+}
+#+end_src
+
+#+BEGIN_SRC dot :file ./Files/dfd2.png :cmdline -Kdot -Tpng
+digraph dfd2{
+        node[shape=record]
+        subgraph level0{
+        enti1 [label="Customer" shape=box];
+        enti2 [label="Manager" shape=box];
+        }
+        subgraph cluster_level1{
+                        label ="Level 1";
+                        proc1 [label="{<f0> 1.0|<f1> One process here\n\n\n}" shape=Mrecord];
+                        proc2 [label="{<f0> 2.0|<f1> Other process here\n\n\n}" shape=Mrecord];
+                        store1 [label="<f0>    |<f1> Data store one"];
+                        store2 [label="<f0>   |<f1> Data store two"];
+                        {rank=same; store1, store2}
+
+        }
+        enti1 -> proc1
+        enti2 -> proc2
+        store1 -> proc1
+        store2 -> proc2
+        proc1 -> store2
+        store2 -> proc1 
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/dfd2.png]]
+** Object Inheritance
+#+begin_src sh
+digraph obj{
+        node[shape=record];
+        rankdir="BT";
+        
+        teacher [label = "{<f0> Teacher|<f1> \n  |<f2> \n   }"];
+        course [label = "{<f0> Course|<f1> \n  |<f2> \n   }"];
+        student [label = "{<f0> Student|<f1> \n  |<f2> \n   }"];
+        lesson [label = "{<f0> Lesson |<f1> \n  |<f2> \n   }"];
+        tutorial [label = "{<f0> Tutorial|<f1> \n  |<f2> \n   }"];
+        assessment[label = "{<f0> Assessment|<f1> \n  |<f2> \n   }"];
+        coursework [label = "{<f0> Coursework|<f1> \n  |<f2> \n   }"];
+        exam [label = "{<f0> Exam|<f1> \n  |<f2> \n   }"];
+
+        {rank=same; teacher course student}
+
+        teacher->course [dir="forward",arrowhead="none",arrowtail="normal",headlabel="1",taillabel="1.."];
+        student->course [dir="forward",arrowhead="none",arrowtail="normal",headlabel="1",taillabel="1.."];
+        lesson->course [dir="forward",arrowhead="diamond",arrowtail="normal"];
+        tutorial->course [dir="forward",arrowhead="diamond",arrowtail="normal"];
+        assessment->course [dir="forward",arrowhead="diamond",arrowtail="normal"];
+        coursework->assessment;
+        exam->assessment;
+
+}
+#+end_src
+
+#+BEGIN_SRC dot :file ./Files/obj.png :cmdline -Kdot -Tpng
+digraph obj{
+        node[shape=record];
+        rankdir="BT";
+        
+        teacher [label = "{<f0> Teacher|<f1> \n  |<f2> \n   }"];
+        course [label = "{<f0> Course|<f1> \n  |<f2> \n   }"];
+        student [label = "{<f0> Student|<f1> \n  |<f2> \n   }"];
+        lesson [label = "{<f0> Lesson |<f1> \n  |<f2> \n   }"];
+        tutorial [label = "{<f0> Tutorial|<f1> \n  |<f2> \n   }"];
+        assessment[label = "{<f0> Assessment|<f1> \n  |<f2> \n   }"];
+        coursework [label = "{<f0> Coursework|<f1> \n  |<f2> \n   }"];
+        exam [label = "{<f0> Exam|<f1> \n  |<f2> \n   }"];
+
+        {rank=same; teacher course student}
+
+        teacher->course [dir="forward",arrowhead="none",arrowtail="normal",headlabel="1",taillabel="1.."];
+        student->course [dir="forward",arrowhead="none",arrowtail="normal",headlabel="1",taillabel="1.."];
+        lesson->course [dir="forward",arrowhead="diamond",arrowtail="normal"];
+        tutorial->course [dir="forward",arrowhead="diamond",arrowtail="normal"];
+        assessment->course [dir="forward",arrowhead="diamond",arrowtail="normal"];
+        coursework->assessment;
+        exam->assessment;
+
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/obj.png]]
+** Entity Relationship
+#+begin_src sh
+digraph ER{
+        node[shape=box];
+        Book;
+        Customer;
+        Loan;
+        {rank=same;Book,Customer,Loan}
+        Book->Loan[dir="forward",arrowhead="crow",arrowtail="normal"];
+        Customer->Loan[dir="forward",arrowhead="crow",arrowtail="normal"];
+}
+#+end_src
+
+#+BEGIN_SRC dot :file ./Files/entity_relation.png :cmdline -Kdot -Tpng
+digraph ER{
+        node[shape=box];
+        Book;
+        Customer;
+        Loan;
+        {rank=same;Book,Customer,Loan}
+        Book->Loan[dir="forward",arrowhead="crow",arrowtail="normal"];
+        Customer->Loan[dir="forward",arrowhead="crow",arrowtail="normal"];
+}
+#+END_SRC
+
+#+RESULTS:
+[[file:./Files/entity_relation.png]]
+
+* cc
 #+begin_src sh
 
 #+end_src
+
+#+BEGIN_SRC dot :file ./Files/.png :cmdline -Kdot -Tpng
+
+#+END_SRC
+
+* Footnotes
+
+[fn:1] http://www.tonyballantyne.com/graphs.html
+
