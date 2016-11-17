@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Heavy Light Decomposition</title>
-<!-- 2016-11-14 Mon 23:32 -->
+<!-- 2016-11-17 Thu 23:12 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -117,6 +117,7 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2">Examples</a>
 <ul>
 <li><a href="#sec-2-1">maximum edge weight on the path from node a to node b</a></li>
+<li><a href="#sec-2-2">the maximum edge cost on the path from node a to node b</a></li>
 </ul>
 </li>
 <li><a href="#sec-3">More</a></li>
@@ -189,6 +190,359 @@ nodes, and edges numbered 1, 2, 3&#x2026;N-1.
 We will ask you to perfrom some instructions of the following form:
 </p>
 <ul class="org-ul">
+<li>change(a, b): Update weight of the ath edge to b.
+</li>
+<li>maxEdge(a, b): Print the maximum edge weight on the path from node a
+to node b.
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;bits/stdc++.h&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">N</span> 1024
+
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">tree</span>[N][N];  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Matrix representing the tree</span>
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">a tree node structure. Every node has a parent, depth,</span>
+<span style="color: #ff7f24;">   subtree size, chain to which it belongs and a position</span>
+<span style="color: #ff7f24;">   in base array*/</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">treeNode</span>
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">par</span>;   <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Parent of this node</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">depth</span>; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Depth of this node</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Size of subtree rooted with this node</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pos_segbase</span>; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Position in segment tree base</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">chain</span>;
+} <span style="color: #eedd82;">node</span>[N];
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">every Edge has a weight and two ends. We store deeper end */</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span>
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">weight</span>;  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Weight of Edge</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">deeper_end</span>; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Deeper end</span>
+} <span style="color: #eedd82;">edge</span>[N];
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">we construct one segment tree, on base array */</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">segmentTree</span>
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">base_array</span>[N], <span style="color: #eedd82;">tree</span>[6*N];
+} <span style="color: #eedd82;">s</span>;
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A function to add Edges to the Tree matrix</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">e is Edge ID, u and v are the two nodes, w is weight</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">addEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">e</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>)
+{
+  <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">tree as undirected graph*/</span>
+  tree[u-1][v-1] = e-1;
+  tree[v-1][u-1] = e-1;
+  edge[e-1].weight = w;
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A recursive function for DFS on the tree</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">curr is the current node, prev is the parent of curr,</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">dep is its depth</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">dfs</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">curr</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">prev</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dep</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>)
+{
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">set parent of current node to predecessor*/</span>
+  node[curr].par = prev;
+  node[curr].depth = dep;
+  node[curr].size = 1;
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">for node's every child */</span>
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span>=0; j&lt;n; j++)
+  {
+    <span style="color: #00ffff;">if</span> (j!=curr &amp;&amp; j!=node[curr].par &amp;&amp; tree[curr][j]!=-1)
+    {
+      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">set deeper end of the Edge as this child*/</span>
+      edge[tree[curr][j]].deeper_end = j;
+      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">do a DFS on subtree */</span>
+      dfs(j, curr, dep+1, n);
+      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">update subtree size */</span>
+      node[curr].size+=node[j].size;
+    }
+  }
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A recursive function that decomposes the Tree into chains</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">hld</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">curr_node</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">id</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">edge_counted</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">curr_chain</span>,
+         <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">chain_heads</span>[])
+{
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">if the current chain has no head, this node is the first node</span>
+<span style="color: #ff7f24;">   * and also chain head */</span>
+  <span style="color: #00ffff;">if</span> (chain_heads[*curr_chain]==-1)
+    chain_heads[*curr_chain] = curr_node;
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">set chain ID to which the node belongs */</span>
+  node[curr_node].chain = *curr_chain;
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">set position of node in the array acting as the base to</span>
+<span style="color: #ff7f24;">     the segment tree */</span>
+  node[curr_node].pos_segbase = *edge_counted;
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">update array which is the base to the segment tree */</span>
+  s.base_array[(*edge_counted)++] = edge[id].weight;
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Find the special child (child with maximum size)  */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">spcl_chld</span> = -1, <span style="color: #eedd82;">spcl_edg_id</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span>=0; j&lt;n; j++)
+    <span style="color: #00ffff;">if</span> (j!=curr_node &amp;&amp; j!=node[curr_node].par &amp;&amp; tree[curr_node][j]!=-1)
+      <span style="color: #00ffff;">if</span> (spcl_chld==-1 || node[spcl_chld].size &lt; node[j].size)
+        spcl_chld = j, spcl_edg_id = tree[curr_node][j];
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">if special child found, extend chain */</span>
+  <span style="color: #00ffff;">if</span> (spcl_chld!=-1)
+    hld(spcl_chld, spcl_edg_id, edge_counted, curr_chain, n, chain_heads);
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">for every other (normal) child, do HLD on child subtree as separate</span>
+<span style="color: #ff7f24;">     chain*/</span>
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span>=0; j&lt;n; j++)
+  {
+    <span style="color: #00ffff;">if</span> (j!=curr_node &amp;&amp; j!=node[curr_node].par &amp;&amp;
+        j!=spcl_chld &amp;&amp; tree[curr_node][j]!=-1)
+    {
+      (*curr_chain)++;
+      hld(j, tree[curr_node][j], edge_counted, curr_chain, n, chain_heads);
+    }
+  }
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A recursive function that constructs Segment Tree for array[ss..se).</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">si is index of current node in segment tree st</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">construct_ST</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ss</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">se</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">si</span>)
+{
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If there is one element in array, store it in current node of</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">segment tree and return</span>
+  <span style="color: #00ffff;">if</span> (ss == se-1)
+  {
+    s.tree[si] = s.base_array[ss];
+    <span style="color: #00ffff;">return</span> s.base_array[ss];
+  }
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If there are more than one elements, then recur for left and</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">right subtrees and store the minimum of two values in this node</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mid</span> = (ss + se)/2;
+  s.tree[si] =  max(construct_ST(ss, mid, si*2),
+                    construct_ST(mid, se, si*2+1));
+  <span style="color: #00ffff;">return</span> s.tree[si];
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A recursive function that updates the Segment Tree</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">x is the node to be updated to value val</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">si is the starting index of the segment tree</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">ss, se mark the corners of the range represented by si</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">update_ST</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ss</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">se</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">si</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">val</span>)
+{
+
+  <span style="color: #00ffff;">if</span> (ss &gt; x || se &lt;= x) {
+  } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (ss == x &amp;&amp; ss == se-1) {
+    s.tree[si] = val;
+  } <span style="color: #00ffff;">else</span> {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mid</span> = (ss + se)/2;
+    s.tree[si] = max(update_ST(ss, mid, si*2, x, val),
+                     update_ST(mid, se, si*2+1, x, val));
+  }
+  <span style="color: #00ffff;">return</span> s.tree[si];
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A function to update Edge e's value to val in segment tree</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">change</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">e</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">val</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>)
+{
+  update_ST(0, n, 1, node[edge[e].deeper_end].pos_segbase, val);
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A function to get the LCA of nodes u and v</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">LCA</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>)
+{
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">array for storing path from u to root */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">LCA_aux</span>[n+5];
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Set u is deeper node if it is not</span>
+  <span style="color: #00ffff;">if</span> (node[u].depth &lt; node[v].depth)
+    swap(u, v);
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">LCA_aux will store path from node u to the root*/</span>
+  memset(LCA_aux, -1, <span style="color: #00ffff;">sizeof</span>(LCA_aux));
+  <span style="color: #00ffff;">while</span> (u!=-1)
+  {
+    LCA_aux[u] = 1;
+    u = node[u].par;
+  }
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">find first node common in path from v to root and u to</span>
+<span style="color: #ff7f24;">     root using LCA_aux */</span>
+  <span style="color: #00ffff;">while</span> (v)
+  {
+    <span style="color: #00ffff;">if</span> (LCA_aux[v]==1)
+      <span style="color: #00ffff;">break</span>;
+    v = node[v].par;
+  }
+  <span style="color: #00ffff;">return</span> v;
+}
+
+<span style="color: #ff7f24;">/*  </span><span style="color: #ff7f24;">A recursive function to get the minimum value in a given range</span>
+<span style="color: #ff7f24;">    of array indexes. The following are parameters for this function.</span>
+<span style="color: #ff7f24;">    index --&gt; Index of current node in the segment tree. Initially</span>
+<span style="color: #ff7f24;">    ss &amp; se  --&gt; Starting and ending indexes of the segment represented</span>
+<span style="color: #ff7f24;">    by current node, i.e., st[index]</span>
+<span style="color: #ff7f24;">    qs &amp; qe  --&gt; Starting and ending indexes of query range */</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">RMQUtil</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ss</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">se</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">qs</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">qe</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">index</span>)
+{ 
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If segment of this node is a part of given range, then return</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">the min of the segment</span>
+  <span style="color: #00ffff;">if</span> (qs &lt;= ss &amp;&amp; qe &gt;= se-1)
+    <span style="color: #00ffff;">return</span> s.tree[index];
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If segment of this node is outside the given range</span>
+  <span style="color: #00ffff;">if</span> (se-1 &lt; qs || ss &gt; qe)
+    <span style="color: #00ffff;">return</span> -1;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If a part of this segment overlaps with the given range</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mid</span> = (ss + se)/2;
+  <span style="color: #00ffff;">return</span> max(RMQUtil(ss, mid, qs, qe, 2*index),
+             RMQUtil(mid, se, qs, qe, 2*index+1));
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Return minimum of elements in range from index qs (quey start) to</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">qe (query end).  It mainly uses RMQUtil()</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">RMQ</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">qs</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">qe</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>)
+{
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Check for erroneous input values</span>
+  <span style="color: #00ffff;">if</span> (qs &lt; 0 || qe &gt; n-1 || qs &gt; qe)
+  {
+    printf(<span style="color: #ffa07a;">"Invalid Input"</span>);
+    <span style="color: #00ffff;">return</span> -1;
+  }
+  <span style="color: #00ffff;">return</span> RMQUtil(0, n, qs, qe, 1);
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A function to move from u to v keeping track of the maximum</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">we move to the surface changing u and chains</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">until u and v donot belong to the same</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">crawl_tree</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">chain_heads</span>[])
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">chain_u</span>, <span style="color: #eedd82;">chain_v</span> = node[v].chain, <span style="color: #eedd82;">ans</span> = 0;
+  <span style="color: #00ffff;">while</span> (<span style="color: #7fffd4;">true</span>)
+  {
+    chain_u = node[u].chain;
+
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">if the two nodes belong to same chain,</span>
+<span style="color: #ff7f24;">     * we can query between their positions in the array</span>
+<span style="color: #ff7f24;">     * acting as base to the segment tree. After the RMQ,</span>
+<span style="color: #ff7f24;">     * we can break out as we have no where further to go */</span>
+    <span style="color: #00ffff;">if</span> (chain_u==chain_v)
+    {
+      <span style="color: #00ffff;">if</span> (u==v);   <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">trivial</span>
+      <span style="color: #00ffff;">else</span>
+        ans = max(RMQ(node[v].pos_segbase+1, node[u].pos_segbase, n),
+                  ans);
+      <span style="color: #00ffff;">break</span>;
+    }
+
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">else, we query between node u and head of the chain to which</span>
+<span style="color: #ff7f24;">       u belongs and later change u to parent of head of the chain</span>
+<span style="color: #ff7f24;">       to which u belongs indicating change of chain */</span>
+    <span style="color: #00ffff;">else</span>
+    {
+      ans = max(ans,
+                RMQ(node[chain_heads[chain_u]].pos_segbase,
+                    node[u].pos_segbase, n));
+
+      u = node[chain_heads[chain_u]].par;
+    }
+  }
+  <span style="color: #00ffff;">return</span> ans;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">maxEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">chain_heads</span>[])
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">lca</span> = LCA(u, v, n);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ans</span> = max(crawl_tree(u, lca, n, chain_heads),
+                crawl_tree(v, lca, n, chain_heads));
+  printf(<span style="color: #ffa07a;">"%d\n"</span>, ans);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>()
+{
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">fill adjacency matrix with -1 to indicate no connections */</span>
+  memset(tree, -1, <span style="color: #00ffff;">sizeof</span>(tree));
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = 11;
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">arguments in order: Edge ID, node u, node v, weight w*/</span>
+  addEdge(1, 1, 2, 13);
+  addEdge(2, 1, 3, 9);
+  addEdge(3, 1, 4, 23);
+  addEdge(4, 2, 5, 4);
+  addEdge(5, 2, 6, 25);
+  addEdge(6, 3, 7, 29);
+  addEdge(7, 6, 8, 5);
+  addEdge(8, 7, 9, 30);
+  addEdge(9, 8, 10, 1);
+  addEdge(10, 8, 11, 6);
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">our tree is rooted at node 0 at depth 0 */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">root</span> = 0, <span style="color: #eedd82;">parent_of_root</span>=-1, <span style="color: #eedd82;">depth_of_root</span>=0;
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">a DFS on the tree to set up:</span>
+<span style="color: #ff7f24;">   * arrays for parent, depth, subtree size for every node;</span>
+<span style="color: #ff7f24;">   * deeper end of every Edge */</span>
+  dfs(root, parent_of_root, depth_of_root, n);
+
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">chain_heads</span>[N];
+
+  <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">we have initialized no chain heads */</span>
+  memset(chain_heads, -1, <span style="color: #00ffff;">sizeof</span>(chain_heads));
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Stores number of edges for construction of segment</span>
+<span style="color: #ff7f24;">     tree. Initially we haven't traversed any Edges. */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">edge_counted</span> = 0;
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">we start with filling the 0th chain */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">curr_chain</span> = 0;
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">HLD of tree */</span>
+  hld(root, n-1, &amp;edge_counted, &amp;curr_chain, n, chain_heads);
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ST of segregated Edges */</span>
+  construct_ST(0, edge_counted, 1);
+
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Since indexes are 0 based, node 11 means index 11-1,</span>
+<span style="color: #ff7f24;">     8 means 8-1, and so on*/</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = 11, <span style="color: #eedd82;">v</span>  = 9;
+  cout &lt;&lt; <span style="color: #ffa07a;">"Max edge between "</span> &lt;&lt; u &lt;&lt; <span style="color: #ffa07a;">" and "</span> &lt;&lt; v &lt;&lt; <span style="color: #ffa07a;">" is "</span>;
+  maxEdge(u-1, v-1, n, chain_heads);
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Change value of edge number 8 (index 8-1) to 28</span>
+  change(8-1, 28, n);
+
+  cout &lt;&lt; <span style="color: #ffa07a;">"After Change: max edge between "</span> &lt;&lt; u &lt;&lt; <span style="color: #ffa07a;">" and "</span>
+       &lt;&lt; v &lt;&lt; <span style="color: #ffa07a;">" is "</span>;
+  maxEdge(u-1, v-1, n, chain_heads);
+
+  v = 4;
+  cout &lt;&lt; <span style="color: #ffa07a;">"Max edge between "</span> &lt;&lt; u &lt;&lt; <span style="color: #ffa07a;">" and "</span> &lt;&lt; v &lt;&lt; <span style="color: #ffa07a;">" is "</span>;
+  maxEdge(u-1, v-1, n, chain_heads);
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Change value of edge number 5 (index 5-1) to 22</span>
+  change(5-1, 22, n);
+  cout &lt;&lt; <span style="color: #ffa07a;">"After Change: max edge between "</span> &lt;&lt; u &lt;&lt; <span style="color: #ffa07a;">" and "</span>
+       &lt;&lt; v &lt;&lt; <span style="color: #ffa07a;">" is "</span>;
+  maxEdge(u-1, v-1, n, chain_heads);
+
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">the maximum edge cost on the path from node a to node b<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup></h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+You are given a tree (an acyclic undirected connected graph) with N
+nodes, and edges numbered 1, 2, 3&#x2026;N-1.
+We will ask you to perfrom some instructions of the following form:
+</p>
+<ul class="org-ul">
 <li>CHANGE i ti : change the cost of the i-th edge to ti
 </li>
 <li>QUERY a b : ask for the maximum edge cost on the path from node a to
@@ -196,15 +550,15 @@ node b
 </li>
 </ul>
 </div>
+<ul class="org-ul"><li><a id="sec-2-2-1" name="sec-2-2-1"></a>solution <sup><a id="fnr.4" name="fnr.4" class="footref" href="#fn.4">4</a></sup><br  /><div class="outline-text-4" id="text-2-2-1">
+<div class="org-src-container">
 
-<ul class="org-ul"><li><a id="sec-2-1-1" name="sec-2-1-1"></a>solution 1<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup><br  /></li>
-
-
-
-<li><a id="sec-2-1-2" name="sec-2-1-2"></a>solution 2<sup><a id="fnr.4" name="fnr.4" class="footref" href="#fn.4">4</a></sup><br  /></li></ul>
+<pre class="src src-c++"></pre>
 </div>
 </div>
-
+</li></ul>
+</div>
+</div>
 
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">More</h2>
@@ -239,11 +593,11 @@ node b
 </p></div>
 
 <div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
-<a href="http://www.spoj.com/problems/QTREE/">http://www.spoj.com/problems/QTREE/</a>
+<a href="http://www.geeksforgeeks.org/heavy-light-decomposition-set-2-implementation/">http://www.geeksforgeeks.org/heavy-light-decomposition-set-2-implementation/</a>
 </p></div>
 
 <div class="footdef"><sup><a id="fn.3" name="fn.3" class="footnum" href="#fnr.3">3</a></sup> <p class="footpara">
-<a href="http://www.geeksforgeeks.org/heavy-light-decomposition-set-2-implementation/">http://www.geeksforgeeks.org/heavy-light-decomposition-set-2-implementation/</a>
+<a href="http://www.spoj.com/problems/QTREE/">http://www.spoj.com/problems/QTREE/</a>
 </p></div>
 
 <div class="footdef"><sup><a id="fn.4" name="fn.4" class="footnum" href="#fnr.4">4</a></sup> <p class="footpara">
@@ -255,7 +609,7 @@ node b
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-11-14 Mon 23:32</p>
+<p class="date">Created: 2016-11-17 Thu 23:12</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
