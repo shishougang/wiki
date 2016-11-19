@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Heavy Light Decomposition</title>
-<!-- 2016-11-17 Thu 23:12 -->
+<!-- 2016-11-19 Sat 22:47 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -121,7 +121,6 @@ for the JavaScript code in this tag.
 </ul>
 </li>
 <li><a href="#sec-3">More</a></li>
-<li><a href="#sec-4">cc</a></li>
 </ul>
 </div>
 </div>
@@ -194,6 +193,23 @@ We will ask you to perfrom some instructions of the following form:
 </li>
 <li>maxEdge(a, b): Print the maximum edge weight on the path from node a
 to node b.
+</li>
+</ul>
+
+<p>
+The basic idea of the source codes:
+</p>
+<ul class="org-ul">
+<li>DFS the whole tree to get tree info(depth, subsize, etc.)
+</li>
+<li>construct a Segment tree using all nodes
+</li>
+<li>A easy LCA algorithm:  find first node common in path from v to root
+and u to root
+</li>
+<li>max edge between the u and LCA(u,v): if they are in the same chain,
+just use segment tree get the max edge, if are not, continue to
+compute the max edge between chain<sub>head</sub>(u) and LCA(u,v)
 </li>
 </ul>
 
@@ -533,7 +549,6 @@ to node b.
 </div>
 </div>
 
-
 <div id="outline-container-sec-2-2" class="outline-3">
 <h3 id="sec-2-2">the maximum edge cost on the path from node a to node b<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup></h3>
 <div class="outline-text-3" id="text-2-2">
@@ -550,10 +565,262 @@ node b
 </li>
 </ul>
 </div>
+
 <ul class="org-ul"><li><a id="sec-2-2-1" name="sec-2-2-1"></a>solution <sup><a id="fnr.4" name="fnr.4" class="footref" href="#fn.4">4</a></sup><br  /><div class="outline-text-4" id="text-2-2-1">
+<ul class="org-ul">
+<li>DFS the whole tree to get tree info(depth, subsize, etc.)
+</li>
+<li>construct a Segment tree using all nodes
+</li>
+<li>A LCA algorithm: use dynamic programming idea store the prev node
+</li>
+</ul>
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;vector&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">root</span> 0
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">N</span> 10100
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">LN</span> 14
+
+<span style="color: #98fb98;">vector</span> &lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">adj</span>[N], <span style="color: #eedd82;">costs</span>[N], <span style="color: #eedd82;">indexx</span>[N];
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">baseArray</span>[N], <span style="color: #eedd82;">ptr</span>;
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">chainNo</span>, <span style="color: #eedd82;">chainInd</span>[N], <span style="color: #eedd82;">chainHead</span>[N], <span style="color: #eedd82;">posInBase</span>[N];
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">depth</span>[N], <span style="color: #eedd82;">pa</span>[LN][N], <span style="color: #eedd82;">otherEnd</span>[N], <span style="color: #eedd82;">subsize</span>[N];
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">st</span>[N*6], <span style="color: #eedd82;">qt</span>[N*6];
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * make_tree:</span>
+<span style="color: #ff7f24;"> * Used to construct the segment tree. It uses the baseArray for construction</span>
+<span style="color: #ff7f24;"> */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">make_tree</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">cur</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">e</span>) {
+        <span style="color: #00ffff;">if</span>(s == e-1) {
+                st[cur] = baseArray[s];
+                <span style="color: #00ffff;">return</span>;
+        }
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">c1</span> = (cur&lt;&lt;1), <span style="color: #eedd82;">c2</span> = c1 | 1, <span style="color: #eedd82;">m</span> = (s+e)&gt;&gt;1;
+        make_tree(c1, s, m);
+        make_tree(c2, m, e);
+        st[cur] = st[c1] &gt; st[c2] ? st[c1] : st[c2];
+}
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * update_tree:</span>
+<span style="color: #ff7f24;"> * Point update. Update a single element of the segment tree.</span>
+<span style="color: #ff7f24;"> */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">update_tree</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">cur</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">e</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">val</span>) {
+        <span style="color: #00ffff;">if</span>(s &gt; x || e &lt;= x) <span style="color: #00ffff;">return</span>;
+        <span style="color: #00ffff;">if</span>(s == x &amp;&amp; s == e-1) {
+                st[cur] = val;
+                <span style="color: #00ffff;">return</span>;
+        }
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">c1</span> = (cur&lt;&lt;1), <span style="color: #eedd82;">c2</span> = c1 | 1, <span style="color: #eedd82;">m</span> = (s+e)&gt;&gt;1;
+        update_tree(c1, s, m, x, val);
+        update_tree(c2, m, e, x, val);
+        st[cur] = st[c1] &gt; st[c2] ? st[c1] : st[c2];
+}
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * query_tree:</span>
+<span style="color: #ff7f24;"> * Given S and E, it will return the maximum value in the range [S,E)</span>
+<span style="color: #ff7f24;"> */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">query_tree</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">cur</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">e</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">S</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">E</span>) {
+        <span style="color: #00ffff;">if</span>(s &gt;= E || e &lt;= S) {
+                qt[cur] = -1;
+                <span style="color: #00ffff;">return</span>;
+        }
+        <span style="color: #00ffff;">if</span>(s &gt;= S &amp;&amp; e &lt;= E) {
+                qt[cur] = st[cur];
+                <span style="color: #00ffff;">return</span>;
+        }
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">c1</span> = (cur&lt;&lt;1), <span style="color: #eedd82;">c2</span> = c1 | 1, <span style="color: #eedd82;">m</span> = (s+e)&gt;&gt;1;
+        query_tree(c1, s, m, S, E);
+        query_tree(c2, m, e, S, E);
+        qt[cur] = qt[c1] &gt; qt[c2] ? qt[c1] : qt[c2];
+}
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * query_up:</span>
+<span style="color: #ff7f24;"> * It takes two nodes u and v, condition is that v is an ancestor of u</span>
+<span style="color: #ff7f24;"> * We query the chain in which u is present till chain head, then move to next chain up</span>
+<span style="color: #ff7f24;"> * We do that way till u and v are in the same chain, we query for that part of chain and break</span>
+<span style="color: #ff7f24;"> */</span>
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">query_up</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>) {
+        <span style="color: #00ffff;">if</span>(u == v) <span style="color: #00ffff;">return</span> 0; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Trivial</span>
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">uchain</span>, <span style="color: #eedd82;">vchain</span> = chainInd[v], <span style="color: #eedd82;">ans</span> = -1;
+        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">uchain and vchain are chain numbers of u and v</span>
+        <span style="color: #00ffff;">while</span>(1) {
+                uchain = chainInd[u];
+                <span style="color: #00ffff;">if</span>(uchain == vchain) {
+                        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Both u and v are in the same chain, so we need to query from u to v, update answer and break.</span>
+                        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">We break because we came from u up till v, we are done</span>
+                        <span style="color: #00ffff;">if</span>(u==v) <span style="color: #00ffff;">break</span>;
+                        query_tree(1, 0, ptr, posInBase[v]+1, posInBase[u]+1);
+                        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Above is call to segment tree query function</span>
+                        <span style="color: #00ffff;">if</span>(qt[1] &gt; ans) ans = qt[1]; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Update answer</span>
+                        <span style="color: #00ffff;">break</span>;
+                }
+                query_tree(1, 0, ptr, posInBase[chainHead[uchain]], posInBase[u]+1);
+                <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Above is call to segment tree query function. We do from chainHead of u till u. That is the whole chain from</span>
+                <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">start till head. We then update the answer</span>
+                <span style="color: #00ffff;">if</span>(qt[1] &gt; ans) ans = qt[1];
+                u = chainHead[uchain]; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">move u to u's chainHead</span>
+                u = pa[0][u]; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Then move to its parent, that means we changed chains</span>
+        }
+        <span style="color: #00ffff;">return</span> ans;
+}
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * LCA:</span>
+<span style="color: #ff7f24;"> * Takes two nodes u, v and returns Lowest Common Ancestor of u, v</span>
+<span style="color: #ff7f24;"> */</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">LCA</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>) {
+        <span style="color: #00ffff;">if</span>(depth[u] &lt; depth[v]) swap(u,v);
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">diff</span> = depth[u] - depth[v];
+        <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>=0; i&lt;LN; i++) <span style="color: #00ffff;">if</span>( (diff&gt;&gt;i)&amp;1 ) u = pa[i][u];
+        <span style="color: #00ffff;">if</span>(u == v) <span style="color: #00ffff;">return</span> u;
+        <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>=LN-1; i&gt;=0; i--) <span style="color: #00ffff;">if</span>(pa[i][u] != pa[i][v]) {
+                u = pa[i][u];
+                v = pa[i][v];
+        }
+        <span style="color: #00ffff;">return</span> pa[0][u];
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">query</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>) {
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * We have a query from u to v, we break it into two queries, u to LCA(u,v) and LCA(u,v) to v</span>
+<span style="color: #ff7f24;">         */</span>
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">lca</span> = LCA(u, v);
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ans</span> = query_up(u, lca); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">One part of path</span>
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">temp</span> = query_up(v, lca); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">another part of path</span>
+        <span style="color: #00ffff;">if</span>(temp &gt; ans) ans = temp; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">take the maximum of both paths</span>
+        printf(<span style="color: #ffa07a;">"%d\n"</span>, ans);
+}
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * change:</span>
+<span style="color: #ff7f24;"> * We just need to find its position in segment tree and update it</span>
+<span style="color: #ff7f24;"> */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">change</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">val</span>) {
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = otherEnd[i];
+        update_tree(1, 0, ptr, posInBase[u], val);
+}
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * Actual HL-Decomposition part</span>
+<span style="color: #ff7f24;"> * Initially all entries of chainHead[] are set to -1.</span>
+<span style="color: #ff7f24;"> * So when ever a new chain is started, chain head is correctly assigned.</span>
+<span style="color: #ff7f24;"> * As we add a new node to chain, we will note its position in the baseArray.</span>
+<span style="color: #ff7f24;"> * In the first for loop we find the child node which has maximum sub-tree size.</span>
+<span style="color: #ff7f24;"> * The following if condition is failed for leaf nodes.</span>
+<span style="color: #ff7f24;"> * When the if condition passes, we expand the chain to special child.</span>
+<span style="color: #ff7f24;"> * In the second for loop we recursively call the function on all normal nodes.</span>
+<span style="color: #ff7f24;"> * chainNo++ ensures that we are creating a new chain for each normal child.</span>
+<span style="color: #ff7f24;"> */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">HLD</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">curNode</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">cost</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">prev</span>) {
+        <span style="color: #00ffff;">if</span>(chainHead[chainNo] == -1) {
+                chainHead[chainNo] = curNode; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Assign chain head</span>
+        }
+        chainInd[curNode] = chainNo;
+        posInBase[curNode] = ptr; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Position of this node in baseArray which we will use in Segtree</span>
+        baseArray[ptr++] = cost;
+
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">sc</span> = -1, <span style="color: #eedd82;">ncost</span>;
+        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Loop to find special child</span>
+        <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>=0; i&lt;adj[curNode].size(); i++) <span style="color: #00ffff;">if</span>(adj[curNode][i] != prev) {
+                <span style="color: #00ffff;">if</span>(sc == -1 || subsize[sc] &lt; subsize[adj[curNode][i]]) {
+                        sc = adj[curNode][i];
+                        ncost = costs[curNode][i];
+                }
+        }
+
+        <span style="color: #00ffff;">if</span>(sc != -1) {
+                <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Expand the chain</span>
+                HLD(sc, ncost, curNode);
+        }
+
+        <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>=0; i&lt;adj[curNode].size(); i++) <span style="color: #00ffff;">if</span>(adj[curNode][i] != prev) {
+                <span style="color: #00ffff;">if</span>(sc != adj[curNode][i]) {
+                        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">New chains at each normal node</span>
+                        chainNo++;
+                        HLD(adj[curNode][i], costs[curNode][i], curNode);
+                }
+        }
+}
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * dfs used to set parent of a node, depth of a node, subtree size of a node</span>
+<span style="color: #ff7f24;"> */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">dfs</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">cur</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">prev</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">_depth</span>=0) {
+        pa[0][cur] = prev;
+        depth[cur] = _depth;
+        subsize[cur] = 1;
+        <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>=0; i&lt;adj[cur].size(); i++)
+                <span style="color: #00ffff;">if</span>(adj[cur][i] != prev) {
+                        otherEnd[indexx[cur][i]] = adj[cur][i];
+                        dfs(adj[cur][i], cur, _depth+1);
+                        subsize[cur] += subsize[adj[cur][i]];
+                }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span>;
+        scanf(<span style="color: #ffa07a;">"%d "</span>, &amp;t);
+        <span style="color: #00ffff;">while</span>(t--) {
+                ptr = 0;
+                <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>;
+                scanf(<span style="color: #ffa07a;">"%d"</span>, &amp;n);
+                <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Cleaning step, new test case</span>
+                <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>=0; i&lt;n; i++) {
+                        adj[i].clear();
+                        costs[i].clear();
+                        indexx[i].clear();
+                        chainHead[i] = -1;
+                        <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span>=0; j&lt;LN; j++) pa[j][i] = -1;
+                }
+                <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>=1; i&lt;n; i++) {
+                        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #eedd82;">v</span>, <span style="color: #eedd82;">c</span>;
+                        scanf(<span style="color: #ffa07a;">"%d %d %d"</span>, &amp;u, &amp;v, &amp;c);
+                        u--; v--;
+                        adj[u].push_back(v);
+                        costs[u].push_back(c);
+                        indexx[u].push_back(i-1);
+                        adj[v].push_back(u);
+                        costs[v].push_back(c);
+                        indexx[v].push_back(i-1);
+                }
+
+                chainNo = 0;
+                dfs(root, -1); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">We set up subsize, depth and parent for each node</span>
+                HLD(root, -1, -1); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">We decomposed the tree and created baseArray</span>
+                make_tree(1, 0, ptr); <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">We use baseArray and construct the needed segment tree</span>
+
+                <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Below Dynamic programming code is for LCA.</span>
+                <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>=1; i&lt;LN; i++)
+                        <span style="color: #00ffff;">for</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span>=0; j&lt;n; j++)
+                                <span style="color: #00ffff;">if</span>(pa[i-1][j] != -1)
+                                        pa[i][j] = pa[i-1][pa[i-1][j]];
+
+                <span style="color: #00ffff;">while</span>(1) {
+                        <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">s</span>[100];
+                        scanf(<span style="color: #ffa07a;">"%s"</span>, s);
+                        <span style="color: #00ffff;">if</span>(s[0]==<span style="color: #ffa07a;">'D'</span>) {
+                                <span style="color: #00ffff;">break</span>;
+                        }
+                        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>, <span style="color: #eedd82;">b</span>;
+                        scanf(<span style="color: #ffa07a;">"%d %d"</span>, &amp;a, &amp;b);
+                        <span style="color: #00ffff;">if</span>(s[0]==<span style="color: #ffa07a;">'Q'</span>) {
+                                query(a-1, b-1);
+                        } <span style="color: #00ffff;">else</span> {
+                                change(a-1, b);
+                        }
+                }
+        }
+}
+</pre>
 </div>
 </div>
 </li></ul>
@@ -572,16 +839,6 @@ node b
 <a href="https://blog.anudeep2011.com/heavy-light-decomposition/">https://blog.anudeep2011.com/heavy-light-decomposition/</a>
 </li>
 </ul>
-</div>
-</div>
-
-<div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">cc</h2>
-<div class="outline-text-2" id="text-4">
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
 </div>
 </div>
 <div id="footnotes">
@@ -609,7 +866,7 @@ node b
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-11-17 Thu 23:12</p>
+<p class="date">Created: 2016-11-19 Sat 22:47</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
