@@ -1,4 +1,4 @@
-wen#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
 #+TITLE: Trie and Suffix tree
 #+OPTIONS: num:nil H:2
 
@@ -105,7 +105,45 @@ abcabxabcd
 这两个实际的意义之后将明了，但现在我们可以这么说：
 + 在 =abc= 这个简单的例子中， active point总是 =(root, '\0x', 0)= ，也
   就是 =active_node= 是 root node, =active_edge= 是null字符 =‘\0x’=
-  ，而 =active_length= 是0。
+  ，而 =active_length= 是0。这个的作用就是每一步插入的新边都在root
+  node那作为全新创建的边插入。之后我们将知道为什么用三元组表示这个信息
+  是必要的。
++ =remainder= 在每一步开始总是被设置为1。意思是在每一步最后我们需要插
+  入suffixes的个数是1（总是最后那个字符）。
+
+现在开始改变。当我们在root插入当前最后的字符 =a=, 我们注意到已经有一条
+以 =a= 为起始的边，也就是 =abca=. 在此种情况下，我们做如下：
++ 我们 *不* 在root node插入新的边 =[4,#]= 。而我们注意到suffix =a= 已
+  经在tree中。它结尾在一个长边的中间，但是我们并不被它干扰。我们把它留
+  在那。
++ 我们 *设置 active pioint* 为 =(root,'a',1)= 。这个意思是active point
+  现在在从root node中以 =a= 为起始点的边的中间某个位置，具体就是那条边
+  的位置1后。我们注意到这条边只是用它的第一个字符 =a= 来指代。这样足够
+  指定那条边是因为边已特定字符起始的是唯一的。
++ 同时增加 =remainder= ，所以在下一步开始它将是2.
+
+*注意：* 当 *最后需要插入的suffix被发现已经在tree中存在*, tree本身 *不
+会改变* (只更新active point和 =remainder= ). /到目前位置/ tree并没有正
+确描述suffix tree，但它包含所有suffixes（因为最后的suffix =a= 隐性的被
+包含）。所以除了更新这些参数（所欲都是固定长度，所以是 $O(1)$ ）， *没
+有其他操作* 需要被做在此步。
+
+*步骤5:* 更新目前位置 =#= 到5. 自动更新tree到这样：
+
+[[./files/suffix/9.png]]
+
+因为 *remainder 是2*.需要插入当前位置2个最后的suffixes： =ab= 和 =b=
+。这基本是因为：
++ 之前步骤的suffix =a= 从没适应的插入。所以它被 /保留下来/ ，然后因为
+  我们进行到下一步，它现在从 =a= 增长到 =ab= 。
++ 并且需要插入新的最终边 =b= .
+
+
+
+
+
+
+
 
 
 

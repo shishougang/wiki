@@ -4,11 +4,14 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Trie and Suffix tree</title>
-<!-- 2016-11-23 Wed 20:54 -->
+<!-- 2016-11-24 Thu 22:09 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
-<link rel="stylesheet" href="./assets/stylesheet.css" type="text/css"/>
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
 <script type="text/javascript">
 /*
 @licstart  The following is the entire license notice for the
@@ -117,9 +120,6 @@ for the JavaScript code in this tag.
 </ul>
 </div>
 </div>
-<p>
-wen#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
-</p>
 <p>
 <a href="http://marknelson.us/1996/08/01/suffix-trees/">http://marknelson.us/1996/08/01/suffix-trees/</a>
 </p>
@@ -307,12 +307,60 @@ Ukkonen's paper on the algorithm: <a href="https://www.cs.helsinki.fi/u/ukkonen/
 </p>
 <ul class="org-ul">
 <li>在 <code>abc</code> 这个简单的例子中， active point总是 <code>(root, '\0x', 0)</code> ，也就是 <code>active_node</code> 是 root node, <code>active_edge</code> 是null字符 <code>‘\0x’</code>
-，而 <code>active_length</code> 是0。
+，而 <code>active_length</code> 是0。这个的作用就是每一步插入的新边都在root
+node那作为全新创建的边插入。之后我们将知道为什么用三元组表示这个信息是必要的。
+</li>
+<li><code>remainder</code> 在每一步开始总是被设置为1。意思是在每一步最后我们需要插入suffixes的个数是1（总是最后那个字符）。
+</li>
+</ul>
+
+<p>
+现在开始改变。当我们在root插入当前最后的字符 <code>a</code>, 我们注意到已经有一条以 <code>a</code> 为起始的边，也就是 <code>abca</code>. 在此种情况下，我们做如下：
+</p>
+<ul class="org-ul">
+<li>我们 <b>不</b> 在root node插入新的边 <code>[4,#]</code> 。而我们注意到suffix <code>a</code> 已经在tree中。它结尾在一个长边的中间，但是我们并不被它干扰。我们把它留在那。
+</li>
+<li>我们 <b>设置 active pioint</b> 为 <code>(root,'a',1)</code> 。这个意思是active point
+现在在从root node中以 <code>a</code> 为起始点的边的中间某个位置，具体就是那条边的位置1后。我们注意到这条边只是用它的第一个字符 <code>a</code> 来指代。这样足够指定那条边是因为边已特定字符起始的是唯一的。
+</li>
+<li>同时增加 <code>remainder</code> ，所以在下一步开始它将是2.
+</li>
+</ul>
+
+<p>
+<b>注意：</b> 当 <b>最后需要插入的suffix被发现已经在tree中存在</b>, tree本身 <b>不会改变</b> (只更新active point和 <code>remainder</code> ). <i>到目前位置</i> tree并没有正确描述suffix tree，但它包含所有suffixes（因为最后的suffix <code>a</code> 隐性的被包含）。所以除了更新这些参数（所欲都是固定长度，所以是 \(O(1)\) ）， <b>没有其他操作</b> 需要被做在此步。
+</p>
+
+<p>
+<b>步骤5:</b> 更新目前位置 <code>#</code> 到5. 自动更新tree到这样：
+</p>
+
+
+<div class="figure">
+<p><img src="./files/suffix/9.png" alt="9.png" />
+</p>
+</div>
+
+<p>
+因为 <b>remainder 是2</b>.需要插入当前位置2个最后的suffixes： <code>ab</code> 和 <code>b</code>
+。这基本是因为：
+</p>
+<ul class="org-ul">
+<li>之前步骤的suffix <code>a</code> 从没适应的插入。所以它被 <i>保留下来</i> ，然后因为我们进行到下一步，它现在从 <code>a</code> 增长到 <code>ab</code> 。
+</li>
+<li>并且需要插入新的最终边 <code>b</code> .
 </li>
 </ul>
 </div>
 </li></ul>
 </div>
+
+
+
+
+
+
+
 
 
 
@@ -382,7 +430,7 @@ algorithms (C)</a>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-11-23 Wed 20:54</p>
+<p class="date">Created: 2016-11-24 Thu 22:09</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
