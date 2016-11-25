@@ -138,14 +138,54 @@ abcabxabcd
   我们进行到下一步，它现在从 =a= 增长到 =ab= 。
 + 并且需要插入新的最终边 =b= .
 
+实际上它意味我们去到 active point （指向 =abcab= 中 =a= 的后边），并插
+入当期最后的字母 =b= 。 *但是* 再次 =b= 也已经在同样的边里了。
 
+所以，再次，我们不改变这课tree。我们只是：
++ 更新active point成 =(root, 'a', 2)= (不变的node和edge，但现在指向
+  =b= 的后面）
++ 增加 =remainder= 到3因为我们并没有在上一步插入最后的边，也没有在一步
+  插入最后的边。
 
+*澄清：* 在当前步，我们需要插入 =ab= 和 =b= 。但因为 =ab= 已经被发现，
+我们更新 active point并没有试图插入 =b= 。为什么？因为如果 =ab= 在tree
+中， 它的 *每个suffix* （包含 =b= ）必定也在tree中。也许只是 /隐式/ 的，
+但是它必定在那，因为到目前我们建立tree的方式如此。
 
+进行到 =step 6= 通过增加 =#= 。tree自动更新到：
 
+[[./files/suffix/10.png]]
 
+因为 *=remainder= 是 3* ，我们需要插入 =abx= ， =bx= 和 =x= 。active
+point告诉我们 =ab= 在哪里结尾，所以我们只需要跳到哪里并插入 =x= 。的确，
+=x= 不再那里，所以我们分叉边 =abcabx= 并插入一个内在node：
 
+[[./files/suffix/11.png]]
 
+边描述的仍然是指向文本的指针，所以分叉和插入一个内在node能在 $O(1)$ 时
+间内完成。
 
+所以我们需要处理 =abx= 并减少 =remainder= 到2。现在我们需要插入下一个
+剩下的suffix =bx= 。但是在做这之前我们需要更新active point。对于这种情
+况的规则，在分叉并插入一条边，将被称为 *Rule 1* ，并且它对只对
+=actvie_node= 是root时适用。rule 1如下：
+
+从root插入之后。
++ =active_node= 仍然是root
++ =active_edge= 被设置成新插入的suffix的首字符，比如 =b=
++ =active_length= 被减少1
+
+因此，新的active-point三元组 =(root, 'b', 1)= 显示下一个插入在 =bcabx=
+边的后面1个字符下，比如在 =b= 之后。我们去识别插入点能在 $O(1)$ 完成并
+检查 =x= 是否已经存在。如果它存在，我们就这样结束此步。但 =x= 不存在，
+所以我们通过分列此边来插入它：
+
+[[./files/suffix/12.png]]
+
+再次这需要 $O(1)$ 的时间并且我们更新 =remainder= 到1和active point到
+=(root, 'x', 0)= 如rule 1所述。
+
+但是我们还需要再做一件事。我们将这称为 *Rule 2*:
 
 
 ** Ukkonen's suffix tree algorithm codes
