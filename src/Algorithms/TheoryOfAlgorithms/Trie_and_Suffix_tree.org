@@ -1,4 +1,4 @@
-#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+ #+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
 #+TITLE: Trie and Suffix tree
 #+OPTIONS: num:nil H:2
 
@@ -248,18 +248,74 @@ suffix， =bcd= 。Rule 3已经把active point设置成正好的node和边，所
 
 [[./files/suffix/17.png]]
 
-*我们发现：* 
+*我们发现：* Sufflix links使我们重置active point所以我们能在 $O(1)$ 复
+杂度内完成接下来余下的插入。上图中能确认边 =ab= 后的node链接到node =b=
+， =abc= 后的node链接到 =bc= 。 
+
+当前步还没有完成。 =remainder= 现在是2,而且我们要遵循rule 3去再次重置
+active point。因为当前 =active_node= （如上红色) 没有suffix link，重置
+到root。现在active point是 =(root, 'c', 1)= 。
+
+所以下一个插入在root node中的以 =c= 起始的边： =cabxabcd= 。这促使再次
+分裂：
 
 [[./files/suffix/18.png]]
 
+因为这涉及创建一个新的内在node，我们遵循rule 2设置新的 suffix link 从
+之前创建的新的内在node：
 
 [[./files/suffix/19.png]]
 
+这之后， =remainder= 能被设为1,而且因为 =active_node= 是root，使用rule
+1更新active point到 =(root, 'd', 0)= 。这意味着当前步最后的插入是在
+root插入单字符 =d= 。
+
 [[./files/suffix/20.png]]
 
+这里有一小处没有得到解释：它会这样发生在沿着suffix link，更新active
+point，然后发现 =active_length= 与新的 =active_node= 并没有配对，如下
+例子，考虑如下情况：
 
-[[./files/suffix/
-[[./files/suffix/
+[[./files/suffix/21.png]]
+
+现在让active point是 =(red, 'd', 3)= ,所以它指向边 =defg= 的 =f= 后面。
+假设我们做了更新并根据rule 3沿着sufflix link去更新active point。新的
+active point是 =(green, 'd', 3)= 。然而，绿色node以 =d= 出去的边是
+=de= ，所以它只有2个字符。为了找到正确的active point，我们明显需要沿着
+那条边到达蓝色的node并重置为 =(blue, 'f', 1)= 。
+
+在最大情况下， =active_length= 能和 =remainder= 一样大，也就是可以达到
+n。有可能发生为了找到正确的active point，我们不仅仅需要跳过一个内部
+node，而是需要达到最大情况下的n个。这是否意味算法的隐藏复杂度达到
+$O(n^2)$ ,因为每一步 =remainder= 总体是 $O(n)$ ，并且调整active node能
+达到 $O(n)$, 可能吗？
+
+不是。因为在调整active point时， =active_length= 将不断减少。
+=active_legth= 不会大于 =remainder= ，并且 =remainder= 是 $O(n)$ 并不
+仅仅在每一步，而是整个过程的 =remainder= 累计增加也是 $O(n)$ ，active
+point的调整次数也受 $O(n)$ 限制。
+
+总结如下3条退则：
+
+*rule 1如下：*
+
+从root插入之后。
++ =active_node= 仍然是root
++ =active_edge= 被设置成新插入的suffix的首字符
++ =active_length= 被减少
+
+*Rule 2：*
+
+如果我们分叉一条边并插入一个新的node，而且如果那 /不是/ 这一步中第一个
+创建的node，我们连接之前插入的node和这个新node通过一个特别的指针，叫做
+*suffix link* 。
+
+*Rule 3*:
+
+从不是root node的 =active_node= 上边分叉后，我们沿着这个node的suffix
+link，如果存在这么个link，重置 =active_node= 为它指向的那个node。如果
+没有suffix link，设置 =active_node= 为root， =active_edge= 和
+=active_lenght= 不变。
 
 ** Ukkonen's suffix tree algorithm codes
 http://www.geeksforgeeks.org/ukkonens-suffix-tree-construction-part-6/

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Trie and Suffix tree</title>
-<!-- 2016-11-29 Tue 23:31 -->
+<!-- 2016-12-01 Thu 22:54 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -539,7 +539,17 @@ suffix， <code>bcd</code> 。Rule 3已经把active point设置成正好的node�
 </div>
 
 <p>
-<b>我们发现：</b> 
+<b>我们发现：</b> Sufflix links使我们重置active point所以我们能在 \(O(1)\) 复杂度内完成接下来余下的插入。上图中能确认边 <code>ab</code> 后的node链接到node <code>b</code>
+， <code>abc</code> 后的node链接到 <code>bc</code> 。 
+</p>
+
+<p>
+当前步还没有完成。 <code>remainder</code> 现在是2,而且我们要遵循rule 3去再次重置
+active point。因为当前 <code>active_node</code> （如上红色) 没有suffix link，重置到root。现在active point是 <code>(root, 'c', 1)</code> 。
+</p>
+
+<p>
+所以下一个插入在root node中的以 <code>c</code> 起始的边： <code>cabxabcd</code> 。这促使再次分裂：
 </p>
 
 
@@ -548,6 +558,9 @@ suffix， <code>bcd</code> 。Rule 3已经把active point设置成正好的node�
 </p>
 </div>
 
+<p>
+因为这涉及创建一个新的内在node，我们遵循rule 2设置新的 suffix link 从之前创建的新的内在node：
+</p>
 
 
 <div class="figure">
@@ -555,16 +568,85 @@ suffix， <code>bcd</code> 。Rule 3已经把active point设置成正好的node�
 </p>
 </div>
 
+<p>
+这之后， <code>remainder</code> 能被设为1,而且因为 <code>active_node</code> 是root，使用rule
+1更新active point到 <code>(root, 'd', 0)</code> 。这意味着当前步最后的插入是在
+root插入单字符 <code>d</code> 。
+</p>
+
 
 <div class="figure">
 <p><img src="./files/suffix/20.png" alt="20.png" />
 </p>
 </div>
 
+<p>
+这里有一小处没有得到解释：它会这样发生在沿着suffix link，更新active
+point，然后发现 <code>active_length</code> 与新的 <code>active_node</code> 并没有配对，如下例子，考虑如下情况：
+</p>
+
+
+<div class="figure">
+<p><img src="./files/suffix/21.png" alt="21.png" />
+</p>
+</div>
 
 <p>
-[[./files/suffix/
-[[./files/suffix/
+现在让active point是 <code>(red, 'd', 3)</code> ,所以它指向边 <code>defg</code> 的 <code>f</code> 后面。假设我们做了更新并根据rule 3沿着sufflix link去更新active point。新的
+active point是 <code>(green, 'd', 3)</code> 。然而，绿色node以 <code>d</code> 出去的边是
+<code>de</code> ，所以它只有2个字符。为了找到正确的active point，我们明显需要沿着那条边到达蓝色的node并重置为 <code>(blue, 'f', 1)</code> 。
+</p>
+
+<p>
+在最大情况下， <code>active_length</code> 能和 <code>remainder</code> 一样大，也就是可以达到
+n。有可能发生为了找到正确的active point，我们不仅仅需要跳过一个内部
+node，而是需要达到最大情况下的n个。这是否意味算法的隐藏复杂度达到
+\(O(n^2)\) ,因为每一步 <code>remainder</code> 总体是 \(O(n)\) ，并且调整active node能达到 \(O(n)\), 可能吗？
+</p>
+
+<p>
+不是。因为在调整active point时， <code>active_length</code> 将不断减少。
+<code>active_legth</code> 不会大于 <code>remainder</code> ，并且 <code>remainder</code> 是 \(O(n)\) 并不仅仅在每一步，而是整个过程的 <code>remainder</code> 累计增加也是 \(O(n)\) ，active
+point的调整次数也受 \(O(n)\) 限制。
+</p>
+
+<p>
+总结如下3条退则：
+</p>
+
+<p>
+<b>rule 1如下：</b>
+</p>
+
+<p>
+从root插入之后。
+</p>
+<ul class="org-ul">
+<li><code>active_node</code> 仍然是root
+</li>
+<li><code>active_edge</code> 被设置成新插入的suffix的首字符
+</li>
+<li><code>active_length</code> 被减少
+</li>
+</ul>
+
+<p>
+<b>Rule 2：</b>
+</p>
+
+<p>
+如果我们分叉一条边并插入一个新的node，而且如果那 <i>不是</i> 这一步中第一个创建的node，我们连接之前插入的node和这个新node通过一个特别的指针，叫做
+<b>suffix link</b> 。
+</p>
+
+<p>
+<b>Rule 3</b>:
+</p>
+
+<p>
+从不是root node的 <code>active_node</code> 上边分叉后，我们沿着这个node的suffix
+link，如果存在这么个link，重置 <code>active_node</code> 为它指向的那个node。如果没有suffix link，设置 <code>active_node</code> 为root， <code>active_edge</code> 和
+<code>active_lenght</code> 不变。
 </p>
 </div>
 </li></ul>
@@ -635,7 +717,7 @@ algorithms (C)</a>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-11-29 Tue 23:31</p>
+<p class="date">Created: 2016-12-01 Thu 22:54</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
