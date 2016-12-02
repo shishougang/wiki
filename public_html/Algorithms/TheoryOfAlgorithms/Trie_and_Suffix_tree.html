@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Trie and Suffix tree</title>
-<!-- 2016-12-01 Thu 22:54 -->
+<!-- 2016-12-02 Fri 23:23 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -57,6 +57,23 @@ for the JavaScript code in this tag.
      target.className = elem.cacheClassTarget;
  }
 /*]]>*///-->
+</script>
+<script type="text/javascript">
+    function rpl(expr,a,b) {
+      var i=0
+      while (i!=-1) {
+         i=expr.indexOf(a,i);
+         if (i>=0) {
+            expr=expr.substring(0,i)+b+expr.substring(i+a.length);
+            i+=b.length;
+         }
+      }
+      return expr
+    }
+
+    function show_org_source(){
+       document.location.href = rpl(document.location.href,"html","org.html");
+    }
 </script>
 <script type="text/javascript" src="http://orgmode.org/mathjax/MathJax.js"></script>
 <script type="text/javascript">
@@ -116,7 +133,6 @@ for the JavaScript code in this tag.
 </ul>
 </li>
 <li><a href="#sec-3">More reference</a></li>
-<li><a href="#sec-4">cc</a></li>
 </ul>
 </div>
 </div>
@@ -653,15 +669,307 @@ link，如果存在这么个link，重置 <code>active_node</code> 为它指向�
 </div>
 
 <div id="outline-container-sec-2-2" class="outline-3">
-<h3 id="sec-2-2">Ukkonen's suffix tree algorithm codes</h3>
+<h3 id="sec-2-2">Ukkonen's suffix tree algorithm codes<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup></h3>
 <div class="outline-text-3" id="text-2-2">
 <p>
-<a href="http://www.geeksforgeeks.org/ukkonens-suffix-tree-construction-part-6/">http://www.geeksforgeeks.org/ukkonens-suffix-tree-construction-part-6/</a>
+<a href="./files/suffix/Ukkonen-suffix-tree.c">Source Codes</a>
 </p>
-</div>
-</div>
-</div>
 
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A C program to implement Ukkonen's Suffix Tree Construction</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">MAX_CHAR</span> 256
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">SuffixTreeNode</span> {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">SuffixTreeNode</span> *<span style="color: #eedd82;">children</span>[MAX_CHAR];
+  <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">pointer to other node via suffix link</span>
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">SuffixTreeNode</span> *<span style="color: #eedd82;">suffixLink</span>;
+  <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">(start, end) interval specifies the edge, by which the</span>
+<span style="color: #ff7f24;">    node is connected to its parent node. Each edge will</span>
+<span style="color: #ff7f24;">    connect two nodes,  one parent and one child, and</span>
+<span style="color: #ff7f24;">    (start, end) interval of a given edge  will be stored</span>
+<span style="color: #ff7f24;">    in the child node. Lets say there are two nods A and B</span>
+<span style="color: #ff7f24;">    connected by an edge with indices (5, 8) then this</span>
+<span style="color: #ff7f24;">    indices (5, 8) will be stored in node B. </span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">start</span>;
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">end</span>;
+  <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">for leaf nodes, it stores the index of suffix for</span>
+<span style="color: #ff7f24;">    the path from root to leaf</span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">suffixIndex</span>;
+};
+
+<span style="color: #00ffff;">typedef</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">SuffixTreeNode</span> <span style="color: #98fb98;">Node</span>;
+
+<span style="color: #98fb98;">char</span> <span style="color: #eedd82;">text</span>[100]; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Input string</span>
+<span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">root</span> = <span style="color: #7fffd4;">NULL</span>; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Pointer to root node</span>
+
+<span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">lastNewNode will point to newly created internal node,</span>
+<span style="color: #ff7f24;">  waiting for it's suffix link to be set, which might get</span>
+<span style="color: #ff7f24;">  a new suffix link (other than root) in next extension of</span>
+<span style="color: #ff7f24;">  same phase. lastNewNode will be set to NULL when last</span>
+<span style="color: #ff7f24;">  newly created internal node (if there is any) got it's</span>
+<span style="color: #ff7f24;">  suffix link reset to new internal node created in next</span>
+<span style="color: #ff7f24;">  extension of same phase. </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">lastNewNode</span> = <span style="color: #7fffd4;">NULL</span>;
+<span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">activeNode</span> = <span style="color: #7fffd4;">NULL</span>;
+
+<span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">activeEdge is represeted as input string character</span>
+<span style="color: #ff7f24;">  index (not the character itself)</span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">activeEdge</span> = -1;
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">activeLength</span> = 0;
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">remainingSuffixCount tells how many suffixes yet to</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">be added in tree</span>
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">remainingSuffixCount</span> = 0;
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">leafEnd</span> = -1;
+<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">rootEnd</span> = <span style="color: #7fffd4;">NULL</span>;
+<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">splitEnd</span> = <span style="color: #7fffd4;">NULL</span>;
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span> = -1; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Length of input string</span>
+
+<span style="color: #98fb98;">Node</span> *<span style="color: #87cefa;">newNode</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">start</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">end</span>) {
+  <span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">node</span> =(<span style="color: #98fb98;">Node</span>*) malloc(<span style="color: #00ffff;">sizeof</span>(Node));
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt; MAX_CHAR; i++)
+    node-&gt;children[i] = <span style="color: #7fffd4;">NULL</span>;
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">For root node, suffixLink will be set to NULL</span>
+<span style="color: #ff7f24;">    For internal nodes, suffixLink will be set to root</span>
+<span style="color: #ff7f24;">    by default in  current extension and may change in</span>
+<span style="color: #ff7f24;">    next extension </span><span style="color: #ff7f24;">*/</span>
+  node-&gt;suffixLink = root;
+  node-&gt;start = start;
+  node-&gt;end = end;
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">suffixIndex will be set to -1 by default and</span>
+<span style="color: #ff7f24;">    actual suffix index will be set later for leaves</span>
+<span style="color: #ff7f24;">    at the end of all phases </span><span style="color: #ff7f24;">*/</span>
+  node-&gt;suffixIndex = -1;
+  <span style="color: #00ffff;">return</span> node;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">edgeLength</span>(<span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">n</span>) {
+  <span style="color: #00ffff;">return</span> *(n-&gt;end) - (n-&gt;start) + 1;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">walkDown</span>(<span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">currNode</span>) {
+  <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">activePoint change for walk down using</span>
+<span style="color: #ff7f24;">    Skip/Count Trick (Trick 1). If activeLength is greater</span>
+<span style="color: #ff7f24;">    than current edge length, set next  internal node as</span>
+<span style="color: #ff7f24;">    activeNode and adjust activeEdge and activeLength</span>
+<span style="color: #ff7f24;">    accordingly to represent same activePoint</span><span style="color: #ff7f24;">*/</span>
+  <span style="color: #00ffff;">if</span> (activeLength &gt;= edgeLength(currNode)) {
+    activeEdge += edgeLength(currNode);
+    activeLength -= edgeLength(currNode);
+    activeNode = currNode;
+    <span style="color: #00ffff;">return</span> 1;
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">extendSuffixTree</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pos</span>) {
+  <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">Extension Rule 1, this takes care of extending all</span>
+<span style="color: #ff7f24;">    leaves created so far in tree</span><span style="color: #ff7f24;">*/</span>
+  leafEnd = pos;
+
+  <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">Increment remainingSuffixCount indicating that a</span>
+<span style="color: #ff7f24;">    new suffix added to the list of suffixes yet to be</span>
+<span style="color: #ff7f24;">    added in tree</span><span style="color: #ff7f24;">*/</span>
+  remainingSuffixCount++;
+
+  <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">set lastNewNode to NULL while starting a new phase,</span>
+<span style="color: #ff7f24;">    indicating there is no internal node waiting for</span>
+<span style="color: #ff7f24;">    it's suffix link reset in current phase</span><span style="color: #ff7f24;">*/</span>
+  lastNewNode = <span style="color: #7fffd4;">NULL</span>;
+
+  <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Add all suffixes (yet to be added) one by one in tree</span>
+  <span style="color: #00ffff;">while</span> (remainingSuffixCount &gt; 0) {
+    <span style="color: #00ffff;">if</span> (activeLength == 0)
+      activeEdge = pos;
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">There is no outgoing edge starting with</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">activeEdge from activeNode</span>
+    <span style="color: #00ffff;">if</span> (activeNode-&gt;children[text[activeEdge]] == <span style="color: #7fffd4;">NULL</span>) {
+      <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Extension Rule 2 (A new leaf edge gets created)</span>
+      activeNode-&gt;children[text[activeEdge]] =
+          newNode(pos, &amp;leafEnd);
+      <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">A new leaf edge is created in above line starting</span>
+<span style="color: #ff7f24;">        from an existng node (the current activeNode), and</span>
+<span style="color: #ff7f24;">        if there is any internal node waiting for it's suffix</span>
+<span style="color: #ff7f24;">        link get reset, point the suffix link from that last</span>
+<span style="color: #ff7f24;">        internal node to current activeNode. Then set lastNewNode</span>
+<span style="color: #ff7f24;">        to NULL indicating no more node waiting for suffix link</span>
+<span style="color: #ff7f24;">        reset.</span><span style="color: #ff7f24;">*/</span>
+      <span style="color: #00ffff;">if</span> (lastNewNode != <span style="color: #7fffd4;">NULL</span>) {
+        lastNewNode-&gt;suffixLink = activeNode;
+        lastNewNode = <span style="color: #7fffd4;">NULL</span>;
+      }
+    } <span style="color: #00ffff;">else</span> {
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">There is an outgoing edge starting with activeEdge</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">from activeNode</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Get the next node at the end of edge starting</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">with activeEdge</span>
+      <span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">next</span> = activeNode-&gt;children[text[activeEdge]];
+      <span style="color: #00ffff;">if</span> (walkDown(next)) { <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Do walkdown</span>
+        <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Start from next node (the new activeNode)</span>
+        <span style="color: #00ffff;">continue</span>;
+      }
+      <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">Extension Rule 3 (current character being processed</span>
+<span style="color: #ff7f24;">        is already on the edge)</span><span style="color: #ff7f24;">*/</span>
+      <span style="color: #00ffff;">if</span> (text[next-&gt;start + activeLength] == text[pos]) {
+        <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">If a newly created node waiting for it's </span>
+        <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">suffix link to be set, then set suffix link </span>
+        <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">of that waiting node to curent active node</span>
+        <span style="color: #00ffff;">if</span> (lastNewNode != <span style="color: #7fffd4;">NULL</span> &amp;&amp; activeNode != root) {
+          lastNewNode-&gt;suffixLink = activeNode;
+          lastNewNode = <span style="color: #7fffd4;">NULL</span>;
+        }
+        activeLength++;
+        <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">STOP all further processing in this phase</span>
+<span style="color: #ff7f24;">          and move on to next phase</span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">break</span>;
+      }
+      <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">We will be here when activePoint is in middle of</span>
+<span style="color: #ff7f24;">        the edge being traversed and current character</span>
+<span style="color: #ff7f24;">        being processed is not on the edge (we fall off</span>
+<span style="color: #ff7f24;">        the tree). In this case, we add a new internal node</span>
+<span style="color: #ff7f24;">        and a new leaf edge going out of that new node. This</span>
+<span style="color: #ff7f24;">        is Extension Rule 2, where a new leaf edge and a new</span>
+<span style="color: #ff7f24;">        internal node get created</span><span style="color: #ff7f24;">*/</span>
+      splitEnd = (<span style="color: #98fb98;">int</span>*) malloc(<span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>));
+      *splitEnd = next-&gt;start + activeLength - 1;
+      <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">New internal node</span>
+      <span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">split</span> = newNode(next-&gt;start, splitEnd);
+      activeNode-&gt;children[text[activeEdge]] = split;
+
+      <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">New leaf coming out of new internal node</span>
+      split-&gt;children[text[pos]] = newNode(pos, &amp;leafEnd);
+      next-&gt;start += activeLength;
+      split-&gt;children[text[next-&gt;start]] = next;
+
+      <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">We got a new internal node here. If there is any</span>
+<span style="color: #ff7f24;">        internal node created in last extensions of same</span>
+<span style="color: #ff7f24;">        phase which is still waiting for it's suffix link</span>
+<span style="color: #ff7f24;">        reset, do it now.</span><span style="color: #ff7f24;">*/</span>
+      <span style="color: #00ffff;">if</span> (lastNewNode != <span style="color: #7fffd4;">NULL</span>) {
+        <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">suffixLink of lastNewNode points to current newly</span>
+<span style="color: #ff7f24;">          created internal node</span><span style="color: #ff7f24;">*/</span>
+        lastNewNode-&gt;suffixLink = split;
+      }
+      <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">Make the current newly created internal node waiting</span>
+<span style="color: #ff7f24;">        for it's suffix link reset (which is pointing to root</span>
+<span style="color: #ff7f24;">        at present). If we come across any other internal node</span>
+<span style="color: #ff7f24;">        (existing or newly created) in next extension of same</span>
+<span style="color: #ff7f24;">        phase, when a new leaf edge gets added (i.e. when</span>
+<span style="color: #ff7f24;">        Extension Rule 2 applies is any of the next extension</span>
+<span style="color: #ff7f24;">        of same phase) at that point, suffixLink of this node</span>
+<span style="color: #ff7f24;">        will point to that internal node.</span><span style="color: #ff7f24;">*/</span>
+      lastNewNode = split;
+    }
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">One suffix got added in tree, decrement the count of</span>
+<span style="color: #ff7f24;">       suffixes yet to be added.</span><span style="color: #ff7f24;">*/</span>
+    remainingSuffixCount--;
+    <span style="color: #00ffff;">if</span> (activeNode == root &amp;&amp; activeLength &gt; 0) {
+      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Rule 1</span><span style="color: #ff7f24;">*/</span>
+      activeLength--;
+      activeEdge = pos - remainingSuffixCount + 1;
+    } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (activeNode != root) {
+      <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Rule 3 </span><span style="color: #ff7f24;">*/</span>
+      activeNode = activeNode-&gt;suffixLink;
+    }
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">print</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span>)
+{
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>;
+  <span style="color: #00ffff;">for</span> (k=i; k&lt;=j; k++)
+    printf(<span style="color: #ffa07a;">"%c"</span>, text[k]);
+}
+
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Print the suffix tree as well along with setting suffix index</span>
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">So tree will be printed in DFS manner</span>
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Each edge along with it's suffix index will be printed</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">setSuffixIndexByDFS</span>(<span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">labelHeight</span>)
+{
+  <span style="color: #00ffff;">if</span> (n == <span style="color: #7fffd4;">NULL</span>)  <span style="color: #00ffff;">return</span>;
+
+  <span style="color: #00ffff;">if</span> (n-&gt;start != -1) {
+    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">A non-root node</span>
+    <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Print the label on edge from parent to current node</span>
+    print(n-&gt;start, *(n-&gt;end));
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">leaf</span> = 1;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt; MAX_CHAR; i++) {
+    <span style="color: #00ffff;">if</span> (n-&gt;children[i] != <span style="color: #7fffd4;">NULL</span>) {
+      <span style="color: #00ffff;">if</span> (leaf == 1 &amp;&amp; n-&gt;start != -1)
+        printf(<span style="color: #ffa07a;">" [%d]\n"</span>, n-&gt;suffixIndex);
+      <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Current node is not a leaf as it has outgoing</span>
+      <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">edges from it.</span>
+      leaf = 0;
+      setSuffixIndexByDFS(n-&gt;children[i], labelHeight +
+                          edgeLength(n-&gt;children[i]));
+    }
+  }
+  <span style="color: #00ffff;">if</span> (leaf == 1) {
+    n-&gt;suffixIndex = size - labelHeight;
+    printf(<span style="color: #ffa07a;">" [%d]\n"</span>, n-&gt;suffixIndex);
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">freeSuffixTreeByPostOrder</span>(<span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">n</span>)
+{
+  <span style="color: #00ffff;">if</span> (n == <span style="color: #7fffd4;">NULL</span>)
+    <span style="color: #00ffff;">return</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt; MAX_CHAR; i++) {
+    <span style="color: #00ffff;">if</span> (n-&gt;children[i] != <span style="color: #7fffd4;">NULL</span>) {
+      freeSuffixTreeByPostOrder(n-&gt;children[i]);
+    }
+  }
+  <span style="color: #00ffff;">if</span> (n-&gt;suffixIndex == -1)
+    free(n-&gt;end);
+  free(n);
+}
+
+<span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">Build the suffix tree and print the edge labels along with</span>
+<span style="color: #ff7f24;">  suffixIndex. suffixIndex for leaf edges will be &gt;= 0 and</span>
+<span style="color: #ff7f24;">  for non-leaf edges will be -1</span><span style="color: #ff7f24;">*/</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">buildSuffixTree</span>() {
+  size = strlen(text);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+  rootEnd = (<span style="color: #98fb98;">int</span>*) malloc(<span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>));
+  *rootEnd = - 1;
+  <span style="color: #ff7f24;">/*</span><span style="color: #ff7f24;">Root is a special node with start and end indices as -1,</span>
+<span style="color: #ff7f24;">    as it has no parent from where an edge comes to root</span><span style="color: #ff7f24;">*/</span>
+  root = newNode(-1, rootEnd);
+
+  activeNode = root; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">First activeNode will be root</span>
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt; size; i++)
+    extendSuffixTree(i);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">labelHeight</span> = 0;
+  setSuffixIndexByDFS(root, labelHeight);
+  <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">Free the dynamically allocated memory</span>
+  freeSuffixTreeByPostOrder(root);
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">driver program to test above functions</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">strcpy(text, "abc"); buildSuffixTree();</span>
+  <span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">strcpy(text, "xabxac#");    buildSuffixTree();</span>
+  <span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">strcpy(text, "xabxa");  buildSuffixTree();</span>
+  <span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">strcpy(text, "xabxa$"); buildSuffixTree();</span>
+  strcpy(text, <span style="color: #ffa07a;">"abcabxabcd$"</span>); buildSuffixTree();
+  <span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">strcpy(text, "geeksforgeeks$"); buildSuffixTree();</span>
+  <span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">strcpy(text, "THIS IS A TEST TEXT$"); buildSuffixTree();</span>
+  <span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">strcpy(text, "AABAACAADAABAAABAA$"); buildSuffixTree();</span>
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
 
 <div id="outline-container-sec-3" class="outline-2">
 <h2 id="sec-3">More reference</h2>
@@ -685,21 +993,6 @@ algorithms (C)</a>
 </ul>
 </div>
 </div>
-
-<div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">cc</h2>
-<div class="outline-text-2" id="text-4">
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
-
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
-</div>
-</div>
-</div>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
 <div id="text-footnotes">
@@ -712,12 +1005,16 @@ algorithms (C)</a>
 <a href="https://xlinux.nist.gov/dads//HTML/suffixtree.html">https://xlinux.nist.gov/dads//HTML/suffixtree.html</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.3" name="fn.3" class="footnum" href="#fnr.3">3</a></sup> <p class="footpara">
+<a href="http://www.geeksforgeeks.org/ukkonens-suffix-tree-construction-part-6/">http://www.geeksforgeeks.org/ukkonens-suffix-tree-construction-part-6/</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-12-01 Thu 22:54</p>
+<p class="date">Created: 2016-12-02 Fri 23:23</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
