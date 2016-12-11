@@ -1,0 +1,710 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Linux Device tree</title>
+<!-- 2016-12-11 Sun 22:42 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Linux Device tree</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">booting with a Device Tree</a></li>
+<li><a href="#sec-2">Device Tree</a></li>
+<li><a href="#sec-3">Basic Device Tree syntax</a></li>
+<li><a href="#sec-4">From source to binary</a></li>
+<li><a href="#sec-5">A simple example</a></li>
+<li><a href="#sec-6">Device Tree inclusion</a></li>
+<li><a href="#sec-7">Device Tree binding</a>
+<ul>
+<li><a href="#sec-7-1">Documentation of Device Tree bindings</a></li>
+<li><a href="#sec-7-2">compatible property</a></li>
+<li><a href="#sec-7-3">Bus, address cells and size cells</a></li>
+<li><a href="#sec-7-4">Interrupt handling</a></li>
+<li><a href="#sec-7-5">Clock tree example, Marvell Armada XP</a></li>
+<li><a href="#sec-7-6">pinctrl binding</a></li>
+</ul>
+</li>
+<li><a href="#sec-8">More references</a></li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">booting with a Device Tree</h2>
+<div class="outline-text-2" id="text-1">
+<ul class="org-ul">
+<li>The kernel no longer contains the description of the hardware, it is
+located in a separate binary: the device tree blob
+</li>
+<li>The bootloader loads two binaries: the kernel image and the DTB
+<ul class="org-ul">
+<li>Kernel image remains <code>uImage</code> or <code>zImage</code>
+</li>
+<li>DTB located in <code>arch/arm/boot/dts</code>, one per board
+</li>
+</ul>
+</li>
+<li>The bootloader passes the DTB address through r2. It is supposed to
+adjust the DTB with memory information, kernel command line, and
+potentially other info.
+</li>
+<li>No more machine type
+</li>
+<li>U-Boot command:
+<code>bootm &lt;kernel img addr&gt; - &lt;dtb addr&gt;</code>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Device Tree</h2>
+<div class="outline-text-2" id="text-2">
+<ul class="org-ul">
+<li>A device tree is a tree data structure with nodes that describe the
+physical devices in a system.
+</li>
+<li>An ePAPR(Embedded Power Architecture Platform
+Requirements)-compliant device tree describes device information in
+a system that cannot be dynamically detected by a client program.
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Basic Device Tree syntax</h2>
+<div class="outline-text-2" id="text-3">
+
+<div class="figure">
+<p><img src="./Files/device-tree-syntax.jpg" alt="device-tree-syntax.jpg" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">From source to binary</h2>
+<div class="outline-text-2" id="text-4">
+<ul class="org-ul">
+<li>On ARM, all <b>Device Tree Source</b> files (DTS) are for now located in
+<code>arch/arm/boot/dts</code>
+<ul class="org-ul">
+<li><code>.dts</code> files for board-level definitions
+</li>
+<li><code>.dtsi</code> files for included files, generally containing SoC-level definitions
+</li>
+</ul>
+</li>
+<li>A tool, the Device Tree Compiler compiles the source into a binary
+form.
+<ul class="org-ul">
+<li>Source code located in <code>scripts/dtc</code>
+</li>
+</ul>
+</li>
+<li>The Device Tree Blob is produced by the compiler, and is the binary
+that gets loaded by the bootloader and parsed by the kernel at boot
+time.
+</li>
+<li><code>arch/arm/boot/dts/Makefile</code> lists which DTBs should be generated at
+build time.
+<div class="org-src-container">
+
+<pre class="src src-makefile"><span style="color: #eedd82;">dtb-$(</span><span style="color: #eedd82;">CONFIG_ARCH_MVEBU</span><span style="color: #eedd82;">)</span> += armada-370-db.dtb \
+armada-370-mirabox.dtb \
+...
+</pre>
+</div>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">A simple example</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+The Device Tree side:
+<img src="./Files/device-tree-simple-example.jpg" alt="device-tree-simple-example.jpg" />
+</p>
+
+<p>
+The compatible string used to bind a device with the driver:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">of_device_id</span> <span style="color: #eedd82;">mxs_auart_dt_ids</span>[] = {
+   {
+     .compatible = <span style="color: #ffa07a;">"fsl,imx28-auart"</span>,
+     .data = &amp;mxs_auart_devtype[IMX28_AUART]
+   }, {
+     .compatible = <span style="color: #ffa07a;">"fsl,imx23-auart"</span>,
+     .data = &amp;mxs_auart_devtype[IMX23_AUART]
+   }, { <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">sentinel </span><span style="color: #ff7f24;">*/</span> }
+   };
+   MODULE_DEVICE_TABLE(of, mxs_auart_dt_ids);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">[...]</span>
+   <span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">platform_driver</span> <span style="color: #eedd82;">mxs_auart_driver</span> = {
+   .probe = mxs_auart_probe,
+   .remove = mxs_auart_remove,
+   .driver = {
+   .name = <span style="color: #ffa07a;">"mxs-auart"</span>,
+   .of_match_table = mxs_auart_dt_ids,
+     },
+   };
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Code from drivers/tty/serial/mxs-auart.c</span>
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><code>of_match_device allows</code> to get the matching entry in the <code>mxs_auart_dt_ids table</code>.
+</li>
+<li>Useful to get the driver-specific <code>data</code> field, typically used to
+alter the behavior of the driver depending on the variant of the
+detected device.
+</li>
+<li><code>of_match_device</code> allows to get the matching entry in the
+<code>mxs_auart_dt_ids</code> table
+</li>
+<li>Useful to get the driver-specific <code>data</code> field, typically used to
+alter the behavior of the driver depending on the variant of the
+detected device.
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">mxs_auart_probe</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">platform_device</span> *<span style="color: #eedd82;">pdev</span>)
+{
+  <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">of_device_id</span> *<span style="color: #eedd82;">of_id</span> =
+      of_match_device(mxs_auart_dt_ids, &amp;pdev-&gt;dev);
+  <span style="color: #00ffff;">if</span> (of_id) {
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Use of_id-&gt;data here </span><span style="color: #ff7f24;">*/</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">[...]</span>
+  }
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">[...]</span>
+}
+</pre>
+</div>
+</li>
+</ul>
+
+<p>
+some driver examples:
+</p>
+<ul class="org-ul">
+<li>Getting a reference to the clock
+<ul class="org-ul">
+<li>described by the <code>clocks</code> property
+</li>
+<li><code>s-&gt;clk = clk_get(&amp;pdev-&gt;dev, NULL);</code>
+</li>
+</ul>
+</li>
+<li>Getting the I/O registers resource
+<ul class="org-ul">
+<li>described by the <code>reg</code> property
+</li>
+<li><code>r = platform_get_resource(pdev, IORESOURCE_MEM, 0);</code>
+</li>
+</ul>
+</li>
+<li>Getting the interrupt
+<ul class="org-ul">
+<li>described by the <code>interrupts</code> property
+</li>
+<li><code>s-&gt;irq = platform_get_irq(pdev, 0);</code>
+</li>
+</ul>
+</li>
+<li>Get a DMA channel
+<ul class="org-ul">
+<li>described by the <code>dmas</code> property
+</li>
+<li><code>s-&gt;rx_dma_chan = dma_request_slave_channel(s-&gt;dev, "rx");</code>
+</li>
+<li><code>s-&gt;tx_dma_chan = dma_request_slave_channel(s-&gt;dev, "tx");</code>
+</li>
+</ul>
+</li>
+<li>Check some custom property
+<ul class="org-ul">
+<li><code>struct device_node *np = pdev-&gt;dev.of_node;</code>
+</li>
+<li><code>if (of_get_property(np, "fsl,uart-has-rtscts", NULL))</code>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Device Tree inclusion</h2>
+<div class="outline-text-2" id="text-6">
+<ul class="org-ul">
+<li>Device Tree files are not monolithic, they can be split in several
+files, including each other.
+</li>
+<li><code>.dtsi</code> files are included files, while <code>.dts</code> files are final
+Device Trees.
+</li>
+<li>Typically, <code>.dtsi</code> will contain definition of SoC-level information.
+</li>
+<li>The <code>.dts</code> file contains the board-level information.
+</li>
+<li>The inclusion works by <b>overlaying</b> the tree of the including file
+over the tree of the included file.
+</li>
+<li>Inclusion using the DT operator <code>/include/</code>, or since a few kernel
+releases, the DTS go through the C preprocessor, so <code>#include</code> is
+recommended.
+</li>
+</ul>
+
+<p>
+Device Tree inclusion example:
+<img src="./Files/DT-inclusion-example.jpg" alt="DT-inclusion-example.jpg" />
+</p>
+</div>
+</div>
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">Device Tree binding</h2>
+<div class="outline-text-2" id="text-7">
+<ul class="org-ul">
+<li>bindings, for how specific types and classes of devices are
+represented in the device tree.
+</li>
+<li>The <code>compatible</code> property of a device node describes the specific
+binding (or bindings) to which the node complies.
+</li>
+<li>When creating a new device tree representation for a device, a
+binding should be created that fully describes the required
+properties and value of the device. This set of properties shall be
+sufficiently descriptive to provide device drivers with needed
+attributes of the device.
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-7-1" class="outline-3">
+<h3 id="sec-7-1">Documentation of Device Tree bindings</h3>
+<div class="outline-text-3" id="text-7-1">
+<p>
+All Device Tree bindings recognized by the kernel are documented in
+<code>Documentation/devicetree/bindings</code>.
+</p>
+
+<p>
+A Device Tree binding documentation example:
+<code>Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt</code>
+</p>
+
+<pre class="example">
+*Freescale MXS Application UART (AUART)
+Required properties:
+- compatible : Should be "fsl,&lt;soc&gt;-auart". The supported SoCs include
+imx23 and imx28.
+- reg : Address and length of the register set for the device
+- interrupts : Should contain the auart interrupt numbers
+- dmas: DMA specifier, consisting of a phandle to DMA controller node
+and AUART DMA channel ID.
+Refer to dma.txt and fsl-mxs-dma.txt for details.
+- dma-names: "rx" for RX channel, "tx" for TX channel.
+Example:
+auart0: serial@8006a000 {
+compatible = "fsl,imx28-auart", "fsl,imx23-auart";
+reg = &lt;0x8006a000 0x2000&gt;;
+interrupts = &lt;112&gt;;
+dmas = &lt;&amp;dma_apbx 8&gt;, &lt;&amp;dma_apbx 9&gt;;
+dma-names = "rx", "tx";
+};
+Note: Each auart port should have an alias correctly numbered in "aliases"
+node.
+Example:
+[...]
+</pre>
+</div>
+</div>
+<div id="outline-container-sec-7-2" class="outline-3">
+<h3 id="sec-7-2">compatible property</h3>
+<div class="outline-text-3" id="text-7-2">
+<p>
+The top-level <code>compatible</code> property typically defines a compatible
+string for the board, and then for the SoC.
+</p>
+
+<p>
+Used to match with the <code>dt_compat</code> field of the <code>DT_MACHINE</code>
+structure:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">mxs_dt_compat</span>[] __initdata = {
+  <span style="color: #ffa07a;">"fsl,imx28"</span>,
+  <span style="color: #ffa07a;">"fsl,imx23"</span>,
+  <span style="color: #7fffd4;">NULL</span>,
+};
+DT_MACHINE_START(MXS, <span style="color: #ffa07a;">"Freescale MXS (Device Tree)"</span>)
+.dt_compat = mxs_dt_compat,
+  <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">[...]</span>
+  MACHINE_END
+</pre>
+</div>
+
+<p>
+Can also be used within code to test the machine:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">if</span> (of_machine_is_compatible(<span style="color: #ffa07a;">"fsl,imx28-evk"</span>))
+  imx28_evk_init();
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7-3" class="outline-3">
+<h3 id="sec-7-3">Bus, address cells and size cells</h3>
+<div class="outline-text-3" id="text-7-3">
+<p>
+Inside a bus, one typically needs to define the following properties:
+</p>
+<ul class="org-ul">
+<li>A compatible property, which identifies the bus controller. Child
+nodes will be registered as <i>platform devices</i>.
+</li>
+<li>The <code>#address-cells</code> property indicate how many cells (i.e 32 bits
+values) are needed to form the base address part in the <code>reg</code>
+property.
+</li>
+<li>The <code>#size-cells</code> is the same, for the size part of the <code>reg</code>
+  property.
+</li>
+<li>The <code>ranges</code> property can describe an <i>address</i> translation between
+the child bus and the parent bus. When simply defined as <code>ranges;</code>,
+it means that the translation is an identity translation.
+</li>
+</ul>
+</div>
+<ul class="org-ul"><li><a id="sec-7-3-1" name="sec-7-3-1"></a>I2C bus, address cells and size cells example<br  /><div class="outline-text-4" id="text-7-3-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">i2c0: i2c@80058000 {
+    <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;1&gt;;</span>
+    <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">size-cells = &lt;0&gt;;</span>
+    <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"fsl,imx28-i2c"</span>;
+    <span style="color: #eedd82;">reg</span> = &lt;0x80058000 0x2000&gt;;
+    <span style="color: #eedd82;">interrupts</span> = &lt;111&gt;;
+    <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">[...]</span>
+    sgtl5000: codec@0a {
+    <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"fsl,sgtl5000"</span>;
+    <span style="color: #eedd82;">reg</span> = &lt;0x0a&gt;;
+    VDDA-supply = &lt;&amp;reg_3p3v&gt;;
+    VDDIO-supply = &lt;&amp;reg_3p3v&gt;;
+    <span style="color: #eedd82;">clocks</span> = &lt;&amp;saif0&gt;;
+    };
+at24@51 {
+    <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"at24,24c32"</span>;
+    <span style="color: #eedd82;">pagesize</span> = &lt;32&gt;;
+    <span style="color: #eedd82;">reg</span> = &lt;0x51&gt;;
+};
+};
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-7-4" class="outline-3">
+<h3 id="sec-7-4">Interrupt handling</h3>
+<div class="outline-text-3" id="text-7-4">
+<ul class="org-ul">
+<li><code>interrupt-controller</code>; is a boolean property that indicates that
+the current node is an interrupt controller.
+</li>
+<li><code>#interrupt-cells</code> indicates the number of cells in the <code>interrupts</code>
+property for the interrupts managed by the selected interrupt
+controller.
+</li>
+<li><code>interrupt-parent</code> is a <i>phandle</i> that points to the interrupt
+controller for the current node. There is generally a top-level
+<code>interrupt-parent</code> definition for the main interrupt controller.
+</li>
+</ul>
+</div>
+<ul class="org-ul"><li><a id="sec-7-4-1" name="sec-7-4-1"></a>Interrupt example: <code>imx28.dtsi</code><br  /><div class="outline-text-4" id="text-7-4-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">/ {
+    interrupt-parent = &lt;&amp;icoll&gt;;
+    apb@80000000 {
+        apbh@80000000 {
+            icoll: interrupt-controller@80000000 {
+                <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"fsl,imx28-icoll"</span>, <span style="color: #ffa07a;">"fsl,icoll"</span>;
+                interrupt-controller;
+                <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">interrupt-cells = &lt;1&gt;;</span>
+                <span style="color: #eedd82;">reg</span> = &lt;0x80000000 0x2000&gt;;
+            };
+            ssp0: ssp@80010000 {
+                <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">[...]</span>
+                <span style="color: #eedd82;">interrupts</span> = &lt;96&gt;;
+            };
+        };
+    };
+};
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-7-5" class="outline-3">
+<h3 id="sec-7-5">Clock tree example, Marvell Armada XP</h3>
+<div class="outline-text-3" id="text-7-5">
+
+<div class="figure">
+<p><img src="./Files/clock-tree-example-marvell.jpg" alt="clock-tree-example-marvell.jpg" />
+</p>
+</div>
+</div>
+
+<ul class="org-ul"><li><a id="sec-7-5-1" name="sec-7-5-1"></a>Clock examples: instantiating clocks<br  /><div class="outline-text-4" id="text-7-5-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">soc {
+    coreclk: mvebu-sar@18230 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"marvell,armada-xp-core-clock"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x18230 0x08&gt;;
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">clock-cells = &lt;1&gt;;</span>
+    };
+    cpuclk: clock-complex@18700 {
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">clock-cells = &lt;1&gt;;</span>
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"marvell,armada-xp-cpu-clock"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x18700 0xA0&gt;;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;coreclk 1&gt;;
+    };
+    gateclk: clock-gating-control@18220 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"marvell,armada-xp-gating-clock"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x18220 0x4&gt;;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;coreclk 0&gt;;
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">clock-cells = &lt;1&gt;;</span>
+    };
+}
+clocks {
+    /* 25 MHz reference crystal */
+    refclk: oscillator {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"fixed-clock"</span>;
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">clock-cells = &lt;0&gt;;</span>
+        clock-frequency = &lt;25000000&gt;;
+    };
+};
+</pre>
+</div>
+</div>
+</li>
+
+<li><a id="sec-7-5-2" name="sec-7-5-2"></a>Clock examples: consuming clocks<br  /><div class="outline-text-4" id="text-7-5-2">
+<p>
+CPU, using a cpuclk
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">cpu@0 {
+    <span style="color: #eedd82;">device_type</span> = <span style="color: #ffa07a;">"cpu"</span>;
+    <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"marvell,sheeva-v7"</span>;
+    <span style="color: #eedd82;">reg</span> = &lt;0&gt;;
+    <span style="color: #eedd82;">clocks</span> = &lt;&amp;cpuclk 0&gt;;
+};
+</pre>
+</div>
+
+<p>
+imer, using either a coreclk or refclk
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">timer@20300 {
+    <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"marvell,armada-xp-timer"</span>;
+    <span style="color: #eedd82;">clocks</span> = &lt;&amp;coreclk 2&gt;, &lt;&amp;refclk&gt;;
+    clock-names = <span style="color: #ffa07a;">"nbclk"</span>, <span style="color: #ffa07a;">"fixed"</span>;
+};
+</pre>
+</div>
+
+<p>
+USB, using a gateclk
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">usb@52000 {
+    <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"marvell,orion-ehci"</span>;
+    <span style="color: #eedd82;">reg</span> = &lt;0x52000 0x500&gt;;
+    <span style="color: #eedd82;">interrupts</span> = &lt;47&gt;;
+    <span style="color: #eedd82;">clocks</span> = &lt;&amp;gateclk 20&gt;;
+    <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+<div id="outline-container-sec-7-6" class="outline-3">
+<h3 id="sec-7-6">pinctrl binding</h3>
+<div class="outline-text-3" id="text-7-6">
+<ul class="org-ul">
+<li>The <code>pinctrl</code> subsystem allows to manage pin muxing.
+</li>
+<li>In the Device Tree, devices that need pins to be muxed in a certain
+way must declare the pinctrl configuration they need.
+</li>
+<li>The <code>pinctrl-&lt;n&gt;</code> properties allow to give the list of pinctrl
+configuration needed for a certain state of the device.
+</li>
+<li>The <code>pinctrl-names</code> property allows to give a name to each state.
+</li>
+<li>When a device is probed, its <code>default</code> pinctrl state is requested
+automatically.
+<div class="org-src-container">
+
+<pre class="src src-sh">ssp0: ssp@80010000 {
+    pinctrl-names = <span style="color: #ffa07a;">"default"</span>;
+    pinctrl-0 = &lt;&amp;mmc0_8bit_pins_a
+    &amp;mmc0_cd_cfg &amp;mmc0_sck_cfg&gt;;
+    [...]
+};
+</pre>
+</div>
+</li>
+</ul>
+</div>
+<ul class="org-ul"><li><a id="sec-7-6-1" name="sec-7-6-1"></a>pinctrl configurations<br  /><div class="outline-text-4" id="text-7-6-1">
+<ul class="org-ul">
+<li>A <code>pinctrl</code> configuration provides a list of pins and their configuration.
+</li>
+<li>Such configurations are defined as <i>sub-nodes</i> of the <i>pinctrl device</i>,
+either at the SoC-level, or board-level.
+</li>
+<li>The binding for such configurations is highly dependent on the
+specific <code>pinctrl</code> driver being used.
+</li>
+</ul>
+
+<p>
+i.MX28
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">mmc0_8bit_pins_a: mmc0-8bit@0 {
+    fsl,pinmux-ids = &lt;
+    0x2000 /* MX28_PAD_SSP0_DATA0__SSP0_D0 */
+    0x2010 /* MX28_PAD_SSP0_DATA1__SSP0_D1 */
+    [...]
+    0x2090 /* MX28_PAD_SSP0_DETECT__SSP0_... */
+    0x20a0 /* MX28_PAD_SSP0_SCK__SSP0_SCK */
+    &gt;;
+    fsl,drive-strength = &lt;1&gt;;
+    fsl,<span style="color: #eedd82;">voltage</span> = &lt;1&gt;;
+    fsl,pull-up = &lt;1&gt;;
+};
+</pre>
+</div>
+
+<p>
+Marvell Kirkwood
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">pmx_nand: pmx-nand {
+    marvell,<span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"mpp0"</span>, <span style="color: #ffa07a;">"mpp1"</span>, <span style="color: #ffa07a;">"mpp2"</span>, <span style="color: #ffa07a;">"mpp3"</span>,
+    <span style="color: #ffa07a;">"mpp4"</span>, <span style="color: #ffa07a;">"mpp5"</span>, <span style="color: #ffa07a;">"mpp18"</span>,
+    <span style="color: #ffa07a;">"mpp19"</span>;
+    marvell,<span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"nand"</span>;
+};
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+</div>
+
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">More references</h2>
+<div class="outline-text-2" id="text-8">
+<ul class="org-ul">
+<li><a href="https://events.linuxfoundation.org/sites/events/files/slides/petazzoni-device-tree-dummies.pdf">Device Tree for Dummies - The Linux Foundation</a>
+</li>
+<li><a href="http://elinux.org/Device_Tree_Usage">Device Tree Usage: how to write a device tree for a new machine</a>
+</li>
+<li>DeviceTree.org website, <a href="http://www.devicetree.org">http://www.devicetree.org</a>
+</li>
+<li><a href="http://www.devicetree.org/specifications-pdf">Device Tree Specification Release 0.1</a>
+</li>
+<li>Device Tree documentation in the kernel sources,
+<code>Documentation/devicetree</code>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2016-12-11 Sun 22:42</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
