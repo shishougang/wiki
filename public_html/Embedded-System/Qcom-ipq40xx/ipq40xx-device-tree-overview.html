@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Qcom IPQ40xx Device Tree Overview</title>
-<!-- 2016-12-12 Mon 22:21 -->
+<!-- 2016-12-14 Wed 22:19 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -77,8 +77,32 @@ for the JavaScript code in this tag.
 <li><a href="#sec-5">QCA Global Counter</a></li>
 <li><a href="#sec-6">Qualcomm Global Clock &amp; Reset Controller Binding</a></li>
 <li><a href="#sec-7">ARM architected timer</a></li>
-<li><a href="#sec-8"></a></li>
-<li><a href="#sec-9">cc</a></li>
+<li><a href="#sec-8">MSM Restart Driver</a></li>
+<li><a href="#sec-9">Qualcomm Krait Processor Sub-system (KPSS) Watchdog</a></li>
+<li><a href="#sec-10">Qualcomm Atheros IPQ40xx TLMM block</a></li>
+<li><a href="#sec-11">MSM Serial UARTDM</a></li>
+<li><a href="#sec-12">SPS (Smart Peripheral Switch)</a></li>
+<li><a href="#sec-13">Qualcomm Universal Peripheral (QUP) Serial Peripheral Interface (SPI)</a></li>
+<li><a href="#sec-14">Qualcomm Parallel Interface controller (QPIC) for NAND devices</a></li>
+<li><a href="#sec-15">QCOM TCSR (Top Control and Status Register)</a></li>
+<li><a href="#sec-16">Qualcomm Atheros SuperSpeed DWC3 USB SoC controller</a></li>
+<li><a href="#sec-17">Qualcomm MSM pseudo random number generator</a></li>
+<li><a href="#sec-18">Qualcomm I2C controller</a></li>
+<li><a href="#sec-19">QCEDEV and QCRYPTO</a></li>
+<li><a href="#sec-20">QCA WLAN Driver</a></li>
+<li><a href="#sec-21">QCA Ethernet Subsystem</a></li>
+<li><a href="#sec-22">MSM PCIe</a></li>
+<li><a href="#sec-23">QCA LED</a></li>
+<li><a href="#sec-24">ARM Performance Monitor Units</a></li>
+<li><a href="#sec-25">Qualcomm SDHCI controller (sdhci-msm)</a></li>
+<li><a href="#sec-26">QCA SCM<sub>RESTART</sub><sub>REASON</sub></a></li>
+<li><a href="#sec-27">cpufreq driver</a></li>
+<li><a href="#sec-28">qcom-ipq40xx-ap.dk04.1</a>
+<ul>
+<li><a href="#sec-28-1">uart1(serial)</a></li>
+<li><a href="#sec-28-2">qcom-ipq40xx-ap.dk04.1</a></li>
+</ul>
+</li>
 </ul>
 </div>
 </div>
@@ -283,38 +307,1318 @@ adcc: clock-controller@7700038 {
 </div>
 </div>
 <div id="outline-container-sec-8" class="outline-2">
-<h2 id="sec-8"></h2>
+<h2 id="sec-8">MSM Restart Driver</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+A power supply hold (ps-hold) bit is set to power the msm chipsets.
+Clearing that bit allows us to restart/poweroff. The difference
+between poweroff and restart is determined by unique power manager IC
+settings.
+</p>
+
+<p>
+<code>Documentation/devicetree/bindings/power_supply/msm-poweroff.txt</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">restart@4ab000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,pshold"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x4ab000 0x4&gt;;
+};
+</pre>
 </div>
-
-
+</div>
+</div>
 <div id="outline-container-sec-9" class="outline-2">
-<h2 id="sec-9">cc</h2>
+<h2 id="sec-9">Qualcomm Krait Processor Sub-system (KPSS) Watchdog</h2>
 <div class="outline-text-2" id="text-9">
 <p>
-arch/arm/boot/dts/
-Documentation/devicetree/bindings/
+<code>Documentation/devicetree/bindings/watchdog/qcom-wdt.txt</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">watchdog@b017000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,kpss-wdt-ipq40xx"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0xb017000 0x40&gt;;
+        interrupt-names = <span style="color: #ffa07a;">"bark_irq"</span>;
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 3 0&gt;;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc_sleep_clk_src&gt;;
+        timeout-sec = &lt;10&gt;;
+        <span style="color: #eedd82;">wdt_res</span> = &lt;0x4&gt;;
+        <span style="color: #eedd82;">wdt_en</span> = &lt;0x8&gt;;
+        <span style="color: #eedd82;">wdt_bark_time</span> = &lt;0x10&gt;;
+        <span style="color: #eedd82;">wdt_bite_time</span> = &lt;0x14&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10">Qualcomm Atheros IPQ40xx TLMM block</h2>
+<div class="outline-text-2" id="text-10">
+<p>
+<code>Documentation/devicetree/bindings/pinctrl/qcom,ipq40xx-pinctrl.txt</code>
 </p>
 
 <p>
-Documentation/devicetree/bindings/mfd/qcom,tcsr.txt
+Please refer to ../gpio/gpio.txt and
+../interrupt-controller/interrupts.txt for a general description of
+GPIO and interrupt bindings.
+</p>
+
+<p>
+Please refer to pinctrl-bindings.txt in this directory for details of the
+common pinctrl bindings used by client devices, including the meaning of the
+phrase "pin configuration node".
+</p>
+
+<p>
+The pin configuration nodes act as a container for an abitrary number of
+subnodes. Each of these subnodes represents some desired configuration for a
+pin, a group, or a list of pins or groups. This configuration can include the
+mux function to select on those pin(s)/group(s), and various pin configuration
+parameters, such as pull-up, drive strength, etc.
 </p>
 
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-sh">tlmm: pinctrl@0x01000000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,ipq40xx-pinctrl"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x01000000 0x300000&gt;;
+        gpio-controller;
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">gpio-cells = &lt;2&gt;;</span>
+        interrupt-controller;
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">interrupt-cells = &lt;2&gt;;</span>
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 208 0&gt;;
+};
+</pre>
 </div>
+</div>
+</div>
+<div id="outline-container-sec-11" class="outline-2">
+<h2 id="sec-11">MSM Serial UARTDM</h2>
+<div class="outline-text-2" id="text-11">
+<p>
+The MSM serial UARTDM hardware is designed for high-speed use cases
+where the transmit and/or receive channels can be offloaded to a
+dma-engine. From a software perspective it's mostly compatible with
+the MSM serial UART except that it supports reading and writing
+multiple characters at a time.
+</p>
 
+<p>
+<code>Documentation/devicetree/bindings/serial/qcom,msm-uartdm.txt</code>
+</p>
 
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-sh">serial@78af000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,msm-uartdm-v1.4"</span>, <span style="color: #ffa07a;">"qcom,msm-uartdm"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x78af000 0x200&gt;;
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 107 0&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_BLSP1_UART1_APPS_CLK&gt;,
+                &lt;&amp;gcc GCC_BLSP1_AHB_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"core"</span>, <span style="color: #ffa07a;">"iface"</span>;
+};
+
+serial@78b0000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,msm-uartdm-v1.4"</span>, <span style="color: #ffa07a;">"qcom,msm-uartdm"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x78b0000 0x200&gt;;
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 108 0&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_BLSP1_UART2_APPS_CLK&gt;,
+                &lt;&amp;gcc GCC_BLSP1_AHB_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"core"</span>, <span style="color: #ffa07a;">"iface"</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-12" class="outline-2">
+<h2 id="sec-12">SPS (Smart Peripheral Switch)</h2>
+<div class="outline-text-2" id="text-12">
+<p>
+SPS (Smart Peripheral Switch) may be used as a DMA engine to move data
+in either the Peripheral-to-Peripheral (a.k.a. BAM-to-BAM) mode or the
+Peripheral-to-Memory (a.k.a. BAM-System) mode. SPS includes BAM (Bus
+Access Module) hardware block, BAM DMA peripheral, and pipe memory.
+</p>
+
+<p>
+<code>Documentation/devicetree/bindings/dma/sps/sps.txt</code>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">qcom,sps {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,msm_sps_4k"</span>;
+        qcom,device-type = &lt;3&gt;;
+        qcom,pipe-attr-ee;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-13" class="outline-2">
+<h2 id="sec-13">Qualcomm Universal Peripheral (QUP) Serial Peripheral Interface (SPI)</h2>
+<div class="outline-text-2" id="text-13">
+<p>
+The QUP core is an AHB slave that provides a common data path (an output FIFO
+and an input FIFO) for serial peripheral interface (SPI) mini-core.
+</p>
+
+<p>
+<code>Documentation/devicetree/bindings/spi/qcom,spi-qup.txt</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">spi_0: spi@78b5000 { /* BLSP1 QUP1 */
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,spi-qup-v2"</span>;
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;1&gt;;</span>
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">size-cells = &lt;0&gt;;</span>
+        reg-names = <span style="color: #ffa07a;">"spi_physical"</span>, <span style="color: #ffa07a;">"spi_bam_physical"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x78b5000 0x600&gt;,
+                &lt;0x7884000 0x23000&gt;;
+        interrupt-names = <span style="color: #ffa07a;">"spi_irq"</span>, <span style="color: #ffa07a;">"spi_bam_irq"</span>;
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 95 0&gt;, &lt;0 238 0&gt;;
+        spi-max-frequency = &lt;24000000&gt;;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_BLSP1_QUP1_SPI_APPS_CLK&gt;,
+                &lt;&amp;gcc GCC_BLSP1_AHB_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"core_clk"</span>, <span style="color: #ffa07a;">"iface_clk"</span>;
+        qcom,infinite-mode = &lt;0&gt;;
+        qcom,use-bam;
+        qcom,bam-consumer-pipe-index = &lt;4&gt;;
+        qcom,bam-producer-pipe-index = &lt;5&gt;;
+        qcom,master-id = &lt;0&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-14" class="outline-2">
+<h2 id="sec-14">Qualcomm Parallel Interface controller (QPIC) for NAND devices</h2>
+<div class="outline-text-2" id="text-14">
+<p>
+<code>Documentation/devicetree/bindings/mtd/msm_qpic_nand.txt</code>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">qcom,nand@7980000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,msm-nand"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x07980000 0x40000&gt;,
+                &lt;0x07984000 0x1A000&gt;;
+        reg-names = <span style="color: #ffa07a;">"nand_phys"</span>,
+                        <span style="color: #ffa07a;">"bam_phys"</span>;
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 101 0&gt;;
+        interrupt-names = <span style="color: #ffa07a;">"bam_irq"</span>;
+
+        qcom,msm-bus,<span style="color: #eedd82;">name</span> = <span style="color: #ffa07a;">"qpic_nand"</span>;
+        qcom,msm-bus,num-cases = &lt;2&gt;;
+        qcom,msm-bus,num-paths = &lt;1&gt;;
+
+        qcom,msm-bus,vectors-KBps =
+                &lt;91 512 0 0&gt;,
+                /* Voting for max b/w on PNOC bus for now */
+                &lt;91 512 400000 800000&gt;;
+        clock-names = <span style="color: #ffa07a;">"iface_clk"</span>, <span style="color: #ffa07a;">"core_clk"</span>;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_QPIC_AHB_CLK&gt;,
+                &lt;&amp;gcc GCC_QPIC_CLK&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-15" class="outline-2">
+<h2 id="sec-15">QCOM TCSR (Top Control and Status Register)</h2>
+<div class="outline-text-2" id="text-15">
+<p>
+The TCSR provides miscellaneous control functions and status registers
+for Qualcomm processors.
+</p>
+
+<p>
+<code>Documentation/devicetree/bindings/soc/qcom/qcom,tcsr.txt</code>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">tcsr: tcsr@194b000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,tcsr"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x194b000 0x100&gt;;
+        qcom,usb-hsphy-mode-select = &lt;TCSR_USB_HSPHY_HOST_MODE&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+
+ess_tcsr: ess_tcsr@1953000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,tcsr"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x1953000 0x1000&gt;;
+        qcom,ess-interface-select = &lt;TCSR_ESS_PSGMII&gt;;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-16" class="outline-2">
+<h2 id="sec-16">Qualcomm Atheros SuperSpeed DWC3 USB SoC controller</h2>
+<div class="outline-text-2" id="text-16">
+<p>
+<code>Documentation/devicetree/bindings/usb/qca,dwc3.txt</code>
+</p>
+<ul class="org-ul">
+<li>QCA BALDUR Highspeed USB PHY
+</li>
+<li>QCA UNI Superspeed USB PHY
+</li>
+<li>QCA DUMMY Superspeed USB PHY
+</li>
+<li>QCA DWC3 controller wrapper
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">usb3_ss_phy: ssphy@0 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,uni-ssphy"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x9a000 0x800&gt;;
+        reg-names = <span style="color: #ffa07a;">"phy_base"</span>;
+        <span style="color: #eedd82;">resets</span> = &lt;&amp;gcc USB3_UNIPHY_PHY_ARES&gt;;
+        reset-names = <span style="color: #ffa07a;">"por_rst"</span>;
+        qca,<span style="color: #eedd82;">host</span> = &lt;1&gt;;
+        qca,<span style="color: #eedd82;">emulation</span> = &lt;0&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+
+dummy_ss_phy: ssphy@1 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,dummy-ssphy"</span>;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+
+usb3_hs_phy: hsphy@a6000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,baldur-usb3-hsphy"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0xa6000 0x40&gt;;
+        reg-names = <span style="color: #ffa07a;">"phy_base"</span>;
+        <span style="color: #eedd82;">resets</span> = &lt;&amp;gcc USB3_HSPHY_POR_ARES&gt;, &lt;&amp;gcc USB3_HSPHY_S_ARES&gt;;
+        reset-names = <span style="color: #ffa07a;">"por_rst"</span>, <span style="color: #ffa07a;">"srif_rst"</span>;
+        qca,<span style="color: #eedd82;">host</span> = &lt;1&gt;;
+        qca,<span style="color: #eedd82;">emulation</span> = &lt;0&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+
+usb2_hs_phy: hsphy@a8000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,baldur-usb2-hsphy"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0xa8000 0x40&gt;;
+        reg-names = <span style="color: #ffa07a;">"phy_base"</span>;
+        <span style="color: #eedd82;">resets</span> = &lt;&amp;gcc USB2_HSPHY_POR_ARES&gt;, &lt;&amp;gcc USB2_HSPHY_S_ARES&gt;;
+        reset-names = <span style="color: #ffa07a;">"por_rst"</span>, <span style="color: #ffa07a;">"srif_rst"</span>;
+        qca,<span style="color: #eedd82;">host</span> = &lt;1&gt;;
+        qca,<span style="color: #eedd82;">emulation</span> = &lt;0&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+
+usb3: usb3@8a00000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,dwc3"</span>;
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;1&gt;;</span>
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">size-cells = &lt;1&gt;;</span>
+        ranges;
+        <span style="color: #eedd82;">reg</span> = &lt;0x8af8800 0x100&gt;;
+        reg-names = <span style="color: #ffa07a;">"qscratch_base"</span>;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_USB3_MASTER_CLK&gt;,
+                &lt;&amp;gcc GCC_USB3_SLEEP_CLK&gt;,
+                &lt;&amp;gcc GCC_USB3_MOCK_UTMI_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"master"</span>,
+                <span style="color: #ffa07a;">"sleep"</span>,
+                <span style="color: #ffa07a;">"mock_utmi"</span>;
+        qca,<span style="color: #eedd82;">host</span> = &lt;1&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+
+        dwc3@8a00000 {
+                <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"snps,dwc3"</span>;
+                <span style="color: #eedd82;">reg</span> = &lt;0x8a00000 0xf8000&gt;;
+                <span style="color: #eedd82;">interrupts</span> = &lt;0 132 0&gt;;
+                usb-phy = &lt;&amp;usb3_hs_phy&gt;, &lt;&amp;usb3_ss_phy&gt;;
+                phy-names = <span style="color: #ffa07a;">"usb2-phy"</span>, <span style="color: #ffa07a;">"usb3-phy"</span>;
+                tx-fifo-resize;
+                <span style="color: #eedd82;">dr_mode</span> = <span style="color: #ffa07a;">"host"</span>;
+                usb2-susphy-quirk;
+                usb2-host-discon-quirk;
+                usb2-host-discon-phy-misc-reg = &lt;0x24&gt;;
+                usb2-host-discon-mask = &lt;0x100&gt;;
+        };
+};
+
+usb2: usb2@6000000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,dwc3"</span>;
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;1&gt;;</span>
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">size-cells = &lt;1&gt;;</span>
+        ranges;
+        <span style="color: #eedd82;">reg</span> = &lt;0x60f8800 0x100&gt;;
+        reg-names = <span style="color: #ffa07a;">"qscratch_base"</span>;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_USB2_MASTER_CLK&gt;,
+                &lt;&amp;gcc GCC_USB2_SLEEP_CLK&gt;,
+                &lt;&amp;gcc GCC_USB2_MOCK_UTMI_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"master"</span>,
+                <span style="color: #ffa07a;">"sleep"</span>,
+                <span style="color: #ffa07a;">"mock_utmi"</span>;
+        qca,<span style="color: #eedd82;">host</span> = &lt;1&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+
+        dwc3@6000000 {
+                <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"snps,dwc3"</span>;
+                <span style="color: #eedd82;">reg</span> = &lt;0x6000000 0xf8000&gt;;
+                <span style="color: #eedd82;">interrupts</span> = &lt;0 136 0&gt;;
+                usb-phy = &lt;&amp;usb2_hs_phy&gt;, &lt;&amp;dummy_ss_phy&gt;;
+                phy-names = <span style="color: #ffa07a;">"usb2-phy"</span>, <span style="color: #ffa07a;">"usb3-phy"</span>;
+                tx-fifo-resize;
+                <span style="color: #eedd82;">dr_mode</span> = <span style="color: #ffa07a;">"host"</span>;
+                usb2-susphy-quirk;
+                usb2-host-discon-quirk;
+                usb2-host-discon-phy-misc-reg = &lt;0x24&gt;;
+                usb2-host-discon-mask = &lt;0x100&gt;;
+        };
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-17" class="outline-2">
+<h2 id="sec-17">Qualcomm MSM pseudo random number generator</h2>
+<div class="outline-text-2" id="text-17">
+<p>
+<code>Documentation/devicetree/bindings/rng/qcom,prng.txt</code>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">rng@0x00022000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,prng"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x00022000 0x140&gt;;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_PRNG_AHB_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"core"</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-18" class="outline-2">
+<h2 id="sec-18">Qualcomm I2C controller</h2>
+<div class="outline-text-2" id="text-18">
+<p>
+<code>Documentation/devicetree/bindings/i2c/i2c-msm-v2.txt</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">i2c_0: i2c@78b7000 { /* BLSP1 QUP2 */
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,i2c-msm-v2"</span>;
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;1&gt;;</span>
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">size-cells = &lt;0&gt;;</span>
+        reg-names = <span style="color: #ffa07a;">"qup_phys_addr"</span>, <span style="color: #ffa07a;">"bam_phys_addr"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x78b7000 0x600&gt;,
+                &lt;0x7884000 0x23000&gt;;
+        interrupt-names = <span style="color: #ffa07a;">"qup_irq"</span>, <span style="color: #ffa07a;">"bam_irq"</span>;
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 97 0&gt;, &lt;0 238 0&gt;;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_BLSP1_AHB_CLK&gt;,
+                &lt;&amp;gcc GCC_BLSP1_QUP1_I2C_APPS_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"iface_clk"</span>, <span style="color: #ffa07a;">"core_clk"</span>;
+        qcom,clk-freq-out = &lt;100000&gt;;
+        qcom,clk-freq-in  = &lt;19050000&gt;;
+        qcom,noise-rjct-scl = &lt;0&gt;;
+        qcom,noise-rjct-sda = &lt;0&gt;;
+        qcom,bam-pipe-idx-cons = &lt;8&gt;;
+        qcom,bam-pipe-idx-prod = &lt;9&gt;;
+        qcom,master-id = &lt;0&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-19" class="outline-2">
+<h2 id="sec-19">QCEDEV and QCRYPTO</h2>
+<div class="outline-text-2" id="text-19">
+<ul class="org-ul">
+<li><code>Documentation/devicetree/bindings/crypto/msm/qcedev.txt</code>
+</li>
+<li><code>Documentation/devicetree/bindings/crypto/msm/qcrypto.txt</code>
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">qcom_crypto: qcrypto@8e20000 {
+                        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,qcrypto"</span>;
+                        <span style="color: #eedd82;">reg</span> = &lt;0x8e20000 0x20000&gt;,
+                                &lt;0x8e04000 0x20000&gt;;
+                        reg-names = <span style="color: #ffa07a;">"crypto-base"</span>,<span style="color: #ffa07a;">"crypto-bam-base"</span>;
+                        <span style="color: #eedd82;">interrupts</span> = &lt;0 207 0&gt;;
+                        qcom,bam-pipe-pair = &lt;1&gt;;
+                        qcom,ce-hw-instance = &lt;0&gt;;
+                        qcom,ce-hw-shared = &lt;1&gt;;
+                        qcom,ce-device = &lt;0&gt;;
+                        qcom,ce-opp-freq= &lt;125000000&gt;;
+                        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_CRYPTO_CLK&gt;,
+                                &lt;&amp;gcc GCC_CRYPTO_AXI_CLK&gt;,
+                                &lt;&amp;gcc GCC_CRYPTO_AHB_CLK&gt;;
+
+                        clock-names = <span style="color: #ffa07a;">"core_clk"</span>, <span style="color: #ffa07a;">"bus_clk"</span>, <span style="color: #ffa07a;">"iface_clk"</span>;
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+                };
+
+                qcom_cedev: qcedev@8e20000 {
+                        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,qcedev"</span>;
+                        <span style="color: #eedd82;">reg</span> = &lt;0x8e20000  0x20000&gt;,
+                                &lt;0x8e04000  0x20000&gt;;
+                        reg-names = <span style="color: #ffa07a;">"crypto-base"</span>,<span style="color: #ffa07a;">"crypto-bam-base"</span>;
+                        <span style="color: #eedd82;">interrupts</span> = &lt;0 207 0&gt;;
+                        qcom,bam-pipe-pair = &lt;1&gt;;
+                        qcom,ce-hw-instance = &lt;0&gt;;
+                        qcom,ce-hw-shared = &lt;1&gt;;
+                        qcom,ce-device = &lt;0&gt;;
+                        qcom,ce-opp-freq= &lt;125000000&gt;;
+                        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_CRYPTO_CLK&gt;,
+                                &lt;&amp;gcc GCC_CRYPTO_AXI_CLK&gt;,
+                                &lt;&amp;gcc GCC_CRYPTO_AHB_CLK&gt;;
+
+                        clock-names = <span style="color: #ffa07a;">"core_clk"</span>, <span style="color: #ffa07a;">"bus_clk"</span>, <span style="color: #ffa07a;">"iface_clk"</span>;
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+                };
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-20" class="outline-2">
+<h2 id="sec-20">QCA WLAN Driver</h2>
+<div class="outline-text-2" id="text-20">
+<p>
+<code>Documentation/devicetree/bindings/qca/wlan.txt</code>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">wifi_glb_tcsr: tcsr@1949000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,tcsr"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x1949000 0x100&gt;;
+        qcom,<span style="color: #eedd82;">wifi_glb_cfg</span> = &lt;TCSR_WIFI_GLB_CFG&gt;;
+};
+
+wifi_noc_memtype_m0_m2_tcsr: tcsr@1957000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,tcsr"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x1957000 0x100&gt;;
+        qcom,<span style="color: #eedd82;">wifi_noc_memtype_m0_m2</span> = &lt;TCSR_WIFI_NOC_MEMTYPE_M0_M2&gt;;
+};
+
+wifi0: wifi@a000000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,wifi-ipq40xx"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0xa000000 0x200000&gt;;
+        core-id = &lt;0x0&gt;;
+        <span style="color: #eedd82;">resets</span> = &lt;&amp;gcc WIFI0_CPU_INIT_RESET&gt;,
+                &lt;&amp;gcc WIFI0_RADIO_SRIF_RESET&gt;,
+                &lt;&amp;gcc WIFI0_RADIO_WARM_RESET&gt;,
+                &lt;&amp;gcc WIFI0_RADIO_COLD_RESET&gt;,
+                &lt;&amp;gcc WIFI0_CORE_WARM_RESET&gt;,
+                &lt;&amp;gcc WIFI0_CORE_COLD_RESET&gt;;
+        reset-names = <span style="color: #ffa07a;">"wifi_cpu_init"</span>,
+                <span style="color: #ffa07a;">"wifi_radio_srif"</span>,
+                <span style="color: #ffa07a;">"wifi_radio_warm"</span>,
+                <span style="color: #ffa07a;">"wifi_radio_cold"</span>,
+                <span style="color: #ffa07a;">"wifi_core_warm"</span>,
+                <span style="color: #ffa07a;">"wifi_core_cold"</span>;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_WCSS2G_CLK&gt;,
+                &lt;&amp;gcc GCC_WCSS2G_REF_CLK&gt;,
+                &lt;&amp;gcc GCC_WCSS2G_RTC_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"wifi_wcss_cmd"</span>, <span style="color: #ffa07a;">"wifi_wcss_ref"</span>, <span style="color: #ffa07a;">"wifi_wcss_rtc"</span>;
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 0x20 0x1&gt;,
+                &lt;0 0x21 0x1&gt;,
+                &lt;0 0x22 0x1&gt;,
+                &lt;0 0x23 0x1&gt;,
+                &lt;0 0x24 0x1&gt;,
+                &lt;0 0x25 0x1&gt;,
+                &lt;0 0x26 0x1&gt;,
+                &lt;0 0x27 0x1&gt;,
+                &lt;0 0x28 0x1&gt;,
+                &lt;0 0x29 0x1&gt;,
+                &lt;0 0x2a 0x1&gt;,
+                &lt;0 0x2b 0x1&gt;,
+                &lt;0 0x2c 0x1&gt;,
+                &lt;0 0x2d 0x1&gt;,
+                &lt;0 0x2e 0x1&gt;,
+                &lt;0 0x2f 0x1&gt;,
+                &lt;0 0xa8 0x0&gt;;
+        interrupt-names = <span style="color: #ffa07a;">"msi0"</span>, <span style="color: #ffa07a;">"msi1"</span>, <span style="color: #ffa07a;">"msi2"</span>, <span style="color: #ffa07a;">"msi3"</span>, <span style="color: #ffa07a;">"msi4"</span>, <span style="color: #ffa07a;">"msi5"</span>, <span style="color: #ffa07a;">"msi6"</span>,
+                <span style="color: #ffa07a;">"msi7"</span>, <span style="color: #ffa07a;">"msi8"</span>, <span style="color: #ffa07a;">"msi9"</span>, <span style="color: #ffa07a;">"msi10"</span>, <span style="color: #ffa07a;">"msi11"</span>, <span style="color: #ffa07a;">"msi12"</span>, <span style="color: #ffa07a;">"msi13"</span>, <span style="color: #ffa07a;">"msi14"</span>,
+                <span style="color: #ffa07a;">"msi15"</span>, <span style="color: #ffa07a;">"legacy"</span>;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+        qca,<span style="color: #eedd82;">msi_addr</span> = &lt;0x0b006040&gt;;
+        qca,<span style="color: #eedd82;">msi_base</span> = &lt;0x40&gt;;
+};
+
+wifi1: wifi@a800000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,wifi-ipq40xx"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0xa800000 0x200000&gt;;
+        core-id = &lt;0x1&gt;;
+        <span style="color: #eedd82;">resets</span> = &lt;&amp;gcc WIFI1_CPU_INIT_RESET&gt;,
+                &lt;&amp;gcc WIFI1_RADIO_SRIF_RESET&gt;,
+                &lt;&amp;gcc WIFI1_RADIO_WARM_RESET&gt;,
+                &lt;&amp;gcc WIFI1_RADIO_COLD_RESET&gt;,
+                &lt;&amp;gcc WIFI1_CORE_WARM_RESET&gt;,
+                &lt;&amp;gcc WIFI1_CORE_COLD_RESET&gt;;
+        reset-names = <span style="color: #ffa07a;">"wifi_cpu_init"</span>,
+                <span style="color: #ffa07a;">"wifi_radio_srif"</span>,
+                <span style="color: #ffa07a;">"wifi_radio_warm"</span>,
+                <span style="color: #ffa07a;">"wifi_radio_cold"</span>,
+                <span style="color: #ffa07a;">"wifi_core_warm"</span>,
+                <span style="color: #ffa07a;">"wifi_core_cold"</span>;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_WCSS5G_CLK&gt;,
+                &lt;&amp;gcc GCC_WCSS5G_REF_CLK&gt;,
+                &lt;&amp;gcc GCC_WCSS5G_RTC_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"wifi_wcss_cmd"</span>, <span style="color: #ffa07a;">"wifi_wcss_ref"</span>, <span style="color: #ffa07a;">"wifi_wcss_rtc"</span>;
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 0x30 0x1&gt;,
+                &lt;0 0x31 0x1&gt;,
+                &lt;0 0x32 0x1&gt;,
+                &lt;0 0x33 0x1&gt;,
+                &lt;0 0x34 0x1&gt;,
+                &lt;0 0x35 0x1&gt;,
+                &lt;0 0x36 0x1&gt;,
+                &lt;0 0x37 0x1&gt;,
+                &lt;0 0x38 0x1&gt;,
+                &lt;0 0x39 0x1&gt;,
+                &lt;0 0x3a 0x1&gt;,
+                &lt;0 0x3b 0x1&gt;,
+                &lt;0 0x3c 0x1&gt;,
+                &lt;0 0x3d 0x1&gt;,
+                &lt;0 0x3e 0x1&gt;,
+                &lt;0 0x3f 0x1&gt;,
+                &lt;0 0xa9 0x0&gt;;
+        interrupt-names = <span style="color: #ffa07a;">"msi0"</span>, <span style="color: #ffa07a;">"msi1"</span>, <span style="color: #ffa07a;">"msi2"</span>, <span style="color: #ffa07a;">"msi3"</span>, <span style="color: #ffa07a;">"msi4"</span>, <span style="color: #ffa07a;">"msi5"</span>, <span style="color: #ffa07a;">"msi6"</span>,
+                <span style="color: #ffa07a;">"msi7"</span>, <span style="color: #ffa07a;">"msi8"</span>, <span style="color: #ffa07a;">"msi9"</span>, <span style="color: #ffa07a;">"msi10"</span>, <span style="color: #ffa07a;">"msi11"</span>, <span style="color: #ffa07a;">"msi12"</span>, <span style="color: #ffa07a;">"msi13"</span>, <span style="color: #ffa07a;">"msi14"</span>,
+                <span style="color: #ffa07a;">"msi15"</span>, <span style="color: #ffa07a;">"legacy"</span>;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+        qca,<span style="color: #eedd82;">msi_addr</span> = &lt;0x0b006040&gt;;
+        qca,<span style="color: #eedd82;">msi_base</span> = &lt;0x50&gt;;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-21" class="outline-2">
+<h2 id="sec-21">QCA Ethernet Subsystem</h2>
+<div class="outline-text-2" id="text-21">
+<ol class="org-ol">
+<li>QCA Ethernet DMA
+<code>Documentation/devicetree/bindings/net/qca-ess.txt</code>
+</li>
+<li>QCA Ethernet Switch
+ESS-SWITCH is used to forward the packet among LAN, WAN and Host
+processor.
+<code>Documentation/devicetree/bindings/arm/msm/ess-switch.txt</code>
+</li>
+<li>QCA Ethernet PHY mode <code>ess-psgmii</code>
+</li>
+<li>MDIO Interface <code>ipq40xx-mdio</code>
+</li>
+</ol>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">edma@c080000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,ess-edma"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0xc080000 0x8000&gt;;
+        qcom,page-mode = &lt;0&gt;;
+        qcom,<span style="color: #eedd82;">rx_head_buf_size</span> = &lt;1540&gt;;
+        qcom,<span style="color: #eedd82;">wan_port_id_mask</span> = &lt;0x10&gt;;
+        qcom,mdio_supported;
+        qcom,<span style="color: #eedd82;">phy_mdio_addr</span> = &lt;4&gt;;
+        qcom,<span style="color: #eedd82;">poll_required</span> = &lt;1&gt;;
+        qcom,<span style="color: #eedd82;">forced_speed</span> = &lt;1000&gt;;
+        qcom,<span style="color: #eedd82;">forced_duplex</span> = &lt;1&gt;;
+
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 65 1&gt;,
+                        &lt;0 66 1&gt;,
+                        &lt;0 67 1&gt;,
+                        &lt;0 68 1&gt;,
+                        &lt;0 69 1&gt;,
+                        &lt;0 70 1&gt;,
+                        &lt;0 71 1&gt;,
+                        &lt;0 72 1&gt;,
+                        &lt;0 73 1&gt;,
+                        &lt;0 74 1&gt;,
+                        &lt;0 75 1&gt;,
+                        &lt;0 76 1&gt;,
+                        &lt;0 77 1&gt;,
+                        &lt;0 78 1&gt;,
+                        &lt;0 79 1&gt;,
+                        &lt;0 80 1&gt;,
+                        &lt;0 240 1&gt;,
+                        &lt;0 241 1&gt;,
+                        &lt;0 242 1&gt;,
+                        &lt;0 243 1&gt;,
+                        &lt;0 244 1&gt;,
+                        &lt;0 245 1&gt;,
+                        &lt;0 246 1&gt;,
+                        &lt;0 247 1&gt;,
+                        &lt;0 248 1&gt;,
+                        &lt;0 249 1&gt;,
+                        &lt;0 250 1&gt;,
+                        &lt;0 251 1&gt;,
+                        &lt;0 252 1&gt;,
+                        &lt;0 253 1&gt;,
+                        &lt;0 254 1&gt;,
+                        &lt;0 255 1&gt;;
+        gmac0 {
+                local-mac-address = [000000000000];
+        };
+        gmac1 {
+                local-mac-address = [000000000000];
+        };
+};
+
+ess-switch@c000000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,ess-switch"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0xc000000 0x80000&gt;; /* 512KB */
+        <span style="color: #eedd82;">switch_access_mode</span> = <span style="color: #ffa07a;">"local bus"</span>;
+        <span style="color: #eedd82;">resets</span> = &lt;&amp;gcc ESS_RESET&gt;, &lt;&amp;gcc ESS_MAC1_CLK_DIS&gt;, <span style="color: #ffa07a;">\</span>
+                &lt;&amp;gcc ESS_MAC2_CLK_DIS&gt;, &lt;&amp;gcc ESS_MAC3_CLK_DIS&gt;, <span style="color: #ffa07a;">\</span>
+                &lt;&amp;gcc ESS_MAC4_CLK_DIS&gt;, &lt;&amp;gcc ESS_MAC5_CLK_DIS&gt;;
+        reset-names = <span style="color: #ffa07a;">"ess_rst"</span>,<span style="color: #ffa07a;">"ess_mac1_clk_dis"</span>, <span style="color: #ffa07a;">\</span>
+                <span style="color: #ffa07a;">"ess_mac2_clk_dis"</span>,<span style="color: #ffa07a;">"ess_mac3_clk_dis"</span>, <span style="color: #ffa07a;">\</span>
+                <span style="color: #ffa07a;">"ess_mac4_clk_dis"</span>, <span style="color: #ffa07a;">"ess_mac5_clk_dis"</span>;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_ESS_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"ess_clk"</span>;
+        <span style="color: #eedd82;">switch_cpu_bmp</span> = &lt;0x1&gt;;  /* cpu port bitmap */
+        <span style="color: #eedd82;">switch_lan_bmp</span> = &lt;0x1e&gt;; /* lan port bitmap */
+        <span style="color: #eedd82;">switch_wan_bmp</span> = &lt;0x20&gt;; /* wan port bitmap */
+};
+ess-psgmii@98000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,ess-psgmii"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x98000 0x800&gt;; /* 2k */
+        <span style="color: #eedd82;">psgmii_access_mode</span> = <span style="color: #ffa07a;">"local bus"</span>;
+        <span style="color: #eedd82;">resets</span> = &lt;&amp;gcc ESS_PSGMII_ARES&gt;;
+        reset-names = <span style="color: #ffa07a;">"psgmii_rst"</span>;
+};
+
+mdio@90000 {
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;1&gt;;</span>
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">size-cells = &lt;1&gt;;</span>
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,ipq40xx-mdio"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x90000 0x64&gt;;
+        phy0: ethernet-phy@0 {
+                <span style="color: #eedd82;">reg</span> = &lt;0&gt;;
+        };
+        phy1: ethernet-phy@1 {
+                <span style="color: #eedd82;">reg</span> = &lt;1&gt;;
+        };
+        phy2: ethernet-phy@2 {
+                <span style="color: #eedd82;">reg</span> = &lt;2&gt;;
+        };
+        phy3: ethernet-phy@3 {
+                <span style="color: #eedd82;">reg</span> = &lt;3&gt;;
+        };
+        phy4: ethernet-phy@4 {
+                <span style="color: #eedd82;">reg</span> = &lt;4&gt;;
+        };
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-22" class="outline-2">
+<h2 id="sec-22">MSM PCIe</h2>
+<div class="outline-text-2" id="text-22">
+<p>
+<code>Documentation/devicetree/bindings/pci/msm_pcie.txt</code>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">pcie0: qcom,pcie@80000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,msm_pcie"</span>;
+        cell-index = &lt;0&gt;;
+        qcom,ctrl-amt = &lt;1&gt;;
+
+        <span style="color: #eedd82;">reg</span> = &lt;0x80000 0x2000&gt;,
+              &lt;0x99000 0x800&gt;,
+              &lt;0x40000000 0xf1d&gt;,
+              &lt;0x40000f20 0xa8&gt;,
+              &lt;0x40100000 0x1000&gt;,
+              &lt;0x40200000 0x100000&gt;,
+              &lt;0x40300000 0xd00000&gt;;
+        reg-names = <span style="color: #ffa07a;">"parf"</span>, <span style="color: #ffa07a;">"phy"</span>, <span style="color: #ffa07a;">"dm_core"</span>, <span style="color: #ffa07a;">"elbi"</span>,
+                <span style="color: #ffa07a;">"conf"</span>, <span style="color: #ffa07a;">"io"</span>, <span style="color: #ffa07a;">"bars"</span>;
+
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;0&gt;;</span>
+        interrupt-parent = &lt;&amp;pcie0&gt;;
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 1 2 3 4 5 6 7 8 9 10 11 12&gt;;
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">interrupt-cells = &lt;1&gt;;</span>
+        interrupt-map-mask = &lt;0xffffffff&gt;;
+        interrupt-map = &lt;0 &amp;intc 0 141 0
+                1 &amp;intc 0 142 0
+                2 &amp;intc 0 143 0
+                3 &amp;intc 0 144 0
+                4 &amp;intc 0 145 0
+                5 &amp;intc 0 146 0
+                6 &amp;intc 0 147 0
+                7 &amp;intc 0 148 0
+                8 &amp;intc 0 149 0
+                9 &amp;intc 0 150 0
+                10 &amp;intc 0 151 0
+                11 &amp;intc 0 152 0 &gt;;
+
+        interrupt-names = <span style="color: #ffa07a;">"int_msi"</span>, <span style="color: #ffa07a;">"int_a"</span>, <span style="color: #ffa07a;">"int_b"</span>, <span style="color: #ffa07a;">"int_c"</span>, <span style="color: #ffa07a;">"int_d"</span>,
+                <span style="color: #ffa07a;">"int_pls_pme"</span>, <span style="color: #ffa07a;">"int_pme_legacy"</span>, <span style="color: #ffa07a;">"int_pls_err"</span>,
+                <span style="color: #ffa07a;">"int_aer_legacy"</span>, <span style="color: #ffa07a;">"int_pls_link_up"</span>,
+                <span style="color: #ffa07a;">"int_pls_link_down"</span>, <span style="color: #ffa07a;">"int_bridge_flush_n"</span>,<span style="color: #ffa07a;">"int_wake"</span>;
+
+        qcom,ep-latency = &lt;10&gt;;
+
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_PCIE_AHB_CLK&gt;,
+                &lt;&amp;gcc GCC_PCIE_AXI_M_CLK&gt;,
+                &lt;&amp;gcc GCC_PCIE_AXI_S_CLK&gt;;
+
+        clock-names =   <span style="color: #ffa07a;">"pcie_0_cfg_ahb_clk"</span>,
+                        <span style="color: #ffa07a;">"pcie_0_mstr_axi_clk"</span>,
+                        <span style="color: #ffa07a;">"pcie_0_slv_axi_clk"</span>;
+
+        max-clock-frequency-hz = &lt;0&gt;, &lt;0&gt;, &lt;0&gt;;
+
+        <span style="color: #eedd82;">resets</span> = &lt;&amp;gcc PCIE_AXI_M_ARES&gt;,
+                &lt;&amp;gcc PCIE_AXI_S_ARES&gt;,
+                &lt;&amp;gcc PCIE_PIPE_ARES&gt;,
+                &lt;&amp;gcc PCIE_AXI_M_VMIDMT_ARES&gt;,
+                &lt;&amp;gcc PCIE_AXI_S_XPU_ARES&gt;,
+                &lt;&amp;gcc PCIE_PARF_XPU_ARES&gt;,
+                &lt;&amp;gcc PCIE_PHY_ARES&gt;,
+                &lt;&amp;gcc PCIE_AXI_M_STICKY_ARES&gt;,
+                &lt;&amp;gcc PCIE_PIPE_STICKY_ARES&gt;,
+                &lt;&amp;gcc PCIE_PWR_ARES&gt;,
+                &lt;&amp;gcc PCIE_AHB_ARES&gt;,
+                &lt;&amp;gcc PCIE_PHY_AHB_ARES&gt;;
+
+        reset-names = <span style="color: #ffa07a;">"pcie_rst_axi_m_ares"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_axi_s_ares"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_pipe_ares"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_axi_m_vmidmt_ares"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_axi_s_xpu_ares"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_parf_xpu_ares"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_phy_ares"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_axi_m_sticky_ares"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_pipe_sticky_ares"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_pwr_ares"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_ahb_res"</span>,
+                <span style="color: #ffa07a;">"pcie_rst_phy_ahb_ares"</span>;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-23" class="outline-2">
+<h2 id="sec-23">QCA LED</h2>
+<div class="outline-text-2" id="text-23">
+<p>
+<code>Documentation/devicetree/bindings/leds/leds-ipq40xx.txt</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">qcom: ledc@1937000  {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,ledc"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x1937000 0x20070&gt;;
+        reg-names = <span style="color: #ffa07a;">"ledc_base_addr"</span>;
+        qcom,<span style="color: #eedd82;">tcsr_ledc_values</span> = &lt;0x320193 0x14720800 0x20d 0x0 <span style="color: #ffa07a;">\</span>
+                0x0 0xFFFFFFFF 0x0 0x7 0x7D0010 0x0 0x10482090 0x3FFFDFC&gt;;
+        qcom,<span style="color: #eedd82;">ledc_blink_indices_cnt</span> = &lt;0&gt;;
+        qcom,<span style="color: #eedd82;">ledc_blink_indices</span> = &lt;0&gt;;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-24" class="outline-2">
+<h2 id="sec-24">ARM Performance Monitor Units</h2>
+<div class="outline-text-2" id="text-24">
+<p>
+ARM cores often have a PMU for counting cpu and cache events like
+cache misses and hits. The interface to the PMU is part of the ARM.
+</p>
+
+<p>
+<code>Documentation/devicetree/bindings/arm/pmu.txt</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">pmu {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"arm,cortex-a7-pmu"</span>;
+        <span style="color: #eedd82;">interrupts</span> = &lt;1 7 0xf04&gt;;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-25" class="outline-2">
+<h2 id="sec-25">Qualcomm SDHCI controller (sdhci-msm)</h2>
+<div class="outline-text-2" id="text-25">
+<p>
+<code>Documentation/devicetree/bindings/mmc/sdhci-msm.txt</code>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">sdhci@7824000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,sdhci-msm-v4"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x7824900 0x11c&gt;, &lt;0x7824000 0x800&gt;;
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 123 0&gt;, &lt;0 138 0&gt;;
+        bus-width = &lt;8&gt;;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_SDCC1_APPS_CLK&gt;, &lt;&amp;gcc GCC_SDCC1_AHB_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"core"</span>, <span style="color: #ffa07a;">"iface"</span>;
+        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-26" class="outline-2">
+<h2 id="sec-26">QCA SCM<sub>RESTART</sub><sub>REASON</sub></h2>
+<div class="outline-text-2" id="text-26">
+<p>
+scm restart reason driver controls the collection of crashdump.
+</p>
+
+<p>
+During panic/assert the notifiers registered in this driver will be
+kicked in and the magic cookie is set, the crashdumps are collected in
+apps bootloader.
+</p>
+
+<p>
+<code>Documentation/devicetree/bindings/soc/qcom/qca,scm_restart_reason.txt</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">qca,scm_restart_reason {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,scm_restart_reason"</span>;
+};
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-27" class="outline-2">
+<h2 id="sec-27">cpufreq driver</h2>
+<div class="outline-text-2" id="text-27">
+<p>
+IPQ40xx SoC cpufreq driver for CPU frequency scaling.
+</p>
+
+<p>
+<code>Documentation/devicetree/bindings/cpufreq/cpufreq-qca.txt</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">cpu_freq_ipq40xx {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,ipq40xx_freq"</span>;
+        clock-latency = &lt;100000&gt;;
+        qcom,cpufreq-table =
+        &lt; 48000 &gt;,
+        &lt; 200000 &gt;,
+        &lt; 500000 &gt;,
+        &lt; 716000 &gt;;
+};
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-28" class="outline-2">
+<h2 id="sec-28">qcom-ipq40xx-ap.dk04.1</h2>
+<div class="outline-text-2" id="text-28">
+</div><div id="outline-container-sec-28-1" class="outline-3">
+<h3 id="sec-28-1">uart1(serial)</h3>
+<div class="outline-text-3" id="text-28-1">
+<p>
+<code>arch/arm/boot/dts/qcom-ipq40xx-hsuart.dtsi</code>
+</p>
+
+<p>
+<code>msm-hsuart-v14</code>: <code>Documentation/devicetree/bindings/tty/serial/msm_serial_hs.txt</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">uart1:uart@78b0000 {
+                <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,msm-hsuart-v14"</span>;
+                <span style="color: #eedd82;">reg</span> = &lt;0x78b0000 0x200&gt;,
+                        &lt;0x7884000 0x23000&gt;;
+                reg-names = <span style="color: #ffa07a;">"core_mem"</span>, <span style="color: #ffa07a;">"bam_mem"</span>;
+                interrupt-names = <span style="color: #ffa07a;">"core_irq"</span>, <span style="color: #ffa07a;">"bam_irq"</span>;
+                <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;0&gt;;</span>
+                interrupt-parent = &lt;&amp;uart1&gt;;
+                <span style="color: #eedd82;">interrupts</span> = &lt;0 1 2&gt;;
+                <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">interrupt-cells = &lt;1&gt;;</span>
+                interrupt-map-mask = &lt;0xffffffff&gt;;
+                interrupt-map = &lt;0 &amp;intc 0 108 0
+                        1 &amp;intc 0 238 0&gt;;
+                qcom,bam-tx-ep-pipe-index = &lt;2&gt;;
+                qcom,bam-rx-ep-pipe-index = &lt;3&gt;;
+                qcom,master-id = &lt;86&gt;;
+                <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_BLSP1_AHB_CLK&gt;,
+                        &lt;&amp;gcc GCC_BLSP1_UART2_APPS_CLK&gt;;
+                clock-names = <span style="color: #ffa07a;">"iface_clk"</span>, <span style="color: #ffa07a;">"core_clk"</span>;
+                <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+                };
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-28-2" class="outline-3">
+<h3 id="sec-28-2">qcom-ipq40xx-ap.dk04.1</h3>
+<div class="outline-text-3" id="text-28-2">
+<div class="org-src-container">
+
+<pre class="src src-sh">/ {
+        <span style="color: #eedd82;">model</span> = <span style="color: #ffa07a;">"Qualcomm Technologies, Inc. IPQ40xx/AP-DK04.1"</span>;
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,ipq40xx-apdk04.1"</span>, <span style="color: #ffa07a;">"qcom,ipq40xx"</span>;
+
+        memory {
+                <span style="color: #eedd82;">device_type</span> = <span style="color: #ffa07a;">"memory"</span>;
+                <span style="color: #eedd82;">reg</span> = &lt;0x80000000 0x10000000&gt;; /* 256MB */
+        };
+
+        reserved-memory {
+                <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;1&gt;;</span>
+                <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">size-cells = &lt;1&gt;;</span>
+                ranges;
+                rsvd1@87000000 {
+                        /* Reserved for other subsystem */
+                        <span style="color: #eedd82;">reg</span> = &lt;0x87000000 0x500000&gt;;
+                        no-map;
+                };
+                wifi_dump@87500000 {
+                        <span style="color: #eedd82;">reg</span> = &lt;0x87500000 0x600000&gt;;
+                        no-map;
+                };
+
+                rsvd2@87B00000 {
+                        /* Reserved for other subsystem */
+                        <span style="color: #eedd82;">reg</span> = &lt;0x87B00000 0x500000&gt;;
+                        no-map;
+                };
+        };
+
+        chosen {
+                bootargs-append = <span style="color: #ffa07a;">" clk_ignore_unused"</span>;
+        };
+
+};
+        &amp;soc {
+                pinctrl@0x01000000 {
+                        serial_0_pins: serial0_pinmux {
+                                mux {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio16"</span>, <span style="color: #ffa07a;">"gpio17"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"blsp_uart0"</span>;
+                                        bias-disable;
+                                };
+                        };
+
+                        led_0_pins: led0_pinmux {
+                                mux_1 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio36"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"led0"</span>;
+                                        bias-pull-down;
+                                };
+                                mux_2 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio40"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"led4"</span>;
+                                        bias-pull-down;
+                                };
+                        };
+
+                        serial_1_pins: serial1_pinmux {
+                                mux {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio8"</span>, <span style="color: #ffa07a;">"gpio9"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"blsp_uart1"</span>;
+                                        bias-disable;
+                                };
+                        };
+
+                        uart1_pins: uart1_pinmux {
+                                mux {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio8"</span>, <span style="color: #ffa07a;">"gpio9"</span>, <span style="color: #ffa07a;">"gpio10"</span>, <span style="color: #ffa07a;">"gpio11"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"blsp_uart1"</span>;
+                                        bias-disable;
+                                };
+                        };
+
+                        spi_0_pins: spi_0_pinmux {
+                                mux {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio12"</span>, <span style="color: #ffa07a;">"gpio13"</span>, <span style="color: #ffa07a;">"gpio14"</span>, <span style="color: #ffa07a;">"gpio15"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"blsp_spi0"</span>;
+                                        bias-disable;
+                                };
+                        };
+
+                        i2c_0_pins: i2c_0_pinmux {
+                                mux {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio20"</span>, <span style="color: #ffa07a;">"gpio21"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"blsp_i2c0"</span>;
+                                        bias-disable;
+                                };
+                        };
+                        sd_0_pins: sd_0_pinmux {
+                                sd0 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio23"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"sdio0"</span>;
+                                        drive-strength = &lt;10&gt;;
+                                };
+                                sd1 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio24"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"sdio1"</span>;
+                                        drive-strength = &lt;10&gt;;
+                                };
+                                sd2 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio25"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"sdio2"</span>;
+                                        drive-strength = &lt;10&gt;;
+                                };
+                                sd3 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio26"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"sdio3"</span>;
+                                        drive-strength = &lt;10&gt;;
+                                };
+                                sdclk {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio27"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"sdio_clk"</span>;
+                                        drive-strength = &lt;16&gt;;
+                                };
+                                sdcmd {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio28"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"sdio_cmd"</span>;
+                                        drive-strength = &lt;10&gt;;
+                                };
+                                sd4 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio29"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"sdio4"</span>;
+                                        drive-strength = &lt;10&gt;;
+                                };
+                                sd5 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio30"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"sdio5"</span>;
+                                        drive-strength = &lt;10&gt;;
+                                };
+                                sd6 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio31"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"sdio6"</span>;
+                                        drive-strength = &lt;10&gt;;
+                                };
+                                sd7 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio32"</span>;
+                                        <span style="color: #eedd82;">function</span> = <span style="color: #ffa07a;">"sdio7"</span>;
+                                        drive-strength = &lt;10&gt;;
+                                        bias-disable;
+                                };
+                        };
+                        ts_0_pins: ts_0_pinmux {
+                                mux_1 {
+                                        <span style="color: #eedd82;">pins</span> = <span style="color: #ffa07a;">"gpio34"</span>;
+                                        output-high;
+                                };
+                                mux_2 {
+                                        <span style="color: #eedd82;">pins</span>= <span style="color: #ffa07a;">"gpio35"</span>;
+                                        input-enable;
+                                        bias-pull-up;
+                                };
+                        };
+                };
+
+                serial@78af000 {
+                        pinctrl-0 = &lt;&amp;serial_0_pins&gt;;
+                        pinctrl-names = <span style="color: #ffa07a;">"default"</span>;
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                serial@78b0000 {
+                        pinctrl-0 = &lt;&amp;serial_1_pins&gt;;
+                        pinctrl-names = <span style="color: #ffa07a;">"default"</span>;
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                uart1:uart@78b0000 {
+                        pinctrl-0 = &lt;&amp;uart1_pins&gt;;
+                        pinctrl-1 = &lt;&amp;uart1_pins&gt;;
+                        pinctrl-names = <span style="color: #ffa07a;">"default"</span>, <span style="color: #ffa07a;">"sleep"</span>;
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+                };
+
+                spi_0: spi@78b5000 { /* BLSP1 QUP1 */
+                        pinctrl-0 = &lt;&amp;spi_0_pins&gt;;
+                        pinctrl-names = <span style="color: #ffa07a;">"default"</span>;
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+
+                        m25p80@0 {
+                                <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;1&gt;;</span>
+                                <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">size-cells = &lt;1&gt;;</span>
+                                <span style="color: #eedd82;">reg</span> = &lt;0&gt;;
+                                <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"n25q128a11"</span>;
+                                linux,<span style="color: #eedd82;">modalias</span> = <span style="color: #ffa07a;">"m25p80"</span>, <span style="color: #ffa07a;">"n25q128a11"</span>;
+                                spi-max-frequency = &lt;24000000&gt;;
+                                use-default-sizes;
+                        };
+                };
+
+                tcsr: tcsr@194b000 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                usb3_ss_phy: ssphy@0 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                dummy_ss_phy: ssphy@1 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                usb3_hs_phy: hsphy@a6000 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                usb2_hs_phy: hsphy@a8000 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                usb3: usb3@8a00000 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                usb2: usb2@6000000 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                i2c_0: i2c@78b7000 { /* BLSP1 QUP2 */
+                        pinctrl-0 = &lt;&amp;i2c_0_pins&gt;;
+                        pinctrl-1 = &lt;&amp;i2c_0_pins&gt;;
+                        pinctrl-names = <span style="color: #ffa07a;">"i2c_active"</span>, <span style="color: #ffa07a;">"i2c_sleep"</span>;
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+
+                        qca_codec: qca_codec@12 {
+                                <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,ipq40xx-codec"</span>;
+                                <span style="color: #eedd82;">reg</span> = &lt;0x12&gt;;
+                                <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+                        };
+
+                        lcd_ts: lcd_ts@40 {
+                                <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qca,gsl1680_ts"</span>;
+                                <span style="color: #eedd82;">reg</span> = &lt;0x40&gt;;
+                                <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+                        };
+                };
+
+                qcom_crypto: qcrypto@8e20000 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                qcom_cedev: qcedev@8e20000 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                };
+
+                pcie0: qcom,pcie@80000 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                        perst-gpio = &lt;&amp;tlmm 57 0&gt;;
+                        wake-gpio = &lt;&amp;tlmm 50 0&gt;;
+                        clkreq-gpio = &lt;&amp;tlmm 39 0&gt;;
+                };
+
+                qcom: ledc@1937000  {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                        pinctrl-0 = &lt;&amp;led_0_pins&gt;;
+                        pinctrl-names = <span style="color: #ffa07a;">"default"</span>;
+                };
+
+                ess-switch@c000000 {
+                        <span style="color: #eedd82;">switch_mac_mode</span> = &lt;0x0&gt;; /* mac mode for RGMII RMII */
+                        <span style="color: #eedd82;">switch_initvlas</span> = &lt;
+                                0x0007c 0x54 /* PORT0_STATUS */
+                        &gt;;
+                        led_source@0 {
+                                <span style="color: #eedd82;">source</span> = &lt;0x1&gt;;  /*source id 1 */
+                                <span style="color: #eedd82;">mode</span> = <span style="color: #ffa07a;">"normal"</span>; /*on,off,blink,normal */
+                                <span style="color: #eedd82;">speed</span> = <span style="color: #ffa07a;">"all"</span>;   /*10M,100M,1000M,all */
+                                <span style="color: #eedd82;">freq</span> = <span style="color: #ffa07a;">"auto"</span>;   /*2Hz,4Hz,8Hz,auto*/
+                        };
+                        led_source@1 {
+                                <span style="color: #eedd82;">source</span> = &lt;0x4&gt;;  /*source id 4 */
+                                <span style="color: #eedd82;">mode</span> = <span style="color: #ffa07a;">"normal"</span>; /*on,off,blink,normal */
+                                <span style="color: #eedd82;">speed</span> = <span style="color: #ffa07a;">"all"</span>;   /*10M,100M,1000M,all */
+                                <span style="color: #eedd82;">freq</span> = <span style="color: #ffa07a;">"auto"</span>;   /*2Hz,4Hz,8Hz,auto*/
+                        };
+                        led_source@2 {
+                                <span style="color: #eedd82;">source</span> = &lt;0x7&gt;;  /*source id 7 */
+                                <span style="color: #eedd82;">mode</span> = <span style="color: #ffa07a;">"normal"</span>; /*on,off,blink,normal */
+                                <span style="color: #eedd82;">speed</span> = <span style="color: #ffa07a;">"all"</span>;   /*10M,100M,1000M,all */
+                                <span style="color: #eedd82;">freq</span> = <span style="color: #ffa07a;">"auto"</span>;   /*2Hz,4Hz,8Hz,auto*/
+                        };
+                        led_source@3 {
+                                <span style="color: #eedd82;">source</span> = &lt;0xa&gt;;  /*source id 10 */
+                                <span style="color: #eedd82;">mode</span> = <span style="color: #ffa07a;">"normal"</span>; /*on,off,blink,normal */
+                                <span style="color: #eedd82;">speed</span> = <span style="color: #ffa07a;">"all"</span>;   /*10M,100M,1000M,all */
+                                <span style="color: #eedd82;">freq</span> = <span style="color: #ffa07a;">"auto"</span>;   /*2Hz,4Hz,8Hz,auto*/
+                        };
+                        led_source@4 {
+                                <span style="color: #eedd82;">source</span> = &lt;0xd&gt;;  /*source id 13 */
+                                <span style="color: #eedd82;">mode</span> = <span style="color: #ffa07a;">"normal"</span>; /*on,off,blink,normal */
+                                <span style="color: #eedd82;">speed</span> = <span style="color: #ffa07a;">"all"</span>;   /*10M,100M,1000M,all */
+                                <span style="color: #eedd82;">freq</span> = <span style="color: #ffa07a;">"auto"</span>;   /*2Hz,4Hz,8Hz,auto*/
+                        };
+                };
+
+                vccq_sd0: regulator@0 {
+                        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,regulator-ipq40xx"</span>;
+                        regulator-name = <span style="color: #ffa07a;">"SD0 VccQ"</span>;
+                        regulator-min-microvolt = &lt;1800000&gt;;
+                        regulator-max-microvolt = &lt;3000000&gt;;
+                        <span style="color: #eedd82;">states</span> = &lt;3000000 0x3
+                                1800000 0x1&gt;;
+                        <span style="color: #eedd82;">reg</span> = &lt;0x01948000 0x4&gt;;
+                        <span style="color: #eedd82;">mask</span> = &lt;0x3&gt;;
+                };
+
+                sdhci@7824000 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"ok"</span>;
+                        pinctrl-0 = &lt;&amp;sd_0_pins&gt;;
+                        pinctrl-names = <span style="color: #ffa07a;">"default"</span>;
+                        vqmmc-supply = &lt;&amp;vccq_sd0&gt;;
+                        cd-gpios = &lt;&amp;tlmm 22 0x1&gt;;
+                        sd-ldo-gpios = &lt;&amp;tlmm 33 0x1&gt;;
+                };
+
+                qcom,nand@7980000 {
+                        <span style="color: #eedd82;">status</span> = <span style="color: #ffa07a;">"disabled"</span>;
+                };
+
+                gpio_keys {
+                        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"gpio-keys"</span>;
+
+                        button@1 {
+                                <span style="color: #eedd82;">label</span> = <span style="color: #ffa07a;">"wps"</span>;
+                                linux,<span style="color: #eedd82;">code</span> = &lt;KEY_WPS_BUTTON&gt;;
+                                <span style="color: #eedd82;">gpios</span> = &lt;&amp;tlmm 18 GPIO_ACTIVE_LOW&gt;;
+                                linux,input-type = &lt;1&gt;;
+                        };
+                };
+
+        };
+</pre>
+</div>
 </div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2016-12-12 Mon 22:21</p>
+<p class="date">Created: 2016-12-14 Wed 22:19</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
