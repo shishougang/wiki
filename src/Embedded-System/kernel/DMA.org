@@ -111,6 +111,92 @@ complex and relatively expensive.
             |       |             |      |
             +-------+             +------+
 #+end_src
+* Cache Coherency[fn:5]
+On processors with a data cache an unwanted side effect of using DMA
+is the possibility that the contents of the cache are no longer
+coherent with respect to main memory which can lead to data corruption
+problems. As with any memory corruption problem, these are notoriously
+difficult to track down because the behaviour of the system may not be
+predictable.
+
+The problem occurs when a DMA transfer changes the contents of main
+memory that has been cached by the processor. The data stored in the
+cache will be the previous value. However, when the cache is flushed
+the stale data will be written back to the main memory overwriting the
+new data stored by the DMA.  The end result is that the data in main
+memory is not correct.
+
+A similar problem can also occur with transfers from main memory. If a
+cached memory location is updated by the processor the new value in
+the cache will be different to the value in main memory until the
+cache is flushed. If a DMA transfer is initiated from main memory the
+stale data will be transferred instead of the data updated by the
+processor.
+
+Some system hardware designs include a mechanism called bus snooping
+or cache snooping; the snooping hardware notices when an external DMA
+transfer refers to main memory using an address that matches data in
+the cache, and either flushes/invalidates the cache entry or
+“redirects” the transfer so that the DMA transfers the correct data
+and the state of the cache entry is updated accordingly.  In systems
+with snooping, DMA drivers don’t have to worry about cache coherency.
+
+The second solution is for the device driver software to explicitly
+flush or invalidate the data cache (depending on the transfer
+direction) before initiating a transfer or making data buffers
+available to bus mastering peripherals. This can also complicate the
+software and will cause more transfers between cache and main memory
+but it does allow the application to use any arbitrary region of
+cached memory as a data buffer.
+
+* Buffer Alignment
+It is not unusual to find that DMA hardware needs data buffers or
+control structures to be located in memory at specific address
+boundaries (multiples of 8, 16, 32, etc). This simplifies the hardware
+design particularly when data is transferred in burst mode.
+
+If the device driver is responsible for allocating the data buffers
+this is not normally a problem as there are standard routines, such as
+memalign(), that return memory aligned to a given address boundary. If
+the application is providing the buffer it may not be correctly
+aligned for the device. Other than forcing the application to using
+strictly aligned buffers, there are two possible solutions to this
+sort of problem, with different levels of complexity.
+
+The simplest solution is to copy the data from the misaligned user
+buffer into a temporary buffer that is accessed during the DMA
+operation. However, depending on the size of the data buffer and the
+frequency of the data transfer this solution could add significant
+extra processing effort and reduce any performance gains from using
+DMA in the first place.
+
+Another solution is to transfer the misaligned part of the buffer
+using programmed I/O. The remaining data in the buffer will then be
+correctly aligned for the hardware and can be transferred using DMA.
+The hardware may also require the DMA transfer count (buffer size) to
+be an integer multiple of the burst size. If this is the case the
+software must also transfer any remainder using programmed I/O.
+
+The simple solution to this problem is to ensure that buffers used for
+DMA are multiples of the cache line size (typically 32 or 64 bytes)
+and are aligned to a cache-line size boundary.
+
+* Debugging problems with DMA
+Dedicated DMA controllers and other DMA capable devices will usually
+provide status registers and error interrupts that can inform software
+if an error occurs. The status registers may give the transfer count,
+source address and destination address when the error occurred. There
+may also be bus-specific protocol registers that might show if the DMA
+transfer terminated because of a bus error, for example due to a
+misaligned access.
+
+Bus analysers are also very useful tools for tracking down DMA errors.
+They can show what is happening on the address and data bus between
+the processor and the peripheral.  They can also be set up to trigger
+and capture transactions that occur outside expected address windows
+on the bus, which helps to limit the amount of data captured and
+needing analysis.
+
 * PCI初始话DMA实例
 以上是硬件实现DMA和DMA硬件传输模式的一些细节，仅做了解和参考。这里以
 PCI为例，看设备如何初始化DMA，为之后操作做准备。
@@ -345,3 +431,5 @@ Summarize as follows:
 [fn:3] https://www.kernel.org/doc/Documentation/DMA-API.txt
 
 [fn:4] https://www.kernel.org/doc/Documentation/DMA-API-HOWTO.txt
+
+[fn:5] http://www.pebblebay.com/a-guide-to-using-direct-memory-access-in-embedded-systems-part-two/
