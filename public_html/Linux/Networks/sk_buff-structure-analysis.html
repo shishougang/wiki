@@ -4,166 +4,14 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>socket buffer结构解析</title>
-<!-- 2015-03-05 Thu 23:20 -->
+<!-- 2017-01-19 Thu 00:26 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
-<style type="text/css">
- <!--/*--><![CDATA[/*><!--*/
-  .title  { text-align: center; }
-  .todo   { font-family: monospace; color: red; }
-  .done   { color: green; }
-  .tag    { background-color: #eee; font-family: monospace;
-            padding: 2px; font-size: 80%; font-weight: normal; }
-  .timestamp { color: #bebebe; }
-  .timestamp-kwd { color: #5f9ea0; }
-  .right  { margin-left: auto; margin-right: 0px;  text-align: right; }
-  .left   { margin-left: 0px;  margin-right: auto; text-align: left; }
-  .center { margin-left: auto; margin-right: auto; text-align: center; }
-  .underline { text-decoration: underline; }
-  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
-  p.verse { margin-left: 3%; }
-  pre {
-    border: 1px solid #ccc;
-    box-shadow: 3px 3px 3px #eee;
-    padding: 8pt;
-    font-family: monospace;
-    overflow: auto;
-    margin: 1.2em;
-  }
-  pre.src {
-    position: relative;
-    overflow: visible;
-    padding-top: 1.2em;
-  }
-  pre.src:before {
-    display: none;
-    position: absolute;
-    background-color: white;
-    top: -10px;
-    right: 10px;
-    padding: 3px;
-    border: 1px solid black;
-  }
-  pre.src:hover:before { display: inline;}
-  pre.src-sh:before    { content: 'sh'; }
-  pre.src-bash:before  { content: 'sh'; }
-  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
-  pre.src-R:before     { content: 'R'; }
-  pre.src-perl:before  { content: 'Perl'; }
-  pre.src-java:before  { content: 'Java'; }
-  pre.src-sql:before   { content: 'SQL'; }
-
-  table { border-collapse:collapse; }
-  caption.t-above { caption-side: top; }
-  caption.t-bottom { caption-side: bottom; }
-  td, th { vertical-align:top;  }
-  th.right  { text-align: center;  }
-  th.left   { text-align: center;   }
-  th.center { text-align: center; }
-  td.right  { text-align: right;  }
-  td.left   { text-align: left;   }
-  td.center { text-align: center; }
-  dt { font-weight: bold; }
-  .footpara:nth-child(2) { display: inline; }
-  .footpara { display: block; }
-  .footdef  { margin-bottom: 1em; }
-  .figure { padding: 1em; }
-  .figure p { text-align: center; }
-  .inlinetask {
-    padding: 10px;
-    border: 2px solid gray;
-    margin: 10px;
-    background: #ffffcc;
-  }
-  #org-div-home-and-up
-   { text-align: right; font-size: 70%; white-space: nowrap; }
-  textarea { overflow-x: auto; }
-  .linenr { font-size: smaller }
-  .code-highlighted { background-color: #ffff00; }
-  .org-info-js_info-navigation { border-style: none; }
-  #org-info-js_console-label
-    { font-size: 10px; font-weight: bold; white-space: nowrap; }
-  .org-info-js_search-highlight
-    { background-color: #ffff00; color: #000000; font-weight: bold; }
-  /*]]>*/-->
-</style>
 <link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
 <link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
 <link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
 <script src="assets/js/bootstrap.min.js"></script>
-
-<script type="text/javascript" src="assets/js/org-info.js">
-/**
- *
- * @source: assets/js/org-info.js
- *
- * @licstart  The following is the entire license notice for the
- *  JavaScript code in assets/js/org-info.js.
- *
- * Copyright (C) 2012-2013 Free Software Foundation, Inc.
- *
- *
- * The JavaScript code in this tag is free software: you can
- * redistribute it and/or modify it under the terms of the GNU
- * General Public License (GNU GPL) as published by the Free Software
- * Foundation, either version 3 of the License, or (at your option)
- * any later version.  The code is distributed WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
- *
- * As additional permission under GNU GPL version 3 section 7, you
- * may distribute non-source (e.g., minimized or compacted) forms of
- * that code without the copy of the GNU GPL normally required by
- * section 4, provided you include this license notice and a URL
- * through which recipients can access the Corresponding Source.
- *
- * @licend  The above is the entire license notice
- * for the JavaScript code in assets/js/org-info.js.
- *
- */
-</script>
-
-<script type="text/javascript">
-
-/*
-@licstart  The following is the entire license notice for the
-JavaScript code in this tag.
-
-Copyright (C) 2012-2013 Free Software Foundation, Inc.
-
-The JavaScript code in this tag is free software: you can
-redistribute it and/or modify it under the terms of the GNU
-General Public License (GNU GPL) as published by the Free Software
-Foundation, either version 3 of the License, or (at your option)
-any later version.  The code is distributed WITHOUT ANY WARRANTY;
-without even the implied warranty of MERCHANTABILITY or FITNESS
-FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
-
-As additional permission under GNU GPL version 3 section 7, you
-may distribute non-source (e.g., minimized or compacted) forms of
-that code without the copy of the GNU GPL normally required by
-section 4, provided you include this license notice and a URL
-through which recipients can access the Corresponding Source.
-
-
-@licend  The above is the entire license notice
-for the JavaScript code in this tag.
-*/
-
-<!--/*--><![CDATA[/*><!--*/
-org_html_manager.set("TOC_DEPTH", "2");
-org_html_manager.set("LINK_HOME", "");
-org_html_manager.set("LINK_UP", "");
-org_html_manager.set("LOCAL_TOC", "0");
-org_html_manager.set("VIEW_BUTTONS", "0");
-org_html_manager.set("MOUSE_HINT", "#dddddd");
-org_html_manager.set("FIXED_TOC", "0");
-org_html_manager.set("TOC", "0");
-org_html_manager.set("VIEW", "showall");
-org_html_manager.setup();  // activate after the parameters are set
-/*]]>*///-->
-</script>
 <script type="text/javascript">
 /*
 @licstart  The following is the entire license notice for the
@@ -240,12 +88,24 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3-12"><code>protocol</code></a></li>
 </ul>
 </li>
-<li><a href="#sec-4">reference</a>
+<li><a href="#sec-4">Details of how SKB work</a>
 <ul>
-<li><a href="#sec-4-1"><code>__alloc_skb</code></a></li>
-<li><a href="#sec-4-2"><code>__kfree_skb</code></a></li>
-<li><a href="#sec-4-3"><code>skb_realloc_headroom</code></a></li>
-<li><a href="#sec-4-4">transport/network/mac</a></li>
+<li><a href="#sec-4-1">the layout of the SKB data area</a></li>
+<li><a href="#sec-4-2"><code>alloc_skb</code></a></li>
+<li><a href="#sec-4-3"><code>skb_reserve</code></a></li>
+<li><a href="#sec-4-4"><code>skb_put</code></a></li>
+<li><a href="#sec-4-5">push the UDP header to the front of the SKB</a></li>
+<li><a href="#sec-4-6">push the IPv4 header to the front of the SKB</a></li>
+<li><a href="#sec-4-7">paged data</a></li>
+<li><a href="#sec-4-8">two helper routines</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">reference</a>
+<ul>
+<li><a href="#sec-5-1"><code>__alloc_skb</code></a></li>
+<li><a href="#sec-5-2"><code>__kfree_skb</code></a></li>
+<li><a href="#sec-5-3"><code>skb_realloc_headroom</code></a></li>
+<li><a href="#sec-5-4">transport/network/mac</a></li>
 </ul>
 </li>
 </ul>
@@ -926,12 +786,439 @@ protocol,传递到相应的协议处理函数中去.
 </div>
 </div>
 </div>
+
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">reference</h2>
+<h2 id="sec-4">Details of how SKB work<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
 <div class="outline-text-2" id="text-4">
 </div><div id="outline-container-sec-4-1" class="outline-3">
-<h3 id="sec-4-1"><code>__alloc_skb</code></h3>
+<h3 id="sec-4-1">the layout of the SKB data area</h3>
 <div class="outline-text-3" id="text-4-1">
+
+<div class="figure">
+<p><img src="./Files/skb_layout.png" alt="skb_layout.png" />
+</p>
+</div>
+
+<p>
+This first diagram illustrates the layout of the SKB data area and
+where in that area the various pointers in <code>struct sk_buff</code> point.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2"><code>alloc_skb</code></h3>
+<div class="outline-text-3" id="text-4-2">
+
+<div class="figure">
+<p><img src="./Files/skb_fresh.png" alt="skb_fresh.png" />
+</p>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c">skb = alloc_skb(len, GFP_KERNEL);
+</pre>
+</div>
+
+<p>
+This is what a new SKB looks like right after you allocate it using
+<code>alloc_skb()</code>.
+</p>
+
+<p>
+As you can see, the head, data, and tail pointers all point to the
+beginning of the data buffer. And the end pointer points to the end of
+it. Note that all of the data area is considered tail room.
+</p>
+
+<p>
+The length of this SKB is zero, it isn't very interesting since it
+doesn't contain any packet data at all. Let's reserve some space for
+protocol headers using <code>skb_reserve()</code>.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3"><code>skb_reserve</code></h3>
+<div class="outline-text-3" id="text-4-3">
+
+<div class="figure">
+<p><img src="./Files/skb_after_reserve.png" alt="skb_after_reserve.png" />
+</p>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c">skb_reserve(skb, header_len);
+</pre>
+</div>
+
+<p>
+This is what a new SKB looks like right after the <code>skb_reserve()</code> call.
+</p>
+
+<p>
+Typically, when building output packets, we reserve enough bytes for
+the maximum amount of header space we think we'll need. Most IPV4
+protocols can do this by using the socket value
+<code>sk-&gt;sk_prot-&gt;max_header</code>.
+</p>
+
+<p>
+When setting up receive packets that an ethernet device will DMA into,
+we typically call skb<sub>reserve</sub>(skb, <code>NET_IP_ALIGN)</code>. By default
+<code>NET_IP_ALIGN</code> is defined to '2'. This makes it so that, after the
+ethernet header, the protocol header will be aligned on at least a
+4-byte boundary. Nearly all of the IPV4 and IPV6 protocol processing
+assumes that the headers are properly aligned.
+</p>
+
+<p>
+Let's now add some user data to the packet.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4"><code>skb_put</code></h3>
+<div class="outline-text-3" id="text-4-4">
+
+<div class="figure">
+<p><img src="./Files/skb_after_user_put.png" alt="skb_after_user_put.png" />
+</p>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">data</span> = skb_put(skb, user_data_len);
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">err</span> = 0;
+skb-&gt;csum = csum_and_copy_from_user(user_pointer, data,
+                                    user_data_len, 0, &amp;err);
+<span style="color: #00ffff;">if</span> (err)
+  <span style="color: #00ffff;">goto</span> <span style="color: #7fffd4;">user_fault</span>;
+</pre>
+</div>
+<p>
+This is what a new SKB looks like right after the user data is added.
+</p>
+
+<p>
+<code>skb_put()</code> advances <code>skb-&gt;tail</code> by the specified number of bytes, it
+also increments <code>skb-&gt;len</code> by that number of bytes as well. This
+routine must not be called on a SKB that has any paged data. You must
+also be sure that there is enough tail room in the SKB for the amount
+of bytes you are trying to put. Both of these conditions are checked
+for by <code>skb_put()</code> and an assertion failure will trigger if either rule
+is violated.
+</p>
+
+<p>
+The computed checksum is remembered in <code>skb-&gt;csum</code>. Now, it's time to
+build the protocol headers. We'll build a UDP header, then one for
+IPV4.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-5" class="outline-3">
+<h3 id="sec-4-5">push the UDP header to the front of the SKB</h3>
+<div class="outline-text-3" id="text-4-5">
+
+<div class="figure">
+<p><img src="./Files/skb_after_udp_push.png" alt="skb_after_udp_push.png" />
+</p>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">inet_sock</span> *<span style="color: #eedd82;">inet</span> = inet_sk(sk);
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">flowi</span> *<span style="color: #eedd82;">fl</span> = &amp;inet-&gt;cork.fl;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">udphdr</span> *<span style="color: #eedd82;">uh</span>;
+
+skb-&gt;h.raw = skb_push(skb, <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">udphdr</span>));
+uh = skb-&gt;h.uh
+    uh-&gt;source = fl-&gt;fl_ip_sport;
+uh-&gt;dest = fl-&gt;fl_ip_dport;
+uh-&gt;len = htons(user_data_len);
+uh-&gt;check = 0;
+skb-&gt;csum = csum_partial((<span style="color: #98fb98;">char</span> *)uh,
+                         <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">udphdr</span>), skb-&gt;csum);
+uh-&gt;check = csum_tcpudp_magic(fl-&gt;fl4_src, fl-&gt;fl4_dst,
+                              user_data_len, IPPROTO_UDP, skb-&gt;csum);
+<span style="color: #00ffff;">if</span> (uh-&gt;check == 0)
+  uh-&gt;check = -1;
+</pre>
+</div>
+
+<p>
+This is what a new SKB looks like after we push the UDP header to the
+front of the SKB.
+</p>
+
+<p>
+<code>skb_push()</code> will decrement the <code>skb-&gt;data</code> pointer by the specified
+number of bytes. It will also increment <code>skb-&gt;len</code> by that number of
+bytes as well. The caller must make sure there is enough head room for
+the push being performed. This condition is checked for by <code>skb_push()</code>
+and an assertion failure will trigger if this rule is violated.
+</p>
+
+<p>
+Now, it's time to tack on an IPV4 header.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4-6" class="outline-3">
+<h3 id="sec-4-6">push the IPv4 header to the front of the SKB</h3>
+<div class="outline-text-3" id="text-4-6">
+
+<div class="figure">
+<p><img src="./Files/skb_after_ip_push.png" alt="skb_after_ip_push.png" />
+</p>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">rtable</span> *<span style="color: #eedd82;">rt</span> = inet-&gt;cork.rt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">iphdr</span> *<span style="color: #eedd82;">iph</span>;
+
+skb-&gt;nh.raw = skb_push(skb, <span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">iphdr</span>));
+iph = skb-&gt;nh.iph;
+iph-&gt;version = 4;
+iph-&gt;ihl = 5;
+iph-&gt;tos = inet-&gt;tos;
+iph-&gt;tot_len = htons(skb-&gt;len);
+iph-&gt;frag_off = 0;
+iph-&gt;id = htons(inet-&gt;id++);
+iph-&gt;ttl = ip_select_ttl(inet, &amp;rt-&gt;u.dst);
+iph-&gt;protocol = sk-&gt;sk_protocol; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">IPPROTO_UDP in this case </span><span style="color: #ff7f24;">*/</span>
+iph-&gt;saddr = rt-&gt;rt_src;
+iph-&gt;daddr = rt-&gt;rt_dst;
+ip_send_check(iph);
+
+skb-&gt;priority = sk-&gt;sk_priority;
+skb-&gt;dst = dst_clone(&amp;rt-&gt;u.dst);
+</pre>
+</div>
+
+<p>
+This is what a new SKB looks like after we push the IPv4 header to the
+front of the SKB.
+</p>
+
+<p>
+Just as above for UDP, <code>skb_push()</code> decrements <code>skb-&gt;data</code> and
+increments <code>skb-&gt;len</code>. We update the <code>skb-&gt;nh.raw</code> pointer to the
+beginning of the new space, and build the IPv4 header.
+</p>
+
+<p>
+This packet is basically ready to be pushed out to the device once we
+have the necessary information to build the ethernet header (from the
+generic neighbour layer and ARP).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4-7" class="outline-3">
+<h3 id="sec-4-7">paged data</h3>
+<div class="outline-text-3" id="text-4-7">
+<p>
+Things start to get a little bit more complicated once paged data
+begins to be used. For the most part the ability to use <code>[page,
+offset, len]</code> tuples for SKB data came about so that file system file contents
+could be directly sent over a socket. But, as it turns out, it is
+sometimes beneficial to use this for normal buffering of process
+<code>sendmsg()</code> data.
+</p>
+
+<p>
+It must be understood that once paged data starts to be used on an
+SKB, this puts a <b>specific restriction</b> on all future SKB data area
+operations. In particular, it is no longer possible to do <code>skb_put()</code>
+operations.
+</p>
+
+<p>
+We will now mention that there are actually <b>two length variables</b>
+assosciated with an SKB, <code>len</code> and <code>data_len</code>. The latter only comes into
+play when there is paged data in the SKB. <code>skb-&gt;data_len</code> tells <b>how
+many bytes of paged data there are in the SKB</b>. From this we can derive a
+few more things:
+</p>
+
+<ul class="org-ul">
+<li>The <b>existence of paged data</b> in an SKB is indicated by <code>skb-&gt;data_len</code>
+being non-zero. This is codified in the helper routine
+<code>skb_is_nonlinear()</code> so that it the function you should use to test
+this.
+</li>
+<li>The amount of <b>non-paged data</b> at <code>skb-&gt;data</code> can be calculated as
+<code>skb-&gt;len - skb-&gt;data_len</code>. Again, there is a helper routine already
+defined for this called <code>skb_headlen()</code> so please use that.
+</li>
+</ul>
+
+<p>
+The main abstraction is that, when there is paged data, the packet
+begins at <code>skb-&gt;data</code> for <code>skb_headlen(skb)</code> bytes, then continues on into
+the paged data area for <code>skb-&gt;data_len</code> bytes. That is why it is
+<b>illogical</b> to try and do an <code>skb_put(skb)</code> when there is paged data. You
+have to add data onto the end of the paged data area instead.
+</p>
+
+<p>
+Each chunk of <b>paged data</b> in an SKB is described by the following structure:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">skb_frag_struct</span> {
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">page</span> *<span style="color: #eedd82;">page</span>;
+        <span style="color: #98fb98;">__u16</span> <span style="color: #eedd82;">page_offset</span>;
+        <span style="color: #98fb98;">__u16</span> <span style="color: #eedd82;">size</span>;
+};
+</pre>
+</div>
+
+<p>
+There is a pointer to the page (which you must hold a proper reference
+to), the offset within the page where this chunk of paged data starts,
+and how many bytes are there.
+</p>
+
+<p>
+The paged frags are organized into an array in the <b>shared SKB area</b>,
+defined by this structure:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">MAX_SKB_FRAGS</span> (65536/PAGE_SIZE + 2)
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">skb_shared_info</span> {
+        <span style="color: #98fb98;">atomic_t</span> <span style="color: #eedd82;">dataref</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>    <span style="color: #eedd82;">nr_frags</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>  <span style="color: #eedd82;">tso_size</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>  <span style="color: #eedd82;">tso_segs</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span>  *<span style="color: #eedd82;">frag_list</span>;
+        <span style="color: #98fb98;">skb_frag_t</span>      <span style="color: #eedd82;">frags</span>[MAX_SKB_FRAGS];
+};
+</pre>
+</div>
+
+<p>
+The <code>nr_frags</code> member states how many frags there are active in the
+<code>frags[]</code> array. The <code>tso_size</code> and <code>tso_segs</code> is used to convey information
+to the device driver for TCP segmentation offload. The <code>frag_list</code> is
+used to maintain a chain of SKBs organized for fragmentation purposes,
+it is <b>not</b> used for maintaining paged data. And finally the <code>frags[]</code>
+holds the frag descriptors themselves.
+</p>
+
+<p>
+A helper routine is available to help you fill in page descriptors.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">skb_fill_page_desc</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>,
+                        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">page</span> *<span style="color: #eedd82;">page</span>,
+                        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">off</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>)
+</pre>
+</div>
+<p>
+This fills the i'th page vector to point to page at offset <code>off</code> of size
+<code>size</code>. It also updates the <code>nr_frags</code> member to be one past <code>i</code>.
+</p>
+
+<p>
+If you wish to simply extend an existing frag entry by some number of
+bytes, increment the <code>size</code> member by that amount.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4-8" class="outline-3">
+<h3 id="sec-4-8">two helper routines</h3>
+<div class="outline-text-3" id="text-4-8">
+<p>
+With all of the complications imposed by non-linear SKBs, it may seem
+difficult to inspect areas of a packet in a straightforward way, or to
+copy data out from a packet into another buffer. This is not the case.
+There are two helper routines available which make this pretty easy.
+</p>
+
+<p>
+First, we have:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> *<span style="color: #87cefa;">skb_header_pointer</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">offset</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">buffer</span>)
+</pre>
+</div>
+
+<p>
+You give it the SKB, the offset (in bytes) to the piece of data you
+are interested in, the number of bytes you want, and a local buffer
+which is to be used <b>only</b> if the data you are interested in resides
+in the non-linear data area.
+</p>
+
+<p>
+You are returned a pointer to the data item, or NULL if you asked for
+an invalid offset and len parameter. This pointer could be one of two
+things. First, if what you asked for is directly in the <code>skb-&gt;data</code>
+linear data area, you are given a direct pointer into there. Else, you
+are given the buffer pointer you passed in.
+</p>
+
+<p>
+Code inspecting packet headers on the output path, especially, should
+use this routine to read and interpret protocol headers. The netfilter
+layer uses this function heavily.
+</p>
+
+<p>
+For larger pieces of data other than protocol headers, it may be more
+appropriate to use the following helper routine instead.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">skb_copy_bits</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">offset</span>,
+                  <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">to</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span>);
+</pre>
+</div>
+
+<p>
+This will copy the specified number of bytes, and the specified
+offset, of the given SKB into the <code>to</code> buffer. This is used for copies
+of SKB data into kernel buffers, and therefore it is not to be used
+for copying SKB data into userspace. There is another helper routine
+for that:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">skb_copy_datagram_iovec</span>(<span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">from</span>,
+                            <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">offset</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">iovec</span> *<span style="color: #eedd82;">to</span>,
+                            <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">size</span>);
+</pre>
+</div>
+<p>
+Here, the user's data area is described by the given <code>IOVEC</code>. The other
+parameters are nearly identical to those passed in to <code>skb_copy_bits()</code>
+above.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">reference</h2>
+<div class="outline-text-2" id="text-5">
+</div><div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1"><code>__alloc_skb</code></h3>
+<div class="outline-text-3" id="text-5-1">
 <p>
 <a id="alloc_skb" name="alloc_skb"></a>
 </p>
@@ -1006,9 +1293,9 @@ protocol,传递到相应的协议处理函数中去.
 </div>
 </div>
 </div>
-<div id="outline-container-sec-4-2" class="outline-3">
-<h3 id="sec-4-2"><code>__kfree_skb</code></h3>
-<div class="outline-text-3" id="text-4-2">
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2"><code>__kfree_skb</code></h3>
+<div class="outline-text-3" id="text-5-2">
 <p>
 <a id="kfree_skb" name="kfree_skb"></a>
 </p>
@@ -1066,9 +1353,9 @@ protocol,传递到相应的协议处理函数中去.
 </div>
 </div>
 </div>
-<div id="outline-container-sec-4-3" class="outline-3">
-<h3 id="sec-4-3"><code>skb_realloc_headroom</code></h3>
-<div class="outline-text-3" id="text-4-3">
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3"><code>skb_realloc_headroom</code></h3>
+<div class="outline-text-3" id="text-5-3">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #87cefa;">skb_realloc_headroom</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sk_buff</span> *<span style="color: #eedd82;">skb</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">headroom</span>)
@@ -1092,9 +1379,9 @@ protocol,传递到相应的协议处理函数中去.
 </div>
 </div>
 </div>
-<div id="outline-container-sec-4-4" class="outline-3">
-<h3 id="sec-4-4">transport/network/mac</h3>
-<div class="outline-text-3" id="text-4-4">
+<div id="outline-container-sec-5-4" class="outline-3">
+<h3 id="sec-5-4">transport/network/mac</h3>
+<div class="outline-text-3" id="text-5-4">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">not NET_SKBUFF_DATA_USES_OFFSET </span><span style="color: #ff7f24;">*/</span>
@@ -1153,10 +1440,20 @@ protocol,传递到相应的协议处理函数中去.
 </div>
 </div>
 </div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://vger.kernel.org/~davem/skb_data.html">http://vger.kernel.org/~davem/skb_data.html</a>
+</p></div>
+
+
 </div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2015-03-05 Thu 23:20</p>
+<p class="date">Created: 2017-01-19 Thu 00:26</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
