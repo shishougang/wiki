@@ -1,0 +1,140 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Analyze Linux kernel crashes on the MIPS platform
+#+OPTIONS: num:nil H:2
+
+
+http://stablebits.blogspot.hk/?view=classic
+
+http://blog.csdn.net/jiankangshiye/article/details/34431597
+
+
+* Introduction[fn:1]
+The aim of this post is to illustrate the analysis of Linux kernel
+crashes by studying a few real-life examples. The examples are coming
+from a MIPS platform, but the general approach is applicable to other
+architectures.
+
+* Tools
+Any general purpose disassembler is sufficient. We'll use objdump with
+'-d' option here.
+
+If a binary was built with debugging information, objdump -S can
+display source code intermixed with disassembly [[objdump][1]]. Also, [[http://www.linuxcommand.org/man_pages/addr2line1.html][addr2line]]
+can be used to match addresses with source code file names and lines.
+
+In order to interpret disassembly, we need to have the [[http://www.mrc.uidaho.edu/mrc/people/jff/digital/MIPSir.html][MIPS
+Instruction Reference]] and the [[https://en.wikipedia.org/wiki/MIPS_architecture#Compiler_register_usage][Compiler Register Usage information]] at
+hand [[calling_convent][2]], so please keep these pages open while reading further material.
+
+If you are not familiar with how the virtual memory space is divided
+on MIPS, please refer to 'Virtual Memory Layout' [[virtual_mem][3]] in the last
+section.
+
+* Format of a crash report
+Here is an example of a crash report:
+#+begin_src sh
+CPU 0 Unable to handle kernel paging request at virtual address 00000000, epc == 8023afd0, ra == 8023b024
+Oops[#1]:
+Cpu 0
+$ 0 : 00000000 1000fc00 8555fc54 00000000
+$ 4 : 00000000 00000000 0000000b 00000001
+$ 8 : 00000008 800445f4 00000000 00000000
+$12 : 0000004f 0000004e 00000041 00000001
+$16 : 00000000 8555fc54 0000000b 8555fc54
+$20 : c01eded0 8555fbd0 80240000 7f7ff0c4
+$24 : 00000002 c01d6edc
+$28 : 8555e000 8555fab0 7f7ff0a0 8023b024
+Hi : 00000000
+Lo : 3b9aca00
+epc : 8023afd0 strlen+0x0/0x28
+    Tainted: PF
+ra : 8023b024 strlcpy+0x2c/0x7c
+Status: 1000fc04 IEp
+Cause : 00000008
+BadVA : 00000000
+PrId : 0000c401 (Fusiv MIPS1)
+Modules linked in: xt_CLASSIFY [ skipped proprietary (aka evil) modules ] ip6_tunnel tunnel6
+Process controllerd (pid: 751, threadinfo=8555e000, task=8783add8, tls=00000000)
+Stack : 1000fc01 7f7ff0d0 8008f4a4 7f7ff268 8555fc5f 8555fc54 8023aff8 80044500
+    c01d6cc8 c01d6ab8 000000a4 7f7ff0c4 00000000 80050000 00000000 c026ca78
+    c026ca78 8555fb18 8555fbd0 7f7ff0d0 7f7ff174 7f7ff0d0 7f7ff0c0 86458400
+    000000a4 c01d4440 80631224 8026d168 87008838 8026ca84 00000000 00000001
+    00000006 00000001 80631224 806312c0 1000fc01 fffffffe 805e5778 805e0000
+...
+Call Trace:
+[<8023afd0>] strlen+0x0/0x28
+[<8023b024>] strlcpy+0x2c/0x7c
+[<c01d6cc8>] contoller_get_info+0x2c4/0x37c [controller_lkm]
+[<c01d4440>] controller_init+0x3e0/0xa64 [controller_lkm]
+
+Code: 00000000  03e00008  01031023 <80820000> 0808ebfa  00801821 24630001  80620000  00000000
+#+end_src
+
+
+* Extra Details
+** objdump
+<<objdump>>
+'objdump -d' alone may be sufficient in many cases (not to mention all
+the fun of matching disassembly and source code on your own).
+Alternatively, you can reproduce the original binary (if possible)
+with debugging information enabled and then use'-dS'. Be careful
+though to double-check that the addresses you are interested in
+correspond to the same instructions in both original and new
+disassembly files. If it's not the case, code shifts/changes should be
+taken into account.
+** Calling conventions
+<<calling_convent>>
+Be sure to verify the options used by your toolchain, if in doubt. For
+gcc, '-mabi=type' options are used. For example, '-mabi=32'
+corresponds to =o32=.
+** Virtual Memory Layout on MIPS
+<<virtual_mem>>
+Please refer to [[http://www.johnloomis.org/microchip/pic32/memory/memory.html][MIPS Address Space]] for a general review.
+
+Regarding the use in Linux:
+
+1) =kuseg range [0x00000000, 0x80000000)= is user-space addresses.
+   A private address space of user-space processes resides in this
+   range. From kernel-space this area can be safely accessed only by
+   means of special-purpose functions, like =copy_to_user()= and
+   =copy_from_user()=. Direct accesses are always a bug, even though,
+   given the nature of MIPS's MMU, such accesses may appear to be
+   working properly under certain circumstances.
+
+2) =kseg0 range [0x80000000, 0xa0000000)= is kernel-space addresses
+   used by the kernel code and data (vmlinux).
+   Dynamic allocations via general purpose allocators, such as
+   =kmalloc()= and =__get_free_pages()= (but not from the =ZONE_HIGHMEM=
+   zone) return addresses in this range.
+
+3) =kseg2 range [0xc0000000, 0xffffffff)= is kernel-space addresses
+   used by the code and data of kernel modules.
+   =vmalloc()= and =vmap()= allocations return addresses in this range.
+
+For =kuseg= and =kseg2=, the translation of virtual addresses into
+physical ones is done via MMU. Conversely, =kseg0= addresses don't
+require MMU translations; the translation is done simply by stripping
+off the top-bit. For example, =0x80100000= corresponds to =0x00100000= (1
+MB) in RAM.
+
+=kseg0= ranges are both virtually and physically contiguous, while =kuseg=
+and =kseg2= are only virtually contiguous.
+
+* cc
+#+begin_src python
+
+#+end_src
+
+#+begin_src c++
+
+#+end_src
+
+
+#+begin_src sh
+
+#+end_src
+
+* Footnotes
+
+[fn:1] http://stablebits.blogspot.hk/?view=classic
+

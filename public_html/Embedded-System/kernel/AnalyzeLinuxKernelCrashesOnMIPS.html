@@ -1,0 +1,300 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Analyze Linux kernel crashes on the MIPS platform</title>
+<!-- 2017-01-24 Tue 00:42 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Analyze Linux kernel crashes on the MIPS platform</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Introduction</a></li>
+<li><a href="#sec-2">Tools</a></li>
+<li><a href="#sec-3">Format of a crash report</a></li>
+<li><a href="#sec-4">Extra Details</a>
+<ul>
+<li><a href="#sec-4-1">objdump</a></li>
+<li><a href="#sec-4-2">Calling conventions</a></li>
+<li><a href="#sec-4-3">Virtual Memory Layout on MIPS</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">cc</a></li>
+</ul>
+</div>
+</div>
+<p>
+<a href="http://stablebits.blogspot.hk/?view=classic">http://stablebits.blogspot.hk/?view=classic</a>
+</p>
+
+<p>
+<a href="http://blog.csdn.net/jiankangshiye/article/details/34431597">http://blog.csdn.net/jiankangshiye/article/details/34431597</a>
+</p>
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Introduction<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-1">
+<p>
+The aim of this post is to illustrate the analysis of Linux kernel
+crashes by studying a few real-life examples. The examples are coming
+from a MIPS platform, but the general approach is applicable to other
+architectures.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Tools</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Any general purpose disassembler is sufficient. We'll use objdump with
+'-d' option here.
+</p>
+
+<p>
+If a binary was built with debugging information, objdump -S can
+display source code intermixed with disassembly <a href="#objdump">1</a>. Also, <a href="http://www.linuxcommand.org/man_pages/addr2line1.html">addr2line</a>
+can be used to match addresses with source code file names and lines.
+</p>
+
+<p>
+In order to interpret disassembly, we need to have the <a href="http://www.mrc.uidaho.edu/mrc/people/jff/digital/MIPSir.html">MIPS
+Instruction Reference</a> and the <a href="https://en.wikipedia.org/wiki/MIPS_architecture#Compiler_register_usage">Compiler Register Usage information</a> at
+hand <a href="#calling_convent">2</a>, so please keep these pages open while reading further material.
+</p>
+
+<p>
+If you are not familiar with how the virtual memory space is divided
+on MIPS, please refer to 'Virtual Memory Layout' <a href="#virtual_mem">3</a> in the last
+section.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Format of a crash report</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+Here is an example of a crash report:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">CPU 0 Unable to handle kernel paging request at virtual address 00000000, <span style="color: #eedd82;">epc</span> == 8023afd0, <span style="color: #eedd82;">ra</span> == 8023b024
+Oops[#1]:
+Cpu 0
+$ 0 : 00000000 1000fc00 8555fc54 00000000
+$ 4 : 00000000 00000000 0000000b 00000001
+$ 8 : 00000008 800445f4 00000000 00000000
+$<span style="color: #eedd82;">12</span> : 0000004f 0000004e 00000041 00000001
+$<span style="color: #eedd82;">16</span> : 00000000 8555fc54 0000000b 8555fc54
+$<span style="color: #eedd82;">20</span> : c01eded0 8555fbd0 80240000 7f7ff0c4
+$<span style="color: #eedd82;">24</span> : 00000002 c01d6edc
+$<span style="color: #eedd82;">28</span> : 8555e000 8555fab0 7f7ff0a0 8023b024
+Hi : 00000000
+Lo : 3b9aca00
+epc : 8023afd0 strlen+0x0/0x28
+    Tainted: PF
+ra : 8023b024 strlcpy+0x2c/0x7c
+Status: 1000fc04 IEp
+Cause : 00000008
+BadVA : 00000000
+PrId : 0000c401 (Fusiv MIPS1)
+Modules linked<span style="color: #00ffff;"> in</span>: xt_CLASSIFY [ skipped proprietary (aka evil) modules ] ip6_tunnel tunnel6
+Process controllerd (pid: 751, <span style="color: #eedd82;">threadinfo</span>=8555e000, <span style="color: #eedd82;">task</span>=8783add8, <span style="color: #eedd82;">tls</span>=00000000)
+Stack : 1000fc01 7f7ff0d0 8008f4a4 7f7ff268 8555fc5f 8555fc54 8023aff8 80044500
+    c01d6cc8 c01d6ab8 000000a4 7f7ff0c4 00000000 80050000 00000000 c026ca78
+    c026ca78 8555fb18 8555fbd0 7f7ff0d0 7f7ff174 7f7ff0d0 7f7ff0c0 86458400
+    000000a4 c01d4440 80631224 8026d168 87008838 8026ca84 00000000 00000001
+    00000006 00000001 80631224 806312c0 1000fc01 fffffffe 805e5778 805e0000
+...
+Call Trace:
+[&lt;8023afd0&gt;] strlen+0x0/0x28
+[&lt;8023b024&gt;] strlcpy+0x2c/0x7c
+[&lt;c01d6cc8&gt;] contoller_get_info+0x2c4/0x37c [controller_lkm]
+[&lt;c01d4440&gt;] controller_init+0x3e0/0xa64 [controller_lkm]
+
+Code: 00000000  03e00008  01031023 &lt;80820000&gt; 0808ebfa  00801821 24630001  80620000  00000000
+</pre>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Extra Details</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">objdump</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+<a id="objdump" name="objdump"></a>
+'objdump -d' alone may be sufficient in many cases (not to mention all
+the fun of matching disassembly and source code on your own).
+Alternatively, you can reproduce the original binary (if possible)
+with debugging information enabled and then use'-dS'. Be careful
+though to double-check that the addresses you are interested in
+correspond to the same instructions in both original and new
+disassembly files. If it's not the case, code shifts/changes should be
+taken into account.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">Calling conventions</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+<a id="calling_convent" name="calling_convent"></a>
+Be sure to verify the options used by your toolchain, if in doubt. For
+gcc, '-mabi=type' options are used. For example, '-mabi=32'
+corresponds to <code>o32</code>.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3">Virtual Memory Layout on MIPS</h3>
+<div class="outline-text-3" id="text-4-3">
+<p>
+<a id="virtual_mem" name="virtual_mem"></a>
+Please refer to <a href="http://www.johnloomis.org/microchip/pic32/memory/memory.html">MIPS Address Space</a> for a general review.
+</p>
+
+<p>
+Regarding the use in Linux:
+</p>
+
+<ol class="org-ol">
+<li><code>kuseg range [0x00000000, 0x80000000)</code> is user-space addresses.
+A private address space of user-space processes resides in this
+range. From kernel-space this area can be safely accessed only by
+means of special-purpose functions, like <code>copy_to_user()</code> and
+<code>copy_from_user()</code>. Direct accesses are always a bug, even though,
+given the nature of MIPS's MMU, such accesses may appear to be
+working properly under certain circumstances.
+</li>
+
+<li><code>kseg0 range [0x80000000, 0xa0000000)</code> is kernel-space addresses
+used by the kernel code and data (vmlinux).
+Dynamic allocations via general purpose allocators, such as
+<code>kmalloc()</code> and <code>__get_free_pages()</code> (but not from the <code>ZONE_HIGHMEM</code>
+zone) return addresses in this range.
+</li>
+
+<li><code>kseg2 range [0xc0000000, 0xffffffff)</code> is kernel-space addresses
+used by the code and data of kernel modules.
+<code>vmalloc()</code> and <code>vmap()</code> allocations return addresses in this range.
+</li>
+</ol>
+
+<p>
+For <code>kuseg</code> and <code>kseg2</code>, the translation of virtual addresses into
+physical ones is done via MMU. Conversely, <code>kseg0</code> addresses don't
+require MMU translations; the translation is done simply by stripping
+off the top-bit. For example, <code>0x80100000</code> corresponds to <code>0x00100000</code> (1
+MB) in RAM.
+</p>
+
+<p>
+<code>kseg0</code> ranges are both virtually and physically contiguous, while <code>kuseg</code>
+and <code>kseg2</code> are only virtually contiguous.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">cc</h2>
+<div class="outline-text-2" id="text-5">
+<div class="org-src-container">
+
+<pre class="src src-python"></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"></pre>
+</div>
+
+
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://stablebits.blogspot.hk/?view=classic">http://stablebits.blogspot.hk/?view=classic</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-01-24 Tue 00:42</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
