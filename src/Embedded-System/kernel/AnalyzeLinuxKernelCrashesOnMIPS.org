@@ -3,11 +3,6 @@
 #+OPTIONS: num:nil H:2
 
 
-http://stablebits.blogspot.hk/?view=classic
-
-http://blog.csdn.net/jiankangshiye/article/details/34431597
-
-
 * Introduction[fn:1]
 The aim of this post is to illustrate the analysis of Linux kernel
 crashes by studying a few real-life examples. The examples are coming
@@ -70,6 +65,653 @@ Call Trace:
 Code: 00000000  03e00008  01031023 <80820000> 0808ebfa  00801821 24630001  80620000  00000000
 #+end_src
 
+Let's review the parts one by one.
+#+begin_src sh
+CPU 0 Unable to handle kernel paging request at virtual address 00000000, epc == 8023afd0, ra == 8023b024
+Oops[#1]:
+#+end_src
+A header indicates a particular reason for this crash.
+
+On CPU #0 a load or store instruction at address epc accessed a
+virtual address =0x00000000=. There was no valid virtual to physical
+address translation available - hence, the crash. In the middle of the
+report the same virtual address is shown as:
+#+begin_src sh
+   BadVA : 00000000
+#+end_src
+
+=BadVA= is a *register* of the MIPS Coprocessor 0 that describes a
+memory address at which address exception occurred.
+#+begin_src sh
+Unable to handle kernel paging request
+#+end_src
+is by far one of the most common reasons for crashes. You may also
+encounter:
+#+begin_src sh
+Kernel bug detected
+#+end_src
+
+It is triggered by one of the sanity checks in the kernel code, such
+as =BUG()= or =BUG_ON(condition)=. This mechanism does what =assert()= does
+for user-space applications.
+
+Other reasons can be found by running =grep -rn die_if_kernel
+arch/mips/= in a Linux kernel tree.
+
+Further, the content of the registers is displayed.
+#+begin_src sh
+$ 0   : 00000000 1000fc00 8555fc54 00000000
+$ 4   : 00000000 00000000 0000000b 00000001
+[ ... ]
+$24   : 00000002 c01d6edc
+$28   : 8555e000 8555fab0 7f7ff0a0 8023b024
+Hi    : 00000000
+Lo    : 3b9aca00
+[ ... ]
+Status: 1000fc04    IEp
+Cause : 00000008
+#+end_src
+
+Registers =$0-31= are general purpose [[https://en.wikipedia.org/wiki/MIPS_instruction_set#Compiler_register_usage][MIPS registers]]. To simplify
+reading, each of them has a mnemonic name in assembler code. Now it's
+time to take a quick look at [[https://en.wikipedia.org/wiki/MIPS_instruction_set#Compiler_register_usage][Compiler Register Usage]]. For example,
+a0-3 correspond to =$4-7=, which are used in the [[https://en.wikipedia.org/wiki/Calling_convention#MIPS][o32 calling convention]]
+to pass the first 4 arguments to a function. =o32= is the most commonly
+used calling convention on 32bit MIPS [[calling_convent][2]] and our examples here relate
+to it.
+
+An ideal case is to have a complete dump of the memory used by the
+kernel. That would allow us to restore the environment - to see the
+content of local variables, various kernel data structures, etc. [[http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/kdump/kdump.txt?id=f4ba394c1b02e7fc2179fda8d3941a5b3b65efb6][Kdump]]
+can do this (no MIPS support at the moment). Nevertheless, in many
+cases the content of the registers alone reveals enough information to
+understand a problem.
+
+The content of [[http://www.doc.ic.ac.uk/lab/secondyear/spim/node10.html][Status and Cause registers]] may be very useful in some cases, but we won't consider them here.
+#+begin_src sh
+epc   : 8023afd0 strlen+0x0/0x28
+ra    : 8023b024 strlcpy+0x2c/0x7c
+#+end_src
+
+=epc= shows the address of the instruction that caused a crash. =ra ($31)=
+contains the *return address* from the last function called prior to a
+crash. In practice, =ra= usually points either to a caller of the
+function where =epc= belongs to or to the same function as =epc=. An
+invalid address in =ra= can indicate stack corruption (at least for
+non-leaf functions).
+
+Names of the functions where =epc= and =ra= belong to are displayed if the
+kernel was built with =CONFIG_KALLSYMS= enabled. In any case, these
+names can be located with =objdump=.
+
+The =+0x0/0x28= notation stands for =+offset/size=, where =offset= is the
+offset of the instruction within a function it belongs to, and =size= is
+the size of this function.
+
+In most cases, =ra= points to the 2nd instruction that follows an
+instruction representing a function call (usually =jal= or =jalr=). For
+example,
+#+begin_src sh
+801f9bb8 <pci_bus_read_config_byte>:
+  [...]
+  801f9c14:       02202821        move    a1,s1
+  801f9c18:       0040f809        jalr    v0
+  801f9c1c:       24070001        li      a3,1
+  801f9c20:       00408021        move    s0,v0
+  801f9c24:       8fa20018        lw      v0,24(sp)
+#+end_src
+A function call is at =0x801f9c18=. Control gets back to
+=pci_bus_read_config_byte= at =0x801f9c20=. =jalr= saves this address into
+=ra= before jumping to an address =v0= - *the start of a called
+function*.
+
+The instruction at =0x801f9c1c= is located in the *delay slot* of =jalr= and
+is executed before any instruction in the called function. Delay slots
+of =jalr= are often used to initialize one of the function arguments. If
+the called function above has at least 4 arguments, its 4th argument
+will be =1=.
+
+Branch instructions, like =bltz= (branch on less than zero), are another
+example of instructions with delay slots.
+
+We mentioned earlier that both =epc= and =ra= may point to the same
+function. To illustrate this case, let's suppose that a crash occurs
+at =0x801f9c24= in the above disassembly. Provided that a function call
+at =0x801f9c18= took place, =ra= would point to =0x801f9c20= inside the same
+function as =epc=.
+#+begin_src sh
+  Modules linked in: xt_CLASSIFY [ ... ] ip6_tunnel tunnel6
+#+end_src
+This is a list of loaded kernel modules.
+#+begin_src sh
+  Process controllerd (pid: 751, threadinfo=8555e000, task=8783add8, tls=00000000)
+#+end_src
+This is information about a process that was running at the moment of a crash.
+
+In an ideal world where kernels and, especially, kernel modules behave
+well, user-space actions can never trigger a kernel crash. No matter
+what these actions are. Kernel-mode tasks have full privileges to
+cause havoc though.
+
+A user-space task appears here in one of the following cases:
++ it has triggered a kernel action (usually via a system call like
+  =ioctl()=) that, due to a kernel bug or memory corruption, results in
+  a crash.
++ a crash has occurred in the interrupt context. Unless your kernel
+  supports threaded interrupt handlers (i.e. interrupts are handled by
+  dedicated threads) or separate interrupt stacks, the kernel-space
+  stack of a current task is used by the interrupt handling code. The
+  displayed task is usually unrelated in this case.
+
+#+begin_src sh
+  Stack : 1000fc01 7f7ff0d0 8008f4a4 7f7ff268 8555fc5f 8555fc54 8023aff8 80044500
+          [ ... ]
+          00000006 00000001 80631224 806312c0 1000fc01 fffffffe 805e5778 805e0000
+         ...
+#+end_src
+This is a partial dump of the kernel-space stack of the current task,
+which we have discussed in the previous section.
+
+#+begin_src sh
+Call Trace:
+  [<8023afd0>] strlen+0x0/0x28
+  [<8023b024>] strlcpy+0x2c/0x7c
+  [<c01d6cc8>] controller_get_info+0x2c4/0x37c [controller_lkm]
+  [<c01d4440>] controller_init+0x3e0/0xa64 [controller_lkm]
+  [ ... ]
+#+end_src
+As the name suggests, this is a *call trace*.
+
+It does not always represent a genuine call trace though. When =epc=
+points to an invalid address on MIPS or =raw_show_trace= is enabled in
+the kernel command line, the so-called raw call trace is displayed. It
+contains all the values from stack that look like valid return
+addresses. So there can be 'ghost' traces of previously run and
+completely unrelated functions. For curious readers, the
+implementation of both methods is in =show_backtrace()= and
+=show_raw_backtrace()= in =arch/mips/kernel/traps.c=.
+#+begin_src sh
+  Code: 00000000  03e00008  01031023 <80820000> 0808ebfa  00801821 24630001  80620000  00000000
+#+end_src
+
+Finally, this last section displays a sequence of instructions (binary
+representation) at and around =epc=, with the instruction at =epc= being
+indicated by <> symbols.
+
+* Analysis
+** Simple crash to learn the basics
+Let's now analyze the crash that was used as an example in the
+previous section.
+#+begin_src sh
+  CPU 0 Unable to handle kernel paging request at virtual address 00000000, epc == 8023afd0, ra == 8023b024
+  [...]
+  epc   : 8023afd0 strlen+0x0/0x28
+  ra    : 8023b024 strlcpy+0x2c/0x7c
+#+end_src
+
+The kernel was built with =CONFIG_KALLSYMS= enabled, and that allows us
+to see the names of functions where the instruction at =epc= and =ra=
+belong to. If it was not the case, we may note that both =epc= and =ra=
+belong to =kseg0= [[virtual_mem][3]], so we may expect to find them inside the kernel
+image (=vmlinux=).
+
+A quick sanity check for ra (recall that property of =ra= we mentioned
+above):
+
+#+begin_src sh
+ 8023aff8 <strlcpy>:
+  [...]
+  8023b018:       afbf0020        sw      ra,32(sp)
+  8023b01c:       0c08ebf4        jal     8023afd0 <strlen>
+  8023b020:       00a08021        move    s0,a1
+  8023b024:       00408821        move    s1,v0                  <=== 'ra' points to this location
+  [...]
+#+end_src
+
+=ra= is indeed one instruction away (delay slot) from =jal=. It's also
+clear that a function being called is =strlen()=. In cases when the
+address of a called function is not known at build time (kernel
+modules), disassembly may look as follows:
+#+begin_src sh
+  b6d38:        3c020000        lui     v0,0x0
+  b6d3c:        24420000        addiu   v0,v0,0
+  b6d40:        0040f809        jalr    v0 
+#+end_src
+The first 2 instructions are changed by the loader at run time. In
+such cases, don't get confused when disassembly and the Code: sequence
+of a crash dump display different instructions at the same address.
+Usually, there is a remote resemblance though. For instance, the
+instructions above might have been changed as follows:
+#+begin_src sh
+  b6d38:        3c02804a        lui     v0,0x804a
+  b6d3c:        2442346c        addiu   v0,v0,13420
+#+end_src
+This basically corresponds to =v0 = 0x804a346c=.
+
+For =epc=,
+#+begin_src sh
+  8023afd0 <strlen>:
+  8023afd0:       80820000        lb      v0,0(a0)               <=== 'epc' is here
+  8023afd4:       0808ebfa        j       8023afe8 <strlen+0x18>
+
+  8023afd8:       00801821        move    v1,a0
+  8023afdc:       24630001        addiu   v1,v1,1
+  [...]
+#+end_src
+we may make the following observations:
++ it's indeed the first instruction (=offset 0x0=) of =strlen()=;
++ =a0 ($4)= is indeed 0. The instruction at =epc= loads a byte from
+  address =MEM[a0 + 0]= and =BadVA= is reported to be 0. Hence, =a0= should
+  have been 0 too.
+  #+begin_src sh
+    $ 4   : 00000000 [...]
+  #+end_src
++ The instructions from disassembly match the ones shown in the Code:
+  sequence.
+  #+begin_src sh
+    Code: [...] <80820000> 0808ebfa  00801821 24630001  80620000  00000000
+  #+end_src
+These checks can be also applied as sanity checks to ensure you have
+got the right image for disassembly.
+
+Now, =a0= is supposed to hold the 1st (and only) argument of =strlen()=
+[[https://en.wikipedia.org/wiki/MIPS_instruction_set#Compiler_register_usage][Compiler Register Usage]]. Given that =epc= points to the 1st
+instruction, =a0= has not yet been reused for anything else inside
+=strlen()=. This can be verified by analyzing an instructions flow. The
+current working hypothesis is that =strlen(s)= has been called with 
+~s == NULL~.
+
+Let's see if we can figure out where this ~s == NULL~ is coming from by
+examining the caller of =strlen - strlcpy()=. But before doing so, we
+should consider a few more aspects common to all functions.
+
+At the beginning of most of the functions, there is a sequence of
+instruction called "prologue". For example,
+#+begin_src sh
+  800a28d0 <vfs_write>:
+  800a28d0:       27bdffd0        addiu   sp,sp,-48
+  800a28d4:       afb30024        sw      s3,36(sp)
+  800a28d8:       afb20020        sw      s2,32(sp)
+  800a28dc:       afb1001c        sw      s1,28(sp)
+  800a28e0:       afb00018        sw      s0,24(sp)
+  800a28e4:       afbf0028        sw      ra,40(sp)
+  [...]
+#+end_src
+The first instruction creates a stack frame by reserving space on the
+stack. As per [[https://en.wikipedia.org/wiki/Calling_convention#MIPS][o32]] calling convention, it's a job of a called function
+to preserve non-temporaries registers (like =$s-registers=) if they are
+to be reused. This is what those =sw $reg, off(sp)= instructions are
+concerned with - saving to-be-reused-registers to the stack. Same
+applies to =ra= for non-leaf functions (those calling other functions).
+Obviously, local variables also reside on this stack frame.
+
+An "epilogue" sequence does the opposite actions.
+#+begin_src sh
+  800a2908:       8fbf0028        lw      ra,40(sp)
+  800a290c:       8fb30024        lw      s3,36(sp)
+  800a2910:       8fb20020        lw      s2,32(sp)
+  800a2914:       8fb1001c        lw      s1,28(sp)
+  800a2918:       8fb00018        lw      s0,24(sp)
+  800a291c:       03e00008        jr      ra
+  800a2920:       27bd0030        addiu   sp,sp,48
+#+end_src
+The content of reused registers is restored. The stack frame is
+deleted - usually, by the last instruction in a delay slot of =jr=.
+Finally, control is given back to the caller by =jr ra=.
+
+Stack corruptions may overwrite a value corresponding to =ra=, resulting
+in the control being given to unexpected places (unless this is a
+result of a deliberate security attack). This is likely to result in
+"=Unable to handle kernel paging request=", "=Unaligned access=" , or
+"=Invalid instruction=". Quite often in such cases =epc= is equal to =ra=
+(or close to it) or to both =ra= and =BadVA=.
+
+"Epilogue" is not necessarily placed at the very end of a function.
+Moreover, a function may have more than one "epilogue".
+
+One more thing before we get back to the analysis. Function calls look
+as follows:
+#+begin_src sh
+  800a2aa0:       00c03821        move    a3,a2
+  800a2aa4:       00002021        move    a0,zero
+  800a2aa8:       02202821        move    a1,s1
+  800a2aac:       0c028848        jal     800a2120 <rw_verify_area>
+  800a2ab0:       02603021        move    a2,s3
+#+end_src
+this sequence corresponds to =rw_verify_area(a0, a1, a2, a3)= with =a0=
+being 0 (zero is register =$0=). The instructions initializing =a0-a3= do
+not have to be placed immediately next to the =jal= instruction, but
+usually they are in some proximity.
+
+The return value of a function, if any, is stored in =v0 ($2)=.
+
+Let's get back to our analysis.
+#+begin_src sh
+ 8023aff8 <strlcpy>:
+  8023aff8:       27bdffd8        addiu   sp,sp,-40
+  8023affc:       afb3001c        sw      s3,28(sp)
+  8023b000:       00809821        move    s3,a0
+  8023b004:       00a02021        move    a0,a1                    <=== the argument for strlen()
+  8023b008:       afb20018        sw      s2,24(sp)
+  8023b00c:       afb10014        sw      s1,20(sp)
+  8023b010:       afb00010        sw      s0,16(sp)
+  8023b014:       00c09021        move    s2,a2
+  8023b018:       afbf0020        sw      ra,32(sp)
+  8023b01c:       0c08ebf4        jal     8023afd0 <strlen>        <=== the call is here
+  8023b020:       00a08021        move    s0,a1
+  8023b024:       00408821        move    s1,v0                    <=== 'ra' points here
+  [...]
+#+end_src
+
+=strlen()= accepts a single argument that is passed via =a0=. A few
+instructions above the actual call (see remarks) - at =0x8023b004=, we
+can see that =a0= is being loaded with the content of =a1=. After
+examining the remaining instructions it becomes clear that =a1= still
+holds its initial value that corresponds to the 2nd argument of
+=strlcpy(dst, src, len)=.
+
+Now we can update our working hypothesis. It looks like =strlcpy()= has
+been called with its 2nd argument, =src=, being =NULL=.
+
+Real-life shortcut: we may simply examine the source code of =strlcpy()=
+and notice that there is a single call to =strlen()=. This is in
+accordance with our hypothesis indeed.
+#+begin_src sh
+  size_t strlcpy(char *dest, const char *src, size_t size)
+  {
+          size_t ret = strlen(src);
+  [...]
+#+end_src
+
+What's next? We can do the same analysis for =contoller_get_info()= that
+has supposedly called =strlcpy()=.
+#+begin_src sh
+  Call Trace:
+  [<8023afd0>] strlen+0x0/0x28
+  [<8023b024>] strlcpy+0x2c/0x7c
+  [<c01d6cc8>] controller_get_info+0x2c4/0x37c [controller_lkm]
+  [...]
+#+end_src
+
+Recall the remarks above regarding the validity of call traces. Basic
+sanity checks won't take much time. At the very least, check that
+=0xc01d6cc8= could have been a valid ra (one instruction away from
+=jalr/jal=). If it is the case, verify the code of (in this example)
+=controller_get_info()= to confirm that it does call =strlcpy()=. Having
+disassembly intermixed with source code is helpful here.
+
+In any case, there is obviously a limit as to how far "in the past" we
+would be able to look by analyzing a crash report even if we had a
+complete memory dump. Nevertheless, the results of this analysis - if
+not sufficient to reveal a root cause - are usually very helpful in
+further debugging. As to this particular example, we would still need
+to analyze =controller_get_info()= to understand why =strlcpy()= might
+have been called with ~src == NULL~.
+
+** Crash in a binary kernel module
+This crash occurred in a kernel module for which no source code is
+available.
+#+begin_src sh
+CPU 1 Unable to handle kernel paging request at virtual address 00000000, epc == c1c52470, ra == c1c63d64
+  [...]
+  $ 0   : 00000000 10008d00 c1c523f0 00000000
+  $ 4   : 00000000 c1f18f5c 0000008c ffff00fe
+  $ 8   : 80008fe1 15941794 8e038b00 fefe7dfd
+  $12   : faf9fdfe 7dfffe7f fb7eff7d 7b7e7e7c
+  $16   : 00000000 00000800 c1e2d178 c1e2cf98
+  $20   : 842ffe08 c1e2d1b4 00000050 c1c51fc0
+  $24   : 00000000 00000000
+  $28   : 842fc000 842ffdf0 00000000 c1c63d64
+  [...]
+  epc   : c1c52470 fast_memcpy+0x80/0x1cc [binary_blob_module]
+      Tainted: P
+  ra    : c1c63d64 net_egress+0x80/0x2b78 [binary_blob_module]
+  [...]
+#+end_src
+
+The load address of a kernel module is not known at build time, so we
+see relative addresses in the disassembly of =binary_blob_module=. We
+can use '=+0x80/0x1cc=' to locate the instruction at =epc=:
+#+begin_src sh
+ a53f0 <fast_memcpy>: 
+  [...]
+  a5468:       98ab000f        lwr     t3,15(a1)
+  a546c:       98af001f        lwr     t7,31(a1)
+  a5470:       a8880000        swl     t0,0(a0)      <== 'epc' points here at offset 0x80
+#+end_src
+
+The instruction at =epc= accesses =MEM[a0 + 0]=, so a0 should have been 0
+to result in a memory access at *virtual address* =0x00000000=. We can
+confirm this by verifying the content of the =a0 ($4)= register:
+#+begin_src sh
+  $ 4   : 00000000 [...]
+#+end_src
+
+Next step is to examine the flow of instructions to trace the source
+of the value in =a0=. A full listing is not provided here, but what it
+revealed is that =a0= is used read-only. At =epc= it still holds the 1st
+input argument of the function. Moreover, there are no explicit
+validity checks prior to its use. Thus, the 1st argument is expected
+to be a valid address.
+
+The name of function, =fast_memcpy()=, suggests its memcpy-like nature,
+so the 1st argument is likely to be dst (of course, this can be
+verified by a careful analysis of disassembly).
+
+Let's examine the caller, =net_egress()=.
+#+begin_src sh
+ b6ce4 <net_egress>:
+  [...]
+  b6d38:       3c020000        lui     v0,0x0           (1)
+  b6d3c:       24420000        addiu   v0,v0,0          (2)
+  b6d40:       0040f809        jalr    v0               (3)
+  b6d44:       97a4001a        lhu     a0,26(sp)        (4)
+  b6d48:       97a6001a        lhu     a2,26(sp)        (5)
+  b6d4c:       00408021        move    s0,v0            (6)
+  b6d50:       00402021        move    a0,v0            (7)
+  b6d54:       3c020000        lui     v0,0x0           (8)
+  b6d58:       24420000        addiu   v0,v0,0          (9)
+  b6d5c:       0040f809        jalr    v0               (10)
+  b6d60:       8fa5001c        lw      a1,28(sp)        (11)
+  b6d64:       02202021        move    a0,s1             <== 'ra' points here at offset 0x80
+  [...]
+#+end_src
+
+There are 2 function calls here. The first one, at line (3), seems to
+have a single argument which gets initialized at line (4). Let's refer
+to this called function as =unknown_function=. The second one, at line
+(10), takes 3 arguments that are initialized at lines (7), (5), and
+(11) respectively. Supposedly, this is a call of =fast_memcpy()= where
+the crash occurred.
+
+Can we say something specific about those arguments?
++ the 1st argument, =a0=, of =fast_memcpy()= gets initialized with the
+  return value, =v0=, of =unknown_function()= at line (7);
++ this return value is passed as is, i.e. there are no validity check;
++ the 1st argument of =unknown_function()= and the 3rd one of
+  =fast_memcpy()= get initilized with the same value loaded from 26(sp)
+  at lines (4) and (5).
+
+These observations suggest that the source code may look as follows:
+#+begin_src sh
+  dst = unknown_function(len);
+  fast_memcpy(dst, src, len);
+#+end_src
+In this particular case, =unknown_function()= returned =NULL= - hence,
+the crash.
+
+Further, a question regarding the nature of that =unknown_function()=,
+accompanied by the analysis of the crash, can be sent to a supplier of
+=binary_blob_module=. By submitting a more detailed report and asking
+concrete questions for hard-to-reproduce problems, we can somewhat
+decrease the chances of having a (sometimes) default reply such as
+"please try reproducing it on our reference software and/or hardware".
+
+** Suspected memory corruption
+Finally, let's consider a case where memory corruption is suspected.
+#+begin_src sh
+CPU 0 Unable to handle kernel paging request at virtual address 0004349c, epc == 0004349c, ra == 80012224
+  Oops[#1]:
+  Cpu 0
+  $ 0   : 00000000 7f99bcc0 00000069 2abc7ea0
+  $ 4   : 00000000 7f99bd20 7f99be60 00000001
+  $ 8   : 00000000 80000008 0004349c fffffff4
+  $12   : 7f99bd08 00000001 00000000 00000000
+  $16   : 2ab01000 2ab01000 7f99bdc8 00000000
+  $20   : 2aafc6a8 00410000 7f99bde0 7f99be60
+  $24   : 00000000 2abc7e80
+  $28   : 85248000 85249f30 0040484c 80012224
+  Hi    : 0000ba1a
+  Lo    : ff98c506
+  epc   : 0004349c 0x4349c
+      Tainted: PF       W
+  ra    : 80012224 stack_done+0x20/0x3c
+  Status: 1100ff03    KERNEL EXL IE
+  Cause : 10800008
+  BadVA : 0004349c
+  PrId  : 00019554 (MIPS 34Kc)
+  [...]
+  Process screen_plugin (pid: 799, threadinfo=85248000, task=87140038, tls=00000000)
+  Stack : 2ab85040 00000000 00000001 00000000 00000000 00000000 00000000 7f99bcc0
+          [...]
+          00000001 00000000 2ac2d530 7f99bce8 7f99bd18 2aae83d4 0100ff13 00028675
+  Call Trace:
+  Code: (Bad address in epc)
+#+end_src
+Note that ~epc == BadVA~. A CPU has tried to fetch an instruction at
+=0x0004349c=, but this is not a valid kernel-space address.
+
+Let's examine the code at =ra=:
+#+begin_src sh
+ra    : 80012224 stack_done+0x20/0x3c
+
+  80012140 <handle_sys>:
+  [...]
+  800121e0:       000240c0        sll     t0,v0,0x3
+  800121e4:       3c098001        lui     t1,0x8001
+  800121e8:       25292460        addiu   t1,t1,9312
+  800121ec:       01284821        addu    t1,t1,t0
+  800121f0:       8d2a0000        lw      t2,0(t1)
+  800121f4:       1140005e        beqz    t2,80012370 <illegal_syscall>
+  800121f8:       8d2b0004        lw      t3,4(t1)
+  800121fc:       05610040        bgez    t3,80012300 <stackargs>
+  80012200:       afa70080        sw      a3,128(sp)
+  80012204 <stack_done>:
+  80012204:       8f880008        lw      t0,8(gp)
+  80012208:       3c098000        lui     t1,0x8000
+  8001220c:       35290008        ori     t1,t1,0x8
+  80012210:       01094024        and     t0,t0,t1
+  80012214:       15000016        bnez    t0,80012270 <syscall_trace_entry>
+
+  80012218:       00000000        nop
+  8001221c:       0140f809        jalr    t2
+  80012220:       00000000        nop
+  80012224:       2408fb92        li      t0,-1134             <=== 'ra' points here
+#+end_src
+
+=ra= is the valid return address for a function call at =0x8001221c=. The
+address of that function is taken from =t2 ($10)=, which indeed contains
+=0x0004349c=:
+#+begin_src sh
+  $ 8   : 00000000 80000008 0004349c fffffff4
+#+end_src
+So what we have is a call through a function pointer that contains a
+bogus (corrupted?) value.
+
+Let's try to figure out where =t2= is coming from:
+#+begin_src sh
+ 800121e0:       000240c0        sll     t0,v0,0x3
+  800121e4:       3c098001        lui     t1,0x8001
+  800121e8:       25292460        addiu   t1,t1,9312
+  800121ec:       01284821        addu    t1,t1,t0
+  800121f0:       8d2a0000        lw      t2,0(t1)
+  800121f4:       1140005e        beqz    t2,80012370 <illegal_syscall>
+#+end_src
+
+The instruction at =0x800121f0= corresponds to '~t2 = *t1~' and is
+followed by an instruction that compares =t2= to 0. In case of =t2= being
+0, control is given to =illegal_syscall=.
+
+Well, some knowledge of the kernel internals would be helpful here. In
+any case, the appearance of names such as =illegal_syscall=, =handle_sys=,
+and =syscall_trace_entry= suggest that the code in question has
+something to do with the handling of system calls. The relevant code
+can indeed be found in =arch/mips/kernel/scall32-o32.S=.
+
+Can we guess what *syscall* it was?
+#+begin_src sh
+  800121e4:       3c098001        lui     t1,0x8001
+  800121e8:       25292460        addiu   t1,t1,9312
+#+end_src
+~t1 = 0x80019312;~
+
+[[https://linux.die.net/man/1/nm][nm]] shows that this value corresponds to =sys_call_table=, which is an
+array that contains addresses of all the system calls.
+#+begin_src sh
+800121ec:       01284821        addu    t1,t1,t0
+#+end_src
+~t1 = t1 + t0;~
+
+=t0= is the offset in the table, which is being calculated as follows:
+#+begin_src sh
+ 800121e0:       000240c0        sll     t0,v0,0x3
+#+end_src
+~t0 = v0 * 8;~
+
+and the value of =v0 ($2)= is =0x69= (105 decimal):
+#+begin_src sh
+  $ 0   : 00000000 7f99bcc0 00000069 2abc7ea0
+#+end_src
+The analysis of the source code of =handle_sys= (it's written in
+assembler) reveals that =v0= represents a syscall number.
+
+The syscall numbers are defined in =arch/mips/include/asm/unistd.h=. The
+one we are interested in corresponds to =sys_getitimer()=:
+#+begin_src sh
+  #define __NR_getitimer                  (__NR_Linux + 105)
+#+end_src
+=sys_call_table= is not modified at run time. Also, it was not the first
+and only call to =sys_gettimer()= - the system has been functioning
+properly for days prior to this crash. So where do we go from here?
+
+Memory corruptions often result in seemingly unrelated crashes: both
+in kernel and user-space. What common though is that all these crashes
+may look "weird". That is, the careful analysis does not reveal any
+obvious problems with the code and, moreover, suggests possible
+external influence, be it stack/memory corruption or hardware issues.
+Having multiple crashes in different parts of the core kernel code is
+usually a good indicator too.
+
+Of course, it's always possible to overlook something. So the larger a
+set of crashes from which a conclusion is drawn, the better.
+
+The strategy then is to *look for common patterns*.
+
+In this particular case, there was another crash in the same location
+(among a dozen of crashes in yet other areas) where the syscall number
+and =epc= were =0x68= and =0x000430d8= correspondingly.
+#+begin_src sh
+  syscall 0x69 (sys_getitimer) and epc: 0x0004349c
+  syscall 0x68 (sys_setitimer) and epc: 0x000430d8
+#+end_src
+
+These 2 slots are neighboring in =sys_call_table=. Maybe it's just a
+coincidence but is worth taking into account. Now, what's about the
+content of =epc=? Do we actually know how the correct values would look
+like? We can look them up with =nm= or from disassembly:
+#+begin_src sh
+  8004349c <sys_getitimer>:
+  800430d8 <sys_setitimer>:
+#+end_src
+
+Is there another pattern? Yes, the only difference between good and
+bad values is in the high bit =0x80000000=.
+
+This missing-high-bit theory had explanatory power when applied
+to some of the other "weird" crashes for which it was possible to
+infer the good value. How could this bit be cleared? In the end, it
+has been found that DDR timing settings were not properly set in the
+bootloader. 
 
 * Extra Details
 ** objdump
@@ -82,6 +724,21 @@ though to double-check that the addresses you are interested in
 correspond to the same instructions in both original and new
 disassembly files. If it's not the case, code shifts/changes should be
 taken into account.
+
+use objdump check the codes location in the kernel:
+1. =arm-none-eabi-objdump -Dz -S vmlinux >linux.dump= (not vmlinux in
+   =arch/arm/boor/compressed/=)
+2. the -S option needs gcc to use -g option, edit the Makefile in the
+   root of linux kernel folder to add -g:   
+   #+begin_src sh
+   KBUILD_CFLAGS   := -g -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
+     -fno-strict-aliasing -fno-common \
+     -Werror-implicit-function-declaration \
+     -Wno-format-security \
+     -fno-delete-null-pointer-checks
+   #+end_src
+3. find the codes location in the file =linux.dump=
+
 ** Calling conventions
 <<calling_convent>>
 Be sure to verify the options used by your toolchain, if in doubt. For
@@ -119,20 +776,6 @@ MB) in RAM.
 
 =kseg0= ranges are both virtually and physically contiguous, while =kuseg=
 and =kseg2= are only virtually contiguous.
-
-* cc
-#+begin_src python
-
-#+end_src
-
-#+begin_src c++
-
-#+end_src
-
-
-#+begin_src sh
-
-#+end_src
 
 * Footnotes
 
