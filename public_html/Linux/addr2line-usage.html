@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>addr2line usage</title>
+<!-- 2017-01-24 Tue 23:27 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">addr2line usage</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Requirement</a></li>
+<li><a href="#sec-2">addr2line usage</a></li>
+<li><a href="#sec-3">Example</a></li>
+<li><a href="#sec-4">Addr2line for kernel debugging</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Requirement</h2>
+<div class="outline-text-2" id="text-1">
+<ul class="org-ul">
+<li>Whether all the functions in your binary are compiled with <code>-g</code>,
+<code>addr2line</code> only support functions has debug information, that is
+compiled with <code>-g</code>
+</li>
+<li>Whether your offset is a valid offset. That means your offset should
+not be an virtual memory address, and should only be an offset in
+the <code>.text</code> section. In the <code>.text</code> section means the address should
+point to an instruction in the binary
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">addr2line usage</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Following is the message from <code>man addr2line</code>.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">addr2line - convert addresses into file names and line numbers.
+</pre>
+</div>
+
+<p>
+The <code>addresses</code> should be the address in an executable or an offset in a
+section of a relocatable object.
+</p>
+
+<p>
+The output is something like <code>FILENAME:LINENO</code>, the source file name,
+and the line number in the file
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Example</h2>
+<div class="outline-text-2" id="text-3">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>()
+{
+    printf(<span style="color: #ffa07a;">"hello\n"</span>);
+    <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+
+<p>
+After compile it with <code>gcc -g hello.c</code>, we could firstly use <code>objdump</code> to
+get an idea about the offset information in the generated <code>a.out</code> file.
+</p>
+
+<p>
+Following is part of the dumped dis-assembly:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Disassembly of section .text:
+
+0000000000400440 &lt;_start&gt;:
+  400440:       31 ed                   xor    %ebp,%ebp
+  400442:       49 89 d1                mov    %rdx,%r9
+  400445:       5e                      pop    %rsi
+  400446:       48 89 e2                mov    %rsp,%rdx
+  400449:       48 83 e4 f0             and    $<span style="color: #eedd82;">0</span>xfffffffffffffff0,%rsp
+  40044d:       50                      push   %rax
+  40044e:       54                      push   %rsp
+  40044f:       49 c7 c0 c0 05 40 00    mov    $<span style="color: #eedd82;">0</span>x4005c0,%r8
+  400456:       48 c7 c1 50 05 40 00    mov    $<span style="color: #eedd82;">0</span>x400550,%rcx
+  40045d:       48 c7 c7 2d 05 40 00    mov    $<span style="color: #eedd82;">0</span>x40052d,%rdi
+  400464:       e8 b7 ff ff ff          callq  400420 <a href="mailto:__libc_start_main%40plt">&lt;__libc_start_main@plt&gt;</a>
+  400469:       f4                      hlt    
+  40046a:       66 0f 1f 44 00 00       nopw   0x0(%rax,%rax,1)
+...
+000000000040052d &lt;main&gt;:
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">include &lt;stdio.h&gt;</span>
+int main()
+{
+  40052d:       55                      push   %rbp
+  40052e:       48 89 e5                mov    %rsp,%rbp
+    printf(<span style="color: #ffa07a;">"hello\n"</span>);
+  400531:       bf d4 05 40 00          mov    $<span style="color: #eedd82;">0</span>x4005d4,%edi
+  400536:       e8 d5 fe ff ff          callq  400410 <a href="mailto:puts%40plt">&lt;puts@plt&gt;</a>
+    <span style="color: #00ffff;">return</span> 0;
+  40053b:       b8 00 00 00 00          mov    $<span style="color: #eedd82;">0</span>x0,%eax
+}
+  400540:       5d                      pop    %rbp
+  400541:       c3                      retq   
+  400542:       66 2e 0f 1f 84 00 00    nopw   %cs:0x0(%rax,%rax,1)
+  400549:       00 00 00 
+  40054c:       0f 1f 40 00             nopl   0x0(%rax)
+...
+</pre>
+</div>
+
+<p>
+The most left column of the code is the offset in the binary file.
+<code>__start</code> function comes from the standard C library and is precompiled
+without debug information. <code>main</code> function comes from our helloworld
+code which has debug information since we compile the file with <code>-g</code>.
+</p>
+
+<p>
+Following is output of <code>addr2line</code>:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ addr2line -e a.out 0x400442 <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">offset in the `__start` function</span>
+??:?
+$ addr2line -e a.out 0x40052d <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">offset in the `main` function</span>
+hello.c:3
+$ addr2line -e a.out 0x40054c -f <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">The last instruction of the `main` function</span>
+main
+??:?
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>Only code segment generated with <code>-g</code> flag (which means the segment
+have debug information) could successfully generate filename and
+linenumber information.
+</li>
+<li>Not all offsets of a function body compiled with <code>-g</code> flag will
+successfully output filename and linenumber. The offset <code>0x40054b</code> is
+the last instruction after <code>ret</code> instruction of the <code>main</code> function,
+but we could not get the information.
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Addr2line for kernel debugging</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+Here's an example of Oops(null pointer exception):
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">[   87.915496] request_suspend_state: sleep (0-&gt;3) at 82181848246 (2010-05-22 19:29:45.776824970 UTC)
+[   88.028686] deinit sharp panel
+[   88.635070] Unable to handle kernel NULL pointer dereference at virtual address 00000fc5
+[   88.635101] <span style="color: #eedd82;">pgd</span> = c5db8000
+[   88.635131] [00000fc5] *<span style="color: #eedd82;">pgd</span>=16aba031, *<span style="color: #eedd82;">pte</span>=00000000, *<span style="color: #eedd82;">ppte</span>=00000000
+[   88.635162] Internal error: Oops: 11 [#1] PREEMPT
+[   88.635192] last sysfs file: /sys/power/state
+[   88.635192] Modules linked<span style="color: #00ffff;"> in</span>:
+[   88.635223] CPU: 0    Not tainted  (2.6.32 <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">385)</span>
+[   88.635253] PC is at msmfb_suspend+0x1c/0x2c
+[   88.635284] LR is at msmfb_suspend+0x20/0x2c
+[   88.635314] pc : [&lt;c01b063c&gt;]    lr : [&lt;c01b0640&gt;]    psr: a0000013
+[   88.635314] sp : c6847f38  ip : c6847f50  fp : c6847f4c
+[   88.635345] r10: c6847f84  r9 : c68009a8  r8 : c04e47e8
+[   88.635345] r7 : c04e4818  r6 : c68e6ea0  r5 : c0535c1c  r4 : c68e6ea0
+[   88.635375] r3 : 00000fc5  r2 : c04e1f64  r1 : c6846000  r0 : 00000fc5
+[   88.635406] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[   88.635437] Control: 00c5387d  Table: 15db8008  DAC: 00000017
+[   88.635437] 
+[   88.635437] PC: 0xc01b05bc:
+[   88.635467] 05bc  e58de000 e58dc008 e58dc004 ebfffe7d e24bd014 e89da830 e1a0c00d e92dd830
+[   88.635528] 05dc  e24cb004 e24dd010 e1a04001 e1a05000 ebfff6df e594000c e894000e e082e000
+[   88.635559] 05fc  e3a0c000 e1a00005 e0813003 e58de000 e58dc008 e58dc004 ebfffe6a e24bd014
+[   88.635620] 061c  e89da830 e1a0c00d e92dd818 e24cb004 e5103038 e1a04000 e1a00003 e1a0e00f
+[   88.635681] 063c  e593f000 e2840074 eb079177 e89da818 e1a0c00d e92ddff0 e24cb004 e24dd02c
+</pre>
+</div>
+
+<p>
+We have function names but not line numbers. Addr2line can solve that:
+in That line we have the program counter
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">[   88.635314] pc : [&lt;c01b063c&gt;]    lr : [&lt;c01b0640&gt;]    psr: a0000013
+</pre>
+</div>
+
+<p>
+In order to translate it into source code line:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">arm-none-linux-gnueabi-addr2line -f -e vmlinux c01b063c</span>
+msmfb_suspend
+/home/gnutoo/embedded/htcdream/SHR/kernel/linux/drivers/video/msm/msm_fb.c:485
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-01-24 Tue 23:27</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

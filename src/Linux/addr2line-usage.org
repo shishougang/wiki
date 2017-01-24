@@ -1,0 +1,142 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: addr2line usage
+#+OPTIONS: num:nil H:2
+
+* Requirement
++ Whether all the functions in your binary are compiled with =-g=,
+  =addr2line= only support functions has debug information, that is
+  compiled with =-g=
++ Whether your offset is a valid offset. That means your offset should
+  not be an virtual memory address, and should only be an offset in
+  the =.text= section. In the =.text= section means the address should
+  point to an instruction in the binary
+* addr2line usage
+Following is the message from =man addr2line=.
+#+begin_src sh
+addr2line - convert addresses into file names and line numbers.
+#+end_src
+
+The =addresses= should be the address in an executable or an offset in a
+section of a relocatable object.
+
+The output is something like =FILENAME:LINENO=, the source file name,
+and the line number in the file
+* Example
+#+begin_src c
+#include <stdio.h>
+int main()
+{
+    printf("hello\n");
+    return 0;
+}
+#+end_src
+
+After compile it with =gcc -g hello.c=, we could firstly use =objdump= to
+get an idea about the offset information in the generated =a.out= file.
+
+Following is part of the dumped dis-assembly:
+#+begin_src sh
+Disassembly of section .text:
+
+0000000000400440 <_start>:
+  400440:	31 ed                	xor    %ebp,%ebp
+  400442:	49 89 d1             	mov    %rdx,%r9
+  400445:	5e                   	pop    %rsi
+  400446:	48 89 e2             	mov    %rsp,%rdx
+  400449:	48 83 e4 f0          	and    $0xfffffffffffffff0,%rsp
+  40044d:	50                   	push   %rax
+  40044e:	54                   	push   %rsp
+  40044f:	49 c7 c0 c0 05 40 00 	mov    $0x4005c0,%r8
+  400456:	48 c7 c1 50 05 40 00 	mov    $0x400550,%rcx
+  40045d:	48 c7 c7 2d 05 40 00 	mov    $0x40052d,%rdi
+  400464:	e8 b7 ff ff ff       	callq  400420 <__libc_start_main@plt>
+  400469:	f4                   	hlt    
+  40046a:	66 0f 1f 44 00 00    	nopw   0x0(%rax,%rax,1)
+...
+000000000040052d <main>:
+#include <stdio.h>
+int main()
+{
+  40052d:	55                   	push   %rbp
+  40052e:	48 89 e5             	mov    %rsp,%rbp
+    printf("hello\n");
+  400531:	bf d4 05 40 00       	mov    $0x4005d4,%edi
+  400536:	e8 d5 fe ff ff       	callq  400410 <puts@plt>
+    return 0;
+  40053b:	b8 00 00 00 00       	mov    $0x0,%eax
+}
+  400540:	5d                   	pop    %rbp
+  400541:	c3                   	retq   
+  400542:	66 2e 0f 1f 84 00 00 	nopw   %cs:0x0(%rax,%rax,1)
+  400549:	00 00 00 
+  40054c:	0f 1f 40 00          	nopl   0x0(%rax)
+...
+#+end_src
+
+The most left column of the code is the offset in the binary file.
+=__start= function comes from the standard C library and is precompiled
+without debug information. =main= function comes from our helloworld
+code which has debug information since we compile the file with =-g=.
+
+Following is output of =addr2line=:
+#+begin_src sh
+$ addr2line -e a.out 0x400442 #offset in the `__start` function
+??:?
+$ addr2line -e a.out 0x40052d #offset in the `main` function
+hello.c:3
+$ addr2line -e a.out 0x40054c -f #The last instruction of the `main` function
+main
+??:?
+#+end_src
+
+1. Only code segment generated with =-g= flag (which means the segment
+   have debug information) could successfully generate filename and
+   linenumber information.
+2. Not all offsets of a function body compiled with =-g= flag will
+   successfully output filename and linenumber. The offset =0x40054b= is
+   the last instruction after =ret= instruction of the =main= function,
+   but we could not get the information.
+* Addr2line for kernel debugging
+Here's an example of Oops(null pointer exception):
+#+begin_src sh
+[   87.915496] request_suspend_state: sleep (0->3) at 82181848246 (2010-05-22 19:29:45.776824970 UTC)
+[   88.028686] deinit sharp panel
+[   88.635070] Unable to handle kernel NULL pointer dereference at virtual address 00000fc5
+[   88.635101] pgd = c5db8000
+[   88.635131] [00000fc5] *pgd=16aba031, *pte=00000000, *ppte=00000000
+[   88.635162] Internal error: Oops: 11 [#1] PREEMPT
+[   88.635192] last sysfs file: /sys/power/state
+[   88.635192] Modules linked in:
+[   88.635223] CPU: 0    Not tainted  (2.6.32 #385)
+[   88.635253] PC is at msmfb_suspend+0x1c/0x2c
+[   88.635284] LR is at msmfb_suspend+0x20/0x2c
+[   88.635314] pc : [<c01b063c>]    lr : [<c01b0640>]    psr: a0000013
+[   88.635314] sp : c6847f38  ip : c6847f50  fp : c6847f4c
+[   88.635345] r10: c6847f84  r9 : c68009a8  r8 : c04e47e8
+[   88.635345] r7 : c04e4818  r6 : c68e6ea0  r5 : c0535c1c  r4 : c68e6ea0
+[   88.635375] r3 : 00000fc5  r2 : c04e1f64  r1 : c6846000  r0 : 00000fc5
+[   88.635406] Flags: NzCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[   88.635437] Control: 00c5387d  Table: 15db8008  DAC: 00000017
+[   88.635437] 
+[   88.635437] PC: 0xc01b05bc:
+[   88.635467] 05bc  e58de000 e58dc008 e58dc004 ebfffe7d e24bd014 e89da830 e1a0c00d e92dd830
+[   88.635528] 05dc  e24cb004 e24dd010 e1a04001 e1a05000 ebfff6df e594000c e894000e e082e000
+[   88.635559] 05fc  e3a0c000 e1a00005 e0813003 e58de000 e58dc008 e58dc004 ebfffe6a e24bd014
+[   88.635620] 061c  e89da830 e1a0c00d e92dd818 e24cb004 e5103038 e1a04000 e1a00003 e1a0e00f
+[   88.635681] 063c  e593f000 e2840074 eb079177 e89da818 e1a0c00d e92ddff0 e24cb004 e24dd02c
+#+end_src
+
+We have function names but not line numbers. Addr2line can solve that:
+in That line we have the program counter
+#+begin_src sh
+[   88.635314] pc : [<c01b063c>]    lr : [<c01b0640>]    psr: a0000013
+#+end_src
+
+In order to translate it into source code line:
+#+begin_src sh
+# arm-none-linux-gnueabi-addr2line -f -e vmlinux c01b063c
+msmfb_suspend
+/home/gnutoo/embedded/htcdream/SHR/kernel/linux/drivers/video/msm/msm_fb.c:485
+#+end_src
+
+
