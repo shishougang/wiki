@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>I<sup>2C</sup> tool usage</title>
+<!-- 2017-01-26 Thu 19:53 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">I<sup>2C</sup> tool usage</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">i2c device</a></li>
+<li><a href="#sec-2">i2c-tools commands</a></li>
+<li><a href="#sec-3">i2cdetect</a></li>
+<li><a href="#sec-4">i2cdump 查詢設備內所有暫存器</a></li>
+<li><a href="#sec-5">i2cset 修改設備暫存器數值</a></li>
+<li><a href="#sec-6">i2cget 來取得暫存器的數值</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">i2c device</h2>
+<div class="outline-text-2" id="text-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">$ ls /dev/i2c*
+/dev/i2c-0  /dev/i2c-1
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">i2c-tools commands<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-2">
+<ul class="org-ul">
+<li>i2cdetect – 用來列舉 I2C bus 和上面所有的裝置
+</li>
+<li>i2cdump – 顯示裝置上所有暫存器 (register) 數值
+</li>
+<li>i2cget – 讀取裝置上某個暫存器值
+</li>
+<li>i2cset – 修改裝置上的暫存器數值
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">i2cdetect</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+察看目前的系統有多少個 i2c bus
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo i2cdetect -l
+</pre>
+</div>
+
+<p>
+查詢 i2c-1 bus 上的所有設備，所得到的結果如下
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">i2cdetect -y 1</span>
+    0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: 50 -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- UU -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+</pre>
+</div>
+<p>
+這樣代表共有兩個裝置掛在 i2c-1 上，其中標示為 UU 的代表該設備有被偵測到並正在被 kernel driver 使用著，而在這邊顯示 0x50 的就是所使用的
+EEPROM。
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">i2cdump 查詢設備內所有暫存器</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+i2cdump 的使用方式如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Usage: i2cdump [-f] [-y] [-r first-last] I2CBUS ADDRESS [MODE [BANK [BANKREG]]]
+I2CBUS is an integer or an I2C bus name
+ADDRESS is an integer (0x03 - 0x77)
+MODE is one of:
+  b (byte, default)
+  w (word)
+  W (word on even register addresses)
+  s (SMBus block)
+  i (I2C block)
+  c (consecutive byte)
+  Append p for SMBus PEC
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">i2cdump -y 1 0x50</span>
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+10: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+20: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+30: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+40: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+50: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+60: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+70: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+90: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+a0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+b0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+c0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+d0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+e0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+f0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">i2cset 修改設備暫存器數值</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+i2cset 的使用方式如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Usage: i2cset [-f] [-y] [-m MASK] I2CBUS CHIP-ADDRESS DATA-ADDRESS [VALUE] ... [MODE]
+  I2CBUS is an integer or an I2C bus name
+  ADDRESS is an integer (0x03 - 0x77)
+  MODE is one of:
+    c (byte, no value)
+    b (byte data, default)
+    w (word data)
+    i (I2C block data)
+    s (SMBus block data)
+    Append p for SMBus PEC
+</pre>
+</div>
+<p>
+修改位於 i2c-1 上 0x50 的 0x12 暫存器，並將其數值修改為 5:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">i2cset -f -y 1 0x50 0x12 5
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">i2cdump -y 1 0x50</span>
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+10: ff ff 05 ff ff ff ff ff ff ff ff ff ff ff ff ff    ..?.............
+20: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+30: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+40: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+50: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+60: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+70: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+90: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+a0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+b0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+c0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+d0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+e0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+f0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">i2cget 來取得暫存器的數值</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+i2cget 命令格式如下:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Usage: i2cget [-f] [-y] I2CBUS CHIP-ADDRESS [DATA-ADDRESS [MODE]]
+I2CBUS is an integer or an I2C bus name
+ADDRESS is an integer (0x03 - 0x77)
+MODE is one of:
+  b (<span style="color: #b0c4de;">read</span> byte data, default)
+  w (<span style="color: #b0c4de;">read</span> word data)
+  c (write byte/read byte)
+  Append p for SMBus PEC
+</pre>
+</div>
+<p>
+察看剛剛所設定的 0x12 暫存器:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">i2cget  -y 1 0x50 0x12</span>
+0x05
+</pre>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://coldnew.github.io/blog/2013/06-19_e5bcf/">http://coldnew.github.io/blog/2013/06-19_e5bcf/</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-01-26 Thu 19:53</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

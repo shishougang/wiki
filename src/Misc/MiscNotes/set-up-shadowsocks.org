@@ -3,16 +3,221 @@
 #+OPTIONS: num:nil H:2
 
 
-* cc
-#+begin_src python
+* websites
++ homepage: http://shadowsocks.org/en/index.html
++ github: https://github.com/shadowsocks
++ Shadowsocks-使用说明:
+  https://github.com/shadowsocks/shadowsocks/wiki/Shadowsocks-%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E
 
+* Set up the Server on the Ubuntu
+#+begin_src sh
+sudo apt-get update
+sudo apt-get install python-pip
+sudo pip install shadowsocks
 #+end_src
 
-#+begin_src c++
-
+create a configure file: =/etc/shadowsocks/shadowsocks.json=
+#+begin_src sh
+mkdir -p /etc/shadowsocks/
 #+end_src
-
 
 #+begin_src sh
-
+{
+    "server":"0.0.0.0",
+    "server_port":8390,
+    "local_address": "127.0.0.1",
+    "local_port":1080,
+    "password":"mypassword",
+    "timeout":300,
+    "method":"aes-256-cfb",
+    "fast_open": false
+}
 #+end_src
+
+start the server:
+#+begin_src sh
+ssserver -c /etc/shadowsocks/shadowsocks.json -d start
+# ignoring hangup signals
+nohup ssserver -c  /etc/shadowsocks/shadowsocks.json &
+#+end_src
+* TCP Fast Open
+If both of your server and client are deployed on Linux 3.7.1 or
+higher, you can turn on fast_open for lower latency.
+
+First set =fast_open= to =true= in your =config.json=.
+
+Then turn on fast open on your OS temporarily:
+#+begin_src sh
+echo 3 > /proc/sys/net/ipv4/tcp_fastopen
+#+end_src
+To turn on fast open permanently, see Optimizing Shadowsocks.
+
+* Optimizing Shadowsocks[fn:2]
+** options
+add below into  =/etc/sysctl.conf=:
+#+begin_src sh
+# max open files
+fs.file-max = 51200
+# max read buffer
+net.core.rmem_max = 67108864
+# max write buffer
+net.core.wmem_max = 67108864
+# default read buffer
+net.core.rmem_default = 65536
+# default write buffer
+net.core.wmem_default = 65536
+# max processor input queue
+net.core.netdev_max_backlog = 4096
+# max backlog
+net.core.somaxconn = 4096
+
+# resist SYN flood attacks
+net.ipv4.tcp_syncookies = 1
+# reuse timewait sockets when safe
+net.ipv4.tcp_tw_reuse = 1
+# turn off fast timewait sockets recycling
+net.ipv4.tcp_tw_recycle = 0
+# short FIN timeout
+net.ipv4.tcp_fin_timeout = 30
+# short keepalive time
+net.ipv4.tcp_keepalive_time = 1200
+# outbound port range
+net.ipv4.ip_local_port_range = 10000 65000
+# max SYN backlog
+net.ipv4.tcp_max_syn_backlog = 4096
+# max timewait sockets held by system simultaneously
+net.ipv4.tcp_max_tw_buckets = 5000
+# turn on TCP Fast Open on both client and server side
+net.ipv4.tcp_fastopen = 3
+# TCP receive buffer
+net.ipv4.tcp_rmem = 4096 87380 67108864
+# TCP write buffer
+net.ipv4.tcp_wmem = 4096 65536 67108864
+# turn on path MTU discovery
+net.ipv4.tcp_mtu_probing = 1
+
+# for high-latency network
+net.ipv4.tcp_congestion_control = hybla
+
+# for low-latency network, use cubic instead
+# net.ipv4.tcp_congestion_control = cubic
+#+end_src
+
+#+begin_src sh
+sysctl -p
+#+end_src
+
+Warning: *DO NOT ENABLE* =net.ipv4.tcp_tw_recycle=!!! See [[https://vincent.bernat.im/en/blog/2014-tcp-time-wait-state-linux.html][this article]].
+
+** tcp congestion control: hybla[fn:3]
+use =lsmod | grep hybla= to check whether the optimization can work
+normally.
+
+* ubuntu使用shadowsocks客户端配置[fn:1]
+有两种方法可行:
+1. 安装shadowsocks命令行程序，配置命令。
+2. 安装shadowsocks GUI图形界面程序，配置。
+** shadowsocks命令行程序
+*** 安装shadowsocks
+#+begin_src sh
+sudo apt-get update
+sudo apt-get install python-pip
+sudo apt-get install python-setuptools m2crypto
+sudo pip install shadowsocks
+#+end_src
+*** 启动shadowsocks
+安装好后，在本地我们要用到sslocal ，终端输入sslocal --help 可以查看帮
+助:
+#+begin_src sh
+$ sslocal --help
+usage: sslocal [OPTION]...
+A fast tunnel proxy that helps you bypass firewalls.
+
+You can supply configurations via either config file or command line arguments.
+
+Proxy options:
+  -c CONFIG              path to config file
+  -s SERVER_ADDR         server address
+  -p SERVER_PORT         server port, default: 8388
+  -b LOCAL_ADDR          local binding address, default: 127.0.0.1
+  -l LOCAL_PORT          local port, default: 1080
+  -k PASSWORD            password
+  -m METHOD              encryption method, default: aes-256-cfb
+  -t TIMEOUT             timeout in seconds, default: 300
+  --fast-open            use TCP_FASTOPEN, requires Linux 3.7+
+#+end_src
+直接命令运行:
+#+begin_src sh
+sslocal -s 11.22.33.44 -p 50003 -k "123456" -l 1080 -t 600 -m aes-256-cfb
+#+end_src
+-s表示服务IP, -p指的是服务端的端口，-l是本地端口默认是1080, -k 是密码
+（要加""）, -t超时默认300,-m是加密方法默认aes-256-cfb，
+
+用配置文件:
+#+begin_src sh
+  {
+      "server":"11.22.33.44",
+      "server_port":50003,
+      "local_port":1080,
+      "password":"123456",
+      "timeout":600,
+      "method":"aes-256-cfb"
+  }
+#+end_src
+#+begin_src sh
+sslocal -c ~/shadowsocks.json
+#+end_src
+*** 开机后台自动运行sslocal
+在/etc下编辑一个叫rc.local的文件,加上
+#+begin_src sh
+sslocal -c /home/username/shadowsocks.json
+#+end_src
+
+** shadowsocks GUI图形界面程序
+安装GUI图形界面程序: [[https://github.com/shadowsocks/shadowsocks-qt5/wiki/%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97][shadowsocks-qt5 安装指南]]
+
+在ubuntu上可以这样，通过PPA源安装，仅支持Ubuntu 14.04或更高版本:
+#+begin_src sh
+sudo add-apt-repository ppa:hzwhuang/ss-qt5
+sudo apt-get update
+sudo apt-get install shadowsocks-qt5
+#+end_src
+
+** 配置Chrome浏览器
+*** 安装插件
+给chrome安装SwitchyOmega插件,但是没有代理之前是不能从谷歌商店安装这个
+插件的，从Github上直接下载最新版
+https://github.com/FelisCatus/SwitchyOmega/releases/ 然后浏览器地址打
+开chrome://extensions/，将下载的插件托进去安装。
+
+*** 设置代理地址
+代理协议选择SOCKS5，地址为127.0.0.1,端口默认1080 。
+[[./Files/shadowsocks-0.png]]
+
+[[./Files/shadowsocks-1.png]]
+*** 设置自动切换
+接着点击自动切换 ( Auto switch）,按照规则列表匹配请求后面选择刚才新建
+的SS，默认情景模式选择直接连接。点击应用选项保存。再往下规则列表设置选
+择AutoProxy 然后将 [[https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt][这个地址]] 填进去，点击下面的立即更新情景模式，会有提示
+更新成功！后再应用选项保存.
+
+[[./Files/shadowsocks-2.png]]
+
+点击浏览器右上角的SwitchyOmega图标，下面选择自动切换，然后打开
+google.com试试
+[[./Files/shadowsocks-3.png]]
+* iOS上的客户端
+iOS上的客户端有shadowrocket，surge，potatso。建议试用shadowrocket，配
+置方便还便宜。
+
+一个新的好用的免费影梭shadowsocks客户端叫wingy
+
+* Footnotes
+
+[fn:1] https://aitanlu.com/ubuntu-shadowsocks-ke-hu-duan-pei-zhi.html
+
+[fn:2] https://github.com/shadowsocks/shadowsocks/wiki/Optimizing-Shadowsocks
+
+[fn:3] https://www.vultr.com/docs/how-to-setup-tcp-optimization-on-linux
+
+

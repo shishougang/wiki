@@ -1,0 +1,67 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Set up PPTP on the Ubuntu
+#+OPTIONS: num:nil H:2
+
+
+PPTP（点对点隧道协议，Point-to-Point Tunnel Protocol）是最基本的VPN协
+议。它的配置相当简单，但稳定性一般。[fn:1]
+
+1. 安装PPTPD服务（Point-to-Point Tunnel Protocol Daemon）
+#+begin_src sh
+# apt-get install pptpd
+#+end_src
+
+2. 编辑内网IP设置 /etc/pptpd.conf
+文件末尾加入以下内容：
+#+begin_src sh
+localip 10.0.0.1
+remoteip 10.0.0.100-200
+#+end_src
+以 10.0.0.1 作为内网网关，10.0.0.100 到 200 作为服务器分配给每个连接的
+内网IP。
+
+3. 在 /etc/ppp/chap-secrets 中加入用户名和密码
+在表头下面另起一行，按照以下格式来添加用户名和密码。多个用户名用空行来
+分隔。
+#+begin_src sh
+username pptpd password *
+#+end_src
+第四个*号表示自动分配IP地址。每个字段中间用空格隔开。
+
+4. 在 /etc/ppp/pptpd-options 中加入 Google 提供的公共DNS配置
+将最后两行代表注释的 # 号去掉，然后修改地址为公共DNS，最后需要达成的内
+容：
+#+begin_src sh
+ms-dns 8.8.8.8
+ms-dns 8.8.4.4
+#+end_src
+
+5. 设置 ipv4_forwarding 转发和 NAT 规则。首先编辑 /etc/sysctl.conf 如
+   下
+将 =net.ipv4.ip_forward = 1= 之前的注释#号去掉
+#+begin_src sh
+# Uncomment the next line to enable packet forwarding for IPv4
+net.ipv4.ip_forward=1
+#+end_src
+
+输入以下命令使刚刚的配置更改生效；确保配置更新的时候看到确认
+=ip_forwarding= 规则的提示：
+#+begin_src sh
+# sysctl -p
+#+end_src
+
+6. 在iptables中创立 NAT 规则。
+#+begin_src sh
+# iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE && iptables-save
+#+end_src
+
+7. 重启PPTPD服务，使得上述的更改生效
+#+begin_src sh
+# service pptpd restart
+#+end_src
+
+
+* Footnotes
+
+[fn:1] http://www.people.virginia.edu/~tq7bw/vpn/
+

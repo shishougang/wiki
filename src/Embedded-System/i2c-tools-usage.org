@@ -1,0 +1,140 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: I^2C tool usage
+#+OPTIONS: num:nil H:2
+
+* i2c device
+#+begin_src sh
+$ ls /dev/i2c*
+/dev/i2c-0  /dev/i2c-1
+#+end_src
+
+* i2c-tools commands[fn:1]
++ i2cdetect – 用來列舉 I2C bus 和上面所有的裝置
++ i2cdump – 顯示裝置上所有暫存器 (register) 數值
++ i2cget – 讀取裝置上某個暫存器值
++ i2cset – 修改裝置上的暫存器數值
+* i2cdetect
+察看目前的系統有多少個 i2c bus
+#+begin_src sh
+$ sudo i2cdetect -l
+#+end_src
+
+查詢 i2c-1 bus 上的所有設備，所得到的結果如下
+#+begin_src sh
+# i2cdetect -y 1
+    0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: 50 -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- UU -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
+#+end_src
+這樣代表共有兩個裝置掛在 i2c-1 上，其中標示為 UU 的代表該設備有被偵測
+到並正在被 kernel driver 使用著，而在這邊顯示 0x50 的就是所使用的
+EEPROM。
+
+* i2cdump 查詢設備內所有暫存器
+i2cdump 的使用方式如下:
+#+begin_src sh
+Usage: i2cdump [-f] [-y] [-r first-last] I2CBUS ADDRESS [MODE [BANK [BANKREG]]]
+I2CBUS is an integer or an I2C bus name
+ADDRESS is an integer (0x03 - 0x77)
+MODE is one of:
+  b (byte, default)
+  w (word)
+  W (word on even register addresses)
+  s (SMBus block)
+  i (I2C block)
+  c (consecutive byte)
+  Append p for SMBus PEC
+#+end_src
+
+#+begin_src sh
+# i2cdump -y 1 0x50
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+10: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+20: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+30: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+40: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+50: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+60: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+70: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+90: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+a0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+b0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+c0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+d0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+e0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+f0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+#+end_src
+
+* i2cset 修改設備暫存器數值
+i2cset 的使用方式如下:
+#+begin_src sh
+Usage: i2cset [-f] [-y] [-m MASK] I2CBUS CHIP-ADDRESS DATA-ADDRESS [VALUE] ... [MODE]
+  I2CBUS is an integer or an I2C bus name
+  ADDRESS is an integer (0x03 - 0x77)
+  MODE is one of:
+    c (byte, no value)
+    b (byte data, default)
+    w (word data)
+    i (I2C block data)
+    s (SMBus block data)
+    Append p for SMBus PEC
+#+end_src
+修改位於 i2c-1 上 0x50 的 0x12 暫存器，並將其數值修改為 5:
+#+begin_src sh
+i2cset -f -y 1 0x50 0x12 5
+#+end_src
+
+#+begin_src sh
+# i2cdump -y 1 0x50
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+10: ff ff 05 ff ff ff ff ff ff ff ff ff ff ff ff ff    ..?.............
+20: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+30: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+40: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+50: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+60: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+70: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+90: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+a0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+b0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+c0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+d0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+e0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+f0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+#+end_src
+
+* i2cget 來取得暫存器的數值
+i2cget 命令格式如下:
+#+begin_src sh
+Usage: i2cget [-f] [-y] I2CBUS CHIP-ADDRESS [DATA-ADDRESS [MODE]]
+I2CBUS is an integer or an I2C bus name
+ADDRESS is an integer (0x03 - 0x77)
+MODE is one of:
+  b (read byte data, default)
+  w (read word data)
+  c (write byte/read byte)
+  Append p for SMBus PEC
+#+end_src
+察看剛剛所設定的 0x12 暫存器:
+
+#+begin_src sh
+# i2cget  -y 1 0x50 0x12
+0x05
+#+end_src
+
+* Footnotes
+
+[fn:1] http://coldnew.github.io/blog/2013/06-19_e5bcf/
+

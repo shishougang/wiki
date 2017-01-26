@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Set up PPTP on the Ubuntu</title>
+<!-- 2017-01-26 Thu 19:53 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Set up PPTP on the Ubuntu</h1>
+<p>
+PPTP（点对点隧道协议，Point-to-Point Tunnel Protocol）是最基本的VPN协议。它的配置相当简单，但稳定性一般。<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
+</p>
+
+<ol class="org-ol">
+<li>安装PPTPD服务（Point-to-Point Tunnel Protocol Daemon）
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">apt-get install pptpd</span>
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>编辑内网IP设置 /etc/pptpd.conf
+</li>
+</ol>
+<p>
+文件末尾加入以下内容：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">localip 10.0.0.1
+remoteip 10.0.0.100-200
+</pre>
+</div>
+<p>
+以 10.0.0.1 作为内网网关，10.0.0.100 到 200 作为服务器分配给每个连接的内网IP。
+</p>
+
+<ol class="org-ol">
+<li>在 /etc/ppp/chap-secrets 中加入用户名和密码
+</li>
+</ol>
+<p>
+在表头下面另起一行，按照以下格式来添加用户名和密码。多个用户名用空行来分隔。
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">username pptpd password *
+</pre>
+</div>
+<p>
+第四个*号表示自动分配IP地址。每个字段中间用空格隔开。
+</p>
+
+<ol class="org-ol">
+<li>在 /etc/ppp/pptpd-options 中加入 Google 提供的公共DNS配置
+</li>
+</ol>
+<p>
+将最后两行代表注释的 # 号去掉，然后修改地址为公共DNS，最后需要达成的内容：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">ms-dns 8.8.8.8
+ms-dns 8.8.4.4
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>设置 ipv4<sub>forwarding</sub> 转发和 NAT 规则。首先编辑 /etc/sysctl.conf 如下
+</li>
+</ol>
+<p>
+将 <code>net.ipv4.ip_forward = 1</code> 之前的注释#号去掉
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Uncomment the next line to enable packet forwarding for IPv4</span>
+net.ipv4.ip_forward=1
+</pre>
+</div>
+
+<p>
+输入以下命令使刚刚的配置更改生效；确保配置更新的时候看到确认
+<code>ip_forwarding</code> 规则的提示：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">sysctl -p</span>
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>在iptables中创立 NAT 规则。
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE &amp;&amp; iptables-save</span>
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>重启PPTPD服务，使得上述的更改生效
+</li>
+</ol>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">service pptpd restart</span>
+</pre>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://www.people.virginia.edu/~tq7bw/vpn/">http://www.people.virginia.edu/~tq7bw/vpn/</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-01-26 Thu 19:53</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

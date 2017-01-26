@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Set up Shadowsocks server and client</title>
-<!-- 2017-01-26 Thu 19:38 -->
+<!-- 2017-01-26 Thu 19:53 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -66,36 +66,394 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">cc</a></li>
+<li><a href="#sec-1">websites</a></li>
+<li><a href="#sec-2">Set up the Server on the Ubuntu</a></li>
+<li><a href="#sec-3">TCP Fast Open</a></li>
+<li><a href="#sec-4">Optimizing Shadowsocks</a>
+<ul>
+<li><a href="#sec-4-1">options</a></li>
+<li><a href="#sec-4-2">tcp congestion control: hybla</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">ubuntu使用shadowsocks客户端配置</a>
+<ul>
+<li><a href="#sec-5-1">shadowsocks命令行程序</a></li>
+<li><a href="#sec-5-2">shadowsocks GUI图形界面程序</a></li>
+<li><a href="#sec-5-3">配置Chrome浏览器</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">iOS上的客户端</a></li>
 </ul>
 </div>
 </div>
 
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">cc</h2>
+<h2 id="sec-1">websites</h2>
 <div class="outline-text-2" id="text-1">
+<ul class="org-ul">
+<li>homepage: <a href="http://shadowsocks.org/en/index.html">http://shadowsocks.org/en/index.html</a>
+</li>
+<li>github: <a href="https://github.com/shadowsocks">https://github.com/shadowsocks</a>
+</li>
+<li>Shadowsocks-使用说明:
+<a href="https://github.com/shadowsocks/shadowsocks/wiki/Shadowsocks-%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E">https://github.com/shadowsocks/shadowsocks/wiki/Shadowsocks-%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E</a>
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Set up the Server on the Ubuntu</h2>
+<div class="outline-text-2" id="text-2">
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
+<pre class="src src-sh">sudo apt-get update
+sudo apt-get install python-pip
+sudo pip install shadowsocks
+</pre>
+</div>
+
+<p>
+create a configure file: <code>/etc/shadowsocks/shadowsocks.json</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">mkdir -p /etc/shadowsocks/
+</pre>
 </div>
 
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-sh">{
+    <span style="color: #ffa07a;">"server"</span>:<span style="color: #ffa07a;">"0.0.0.0"</span>,
+    <span style="color: #ffa07a;">"server_port"</span>:8390,
+    <span style="color: #ffa07a;">"local_address"</span>: <span style="color: #ffa07a;">"127.0.0.1"</span>,
+    <span style="color: #ffa07a;">"local_port"</span>:1080,
+    <span style="color: #ffa07a;">"password"</span>:<span style="color: #ffa07a;">"mypassword"</span>,
+    <span style="color: #ffa07a;">"timeout"</span>:300,
+    <span style="color: #ffa07a;">"method"</span>:<span style="color: #ffa07a;">"aes-256-cfb"</span>,
+    <span style="color: #ffa07a;">"fast_open"</span>: false
+}
+</pre>
 </div>
 
+<p>
+start the server:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">ssserver -c /etc/shadowsocks/shadowsocks.json -d start
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">ignoring hangup signals</span>
+nohup ssserver -c  /etc/shadowsocks/shadowsocks.json &amp;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">TCP Fast Open</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+If both of your server and client are deployed on Linux 3.7.1 or
+higher, you can turn on fast<sub>open</sub> for lower latency.
+</p>
+
+<p>
+First set <code>fast_open</code> to <code>true</code> in your <code>config.json</code>.
+</p>
+
+<p>
+Then turn on fast open on your OS temporarily:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #b0c4de;">echo</span> 3 &gt; /proc/sys/net/ipv4/tcp_fastopen
+</pre>
+</div>
+<p>
+To turn on fast open permanently, see Optimizing Shadowsocks.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Optimizing Shadowsocks<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">options</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+add below into  <code>/etc/sysctl.conf</code>:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">max open files</span>
+fs.file-max = 51200
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">max read buffer</span>
+net.core.rmem_max = 67108864
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">max write buffer</span>
+net.core.wmem_max = 67108864
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">default read buffer</span>
+net.core.rmem_default = 65536
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">default write buffer</span>
+net.core.wmem_default = 65536
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">max processor input queue</span>
+net.core.netdev_max_backlog = 4096
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">max backlog</span>
+net.core.somaxconn = 4096
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">resist SYN flood attacks</span>
+net.ipv4.tcp_syncookies = 1
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">reuse timewait sockets when safe</span>
+net.ipv4.tcp_tw_reuse = 1
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">turn off fast timewait sockets recycling</span>
+net.ipv4.tcp_tw_recycle = 0
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">short FIN timeout</span>
+net.ipv4.tcp_fin_timeout = 30
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">short keepalive time</span>
+net.ipv4.tcp_keepalive_time = 1200
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">outbound port range</span>
+net.ipv4.ip_local_port_range = 10000 65000
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">max SYN backlog</span>
+net.ipv4.tcp_max_syn_backlog = 4096
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">max timewait sockets held by system simultaneously</span>
+net.ipv4.tcp_max_tw_buckets = 5000
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">turn on TCP Fast Open on both client and server side</span>
+net.ipv4.tcp_fastopen = 3
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">TCP receive buffer</span>
+net.ipv4.tcp_rmem = 4096 87380 67108864
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">TCP write buffer</span>
+net.ipv4.tcp_wmem = 4096 65536 67108864
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">turn on path MTU discovery</span>
+net.ipv4.tcp_mtu_probing = 1
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">for high-latency network</span>
+net.ipv4.tcp_congestion_control = hybla
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">for low-latency network, use cubic instead</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">net.ipv4.tcp_congestion_control = cubic</span>
+</pre>
+</div>
 
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-sh">sysctl -p
+</pre>
+</div>
+
+<p>
+Warning: <b>DO NOT ENABLE</b> <code>net.ipv4.tcp_tw_recycle</code>!!! See <a href="https://vincent.bernat.im/en/blog/2014-tcp-time-wait-state-linux.html">this article</a>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">tcp congestion control: hybla<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup></h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+use <code>lsmod | grep hybla</code> to check whether the optimization can work
+normally.
+</p>
 </div>
 </div>
 </div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">ubuntu使用shadowsocks客户端配置<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup></h2>
+<div class="outline-text-2" id="text-5">
+<p>
+有两种方法可行:
+</p>
+<ol class="org-ol">
+<li>安装shadowsocks命令行程序，配置命令。
+</li>
+<li>安装shadowsocks GUI图形界面程序，配置。
+</li>
+</ol>
 </div>
+<div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">shadowsocks命令行程序</h3>
+<div class="outline-text-3" id="text-5-1">
+</div><ul class="org-ul"><li><a id="sec-5-1-1" name="sec-5-1-1"></a>安装shadowsocks<br  /><div class="outline-text-4" id="text-5-1-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt-get update
+sudo apt-get install python-pip
+sudo apt-get install python-setuptools m2crypto
+sudo pip install shadowsocks
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-5-1-2" name="sec-5-1-2"></a>启动shadowsocks<br  /><div class="outline-text-4" id="text-5-1-2">
+<p>
+安装好后，在本地我们要用到sslocal ，终端输入sslocal &#x2013;help 可以查看帮助:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sslocal --help
+usage: sslocal [OPTION]...
+A fast tunnel proxy that helps you bypass firewalls.
+
+You can supply configurations via either config file or command line arguments.
+
+Proxy options:
+  -c CONFIG              path to config file
+  -s SERVER_ADDR         server address
+  -p SERVER_PORT         server port, default: 8388
+  -b LOCAL_ADDR          local binding address, default: 127.0.0.1
+  -l LOCAL_PORT          local port, default: 1080
+  -k PASSWORD            password
+  -m METHOD              encryption method, default: aes-256-cfb
+  -t TIMEOUT             timeout<span style="color: #00ffff;"> in</span> seconds, default: 300
+  --fast-open            use TCP_FASTOPEN, requires Linux 3.7+
+</pre>
+</div>
+<p>
+直接命令运行:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sslocal -s 11.22.33.44 -p 50003 -k <span style="color: #ffa07a;">"123456"</span> -l 1080 -t 600 -m aes-256-cfb
+</pre>
+</div>
+<p>
+-s表示服务IP, -p指的是服务端的端口，-l是本地端口默认是1080, -k 是密码（要加""）, -t超时默认300,-m是加密方法默认aes-256-cfb，
+</p>
+
+<p>
+用配置文件:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">{
+    <span style="color: #ffa07a;">"server"</span>:<span style="color: #ffa07a;">"11.22.33.44"</span>,
+    <span style="color: #ffa07a;">"server_port"</span>:50003,
+    <span style="color: #ffa07a;">"local_port"</span>:1080,
+    <span style="color: #ffa07a;">"password"</span>:<span style="color: #ffa07a;">"123456"</span>,
+    <span style="color: #ffa07a;">"timeout"</span>:600,
+    <span style="color: #ffa07a;">"method"</span>:<span style="color: #ffa07a;">"aes-256-cfb"</span>
+}
+</pre>
+</div>
+<div class="org-src-container">
+
+<pre class="src src-sh">sslocal -c ~/shadowsocks.json
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-5-1-3" name="sec-5-1-3"></a>开机后台自动运行sslocal<br  /><div class="outline-text-4" id="text-5-1-3">
+<p>
+在/etc下编辑一个叫rc.local的文件,加上
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sslocal -c /home/username/shadowsocks.json
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">shadowsocks GUI图形界面程序</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+安装GUI图形界面程序: <a href="https://github.com/shadowsocks/shadowsocks-qt5/wiki/%E5%AE%89%E8%A3%85%E6%8C%87%E5%8D%97">shadowsocks-qt5 安装指南</a>
+</p>
+
+<p>
+在ubuntu上可以这样，通过PPA源安装，仅支持Ubuntu 14.04或更高版本:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo add-apt-repository ppa:hzwhuang/ss-qt5
+sudo apt-get update
+sudo apt-get install shadowsocks-qt5
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3">配置Chrome浏览器</h3>
+<div class="outline-text-3" id="text-5-3">
+</div><ul class="org-ul"><li><a id="sec-5-3-1" name="sec-5-3-1"></a>安装插件<br  /><div class="outline-text-4" id="text-5-3-1">
+<p>
+给chrome安装SwitchyOmega插件,但是没有代理之前是不能从谷歌商店安装这个插件的，从Github上直接下载最新版
+<a href="https://github.com/FelisCatus/SwitchyOmega/releases/">https://github.com/FelisCatus/SwitchyOmega/releases/</a> 然后浏览器地址打开chrome://extensions/，将下载的插件托进去安装。
+</p>
+</div>
+</li>
+
+<li><a id="sec-5-3-2" name="sec-5-3-2"></a>设置代理地址<br  /><div class="outline-text-4" id="text-5-3-2">
+<p>
+代理协议选择SOCKS5，地址为127.0.0.1,端口默认1080 。
+<img src="./Files/shadowsocks-0.png" alt="shadowsocks-0.png" />
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/shadowsocks-1.png" alt="shadowsocks-1.png" />
+</p>
+</div>
+</div>
+</li>
+<li><a id="sec-5-3-3" name="sec-5-3-3"></a>设置自动切换<br  /><div class="outline-text-4" id="text-5-3-3">
+<p>
+接着点击自动切换 ( Auto switch）,按照规则列表匹配请求后面选择刚才新建的SS，默认情景模式选择直接连接。点击应用选项保存。再往下规则列表设置选择AutoProxy 然后将 <a href="https://raw.githubusercontent.com/gfwlist/gfwlist/master/gfwlist.txt">这个地址</a> 填进去，点击下面的立即更新情景模式，会有提示更新成功！后再应用选项保存.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/shadowsocks-2.png" alt="shadowsocks-2.png" />
+</p>
+</div>
+
+<p>
+点击浏览器右上角的SwitchyOmega图标，下面选择自动切换，然后打开
+google.com试试
+<img src="./Files/shadowsocks-3.png" alt="shadowsocks-3.png" />
+</p>
+</div>
+</li></ul>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">iOS上的客户端</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+iOS上的客户端有shadowrocket，surge，potatso。建议试用shadowrocket，配置方便还便宜。
+</p>
+
+<p>
+一个新的好用的免费影梭shadowsocks客户端叫wingy
+</p>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="https://github.com/shadowsocks/shadowsocks/wiki/Optimizing-Shadowsocks">https://github.com/shadowsocks/shadowsocks/wiki/Optimizing-Shadowsocks</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="https://www.vultr.com/docs/how-to-setup-tcp-optimization-on-linux">https://www.vultr.com/docs/how-to-setup-tcp-optimization-on-linux</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.3" name="fn.3" class="footnum" href="#fnr.3">3</a></sup> <p class="footpara">
+<a href="https://aitanlu.com/ubuntu-shadowsocks-ke-hu-duan-pei-zhi.html">https://aitanlu.com/ubuntu-shadowsocks-ke-hu-duan-pei-zhi.html</a>
+</p></div>
+
+
+</div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-01-26 Thu 19:38</p>
+<p class="date">Created: 2017-01-26 Thu 19:53</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
