@@ -1,0 +1,202 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Determine the line of oops
+#+OPTIONS: num:nil H:2
+
+
+* oops例子
+#+begin_src sh
+Oops: 0000 [#1] PREEMPT SMP  
+                Modules linked in: capidrv kernelcapi isdn slhc ipv6 loop dm_multipath snd_ens1371 gameport snd_rawmidi snd_ac97_codec ac97_bus s nd_seq_dummy snd_seq_oss snd_seq_midi_event snd_seq snd_seq_device snd_pcm_oss snd_mixer_oss snd_pcm snd_timer snd parport_pc floppy parport pcnet32 soundcore mii pcspkr snd_page_alloc ac i2c_piix4 i2c_core button power_supply sr_mod sg cdrom ata_piix libata dm_snapshot dm_zero dm_mirror dm_mod BusLogic sd_mod scsi_mod ext3 jbd mbcache uhci_hcd ohci_hcd ehci_hcd
+Pid: 1726, comm: kstopmachine Not tainted (2.6.24-rc3-module #2)
+                EIP: 0060:[<c04e53d6>] EFLAGS: 00010092 CPU: 0
+                EIP is at list_del+0xa/0x61
+                EAX: e0c3cc04 EBX: 00000020 ECX: 0000000e EDX: dec62000
+                ESI: df6e8f08 EDI: 000006bf EBP: dec62fb4 ESP: dec62fa4
+                 DS: 007b ES: 007b FS: 00d8 GS: 0000 SS: 0068 
+                Process kstopmachine (pid: 1726, ti=dec62000 task=df8d2d40 task.ti=dec62000)
+                Stack: 000006bf dec62fb4 c04276c7 00000020 dec62fbc c044ab4c dec62fd0 c045336c 
+                       df6e8f08 c04532b4 00000000 dec62fe0 c043deb0 c043de75 00000000 00000000 
+                       c0405cdf df6e8eb4 00000000 00000000 00000000 00000000 00000000 
+                Call Trace:
+                 [<c0406081>] show_trace_log_lvl+0x1a/0x2f
+                 [<c0406131>] show_stack_log_lvl+0x9b/0xa3
+                 [<c04061dc>] show_registers+0xa3/0x1df
+                 [<c0406437>] die+0x11f/0x200
+                 [<c0613cba>] do_page_fault+0x533/0x61a
+                 [<c06123ea>] error_code+0x72/0x78
+                 [<c044ab4c>] __unlink_module+0xb/0xf
+                 [<c045336c>] do_stop+0xb8/0x108
+                 [<c043deb0>] kthread+0x3b/0x63
+                 [<c0405cdf>] kernel_thread_helper+0x7/0x10
+                 =======================
+                Code: 6b c0 e8 2e 7e f6 ff e8 d1 16 f2 ff b8 01 00 00 00 e8 aa 1c f4 ff 89 d8 83 c4 10 5b 5d c3 90 90 90 55 89 e5 53 83 ec 0c 8b 48 04 <8b> 11 39 c2 74 18 89 54 24 08 89 44 24 04 c7 04 24 be 32 6b c0  
+                EIP: [<c04e53d6>] list_del+0xa/0x61 SS:ESP 0068:dec62fa4
+                note: kstopmachine[1726] exited with preempt_count 1
+#+end_src
+* 有自己编译的vmlinux： 使用gdb[fn:1]
+编译时打开complie with debug info选项。 
+
+注意这行： 
+=EIP is at list_del+0xa/0x61=
+这告诉我们， =list_del= 函数有 =0x61= 这么大，而Oops发生在 =0xa= 处。
+
+先看一下 =list_del= 从哪里开始:
+#+begin_src sh
+# grep list_del /boot/System.map-2.6.24-rc3-module
+                c10e5234 T plist_del
+                c10e53cc T list_del
+                c120feb6 T klist_del
+                c12d6d34 r __ksymtab_list_del
+                c12dadfc r __ksymtab_klist_del
+                c12e1abd r __kstrtab_list_del
+                c12e9d03 r __kstrtab_klist_del
+#+end_src
+于是我们知道，发生Oops时的EIP值是：
+~c10e53cc + 0xa  == c10e53d6~
+然后用gdb查看：
+#+begin_src sh
+  # gdb /home/arc/build/linux-2.6/vmlinux
+  (gdb) b *0xc10e53d6
+  Breakpoint 1 at 0xc10e53d6: file /usr/src/linux-2.6.24-rc3/lib/list_debug.c, line 64.
+#+end_src
+gdb直接就告诉你在哪个文件、哪一行了。
+
+gdb中还可以这样. function name + offset, 直接知道line number。：
+#+begin_src sh
+# gdb Sources/linux-2.6.24/vmlinux
+                (gdb) l *do_fork+0x1f
+                0xc102b7ac is in do_fork (kernel/fork.c:1385).
+                1380
+                1381    static int fork_traceflag(unsigned clone_flags)
+                1382    {
+                1383            if (clone_flags & CLONE_UNTRACED)
+                1384                    return 0;
+                1385            else if (clone_flags & CLONE_VFORK) {
+                1386                    if (current->ptrace & PT_TRACE_VFORK)
+                1387                            return PTRACE_EVENT_VFORK;
+                1388            } else if ((clone_flags & CSIGNAL) != SIGCHLD) {
+                1389                    if (current->ptrace & PT_TRACE_CLONE)
+                (gdb)
+#+end_src
+ 或者：
+ =(gdb) l *(0xffffffff8023eaf0 + 0xff)=  /* 出错函数的地址加上偏移 */
+* 没有自己编译的vmlinux[fn:2]
+如果在lkml或bugzilla上看到一个Oops，而自己不能重现，那就只能反汇编以
+"Code:"开始的行。 这样可以尝试定位到源代码中。
+
+注意，Oops中的Code:行，会把导致Oops的第一条指令，也就是EIP的值的第一个
+字节， 用尖括号<>括起来。 但是，有些体系结构(例如常见的x86)指令是不等
+长的(不一样的指令可能有不一样的长度)，所以要不断的尝试
+(trial-and-error)。
+
+Linus通常使用一个小程序，类似这样：
+#+begin_src c
+  const char array[] = "\xnn\xnn\xnn...";
+  int main(int argc, char *argv[])
+  {
+    printf("%p\n", array);
+    *(int *)0 = 0;
+  }
+#+end_src
+注意， array一共有从 =array[0]= 到 =array[64]= 这65个元素， 其中出错
+的那个操作码 ~<8b> == arry[43]~ .
+#+begin_src c
+  #include <stdio.h>
+  #include <stdlib.h>
+  
+  const char array[] ="\x6b\xc0\xe8\x2e\x7e\xf6\xff\xe8\xd1\x16\xf2\xff\xb8\x01\x00\x00\x00\xe8\xaa\x1c\xf4\xff\x89\xd8\x83\xc4\x10\x5b\x5d\xc3\x90\x90\x90\x55\x89\xe5\x53\x83\xec\x0c\x8b\x48\x04\x8b\x11\x39\xc2\x74\x18\x89\x54\x24\x08\x89\x44\x24\x04\xc7\x04\x24\xbe\x32\x6b\xc0";
+  int main(int argc, char *argv[])
+  {
+    printf("%p\n", array);
+    ,*(int *)0 = 0;
+  }
+#+end_src
+
+用 =gcc -g= 编译，在gdb里运行它：
+#+begin_src sh
+    [arc@dhcp-cbjs05-218-251 ~]$ gdb hello
+                GNU gdb Fedora (6.8-1.fc9)
+                Copyright (C) 2008 Free Software Foundation, Inc.
+                License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+                This is free software: you are free to change and redistribute it.
+                There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+                and "show warranty" for details.
+                This GDB was configured as "x86_64-redhat-linux-gnu"...
+                (no debugging symbols found)
+                (gdb) r
+                Starting program: /home/arc/hello
+                0x80484e0
+
+                Program received signal SIGSEGV, Segmentation fault.
+#+end_src
+
+注意，这时候就可以反汇编0x80484e0这个地址：
+
+#+begin_src sh
+(gdb) disassemble 0x80484e0
+                Dump of assembler code for function array:
+                0x080484e0 <array+0>:   imul   $0xffffffe8,%eax,%eax
+                0x080484e3 <array+3>:   jle,pn 0x80484dc <__dso_handle+20>
+                0x080484e6 <array+6>:   ljmp   *<internal disassembler error>
+                0x080484e8 <array+8>:   rcll   (%esi)
+                0x080484ea <array+10>:  repnz (bad)
+                0x080484ec <array+12>:  mov    $0x1,%eax
+                0x080484f1 <array+17>:  call   0x7f8a1a0
+                0x080484f6 <array+22>:  mov    %ebx,%eax
+                0x080484f8 <array+24>:  add    $0x10,%esp
+                0x080484fb <array+27>:  pop    %ebx
+                0x080484fc <array+28>:  pop    %ebp
+                0x080484fd <array+29>:  ret
+                0x080484fe <array+30>:  nop
+                0x080484ff <array+31>:  nop
+                0x08048500 <array+32>:  nop
+                0x08048501 <array+33>:  push   %ebp
+                0x08048502 <array+34>:  mov    %esp,%ebp
+                0x08048504 <array+36>:  push   %ebx
+                0x08048505 <array+37>:  sub    $0xc,%esp
+                0x08048508 <array+40>:  mov    0x4(%eax),%ecx
+                0x0804850b <array+43>:  mov    (%ecx),%edx
+                0x0804850d <array+45>:  cmp    %eax,%edx
+                0x0804850f <array+47>:  je     0x8048529
+                0x08048511 <array+49>:  mov    %edx,0x8(%esp)
+                0x08048515 <array+53>:  mov    %eax,0x4(%esp)
+                0x08048519 <array+57>:  movl   $0xc06b32be,(%esp)
+                0x08048520 <array+64>:  add    %ah,0xa70
+                End of assembler dump.
+                (gdb)
+#+end_src
+
+现在你知道出错的那条指令是 =array[43]= ，也就是 =mov    (%ecx),%edx= ，也就是
+说， =(%ecx)= 指向了一个错误内存地址。
+
+为了使汇编代码和C代码更好的对应起来， Linux内核的Kbuild子系统提供了这
+样一个功能： 任何一个C文件都可以单独编译成汇编文件，例如：
+=make path/to/the/sourcefile.s=
+
+有时侯需要对*.s文件进行分析，以确定BUG所在的位置。 对任何一个内核build
+目录下的*.c文件，都可以直接编译出*.s文件。
+
+而对于自己写的module，就需要在Makefile中有一个灵活的target写法：
+#+begin_src sh
+obj-m := usb-skel.o
+                KDIR := /lib/modules/`uname -r`/build
+                traget := modules
+
+                default:
+                        make -C $(KDIR) M=$(shell pwd) $(target)
+                clean:
+                        rm -f *.o *.ko .*.cmd *.symvers *.mod.c
+                        rm -rf .tmp_versions
+#+end_src
+
+#+begin_src sh
+  # make target=usb-skel.s V=1
+#+end_src
+这样，kbuild系统才知道你要make的目标不是modules，而是 =usb-skel.s= 。
+
+* Footnotes
+
+[fn:1] http://bbs.chinaunix.net/thread-1999464-1-1.html
+
+[fn:2] https://groups.google.com/forum/#!topic/linux.kernel/twv_6QFajEE
+

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>IPQ4xx Ethernet Analysis</title>
-<!-- 2017-01-19 Thu 00:26 -->
+<!-- 2017-02-06 Mon 23:26 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -66,15 +66,145 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">cc</a></li>
+<li><a href="#sec-1">Device tree</a></li>
+<li><a href="#sec-2">cc</a></li>
 </ul>
 </div>
 </div>
+<p>
+<code>/net/ethernet/eth.c</code>
+<code>/drivers/net/ethernet/qcom/essedma/</code>
+<code>/drivers/net/phy/mdio-ipq40xx.c</code>
+</p>
 
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">cc</h2>
+<h2 id="sec-1">Device tree</h2>
 <div class="outline-text-2" id="text-1">
+<ol class="org-ol">
+<li>QCA Ethernet DMA
+<code>Documentation/devicetree/bindings/net/qca-ess.txt</code>
+</li>
+<li>QCA Ethernet Switch
+ESS-SWITCH is used to forward the packet among LAN, WAN and Host
+processor.
+<code>Documentation/devicetree/bindings/arm/msm/ess-switch.txt</code>
+</li>
+<li>QCA Ethernet PHY mode <code>ess-psgmii</code>
+</li>
+<li>MDIO Interface <code>ipq40xx-mdio</code>
+</li>
+</ol>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">edma@c080000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,ess-edma"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0xc080000 0x8000&gt;;
+        qcom,page-mode = &lt;0&gt;;
+        qcom,<span style="color: #eedd82;">rx_head_buf_size</span> = &lt;1540&gt;;
+        qcom,<span style="color: #eedd82;">wan_port_id_mask</span> = &lt;0x10&gt;;
+        qcom,mdio_supported;
+        qcom,<span style="color: #eedd82;">phy_mdio_addr</span> = &lt;4&gt;;
+        qcom,<span style="color: #eedd82;">poll_required</span> = &lt;1&gt;;
+        qcom,<span style="color: #eedd82;">forced_speed</span> = &lt;1000&gt;;
+        qcom,<span style="color: #eedd82;">forced_duplex</span> = &lt;1&gt;;
+
+        <span style="color: #eedd82;">interrupts</span> = &lt;0 65 1&gt;,
+                        &lt;0 66 1&gt;,
+                        &lt;0 67 1&gt;,
+                        &lt;0 68 1&gt;,
+                        &lt;0 69 1&gt;,
+                        &lt;0 70 1&gt;,
+                        &lt;0 71 1&gt;,
+                        &lt;0 72 1&gt;,
+                        &lt;0 73 1&gt;,
+                        &lt;0 74 1&gt;,
+                        &lt;0 75 1&gt;,
+                        &lt;0 76 1&gt;,
+                        &lt;0 77 1&gt;,
+                        &lt;0 78 1&gt;,
+                        &lt;0 79 1&gt;,
+                        &lt;0 80 1&gt;,
+                        &lt;0 240 1&gt;,
+                        &lt;0 241 1&gt;,
+                        &lt;0 242 1&gt;,
+                        &lt;0 243 1&gt;,
+                        &lt;0 244 1&gt;,
+                        &lt;0 245 1&gt;,
+                        &lt;0 246 1&gt;,
+                        &lt;0 247 1&gt;,
+                        &lt;0 248 1&gt;,
+                        &lt;0 249 1&gt;,
+                        &lt;0 250 1&gt;,
+                        &lt;0 251 1&gt;,
+                        &lt;0 252 1&gt;,
+                        &lt;0 253 1&gt;,
+                        &lt;0 254 1&gt;,
+                        &lt;0 255 1&gt;;
+        gmac0 {
+                local-mac-address = [000000000000];
+        };
+        gmac1 {
+                local-mac-address = [000000000000];
+        };
+};
+
+ess-switch@c000000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,ess-switch"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0xc000000 0x80000&gt;; /* 512KB */
+        <span style="color: #eedd82;">switch_access_mode</span> = <span style="color: #ffa07a;">"local bus"</span>;
+        <span style="color: #eedd82;">resets</span> = &lt;&amp;gcc ESS_RESET&gt;, &lt;&amp;gcc ESS_MAC1_CLK_DIS&gt;, <span style="color: #ffa07a;">\</span>
+                &lt;&amp;gcc ESS_MAC2_CLK_DIS&gt;, &lt;&amp;gcc ESS_MAC3_CLK_DIS&gt;, <span style="color: #ffa07a;">\</span>
+                &lt;&amp;gcc ESS_MAC4_CLK_DIS&gt;, &lt;&amp;gcc ESS_MAC5_CLK_DIS&gt;;
+        reset-names = <span style="color: #ffa07a;">"ess_rst"</span>,<span style="color: #ffa07a;">"ess_mac1_clk_dis"</span>, <span style="color: #ffa07a;">\</span>
+                <span style="color: #ffa07a;">"ess_mac2_clk_dis"</span>,<span style="color: #ffa07a;">"ess_mac3_clk_dis"</span>, <span style="color: #ffa07a;">\</span>
+                <span style="color: #ffa07a;">"ess_mac4_clk_dis"</span>, <span style="color: #ffa07a;">"ess_mac5_clk_dis"</span>;
+        <span style="color: #eedd82;">clocks</span> = &lt;&amp;gcc GCC_ESS_CLK&gt;;
+        clock-names = <span style="color: #ffa07a;">"ess_clk"</span>;
+        <span style="color: #eedd82;">switch_cpu_bmp</span> = &lt;0x1&gt;;  /* cpu port bitmap */
+        <span style="color: #eedd82;">switch_lan_bmp</span> = &lt;0x1e&gt;; /* lan port bitmap */
+        <span style="color: #eedd82;">switch_wan_bmp</span> = &lt;0x20&gt;; /* wan port bitmap */
+};
+ess-psgmii@98000 {
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,ess-psgmii"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x98000 0x800&gt;; /* 2k */
+        <span style="color: #eedd82;">psgmii_access_mode</span> = <span style="color: #ffa07a;">"local bus"</span>;
+        <span style="color: #eedd82;">resets</span> = &lt;&amp;gcc ESS_PSGMII_ARES&gt;;
+        reset-names = <span style="color: #ffa07a;">"psgmii_rst"</span>;
+};
+
+mdio@90000 {
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">address-cells = &lt;1&gt;;</span>
+        <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">size-cells = &lt;1&gt;;</span>
+        <span style="color: #eedd82;">compatible</span> = <span style="color: #ffa07a;">"qcom,ipq40xx-mdio"</span>;
+        <span style="color: #eedd82;">reg</span> = &lt;0x90000 0x64&gt;;
+        phy0: ethernet-phy@0 {
+                <span style="color: #eedd82;">reg</span> = &lt;0&gt;;
+        };
+        phy1: ethernet-phy@1 {
+                <span style="color: #eedd82;">reg</span> = &lt;1&gt;;
+        };
+        phy2: ethernet-phy@2 {
+                <span style="color: #eedd82;">reg</span> = &lt;2&gt;;
+        };
+        phy3: ethernet-phy@3 {
+                <span style="color: #eedd82;">reg</span> = &lt;3&gt;;
+        };
+        phy4: ethernet-phy@4 {
+                <span style="color: #eedd82;">reg</span> = &lt;4&gt;;
+        };
+};
+</pre>
+</div>
+</div>
+</div>
+
+
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">cc</h2>
+<div class="outline-text-2" id="text-2">
 <div class="org-src-container">
 
 <pre class="src src-python"></pre>
@@ -95,7 +225,7 @@ for the JavaScript code in this tag.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-01-19 Thu 00:26</p>
+<p class="date">Created: 2017-02-06 Mon 23:26</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

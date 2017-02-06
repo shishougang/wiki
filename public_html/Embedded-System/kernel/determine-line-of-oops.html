@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Determine the line of oops</title>
+<!-- 2017-02-06 Mon 23:26 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Determine the line of oops</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">oops例子</a></li>
+<li><a href="#sec-2">有自己编译的vmlinux： 使用gdb</a></li>
+<li><a href="#sec-3">没有自己编译的vmlinux</a></li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">oops例子</h2>
+<div class="outline-text-2" id="text-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">Oops: 0000 [#1] PREEMPT SMP  
+                Modules linked<span style="color: #00ffff;"> in</span>: capidrv kernelcapi isdn slhc ipv6 loop dm_multipath snd_ens1371 gameport snd_rawmidi snd_ac97_codec ac97_bus s nd_seq_dummy snd_seq_oss snd_seq_midi_event snd_seq snd_seq_device snd_pcm_oss snd_mixer_oss snd_pcm snd_timer snd parport_pc floppy parport pcnet32 soundcore mii pcspkr snd_page_alloc ac i2c_piix4 i2c_core button power_supply sr_mod sg cdrom ata_piix libata dm_snapshot dm_zero dm_mirror dm_mod BusLogic sd_mod scsi_mod ext3 jbd mbcache uhci_hcd ohci_hcd ehci_hcd
+Pid: 1726, comm: kstopmachine Not tainted (2.6.24-rc3-module <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">2)</span>
+                EIP: 0060:[&lt;c04e53d6&gt;] EFLAGS: 00010092 CPU: 0
+                EIP is at list_del+0xa/0x61
+                EAX: e0c3cc04 EBX: 00000020 ECX: 0000000e EDX: dec62000
+                ESI: df6e8f08 EDI: 000006bf EBP: dec62fb4 ESP: dec62fa4
+                 DS: 007b ES: 007b FS: 00d8 GS: 0000 SS: 0068 
+                Process kstopmachine (pid: 1726, <span style="color: #eedd82;">ti</span>=dec62000 <span style="color: #eedd82;">task</span>=df8d2d40 task.ti=dec62000)
+                Stack: 000006bf dec62fb4 c04276c7 00000020 dec62fbc c044ab4c dec62fd0 c045336c 
+                       df6e8f08 c04532b4 00000000 dec62fe0 c043deb0 c043de75 00000000 00000000 
+                       c0405cdf df6e8eb4 00000000 00000000 00000000 00000000 00000000 
+                Call Trace:
+                 [&lt;c0406081&gt;] show_trace_log_lvl+0x1a/0x2f
+                 [&lt;c0406131&gt;] show_stack_log_lvl+0x9b/0xa3
+                 [&lt;c04061dc&gt;] show_registers+0xa3/0x1df
+                 [&lt;c0406437&gt;] die+0x11f/0x200
+                 [&lt;c0613cba&gt;] do_page_fault+0x533/0x61a
+                 [&lt;c06123ea&gt;] error_code+0x72/0x78
+                 [&lt;c044ab4c&gt;] __unlink_module+0xb/0xf
+                 [&lt;c045336c&gt;] do_stop+0xb8/0x108
+                 [&lt;c043deb0&gt;] kthread+0x3b/0x63
+                 [&lt;c0405cdf&gt;] kernel_thread_helper+0x7/0x10
+                 =======================
+                Code: 6b c0 e8 2e 7e f6 ff e8 d1 16 f2 ff b8 01 00 00 00 e8 aa 1c f4 ff 89 d8 83 c4 10 5b 5d c3 90 90 90 55 89 e5 53 83 ec 0c 8b 48 04 &lt;8b&gt; 11 39 c2 74 18 89 54 24 08 89 44 24 04 c7 04 24 be 32 6b c0  
+                EIP: [&lt;c04e53d6&gt;] list_del+0xa/0x61 SS:ESP 0068:dec62fa4
+                note: kstopmachine[1726] exited with preempt_count 1
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">有自己编译的vmlinux： 使用gdb<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-2">
+<p>
+编译时打开complie with debug info选项。 
+</p>
+
+<p>
+注意这行： 
+<code>EIP is at list_del+0xa/0x61</code>
+这告诉我们， <code>list_del</code> 函数有 <code>0x61</code> 这么大，而Oops发生在 <code>0xa</code> 处。
+</p>
+
+<p>
+先看一下 <code>list_del</code> 从哪里开始:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">grep list_del /boot/System.map-2.6.24-rc3-module</span>
+                c10e5234 T plist_del
+                c10e53cc T list_del
+                c120feb6 T klist_del
+                c12d6d34 r __ksymtab_list_del
+                c12dadfc r __ksymtab_klist_del
+                c12e1abd r __kstrtab_list_del
+                c12e9d03 r __kstrtab_klist_del
+</pre>
+</div>
+<p>
+于是我们知道，发生Oops时的EIP值是：
+<code>c10e53cc + 0xa  == c10e53d6</code>
+然后用gdb查看：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">gdb /home/arc/build/linux-2.6/vmlinux</span>
+(gdb) b *0xc10e53d6
+Breakpoint 1 at 0xc10e53d6: file /usr/src/linux-2.6.24-rc3/lib/list_debug.c, line 64.
+</pre>
+</div>
+<p>
+gdb直接就告诉你在哪个文件、哪一行了。
+</p>
+
+<p>
+gdb中还可以这样. function name + offset, 直接知道line number。：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">gdb Sources/linux-2.6.24/vmlinux</span>
+                (gdb) l *do_fork+0x1f
+                0xc102b7ac is<span style="color: #00ffff;"> in</span> do_fork (kernel/fork.c:1385).
+                1380
+                1381    static int fork_traceflag(unsigned clone_flags)
+                1382    {
+                1383            if (clone_flags &amp; CLONE_UNTRACED)
+                1384                    return 0;
+                1385            else if (clone_flags &amp; CLONE_VFORK) {
+                1386                    if (current-&gt;ptrace &amp; PT_TRACE_VFORK)
+                1387                            return PTRACE_EVENT_VFORK;
+                1388            } <span style="color: #00ffff;">else if</span> ((clone_flags &amp; CSIGNAL) != SIGCHLD) {
+                1389                    if (current-&gt;ptrace &amp; PT_TRACE_CLONE)
+                (gdb)
+</pre>
+</div>
+<p>
+或者：
+<code>(gdb) l *(0xffffffff8023eaf0 + 0xff)</code>  <i>* 出错函数的地址加上偏移 *</i>
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">没有自己编译的vmlinux<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup></h2>
+<div class="outline-text-2" id="text-3">
+<p>
+如果在lkml或bugzilla上看到一个Oops，而自己不能重现，那就只能反汇编以
+"Code:"开始的行。 这样可以尝试定位到源代码中。
+</p>
+
+<p>
+注意，Oops中的Code:行，会把导致Oops的第一条指令，也就是EIP的值的第一个字节， 用尖括号&lt;&gt;括起来。 但是，有些体系结构(例如常见的x86)指令是不等长的(不一样的指令可能有不一样的长度)，所以要不断的尝试
+(trial-and-error)。
+</p>
+
+<p>
+Linus通常使用一个小程序，类似这样：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">array</span>[] = <span style="color: #ffa07a;">"\xnn\xnn\xnn..."</span>;
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[])
+{
+  printf(<span style="color: #ffa07a;">"%p\n"</span>, array);
+  *(<span style="color: #98fb98;">int</span> *)0 = 0;
+}
+</pre>
+</div>
+<p>
+注意， array一共有从 <code>array[0]</code> 到 <code>array[64]</code> 这65个元素， 其中出错的那个操作码 <code>&lt;8b&gt; == arry[43]</code> .
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">array</span>[] =<span style="color: #ffa07a;">"\x6b\xc0\xe8\x2e\x7e\xf6\xff\xe8\xd1\x16\xf2\xff\xb8\x01\x00\x00\x00\xe8\xaa\x1c\xf4\xff\x89\xd8\x83\xc4\x10\x5b\x5d\xc3\x90\x90\x90\x55\x89\xe5\x53\x83\xec\x0c\x8b\x48\x04\x8b\x11\x39\xc2\x74\x18\x89\x54\x24\x08\x89\x44\x24\x04\xc7\x04\x24\xbe\x32\x6b\xc0"</span>;
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[])
+{
+  printf(<span style="color: #ffa07a;">"%p\n"</span>, array);
+  *(<span style="color: #98fb98;">int</span> *)0 = 0;
+}
+</pre>
+</div>
+
+<p>
+用 <code>gcc -g</code> 编译，在gdb里运行它：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">[arc@dhcp-cbjs05-218-251 ~]$ gdb hello
+            GNU gdb Fedora (6.8-1.fc9)
+            Copyright (C) 2008 Free Software Foundation, Inc.
+            License GPLv3+: GNU GPL version 3 or later <a href="http://gnu.org/licenses/gpl.html">&lt;http://gnu.org/licenses/gpl.html&gt;</a>
+            This is free software: you are free to change and redistribute it.
+            There is NO WARRANTY, to the extent permitted by law.  Type <span style="color: #ffa07a;">"show copying"</span>
+            and <span style="color: #ffa07a;">"show warranty"</span> for details.
+            This GDB was configured as <span style="color: #ffa07a;">"x86_64-redhat-linux-gnu"</span>...
+            (no debugging symbols found)
+            (gdb) <span style="color: #b0c4de;">r</span>
+            Starting program: /home/arc/hello
+            0x80484e0
+
+            Program received signal SIGSEGV, Segmentation fault.
+</pre>
+</div>
+
+<p>
+注意，这时候就可以反汇编0x80484e0这个地址：
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">(gdb) disassemble 0x80484e0
+                Dump of assembler code for <span style="color: #00ffff;">function</span> <span style="color: #87cefa;">array</span>:
+                0x080484e0 &lt;array+0&gt;:   imul   $<span style="color: #eedd82;">0</span>xffffffe8,%eax,%eax
+                0x080484e3 &lt;array+3&gt;:   jle,pn 0x80484dc &lt;__dso_handle+20&gt;
+                0x080484e6 &lt;array+6&gt;:   ljmp   *&lt;internal disassembler error&gt;
+                0x080484e8 &lt;array+8&gt;:   rcll   (%esi)
+                0x080484ea &lt;array+10&gt;:  repnz (bad)
+                0x080484ec &lt;array+12&gt;:  mov    $<span style="color: #eedd82;">0</span>x1,%eax
+                0x080484f1 &lt;array+17&gt;:  call   0x7f8a1a0
+                0x080484f6 &lt;array+22&gt;:  mov    %ebx,%eax
+                0x080484f8 &lt;array+24&gt;:  add    $<span style="color: #eedd82;">0</span>x10,%esp
+                0x080484fb &lt;array+27&gt;:  pop    %ebx
+                0x080484fc &lt;array+28&gt;:  pop    %ebp
+                0x080484fd &lt;array+29&gt;:  ret
+                0x080484fe &lt;array+30&gt;:  nop
+                0x080484ff &lt;array+31&gt;:  nop
+                0x08048500 &lt;array+32&gt;:  nop
+                0x08048501 &lt;array+33&gt;:  push   %ebp
+                0x08048502 &lt;array+34&gt;:  mov    %esp,%ebp
+                0x08048504 &lt;array+36&gt;:  push   %ebx
+                0x08048505 &lt;array+37&gt;:  sub    $<span style="color: #eedd82;">0</span>xc,%esp
+                0x08048508 &lt;array+40&gt;:  mov    0x4(%eax),%ecx
+                0x0804850b &lt;array+43&gt;:  mov    (%ecx),%edx
+                0x0804850d &lt;array+45&gt;:  cmp    %eax,%edx
+                0x0804850f &lt;array+47&gt;:  je     0x8048529
+                0x08048511 &lt;array+49&gt;:  mov    %edx,0x8(%esp)
+                0x08048515 &lt;array+53&gt;:  mov    %eax,0x4(%esp)
+                0x08048519 &lt;array+57&gt;:  movl   $<span style="color: #eedd82;">0</span>xc06b32be,(%esp)
+                0x08048520 &lt;array+64&gt;:  add    %ah,0xa70
+                End of assembler dump.
+                (gdb)
+</pre>
+</div>
+
+<p>
+现在你知道出错的那条指令是 <code>array[43]</code> ，也就是 <code>mov    (%ecx),%edx</code> ，也就是说， <code>(%ecx)</code> 指向了一个错误内存地址。
+</p>
+
+<p>
+为了使汇编代码和C代码更好的对应起来， Linux内核的Kbuild子系统提供了这样一个功能： 任何一个C文件都可以单独编译成汇编文件，例如：
+<code>make path/to/the/sourcefile.s</code>
+</p>
+
+<p>
+有时侯需要对*.s文件进行分析，以确定BUG所在的位置。 对任何一个内核build
+目录下的*.c文件，都可以直接编译出*.s文件。
+</p>
+
+<p>
+而对于自己写的module，就需要在Makefile中有一个灵活的target写法：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">obj-m := usb-skel.o
+                KDIR := /lib/modules/<span style="color: #fa8072;">`uname -r`</span>/build
+                traget := modules
+
+                default:
+                        make -C $(KDIR) <span style="color: #eedd82;">M</span>=$(shell pwd) $(target)
+                clean:
+                        rm -f *.o *.ko .*.cmd *.symvers *.mod.c
+                        rm -rf .tmp_versions
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">make target=usb-skel.s V=1</span>
+</pre>
+</div>
+<p>
+这样，kbuild系统才知道你要make的目标不是modules，而是 <code>usb-skel.s</code> 。
+</p>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://bbs.chinaunix.net/thread-1999464-1-1.html">http://bbs.chinaunix.net/thread-1999464-1-1.html</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="https://groups.google.com/forum/#!topic/linux.kernel/twv_6QFajEE">https://groups.google.com/forum/#!topic/linux.kernel/twv_6QFajEE</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-02-06 Mon 23:26</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Graph Algorithms</title>
-<!-- 2017-01-25 Wed 00:06 -->
+<!-- 2017-02-06 Mon 23:29 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -66,36 +66,1295 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">Tarjan's strongly connected components algorithm</a></li>
+<li><a href="#sec-1">Breadth First Traversal for a Graph</a></li>
+<li><a href="#sec-2">Depth First Traversal for a Graph</a></li>
+<li><a href="#sec-3">Dijkstra’s shortest path algorithm</a></li>
+<li><a href="#sec-4">Floyd Warshall Algorithm (All Pairs Shortest Path)</a></li>
+<li><a href="#sec-5">Union-Find Algorithm(Detect Cycle in an Undirected Graph)</a></li>
+<li><a href="#sec-6">Kruskal’s Minimum Spanning Tree Algorithm</a></li>
+<li><a href="#sec-7">Prim’s Minimum Spanning Tree</a></li>
+<li><a href="#sec-8">Topological Sorting</a></li>
+<li><a href="#sec-9">Articulation Points (or Cut Vertices) in a Graph</a></li>
+<li><a href="#sec-10">Bridges in a graph</a></li>
+<li><a href="#sec-11">Tarjan's strongly connected components algorithm</a>
+<ul>
+<li><a href="#sec-11-1">Overview</a></li>
+<li><a href="#sec-11-2">The algorithm in pseudocode</a></li>
+<li><a href="#sec-11-3">Strong connectivity</a></li>
+<li><a href="#sec-11-4">Strong connectivity algorithm</a></li>
+<li><a href="#sec-11-5">Algorithm in Python</a></li>
+<li><a href="#sec-11-6">More</a></li>
+</ul>
+</li>
+<li><a href="#sec-12">cc</a></li>
 </ul>
 </div>
 </div>
 
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">Tarjan's strongly connected components algorithm</h2>
+<h2 id="sec-1">Breadth First Traversal for a Graph</h2>
 <div class="outline-text-2" id="text-1">
 <p>
-<a href="http://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm">http://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm</a>
+<a href="./Files/breadth-first-traversal.cc">breadth-first-traversal.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;list&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Graph</span> {
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>;
+  <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt; *<span style="color: #eedd82;">adj</span>;
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>);
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">print BFS from a given source s */</span>
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">BFS</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>);
+};
+
+<span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>) {
+  <span style="color: #00ffff;">this</span>-&gt;v = v;
+  adj = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;[v];
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>) {
+  adj[v].push_back(w);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">BFS</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>) {
+  <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">visited</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">bool</span>[v];
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; v; ++i) {
+    visited[i] = <span style="color: #7fffd4;">false</span>;
+  }
+  <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">queue</span>;
+  visited[s] = <span style="color: #7fffd4;">true</span>;
+  queue.push_back(s);
+
+  <span style="color: #7fffd4;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">node</span>;
+  <span style="color: #00ffff;">while</span> (!queue.empty()) {
+    node = queue.front();
+    cout &lt;&lt; node &lt;&lt; <span style="color: #ffa07a;">" "</span>;
+    queue.pop_front();
+
+    <span style="color: #00ffff;">for</span> (it = adj[node].begin(); it != adj[node].end(); ++it) {
+      <span style="color: #00ffff;">if</span> (!visited[*it]) {
+        visited[*it] = <span style="color: #7fffd4;">true</span>;
+        queue.push_back(*it);
+      }
+    }
+  }
+  cout &lt;&lt; endl;
+  <span style="color: #00ffff;">delete</span>[] visited;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">Graph</span> <span style="color: #eedd82;">g</span>(4);
+  g.AddEdge(0, 1);
+  g.AddEdge(0, 2);
+  g.AddEdge(1, 2);
+  g.AddEdge(2, 0);
+  g.AddEdge(2, 3);
+  g.AddEdge(3, 3);
+
+  cout &lt;&lt; <span style="color: #ffa07a;">"Following is Breadth First Traversal "</span>
+       &lt;&lt; <span style="color: #ffa07a;">"(starting from vertex 2) \n"</span>;
+  g.BFS(2);
+
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Depth First Traversal for a Graph</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+<a href="./Files/depth-first-traversal.cc">depth-first-traversal.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;list&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Graph</span> {
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>;
+  <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt; *<span style="color: #eedd82;">adj</span>;
+
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">DFSHelper</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">visited</span>);
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>);
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">print DFS from a given source s */</span>
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">DFS</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>);
+};
+
+<span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>) {
+  <span style="color: #00ffff;">this</span>-&gt;v = v;
+  adj = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;[v];
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>) {
+  adj[v].push_back(w);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">DFSHelper</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">visited</span>) {
+  visited[s] = <span style="color: #7fffd4;">true</span>;
+  cout &lt;&lt; s &lt;&lt; <span style="color: #ffa07a;">" "</span>;
+  <span style="color: #7fffd4;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it</span>;
+  <span style="color: #00ffff;">for</span> (it = adj[s].begin(); it != adj[s].end(); ++it) {
+    <span style="color: #00ffff;">if</span> (!visited[*it]) {
+      DFSHelper(*it, visited);
+    }
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">DFS</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>) {
+  <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">visited</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">bool</span>[v];
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; v; ++i) {
+    visited[i] = <span style="color: #7fffd4;">false</span>;
+  }
+  DFSHelper(s, visited);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">Graph</span> <span style="color: #eedd82;">g</span>(4);
+  g.AddEdge(0, 1);
+  g.AddEdge(0, 2);
+  g.AddEdge(1, 2);
+  g.AddEdge(2, 0);
+  g.AddEdge(2, 3);
+  g.AddEdge(3, 3);
+  cout &lt;&lt; <span style="color: #ffa07a;">"Following is Depth First Traversal (starting from vertex 2) \n"</span>;
+  g.DFS(2);
+  cout &lt;&lt; endl;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Dijkstra’s shortest path algorithm</h2>
+<div class="outline-text-2" id="text-3">
+<ol class="org-ol">
+<li>Create a set sptSet (shortest path tree set) that keeps track of
+vertices included in shortest path tree, i.e., whose minimum
+distance from source is calculated and finalized. Initially, this
+set is empty.
+</li>
+<li>Assign a distance value to all vertices in the input graph.
+Initialize all distance values as INFINITE. Assign distance value
+as 0 for the source vertex so that it is picked first.
+</li>
+<li>While sptSet doesn’t include all vertices
+a) Pick a vertex u which is not there in sptSetand has minimum
+distance value.
+b) Include u to sptSet.
+c) Update distance value of all adjacent vertices of u. To update
+the distance values, iterate through all adjacent vertices. For
+every adjacent vertex v, if sum of distance value of u (from
+source) and weight of edge u-v, is less than the distance value of
+v, then update the distance value of v.
+</li>
+</ol>
+
+<p>
+<a href="./Files/dijkstra-shortest-path.cc">dijkstra-shortest-path.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;climits&gt;</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">V</span> 9
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">MinDistance</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">dist</span>, <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">spt_set</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">min</span> = INT_MAX, <span style="color: #eedd82;">min_index</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt; V; ++v) {
+    <span style="color: #00ffff;">if</span> (spt_set[v] == <span style="color: #7fffd4;">false</span> &amp;&amp; dist[v] &lt; min) {
+      min = dist[v];
+      min_index = v;
+    }
+  }
+  <span style="color: #00ffff;">return</span> min_index;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">PrintSolution</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">dist</span>) {
+  printf(<span style="color: #ffa07a;">"Vertex   Distance from Source\n"</span>);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; i++) {
+    printf(<span style="color: #ffa07a;">"%d \t\t %d\n"</span>, i, dist[i]);
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">dijkstra</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[V][V], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">src</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dist</span>[V];
+  <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">spt_set</span>[V];
+
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; ++i) {
+    dist[i] = INT_MAX;
+    spt_set[i] = <span style="color: #7fffd4;">false</span>;
+  }
+  dist[src] = 0;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span> = 0; count &lt; V - 1; ++count) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">min_dis_v</span> = MinDistance(dist, spt_set);
+    spt_set[min_dis_v] = <span style="color: #7fffd4;">true</span>;
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt; V; ++v) {
+      <span style="color: #00ffff;">if</span> (!spt_set[v] &amp;&amp; graph[min_dis_v][v] &amp;&amp;
+          dist[min_dis_v] != INT_MAX &amp;&amp;
+          (dist[min_dis_v] + graph[min_dis_v][v] &lt; dist[v])) {
+        dist[v] = dist[min_dis_v] + graph[min_dis_v][v];
+      }
+    }
+  }
+  PrintSolution(dist);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[V][V] = {{0, 4, 0, 0, 0, 0, 0, 8, 0},
+                     {4, 0, 8, 0, 0, 0, 0, 11, 0},
+                     {0, 8, 0, 7, 0, 4, 0, 0, 2},
+                     {0, 0, 7, 0, 9, 14, 0, 0, 0},
+                     {0, 0, 0, 9, 0, 10, 0, 0, 0},
+                     {0, 0, 4, 14, 10, 0, 2, 0, 0},
+                     {0, 0, 0, 0, 0, 2, 0, 1, 6},
+                     {8, 11, 0, 0, 0, 0, 1, 0, 7},
+                     {0, 0, 2, 0, 0, 0, 6, 7, 0}
+  };
+  dijkstra(graph, 0);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Floyd Warshall Algorithm (All Pairs Shortest Path)</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+We initialize the solution matrix same as the input graph matrix as a
+first step. Then we update the solution matrix by considering all
+vertices as an intermediate vertex. The idea is to one by one pick all
+vertices and update all shortest paths which include the picked vertex
+as an intermediate vertex in the shortest path. When we pick vertex
+number k as an intermediate vertex, we already have considered
+vertices {0, 1, 2, .. k-1} as intermediate vertices. For every pair
+(i, j) of source and destination vertices respectively, there are two
+possible cases.
+</p>
+
+<ol class="org-ol">
+<li>k is not an intermediate vertex in shortest path from i to j. We
+keep the value of dist[i][j] as it is.
+</li>
+<li>k is an intermediate vertex in shortest path from i to j. We update
+the value of dist[i][j] as dist[i][k] + dist[k][j].
+</li>
+</ol>
+
+<p>
+<a href="./Files/floyd-warshall-algorithm.cc">floyd-warshall-algorithm.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;climits&gt;</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">V</span> 4
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">INF</span> 9999
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">PrintSolution</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dist</span>[][V]) {
+  printf (<span style="color: #ffa07a;">"Following matrix shows the shortest distances"</span>
+          <span style="color: #ffa07a;">" between every pair of vertices \n"</span>);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; i++) {
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = 0; j &lt; V; j++) {
+      <span style="color: #00ffff;">if</span> (dist[i][j] == INF)
+        printf(<span style="color: #ffa07a;">"%7s"</span>, <span style="color: #ffa07a;">"INF"</span>);
+      <span style="color: #00ffff;">else</span>
+        printf (<span style="color: #ffa07a;">"%7d"</span>, dist[i][j]);
+    }
+    printf(<span style="color: #ffa07a;">"\n"</span>);
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">FloydWarshall</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[][V]) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dist</span>[V][V], <span style="color: #eedd82;">i</span>, <span style="color: #eedd82;">j</span> , <span style="color: #eedd82;">k</span>;
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt; V; ++i) {
+    <span style="color: #00ffff;">for</span> (j = 0; j &lt; V; ++j) {
+      dist[i][j] = graph[i][j];
+    }
+  }
+  <span style="color: #00ffff;">for</span> (k = 0; k &lt; V; ++k) {
+    <span style="color: #00ffff;">for</span> (i = 0; i &lt; V; ++i) {
+      <span style="color: #00ffff;">for</span> (j = 0; j &lt; V; ++j) {
+        <span style="color: #00ffff;">if</span> (dist[i][k] + dist[k][j] &lt; dist[i][j]) {
+          dist[i][j] = dist[i][k] + dist[k][j];
+        }
+      }
+    }
+  }
+  PrintSolution(dist);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Let us create the following weighted graph</span>
+<span style="color: #ff7f24;">            10</span>
+<span style="color: #ff7f24;">       (0)-------&gt;(3)</span>
+<span style="color: #ff7f24;">        |         /|\</span>
+<span style="color: #ff7f24;">      5 |          |</span>
+<span style="color: #ff7f24;">        |          | 1</span>
+<span style="color: #ff7f24;">       \|/         |</span>
+<span style="color: #ff7f24;">       (1)-------&gt;(2)</span>
+<span style="color: #ff7f24;">            3           */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[V][V] = { {0,   5,  INF, 10},
+                      {INF, 0,   3, INF},
+                      {INF, INF, 0,   1},
+                      {INF, INF, INF, 0} };
+
+  FloydWarshall(graph);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Union-Find Algorithm(Detect Cycle in an Undirected Graph)</h2>
+<div class="outline-text-2" id="text-5">
+<ul class="org-ul">
+<li>Find: Determine which subset a particular element is in. This can be
+used for determining if two elements are in the same subset.
+</li>
+<li>Union: Join two subsets into a single subset.
+</li>
+</ul>
+
+<p>
+<a href="./Files/union-find-algorithm.cc">union-find-algorithm.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdlib&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstring&gt;</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NO_PARENT</span> -1
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">src</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dest</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span> {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">V-&gt; Number of vertices</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">E-&gt; Number of edges</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">E</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span>* <span style="color: #eedd82;">edge</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span>* <span style="color: #87cefa;">CreateGraph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">E</span>) {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span>* <span style="color: #eedd82;">graph</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Graph</span>;
+  graph-&gt;V = V;
+  graph-&gt;E = E;
+  graph-&gt;edge = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Edge</span>[E];
+  <span style="color: #00ffff;">return</span> graph;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">Find</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">parent</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>) {
+  <span style="color: #00ffff;">if</span> (parent[i] == NO_PARENT) {
+    <span style="color: #00ffff;">return</span> i;
+  }
+  <span style="color: #00ffff;">return</span> Find(parent, parent[i]);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Union</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">parent</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">xset</span> = Find(parent, x);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">yset</span> = Find(parent, y);
+  parent[xset] = yset;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">IsCycle</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span>* <span style="color: #eedd82;">graph</span>) {
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">parent</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[graph-&gt;V];
+  memset(parent, NO_PARENT, <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>) * graph-&gt;V);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; graph-&gt;E; ++i) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span> = Find(parent, graph-&gt;edge[i].src);
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span> = Find(parent, graph-&gt;edge[i].dest);
+    <span style="color: #00ffff;">if</span> (x == y) {
+      <span style="color: #00ffff;">return</span> 1;
+    }
+    Union(parent, x, y);
+  }
+  <span style="color: #00ffff;">delete</span>[] parent;
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Let us create following graph</span>
+<span style="color: #ff7f24;">         0</span>
+<span style="color: #ff7f24;">        |  \</span>
+<span style="color: #ff7f24;">        |    \</span>
+<span style="color: #ff7f24;">        1-----2 */</span>    
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span> = 3, <span style="color: #eedd82;">E</span> = 3;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span>* <span style="color: #eedd82;">graph</span> = CreateGraph(V, E);
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 0-1</span>
+  graph-&gt;edge[0].src = 0;
+  graph-&gt;edge[0].dest = 1;
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 1-2</span>
+  graph-&gt;edge[1].src = 1;
+  graph-&gt;edge[1].dest = 2;
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 0-2</span>
+  graph-&gt;edge[2].src = 0;
+  graph-&gt;edge[2].dest = 2;
+
+  <span style="color: #00ffff;">if</span> (IsCycle(graph))
+    printf( <span style="color: #ffa07a;">"graph contains cycle\n"</span> );
+  <span style="color: #00ffff;">else</span>
+    printf( <span style="color: #ffa07a;">"graph doesn't contain cycle\n"</span> );
+  <span style="color: #00ffff;">delete</span> graph;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Kruskal’s Minimum Spanning Tree Algorithm</h2>
+<div class="outline-text-2" id="text-6">
+<ol class="org-ol">
+<li>Sort all the edges in non-decreasing order of their weight.
+</li>
+<li>Pick the smallest edge. Check if it forms a cycle with the spanning
+tree  formed so far. If cycle is not formed, include this edge.
+Else, discard it.  
+</li>
+<li>Repeat step#2 until there are (V-1) edges in the spanning tree.
+</li>
+</ol>
+
+<p>
+<a href="./Files/kruskal-min-spanning-tree.cc">kruskal-min-spanning-tree.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdlib&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstring&gt;</span>
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">src</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dest</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">weight</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">E</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span> *<span style="color: #eedd82;">edge</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span>* <span style="color: #87cefa;">CreateGraph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">E</span>) {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span> *<span style="color: #eedd82;">graph</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Graph</span>;
+  graph-&gt;V = V;
+  graph-&gt;E = E;
+  graph-&gt;edge = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Edge</span>[E];
+  <span style="color: #00ffff;">return</span> graph;
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A structure to represent a subset for union-find</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">subset</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">parent</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rank</span>;
+};
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">Find</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">subset</span> *<span style="color: #eedd82;">subsets</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>) {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">find root and make root as parent of i (path compression)</span>
+  <span style="color: #00ffff;">if</span> (subsets[i].parent != i) {
+    subsets[i].parent = Find(subsets, subsets[i].parent);
+  }
+  <span style="color: #00ffff;">return</span> subsets[i].parent;
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A function that does union of two sets of x and y</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">(uses union by rank)</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Union</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">subset</span> *<span style="color: #eedd82;">subsets</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">xroot</span> = Find(subsets, x);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">yroot</span> = Find(subsets, y);
+
+  <span style="color: #00ffff;">if</span> (subsets[xroot].rank &lt; subsets[yroot].rank) {
+    subsets[xroot].parent = yroot;
+  } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (subsets[xroot].rank &gt; subsets[yroot].rank) {
+    subsets[yroot].parent = xroot;
+  } <span style="color: #00ffff;">else</span> {
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If ranks are same, then make one as root and increment</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">its rank by one</span>
+    subsets[yroot].parent = xroot;
+    subsets[xroot].rank++;
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">EdgeComp</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">a</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">b</span>) {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span> *<span style="color: #eedd82;">e1</span> = (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span>*) a;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span> *<span style="color: #eedd82;">e2</span> = (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span>*) b;
+  <span style="color: #00ffff;">return</span> e1-&gt;weight &gt; e2-&gt;weight;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">KruskalMST</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span> *<span style="color: #eedd82;">graph</span>) {
+  qsort(graph-&gt;edge, graph-&gt;E, <span style="color: #00ffff;">sizeof</span>(graph-&gt;edge[0]), EdgeComp);
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">subset</span> *<span style="color: #eedd82;">subsets</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">subset</span>[graph-&gt;V];
+
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt; graph-&gt;V; ++v) {
+    subsets[v].parent = v;
+    subsets[v].rank = 0;
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">e</span> = 0;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span> <span style="color: #eedd82;">result</span>[graph-&gt;V];
+  <span style="color: #00ffff;">while</span> (e &lt; graph-&gt;V - 1) {
+    <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span> <span style="color: #eedd82;">next_edge</span> = graph-&gt;edge[i++];
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span> = Find(subsets, next_edge.src);
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span> = Find(subsets, next_edge.dest);
+    <span style="color: #00ffff;">if</span> (x != y) {
+      result[e++] = next_edge;
+      Union(subsets, x, y);
+    }
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">else discard the next_edge</span>
+  }
+  printf(<span style="color: #ffa07a;">"Following are the edges in the constructed MST\n"</span>);
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt; e; ++i) {
+    printf(<span style="color: #ffa07a;">"%d -- %d == %d\n"</span>, result[i].src, result[i].dest,
+           result[i].weight);
+  }
+  <span style="color: #00ffff;">delete</span>[] subsets;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>()
+{
+  <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Let us create following weighted graph</span>
+<span style="color: #ff7f24;">         10</span>
+<span style="color: #ff7f24;">     0--------1</span>
+<span style="color: #ff7f24;">     |  \     |</span>
+<span style="color: #ff7f24;">     6|   5\   |15</span>
+<span style="color: #ff7f24;">     |      \ |</span>
+<span style="color: #ff7f24;">     2--------3</span>
+<span style="color: #ff7f24;">         4       */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span> = 4;  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Number of vertices in graph</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">E</span> = 5;  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Number of edges in graph</span>
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span>* <span style="color: #eedd82;">graph</span> = CreateGraph(V, E);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 0-1</span>
+  graph-&gt;edge[0].src = 0;
+  graph-&gt;edge[0].dest = 1;
+  graph-&gt;edge[0].weight = 10;
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 0-2</span>
+  graph-&gt;edge[1].src = 0;
+  graph-&gt;edge[1].dest = 2;
+  graph-&gt;edge[1].weight = 6;
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 0-3</span>
+  graph-&gt;edge[2].src = 0;
+  graph-&gt;edge[2].dest = 3;
+  graph-&gt;edge[2].weight = 5;
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 1-3</span>
+  graph-&gt;edge[3].src = 1;
+  graph-&gt;edge[3].dest = 3;
+  graph-&gt;edge[3].weight = 15;
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 2-3</span>
+  graph-&gt;edge[4].src = 2;
+  graph-&gt;edge[4].dest = 3;
+  graph-&gt;edge[4].weight = 4;
+
+  KruskalMST(graph);
+  <span style="color: #00ffff;">delete</span>[] graph-&gt;edge;
+  <span style="color: #00ffff;">delete</span> graph;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">Prim’s Minimum Spanning Tree</h2>
+<div class="outline-text-2" id="text-7">
+<ol class="org-ol">
+<li>Create a set mstSet that keeps track of vertices already included
+in MST.
+</li>
+<li>Assign a key value to all vertices in the input graph. Initialize
+all key values as INFINITE. Assign key value as 0 for the first
+vertex so that it is picked first.
+</li>
+<li>While mstSet doesn’t include all vertices
+a) Pick a vertex u which is not there in mstSet and has minimum key
+value.
+b) Include u to mstSet.
+c) Update key value of all adjacent vertices of u. To update the
+key values, iterate through all adjacent vertices. For every
+adjacent vertex v, if weight of edge u-v is less than the previous
+key value of v, update the key value as weight of u-v
+</li>
+</ol>
+
+<p>
+<a href="./Files/prim-min-spanning-tree.cc">prim-min-spanning-tree.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;climits&gt;</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">V</span> 5
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">MinKey</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">key</span>, <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">mst_set</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">min</span> = INT_MAX;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">min_index</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt; V; ++v) {
+    <span style="color: #00ffff;">if</span> (mst_set[v] == <span style="color: #7fffd4;">false</span> &amp;&amp; key[v] &lt; min) {
+      min = key[v];
+      min_index = v;
+    }
+  }
+  <span style="color: #00ffff;">return</span> min_index;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">PrintMST</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">parent</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[V][V]) {
+  printf(<span style="color: #ffa07a;">"Edge   Weight\n"</span>);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 1; i &lt; V; i++) {
+    printf(<span style="color: #ffa07a;">"%d - %d    %d \n"</span>, parent[i], i, graph[i][parent[i]]);
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">PrimMST</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[V][V]) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">key</span>[V];
+  <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">mst_set</span>[V];
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; ++i) {
+    key[i] = INT_MAX;
+    mst_set[i] = <span style="color: #7fffd4;">false</span>;
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">parent</span>[V];
+  key[0] = 0;
+  parent[0] = -1;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">count</span> = 0; count &lt; V - 1; ++count) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">min_v</span> = MinKey(key, mst_set);
+    mst_set[min_v] = <span style="color: #7fffd4;">true</span>;
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt; V; ++v) {
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">graph[min_v][v] is non zero only for adjacent vertices of min_v</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">mstSet[v] is false for vertices not yet included in MST</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Update the key only if graph[min_v][v] is smaller than key[v]</span>
+      <span style="color: #00ffff;">if</span> (graph[min_v][v] &amp;&amp; mst_set[v] == <span style="color: #7fffd4;">false</span> &amp;&amp;
+          graph[min_v][v] &lt; key[v]) {
+        parent[v] = min_v;
+        key[v] = graph[min_v][v];
+      }
+    }
+  }
+  PrintMST(parent, graph);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Let us create the following graph</span>
+<span style="color: #ff7f24;">          2    3</span>
+<span style="color: #ff7f24;">      (0)--(1)--(2)</span>
+<span style="color: #ff7f24;">       |   / \   |</span>
+<span style="color: #ff7f24;">      6| 8/   \5 |7</span>
+<span style="color: #ff7f24;">       | /     \ |</span>
+<span style="color: #ff7f24;">      (3)-------(4)</span>
+<span style="color: #ff7f24;">            9          */</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[V][V] = {{0, 2, 0, 6, 0},
+                     {2, 0, 3, 8, 5},
+                     {0, 3, 0, 0, 7},
+                     {6, 8, 0, 0, 9},
+                     {0, 5, 7, 9, 0},
+  };
+  PrimMST(graph);
+
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">Topological Sorting</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+Topological sorting for Directed Acyclic Graph (DAG) is a linear
+ordering of vertices such that for every directed edge uv, vertex u
+comes before v in the ordering. Topological Sorting for a graph is not
+possible if the graph is not a DAG.
 </p>
 
 <p>
+<a href="./Files/topological-sorting.cc">topological-sorting.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span><span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;list&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stack&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Graph</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>; 
+  <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt; *<span style="color: #eedd82;">adj</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">topologicalSortUtil</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">visited</span>[], <span style="color: #98fb98;">stack</span>&lt;<span style="color: #98fb98;">int</span>&gt; &amp;<span style="color: #eedd82;">Stack</span>);
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>); 
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">addEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">topologicalSort</span>();
+};
+
+<span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>) {
+  <span style="color: #00ffff;">this</span>-&gt;V = V;
+  adj = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;[V];
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">addEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>) {
+  adj[v].push_back(w);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">topologicalSortUtil</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">visited</span>[], 
+                                <span style="color: #98fb98;">stack</span>&lt;<span style="color: #98fb98;">int</span>&gt; &amp;<span style="color: #eedd82;">Stack</span>) {
+  visited[v] = <span style="color: #7fffd4;">true</span>;
+  <span style="color: #7fffd4;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">i</span>;
+  <span style="color: #00ffff;">for</span> (i = adj[v].begin(); i != adj[v].end(); ++i)
+    <span style="color: #00ffff;">if</span> (!visited[*i])
+      topologicalSortUtil(*i, visited, Stack);
+  Stack.push(v);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">topologicalSort</span>() {
+  <span style="color: #98fb98;">stack</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">Stack</span>;
+  <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">visited</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">bool</span>[V];
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; i++)
+    visited[i] = <span style="color: #7fffd4;">false</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; i++)
+    <span style="color: #00ffff;">if</span> (visited[i] == <span style="color: #7fffd4;">false</span>)
+      topologicalSortUtil(i, visited, Stack);
+
+  <span style="color: #00ffff;">while</span> (Stack.empty() == <span style="color: #7fffd4;">false</span>) {
+    cout &lt;&lt; Stack.top() &lt;&lt; <span style="color: #ffa07a;">" "</span>;
+    Stack.pop();
+  }
+  cout &lt;&lt; endl;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">Graph</span> <span style="color: #eedd82;">g</span>(6);
+  g.addEdge(5, 2);
+  g.addEdge(5, 0);
+  g.addEdge(4, 0);
+  g.addEdge(4, 1);
+  g.addEdge(2, 3);
+  g.addEdge(3, 1);
+
+  cout &lt;&lt; <span style="color: #ffa07a;">"Following is a Topological Sort of the given graph \n"</span>;
+  g.topologicalSort();
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">Articulation Points (or Cut Vertices) in a Graph</h2>
+<div class="outline-text-2" id="text-9">
+<p>
+A O(V+E) algorithm to find all Articulation Points (APs)
+The idea is to use DFS (Depth First Search). In DFS, we follow
+vertices in tree form called DFS tree. In DFS tree, a vertex u is
+parent of another vertex v, if v is discovered by u (obviously v is an
+adjacent of u in graph). In DFS tree, a vertex u is articulation point
+if one of the following two conditions is true.
+</p>
+
+<ol class="org-ol">
+<li>u is root of DFS tree and it has at least two children.
+</li>
+<li>u is not root of DFS tree and it has a child v such that no vertex
+in subtree rooted with v has a back edge to one of the ancestors
+(in DFS tree) of u.
+</li>
+</ol>
+
+<p>
+We do DFS traversal of given graph with additional code to find out
+Articulation Points (APs). In DFS traversal, we maintain a <code>parent[]</code>
+array where <code>parent[u]</code> stores parent of vertex u. Among the above
+mentioned two cases, the first case is simple to detect. For every
+vertex, count children. If currently visited vertex u is root
+(<code>parent[u]</code> is NIL) and has more than two children, print it.
+</p>
+
+<p>
+How to handle second case? The second case is trickier. We maintain an
+array <code>disc[]</code> to store discovery time of vertices. For every node u, we
+need to find out the earliest visited vertex (the vertex with minimum
+discovery time) that can be reached from subtree rooted with u. So we
+maintain an additional array <code>low[]</code> which is defined as follows.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">low</span>[u] = min(disc[u], disc[w]) 
+where w is an ancestor of u and there is a back edge from 
+some descendant of u to w.
+</pre>
+</div>
+
+<p>
+<a href="./Files/articulation-points.cc">articulation-points.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;list&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NIL</span> -1
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Graph</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>);
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Graph</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">AP</span>();
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>;
+  <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt; *<span style="color: #eedd82;">adj</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">APUtil</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">visited</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">disc</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">low</span>,
+              <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">parent</span>, <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">ap</span>);
+};
+
+<span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>) {
+  <span style="color: #00ffff;">this</span>-&gt;V = V;
+  adj = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;[V];
+}
+
+<span style="color: #7fffd4;">Graph</span>::~<span style="color: #87cefa;">Graph</span>() {
+  <span style="color: #00ffff;">delete</span>[] adj;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>) {
+  adj[v].push_back(w);
+  adj[w].push_back(v);  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Note: the graph is undirected</span>
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">AP</span>() {
+  <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">visited</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">bool</span>[V];
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">disc</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[V];
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">low</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[V];
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">parent</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[V];
+  <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">ap</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">bool</span>[V];
+
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; ++i) {
+    parent[i] = NIL;
+    visited[i] = <span style="color: #7fffd4;">false</span>;
+    ap[i] = <span style="color: #7fffd4;">false</span>;
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; ++i) {
+    <span style="color: #00ffff;">if</span> (visited[i] == <span style="color: #7fffd4;">false</span>) {
+      APUtil(i, visited, disc, low, parent, ap);
+    }
+  }
+
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; ++i) {
+    <span style="color: #00ffff;">if</span> (ap[i] == <span style="color: #7fffd4;">true</span>) {
+      cout &lt;&lt; i &lt;&lt; <span style="color: #ffa07a;">" "</span>;
+    }
+  }
+  <span style="color: #00ffff;">delete</span>[] visited;
+  <span style="color: #00ffff;">delete</span>[] disc;
+  <span style="color: #00ffff;">delete</span>[] low;
+  <span style="color: #00ffff;">delete</span>[] parent;
+  <span style="color: #00ffff;">delete</span>[] ap;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">APUtil</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">visited</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">disc</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">low</span>,
+              <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">parent</span>, <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">ap</span>) {
+  <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">time</span> = 0;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">children</span> = 0;
+  visited[u] = <span style="color: #7fffd4;">true</span>;
+  disc[u] = low[u] = ++time;
+  <span style="color: #7fffd4;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it</span>;
+  <span style="color: #00ffff;">for</span> (it = adj[u].begin(); it != adj[u].end(); ++it) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = *it;
+    <span style="color: #00ffff;">if</span> (visited[v] == <span style="color: #7fffd4;">false</span>) {
+      children++;
+      parent[v] = u;
+      APUtil(v, visited, disc, low, parent, ap);
+      low[u] = min(low[u], low[v]);
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">case 1</span>
+      <span style="color: #00ffff;">if</span> (parent[u] == NIL &amp;&amp; children &gt; 1) {
+        ap[u] = <span style="color: #7fffd4;">true</span>;
+      }
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">case 2</span>
+      <span style="color: #00ffff;">if</span> (parent[u] != NIL &amp;&amp; low[v] &gt;= disc[u]) {
+        ap[u] = <span style="color: #7fffd4;">true</span>;
+      }
+    } <span style="color: #00ffff;">else</span> {
+      <span style="color: #00ffff;">if</span> (v != parent[u]) {
+        low[u] = min(low[u], disc[v]);
+      }
+    }
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Create graphs given in above diagrams</span>
+  cout &lt;&lt; <span style="color: #ffa07a;">"\nArticulation points in first graph \n"</span>;
+  <span style="color: #98fb98;">Graph</span> <span style="color: #eedd82;">g1</span>(5);
+  g1.AddEdge(1, 0);
+  g1.AddEdge(0, 2);
+  g1.AddEdge(2, 1);
+  g1.AddEdge(0, 3);
+  g1.AddEdge(3, 4);
+  g1.AP();
+
+  cout &lt;&lt; <span style="color: #ffa07a;">"\nArticulation points in second graph \n"</span>;
+  <span style="color: #98fb98;">Graph</span> <span style="color: #eedd82;">g2</span>(4);
+  g2.AddEdge(0, 1);
+  g2.AddEdge(1, 2);
+  g2.AddEdge(2, 3);
+  g2.AP();
+
+  cout &lt;&lt; <span style="color: #ffa07a;">"\nArticulation points in third graph \n"</span>;
+  <span style="color: #98fb98;">Graph</span> <span style="color: #eedd82;">g3</span>(7);
+  g3.AddEdge(0, 1);
+  g3.AddEdge(1, 2);
+  g3.AddEdge(2, 0);
+  g3.AddEdge(1, 3);
+  g3.AddEdge(1, 4);
+  g3.AddEdge(1, 6);
+  g3.AddEdge(3, 5);
+  g3.AddEdge(4, 5);
+  g3.AP();
+
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10">Bridges in a graph</h2>
+<div class="outline-text-2" id="text-10">
+<p>
+An edge in an undirected connected graph is a bridge iff removing it
+disconnects the graph. For a disconnected undirected graph, definition
+is similar, a bridge is an edge removing which increases number of
+connected components.
+</p>
+
+<p>
+A simple approach is to one by one remove all edges and see if removal
+of a edge causes disconnected graph. Following are steps of simple
+approach for connected graph.
+</p>
+
+<ol class="org-ol">
+<li>For every edge (u, v), do following
+a) Remove (u, v) from graph
+b) See if the graph remains connected (We can either use BFS or
+DFS)
+c) Add (u, v) back to the graph.
+</li>
+</ol>
+
+<p>
+Time complexity of above method is O(E*(V+E)) for a graph represented
+using adjacency list.
+</p>
+
+<p>
+<b>A O(V+E) algorithm to find all Bridges</b>
+The idea is similar to O(V+E) algorithm for Articulation Points. We do
+DFS traversal of the given graph. In DFS tree an edge(u, v) (u is
+parent of v in DFS tree) is bridge if there does not exit any other
+alternative to reach u or an ancestor of u from subtree rooted with v.
+As discussed in the previous post, the value low[v] indicates earliest
+visited vertex reachable from subtree rooted with v. The condition for
+an edge(u, v) to be a bridge is, <code>low[v] &gt; disc[u]</code>.
+</p>
+</div>
+</div>
+
+
+
+<div id="outline-container-sec-11" class="outline-2">
+<h2 id="sec-11">Tarjan's strongly connected components algorithm</h2>
+<div class="outline-text-2" id="text-11">
+</div><div id="outline-container-sec-11-1" class="outline-3">
+<h3 id="sec-11-1">Overview</h3>
+<div class="outline-text-3" id="text-11-1">
+<p>
+<a href="https://en.wikipedia.org/wiki/Tarjan's_strongly_connected_components_algorithm">Tarjan's algorithm</a> is an algorithm in graph theory for finding the
+strongly connected components of a graph. It runs in linear time,
+matching the time bound for alternative methods including Kosaraju's
+algorithm and the path-based strong component algorithm.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-11-2" class="outline-3">
+<h3 id="sec-11-2">The algorithm in pseudocode</h3>
+<div class="outline-text-3" id="text-11-2">
+<div class="org-src-container">
+
+<pre class="src src-sh">algorithm tarjan is
+ input: graph <span style="color: #eedd82;">G</span> = (V, E)
+ output: set of strongly connected components (sets of vertices)
+
+ index := 0
+ S := empty
+ <span style="color: #00ffff;">for</span> each v<span style="color: #00ffff;"> in</span> V do
+   <span style="color: #00ffff;">if</span> (v.index is undefined) <span style="color: #00ffff;">then</span>
+     strongconnect(v)
+   end if
+ end for
+
+ <span style="color: #00ffff;">function</span> <span style="color: #87cefa;">strongconnect</span>(v)
+   // Set the depth index for v to the smallest unused index
+   v.index := index
+   v.lowlink := index
+   index := index + 1
+   S.push(v)
+   v.onStack := true
+
+   // Consider successors of v
+   <span style="color: #00ffff;">for</span> each (v, w) <span style="color: #00ffff;">in</span> E do
+     <span style="color: #00ffff;">if</span> (w.index is undefined) <span style="color: #00ffff;">then</span>
+       // Successor w has not yet been visited; recurse on it
+       strongconnect(w)
+       v.lowlink  := min(v.lowlink, w.lowlink)
+     <span style="color: #00ffff;">else if</span> (w.onStack) <span style="color: #00ffff;">then</span>
+       // Successor w is<span style="color: #00ffff;"> in</span> stack S and hence<span style="color: #00ffff;"> in</span> the current SCC
+       v.lowlink  := min(v.lowlink, w.index)
+     end if
+   end for
+
+   // If v is a root node, pop the stack and generate an SCC
+   <span style="color: #00ffff;">if</span> (v.lowlink = v.index) <span style="color: #00ffff;">then</span>
+     start a new strongly connected component
+     repeat
+       w := S.pop()
+       w.onStack := false
+       add w to current strongly connected component
+     <span style="color: #00ffff;">while</span> (w != v)
+     output the current strongly connected component
+   end if
+ end <span style="color: #00ffff;">function</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-11-3" class="outline-3">
+<h3 id="sec-11-3">Strong connectivity</h3>
+<div class="outline-text-3" id="text-11-3">
+<p>
+In undirected graphs, two vertices are connected if they have a path
+connecting them. How should we define connected in a directed graph?
+</p>
+
+<p>
+We say that a vertex a is strongly connected to b if there exist two
+paths, one from a to b and another from b to a.
+</p>
+
+<p>
+Note that we allow the two paths to share vertices or even to share
+edges. We will use a ~ b as shorthand for "a is strongly connected to
+b". We will allow very short paths, with one vertex and no edges, so
+that any vertex is strongly connected to itself.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-11-4" class="outline-3">
+<h3 id="sec-11-4">Strong connectivity algorithm<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h3>
+<div class="outline-text-3" id="text-11-4">
+<p>
+Define the DFS numbering dfsnum(v) to be the number of vertices
+visited before v in the DFS. Then if there is a back or cross edge out
+of the subtree of v, it's to something visited before v and therefore
+with a smaller dfsnum. We use this by defining the low value low(v) to
+be the smallest dfsnum of a vertex reachable by a back or cross edge
+from the subtree of v. If there is no such edge, low(v)=dfsnum(v).
+Then rephrasing what we've seen so far, v is a head of a component
+exactly when low(v)=dfsnum(v). The advantage of using these
+definitions is that dfsnum(v) is trivial to calculate as we perform
+the DFS, and low(v) is easily computed by combining the low values
+from the children of v with the values coming from back or cross edges
+out of v itself.
+</p>
+
+<p>
+We use one more simple data structure, a stack L (represented as a
+list) which we use to identify the subtree rooted at a vertex. We
+simply push each new vertex onto L as we visit it; then when we have
+finished visiting a vertex, its subtree will be everything pushed
+after it onto L. If v is a head, and we've already deleted the other
+heads in that subtree, the remaining vertices left on L will be
+exactly the component [v].
+</p>
+
+<p>
+We are now ready to describe the actual algorithm. It simply performs
+a DFS, keeping track of the low and dfsnum values defined above, using
+them to identify heads of components, and when finding a head deleting
+the whole component from the graph, using L to find the vertices of
+the component.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-11-5" class="outline-3">
+<h3 id="sec-11-5">Algorithm in Python</h3>
+<div class="outline-text-3" id="text-11-5">
+<p>
+<a href="./Files/tarjan_strongly_connected.py">tarjan strongly connected.py</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-python"><span style="color: #00ffff;">def</span> <span style="color: #87cefa;">strongly_connected_components</span>(graph):
+    <span style="color: #ffa07a;">"""</span>
+<span style="color: #ffa07a;">    Tarjan's Algorithm (named for its discoverer, Robert Tarjan) is a graph theory algorithm</span>
+<span style="color: #ffa07a;">    for finding the strongly connected components of a graph.</span>
+
+<span style="color: #ffa07a;">    Based on: http://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm</span>
+<span style="color: #ffa07a;">    """</span>
+
+    <span style="color: #ffebcd; background-color: #2f4f4f;">index_counter</span> = [0]
+    <span style="color: #ffebcd; background-color: #2f4f4f;">stack</span> = []
+    <span style="color: #ffebcd; background-color: #2f4f4f;">lowlinks</span> = {}
+    <span style="color: #ffebcd; background-color: #2f4f4f;">index</span> = {}
+    <span style="color: #ffebcd; background-color: #2f4f4f;">result</span> = []
+
+    <span style="color: #00ffff;">def</span> <span style="color: #87cefa;">strongconnect</span>(node):
+        <span style="color: #ff7f24;"># set the depth index for this node to the smallest unused index</span>
+        index[node] = index_counter[0]
+        lowlinks[node] = index_counter[0]
+        index_counter[0] += 1
+        stack.append(node)
+
+        <span style="color: #ff7f24;"># Consider successors of `node`</span>
+        <span style="color: #00ffff;">try:</span>
+            <span style="color: #ffebcd; background-color: #2f4f4f;">successors</span> = graph[node]
+        <span style="color: #00ffff;">except:</span>
+            <span style="color: #ffebcd; background-color: #2f4f4f;">successors</span> = []
+        <span style="color: #00ffff;">for</span> successor <span style="color: #00ffff;">in</span> successors:
+            <span style="color: #00ffff;">if</span> successor <span style="color: #00ffff;">not</span> <span style="color: #00ffff;">in</span> lowlinks:
+                <span style="color: #ff7f24;"># Successor has not yet been visited; recurse on it</span>
+                strongconnect(successor)
+                lowlinks[node] = <span style="color: #b0c4de;">min</span>(lowlinks[node],lowlinks[successor])
+            <span style="color: #00ffff;">elif</span> successor <span style="color: #00ffff;">in</span> stack:
+                <span style="color: #ff7f24;"># the successor is in the stack and hence in the current strongly connected component (SCC)</span>
+                lowlinks[node] = <span style="color: #b0c4de;">min</span>(lowlinks[node],index[successor])
+
+        <span style="color: #ff7f24;"># If `node` is a root node, pop the stack and generate an SCC</span>
+        <span style="color: #00ffff;">if</span> lowlinks[node] == index[node]:
+            <span style="color: #ffebcd; background-color: #2f4f4f;">connected_component</span> = []
+
+            <span style="color: #00ffff;">while</span> <span style="color: #00ffff;">True</span>:
+                <span style="color: #ffebcd; background-color: #2f4f4f;">successor</span> = stack.pop()
+                connected_component.append(successor)
+                <span style="color: #00ffff;">if</span> successor == node: <span style="color: #00ffff;">break</span>
+            <span style="color: #ffebcd; background-color: #2f4f4f;">component</span> = <span style="color: #b0c4de;">tuple</span>(connected_component)
+            <span style="color: #ff7f24;"># storing the result</span>
+            result.append(component)
+
+    <span style="color: #00ffff;">for</span> node <span style="color: #00ffff;">in</span> graph:
+        <span style="color: #00ffff;">if</span> node <span style="color: #00ffff;">not</span> <span style="color: #00ffff;">in</span> lowlinks:
+            strongconnect(node)
+
+    <span style="color: #00ffff;">return</span> result
+
+<span style="color: #00ffff;">if</span> <span style="color: #b0c4de;">__name__</span> == <span style="color: #ffa07a;">'__main__'</span>:
+    <span style="color: #ffebcd; background-color: #2f4f4f;">result</span> = strongly_connected_components(
+        {1:[2],2:[1,5],3:[4],4:[3,5],5:[6],6:[7],7:[8],8:[6,9],9:[]}
+        );
+    <span style="color: #b0c4de;">print</span> result
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-11-6" class="outline-3">
+<h3 id="sec-11-6">More</h3>
+<div class="outline-text-3" id="text-11-6">
+<ul class="org-ul">
+<li><a href="https://gist.github.com/chadhutchins/1440602">Tarjan's strongly connected components algorithm in Javascript</a>
+</li>
+<li><a href="https://github.com/bwesterb/py-tarjan">Python implementation of Tarjan's algorithm</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-12" class="outline-2">
+<h2 id="sec-12">cc</h2>
+<div class="outline-text-2" id="text-12">
+<div class="org-src-container">
+
+<pre class="src src-python"></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"></pre>
+</div>
+
+
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
 <a href="http://www.ics.uci.edu/~eppstein/161/960220.html#sca">http://www.ics.uci.edu/~eppstein/161/960220.html#sca</a>
-</p>
+</p></div>
 
-<p>
-<a href="https://github.com/bwesterb/py-tarjan/">https://github.com/bwesterb/py-tarjan/</a>
-</p>
 
-<p>
-<a href="https://gist.github.com/chadhutchins/1440602">https://gist.github.com/chadhutchins/1440602</a>
-</p>
 </div>
-</div>
-</div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-01-25 Wed 00:06</p>
+<p class="date">Created: 2017-02-06 Mon 23:29</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

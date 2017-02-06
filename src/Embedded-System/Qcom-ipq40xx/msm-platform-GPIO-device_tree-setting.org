@@ -3,16 +3,273 @@
 #+OPTIONS: num:nil H:2
 
 
-* cc
-#+begin_src python
-
+* GPIO号以及GPIO相关的属性设置
+以tsp的proxy_en端口为例：
+#+begin_src c
+  i2c@78b6000 { /* BLSP1 QUP2 */
+        compatible = "qcom,i2c-msm-v2";
+        ...
+        tmd3782@39 {
+            compatible = "taos,tmd3782";
+            ...
+            taos,en = <&msm_gpio 8 0x1>; //GPIO Num
+            ...
+        }
+#+end_src
+在相应的驱动里边，取gpio号以及设置输入或者输入
+#+begin_src c
+    //在tsp驱动里边，可以通过of_get_named_gpio()来取相应的gpio号
+    pdata->enable = of_get_named_gpio(np, "taos,en", 0);
+    gpio_direction_output(pdata->enable, 1);
 #+end_src
 
-#+begin_src c++
+gpio的active的时候和sleep的时候的PULL_DOWN,PULL_UP,NO_PULL等属性设置,
+在pinctrl相关的dtsi文件里边设置:
+#+begin_src c
+     prox_sensor_power {
+            qcom,pins = <&gp 8>; //gpio 8的上拉，下拉或者no pull等属性
+            qcom,pin-func = <0>;
+            qcom,num-grp-pins = <1>;
+            //qcom,num-grp-pins，这个表示一共有几个pin
+            //msm-pinctrl.txt里边写的是number of pins in the group.
 
+            label = "prox_sensor_power";
+            //label: name to identify the pin group to be used by a client.
+
+            //以下是pinctrl的时候的设置，下面有pinctrl的说明
+            prox_power_active: prox_power_active {
+                drive-strength = <2>;//2MA
+                bias-disable; /* No PULL *///也可以写成 bias-disable = <0>;
+                //这里可以把bias-disable替换成bias-pull-up;或者bias-pull-down; 
+            };
+            prox_power_suspend: prox_power_suspend {
+                drive-strength = <2>; //2MA
+                bias-disable; /* No PULL */
+            };
+        };
+#+end_src
+* GPIO相关的中断
+以spi相关的dtsi定义为例:
+#+begin_src c
+        spi_0: spi@78b5000 { /* BLSP1 QUP1 */
+          compatible = "qcom,spi-qup-v2";
+        #address-cells = <1>;
+        #size-cells = <0>;
+          reg-names = "spi_physical", "spi_bam_physical";
+          reg = <0x78b5000 0x600>,
+              <0x7884000 0x23000>;
+          interrupt-names = "spi_irq", "spi_bam_irq";
+          interrupts = <0 95 0>, <0 238 0>;
+          // 1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI interrupts.
+          // 2nd cell contains the interrupt number for the interrupt type.
+          // 3rd cell is the flags, encoded as follows:
+          // bits[3:0] trigger type and level flags.
+          //      1 = low-to-high edge triggered
+          //      2 = high-to-low edge triggered
+          //      4 = active high level-sensitive
+          //      8 = active low level-sensitive
+          // Documentation/devicetree/bindings/arm/gic.txt
+          spi-max-frequency = <24000000>;
+          clocks = <&gcc GCC_BLSP1_QUP1_SPI_APPS_CLK>,
+              <&gcc GCC_BLSP1_AHB_CLK>;
+          clock-names = "core_clk", "iface_clk";
+          qcom,infinite-mode = <0>;
+          qcom,use-bam;
+          qcom,bam-consumer-pipe-index = <4>;
+          qcom,bam-producer-pipe-index = <5>;
+          qcom,master-id = <0>;
+          status = "disabled";
+        };
+#+end_src
+通过 =platform_get_irq(pdev,0)= 来取第一个irq号，
+=platform_get_irq(pdev,1)= 来取第二个irq号。
+* pinctrl相关的设置
+在驱动里边常常碰到驱动相关的一个或者几个gpio，在醒来或者睡眠的时候需要
+设置成不同的类型，醒来的时候是i2c端口，但睡眠的时候可能要设置成GPIO并
+把输出设置成0等。 
+
+这个时候pinctrl就派上用场了，这个可以大大简化驱动的编写，因为这个可以像下面这样根据 
+active和suspend来设置要配置的gpio的管脚配置，然后在驱动里边调用:
+#+begin_src c
+devm_pinctrl_get_select(dev,"tlmm_motor_active");
+devm_pinctrl_get_select(dev,"tlmm_motor_suspend");
 #+end_src
 
+来实现pinctrl-0和pinctrl-1里对应 =tlmm_motor_active= 和 =tlmm_motor_suspend=
+的配置.像下面的device tree配置的话，如果是
+=devm_pinctrl_get_select(dev,”tlmm_motor_active”);= 则应该就是把
+pinctrl-0里边的gpio相关配置都配置上去。如果是
+=devm_pinctrl_get_select(dev,”tlmm_motor_suspend”);= 的话就把pinctrl-1
+里边的设置都配置上去。 
 
-#+begin_src sh
+#+begin_src c
+&soc {
+        xxx,vibrator {
+            compatible = "haptic_vib";
+            pinctrl-names = "tlmm_motor_active","tlmm_motor_suspend";
+            pinctrl-0 = <&motor_en_active &motor_pwm_active>;
+            pinctrl-1 = <&motor_en_suspend &motor_pwm_suspend>;
 
+            xxx,vib_en = <&msm_gpio 76 0x1>;
+            xxx,vib_pwm = <&msm_gpio 50 0x1>;
+
+            xxx,vib_model = <1>;
+            xxx,is_pmic_vib_pwm = <0>;
+            xxx,pwm_period_us = <40>;
+            xxx,duty_us = <36>;
+            status = "ok";
+        };   
+            tlmm_motor_en {
+                qcom,pins = <&gp 76>;
+                qcom,pin-func = <0>;
+                qcom,num-grp-pins = <1>;
+                label = "tlmm_motor_en";
+                motor_en_active: motor_en_active {
+                    drive-strength = <2>;
+                    bias-disable = <0>; /* No PULL */
+                };
+                motor_en_suspend: motor_en_suspend {
+                    drive-strength = <2>;
+                    bias-disable = <0>; /* No PULL */
+                };
+            };
 #+end_src
+
+* 操作GPIO
+#+begin_src c
+//开始操作GPIO的时候必须要先执行
+#echo 30 > /sys/class/gpio/export
+
+//设置GPIO 30的输入输出
+#echo "out" > /sys/class/gpio/gpio30/direction
+#echo "in"  > /sys/class/gpio/gpio30/direction
+
+//改变GPIO 30的值
+#echo 1 > /sys/class/gpio/gpio30/value
+#echo 0 > /sys/class/gpio/gpio30/value
+
+//操作完毕需要执行如下命令
+#echo 30 > /sys/class/gpio/unexport
+#+end_src
+* GIC 中断控制器
+ARM SMP cores are often associated with a GIC, providing per processor
+interrupts (PPI), shared processor interrupts (SPI) and software
+generated interrupts (SGI).
+
+GIC中断控制器的device tree定义的例子如下：
+#+begin_src c
+		intc: interrupt-controller@b000000 {
+			compatible = "qcom,msm-qgic2";
+			interrupt-controller; // 声明这个为一个中断控制器
+			#interrupt-cells = <3>; // //高通的这里是3，具体看芯片的GIC中断控制器
+			reg = <0x0b000000 0x1000>,
+			<0x0b002000 0x1000>;
+		};
+#+end_src
+申请中断的例子：
+#+begin_src c
+device1@f991f000{
+    compatible = "qcom,msm-device-v1";
+    reg = <0xf991f000 0x1000>;
+    interrupt-parent = <&intc>; //指定中断控制器
+    interrupts = <0 131 0>, <0 179 0>;
+    interrupt-names = "irq" ,"otg_irq";
+};
+#+end_src
+
+某个高通平台的/proc/interrupts的内容:
+#+begin_src c
+# cat /proc/interrupts
+          CPU0       CPU1       CPU2       CPU3
+ 20:   11501064    2634910    1450801    1172471       GIC  arch_timer
+ 35:          0          0          0          0       GIC  apps_wdog_bark
+ 39:    5643824    2599019    1701936    1316131       GIC  arch_mem_timer
+ 47:      52981          0          0          0       GIC  cpr
+ 56:          0          0          0          0       GIC  modem
+ 57:    1527948          0          0          0       GIC  qcom,smd-modem
+ 58:          5          0          0          0       GIC  qcom,smsm-modem
+ 59:          5          0          0          0       GIC  smp2p
+ 61:         10          0          0          0       GIC  sps
+ 65:      23838          0          0          0       GIC  kgsl-3d0
+ 75:          0          0          0          0       GIC  msm_iommu_global_cfg_irq, msm_iommu_global_cfg_irq
+ 76:        420          0          0          0       GIC  msm_vidc
+ 82:         10          0          0          0       GIC  cci
+ 83:          2          0          0          0       GIC  csid
+ 84:          2          0          0          0       GIC  csid
+ 89:          2          0          0          0       GIC
+102:          0          0          0          0       GIC  msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_secure_irq, msm_iommu_secure_irq, msm_iommu_secure_irq, msm_iommu_secure_irq, msm_iommu_secure_irq, msm_iommu_secure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq, msm_iommu_nonsecure_irq
+104:     650484          0          0          0       GIC  MDSS
+110:          0          0          0          0       GIC  csiphy
+111:          0          0          0          0       GIC  csiphy
+127:          0          0          0          0       GIC  i2c-msm-v2-irq
+128:       7585          0          0          0       GIC  i2c-msm-v2-irq
+130:          0          0          0          0       GIC  i2c-msm-v2-irq
+131:          0          0          0          0       GIC  i2c-msm-v2-irq
+132:          0          0          0          0       GIC  i2c-msm-v2-irq
+140:     384648          0          0          0       GIC  msm_serial_hsl0
+155:   12681898          0          0          0       GIC  mmc0
+157:          0          0          0          0       GIC  mmc1
+166:       1761          0          0          0       GIC  msm_otg, msm_hsusb
+170:     263953          0          0          0       GIC  7824900.sdhci
+172:          0          0          0          0       GIC  msm_otg
+174:        207          0          0          0       GIC  qcom,smd-wcnss
+175:          5          0          0          0       GIC  smp2p
+176:          0          0          0          0       GIC  qcom,smsm-wcnss
+181:          0          0          0          0       GIC  wcnss
+200:    8461599     379482     175887     113247       GIC  qcom,smd-rpm
+203:     932778     390645     274255     170499       GIC  601d0.qcom,mpm
+216:          0          0          0          0       GIC  tsens_interrupt
+222:          7          0          0          0       GIC  200f000.qcom,spmi
+239:          0          0          0          0       GIC  sps
+240:        946          0          0          0       GIC  1000000.pinctrl
+253:          2          0          0          0       GIC  7864900.sdhci
+273:          0          0          0          0       GIC  msm_iommu_nonsecure_irq
+274:          0          0          0          0       GIC  msm_iommu_nonsecure_irq
+280:          1          0          0          0       GIC  mobicore
+288:          3          0          0          0  msm_tlmm_irq  sm5703
+290:          0          0          0          0  msm_tlmm_irq  7864900.sdhci cd
+291:          6          0          0          0  qpnp-int  qpnp_kpdpwr_status
+292:          0          0          0          0  qpnp-int  qpnp_resin_status
+294:          0          0          0          0  qpnp-int  qpnp_kpdpwr_resin_bark
+295:          0          0          0          0  qpnp-int  qpnp_rtc_alarm
+297:          0          0          0          0  qpnp-int  pm8916_tz
+299:          1          0          0          0  qpnp-int  qpnp_adc_tm_high_interrupt
+300:          0          0          0          0  qpnp-int  qpnp_adc_tm_low_interrupt
+330:          0          0          0          0  msm_tlmm_irq  k2hh_accel
+338:          0          0          0          0    sm5703  otffail
+348:          3          0          0          0    sm5703  topoff
+349:          0          0          0          0    sm5703  done
+357:          5          0          0          0  msm_tlmm_irq  sm5703 muic micro USB
+454:        932          2          1          1  msm_tlmm_irq  zt7554_ts
+455:          0          0          0          0  msm_tlmm_irq  fuelgauge-irq
+456:          0          0          0          0  msm_tlmm_irq  sx9500_irq
+457:          0          0          0          0  msm_tlmm_irq  sx9500_wifi_irq
+458:          0          0          0          0  smp2p_gpio  modem
+459:          1          0          0          0  smp2p_gpio  error_ready_interrupt
+460:          1          0          0          0  smp2p_gpio  modem
+461:          0          0          0          0  smp2p_gpio  modem
+490:          0          0          0          0  smp2p_gpio  wcnss
+491:          1          0          0          0  smp2p_gpio  error_ready_interrupt
+492:          1          0          0          0  smp2p_gpio  wcnss
+493:          0          0          0          0  smp2p_gpio  wcnss
+522:          2          0          0          0  msm_tlmm_irq  home_key
+523:          0          0          0          0  msm_tlmm_irq  volume_up
+524:          0          0          0          0  msm_tlmm_irq  sec_headset_detect
+IPI0:          0      49521      49521      49521  CPU wakeup interrupts
+IPI1:     263118     216085     322849     349358  Timer broadcast interrupts
+IPI2:    5221229   10110805    7696353    5534579  Rescheduling interrupts
+IPI3:     585272    2348936    2593715    2633820  Function call interrupts
+IPI4:       2127     403855     275707     237116  Single function call interrupts
+IPI5:          0          0          0          0  CPU stop interrupts
+IPI6:          0          0          0          0  CPU backtrace
+Err:          0
+#+end_src
+
+* Documentation
++ =Documentation/pintrl.txt=
++ =Documentation/devicetree/bindings/arm/gic.txt=
++ =Documentation/arm/msm/gpiomux.txt=
++ =Documentation/devicetree/bindings/gpio/gpio.txt=
++ =Documentation/devicetree/bindings/gpio/gpio-msm.txt=
++ =Documentation/devicetree/bindings/pintrl/qcom,ipq40xx-pinctrl.txt=
+

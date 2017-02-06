@@ -2,6 +2,122 @@
 #+TITLE: IPQ4xx Ethernet Analysis
 #+OPTIONS: num:nil H:2
 
+=/net/ethernet/eth.c=
+=/drivers/net/ethernet/qcom/essedma/=
+=/drivers/net/phy/mdio-ipq40xx.c=
+
+
+* Device tree
+1. QCA Ethernet DMA
+   =Documentation/devicetree/bindings/net/qca-ess.txt=
+2. QCA Ethernet Switch
+   ESS-SWITCH is used to forward the packet among LAN, WAN and Host
+   processor.
+   =Documentation/devicetree/bindings/arm/msm/ess-switch.txt=
+3. QCA Ethernet PHY mode =ess-psgmii=
+4. MDIO Interface =ipq40xx-mdio=
+
+#+begin_src sh
+		edma@c080000 {
+			compatible = "qcom,ess-edma";
+			reg = <0xc080000 0x8000>;
+			qcom,page-mode = <0>;
+			qcom,rx_head_buf_size = <1540>;
+			qcom,wan_port_id_mask = <0x10>;
+			qcom,mdio_supported;
+			qcom,phy_mdio_addr = <4>;
+			qcom,poll_required = <1>;
+			qcom,forced_speed = <1000>;
+			qcom,forced_duplex = <1>;
+
+			interrupts = <0 65 1>,
+					<0 66 1>,
+					<0 67 1>,
+					<0 68 1>,
+					<0 69 1>,
+					<0 70 1>,
+					<0 71 1>,
+					<0 72 1>,
+					<0 73 1>,
+					<0 74 1>,
+					<0 75 1>,
+					<0 76 1>,
+					<0 77 1>,
+					<0 78 1>,
+					<0 79 1>,
+					<0 80 1>,
+					<0 240 1>,
+					<0 241 1>,
+					<0 242 1>,
+					<0 243 1>,
+					<0 244 1>,
+					<0 245 1>,
+					<0 246 1>,
+					<0 247 1>,
+					<0 248 1>,
+					<0 249 1>,
+					<0 250 1>,
+					<0 251 1>,
+					<0 252 1>,
+					<0 253 1>,
+					<0 254 1>,
+					<0 255 1>;
+			gmac0 {
+				local-mac-address = [000000000000];
+			};
+			gmac1 {
+				local-mac-address = [000000000000];
+			};
+		};
+
+		ess-switch@c000000 {
+			compatible = "qcom,ess-switch";
+			reg = <0xc000000 0x80000>; /* 512KB */
+			switch_access_mode = "local bus";
+			resets = <&gcc ESS_RESET>, <&gcc ESS_MAC1_CLK_DIS>, \
+				<&gcc ESS_MAC2_CLK_DIS>, <&gcc ESS_MAC3_CLK_DIS>, \
+				<&gcc ESS_MAC4_CLK_DIS>, <&gcc ESS_MAC5_CLK_DIS>;
+			reset-names = "ess_rst","ess_mac1_clk_dis", \
+				"ess_mac2_clk_dis","ess_mac3_clk_dis", \
+				"ess_mac4_clk_dis", "ess_mac5_clk_dis";
+			clocks = <&gcc GCC_ESS_CLK>;
+			clock-names = "ess_clk";
+			switch_cpu_bmp = <0x1>;  /* cpu port bitmap */
+			switch_lan_bmp = <0x1e>; /* lan port bitmap */
+			switch_wan_bmp = <0x20>; /* wan port bitmap */
+		};
+		ess-psgmii@98000 {
+			compatible = "qcom,ess-psgmii";
+			reg = <0x98000 0x800>; /* 2k */
+			psgmii_access_mode = "local bus";
+			resets = <&gcc ESS_PSGMII_ARES>;
+			reset-names = "psgmii_rst";
+		};
+
+		mdio@90000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "qcom,ipq40xx-mdio";
+			reg = <0x90000 0x64>;
+			phy0: ethernet-phy@0 {
+				reg = <0>;
+			};
+			phy1: ethernet-phy@1 {
+				reg = <1>;
+			};
+			phy2: ethernet-phy@2 {
+				reg = <2>;
+			};
+			phy3: ethernet-phy@3 {
+				reg = <3>;
+			};
+			phy4: ethernet-phy@4 {
+				reg = <4>;
+			};
+		};
+#+end_src
+
+
 
 * cc
 #+begin_src python

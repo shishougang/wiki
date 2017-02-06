@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>MSM Platform GPIO device tree setting</title>
-<!-- 2017-01-19 Thu 00:26 -->
+<!-- 2017-02-06 Mon 23:26 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -66,36 +66,364 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">cc</a></li>
+<li><a href="#sec-1">GPIO号以及GPIO相关的属性设置</a></li>
+<li><a href="#sec-2">GPIO相关的中断</a></li>
+<li><a href="#sec-3">pinctrl相关的设置</a></li>
+<li><a href="#sec-4">操作GPIO</a></li>
+<li><a href="#sec-5">GIC 中断控制器</a></li>
+<li><a href="#sec-6">Documentation</a></li>
 </ul>
 </div>
 </div>
 
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">cc</h2>
+<h2 id="sec-1">GPIO号以及GPIO相关的属性设置</h2>
 <div class="outline-text-2" id="text-1">
+<p>
+以tsp的proxy<sub>en端口为例：</sub>
+</p>
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
+<pre class="src src-c">i2c@78b6000 { <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">BLSP1 QUP2 </span><span style="color: #ff7f24;">*/</span>
+      compatible = <span style="color: #ffa07a;">"qcom,i2c-msm-v2"</span>;
+      ...
+      tmd3782@39 {
+          compatible = <span style="color: #ffa07a;">"taos,tmd3782"</span>;
+          ...
+          taos,en = &lt;&amp;msm_gpio 8 0x1&gt;; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">GPIO Num</span>
+          ...
+      }
+</pre>
 </div>
+<p>
+在相应的驱动里边，取gpio号以及设置输入或者输入
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#22312;tsp&#39537;&#21160;&#37324;&#36793;&#65292;&#21487;&#20197;&#36890;&#36807;of_get_named_gpio()&#26469;&#21462;&#30456;&#24212;&#30340;gpio&#21495;</span>
+pdata-&gt;enable = of_get_named_gpio(np, <span style="color: #ffa07a;">"taos,en"</span>, 0);
+gpio_direction_output(pdata-&gt;enable, 1);
+</pre>
+</div>
+
+<p>
+gpio的active的时候和sleep的时候的PULL<sub>DOWN</sub>,PULL<sub>UP</sub>,NO<sub>PULL等属性设置</sub>,
+在pinctrl相关的dtsi文件里边设置:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">prox_sensor_power {
+       qcom,pins = &lt;&amp;gp 8&gt;; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">gpio 8&#30340;&#19978;&#25289;&#65292;&#19979;&#25289;&#25110;&#32773;no pull&#31561;&#23646;&#24615;</span>
+       qcom,pin-func = &lt;0&gt;;
+       qcom,num-grp-pins = &lt;1&gt;;
+       <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">qcom,num-grp-pins&#65292;&#36825;&#20010;&#34920;&#31034;&#19968;&#20849;&#26377;&#20960;&#20010;pin</span>
+       <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">msm-pinctrl.txt&#37324;&#36793;&#20889;&#30340;&#26159;number of pins in the group.</span>
+
+       label = <span style="color: #ffa07a;">"prox_sensor_power"</span>;
+       <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">label: name to identify the pin group to be used by a client.</span>
+
+       <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#20197;&#19979;&#26159;pinctrl&#30340;&#26102;&#20505;&#30340;&#35774;&#32622;&#65292;&#19979;&#38754;&#26377;pinctrl&#30340;&#35828;&#26126;</span>
+       <span style="color: #7fffd4;">prox_power_active</span>: prox_power_active {
+           drive-strength = &lt;2&gt;;<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">2MA</span>
+           bias-disable; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">No PULL </span><span style="color: #ff7f24;">*///</span><span style="color: #ff7f24;">&#20063;&#21487;&#20197;&#20889;&#25104; bias-disable = &lt;0&gt;;</span>
+           <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#36825;&#37324;&#21487;&#20197;&#25226;bias-disable&#26367;&#25442;&#25104;bias-pull-up;&#25110;&#32773;bias-pull-down; </span>
+       };
+       <span style="color: #7fffd4;">prox_power_suspend</span>: prox_power_suspend {
+           drive-strength = &lt;2&gt;; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">2MA</span>
+           bias-disable; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">No PULL </span><span style="color: #ff7f24;">*/</span>
+       };
+   };
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">GPIO相关的中断</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+以spi相关的dtsi定义为例:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #7fffd4;">spi_0</span>: spi@78b5000 { <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">BLSP1 QUP1 </span><span style="color: #ff7f24;">*/</span>
+  compatible = <span style="color: #ffa07a;">"qcom,spi-qup-v2"</span>;
+<span style="color: #b0c4de;">#address</span>-cells = &lt;1&gt;;
+<span style="color: #b0c4de;">#size</span>-cells = &lt;0&gt;;
+  reg-names = <span style="color: #ffa07a;">"spi_physical"</span>, <span style="color: #ffa07a;">"spi_bam_physical"</span>;
+  reg = &lt;0x78b5000 0x600&gt;,
+      &lt;0x7884000 0x23000&gt;;
+  interrupt-names = <span style="color: #ffa07a;">"spi_irq"</span>, <span style="color: #ffa07a;">"spi_bam_irq"</span>;
+  interrupts = &lt;0 95 0&gt;, &lt;0 238 0&gt;;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">1st cell is the interrupt type; 0 for SPI interrupts, 1 for PPI interrupts.</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">2nd cell contains the interrupt number for the interrupt type.</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">3rd cell is the flags, encoded as follows:</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">bits[3:0] trigger type and level flags.</span>
+  <span style="color: #ff7f24;">//      </span><span style="color: #ff7f24;">1 = low-to-high edge triggered</span>
+  <span style="color: #ff7f24;">//      </span><span style="color: #ff7f24;">2 = high-to-low edge triggered</span>
+  <span style="color: #ff7f24;">//      </span><span style="color: #ff7f24;">4 = active high level-sensitive</span>
+  <span style="color: #ff7f24;">//      </span><span style="color: #ff7f24;">8 = active low level-sensitive</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Documentation/devicetree/bindings/arm/gic.txt</span>
+  spi-max-frequency = &lt;24000000&gt;;
+  clocks = &lt;&amp;gcc GCC_BLSP1_QUP1_SPI_APPS_CLK&gt;,
+      &lt;&amp;gcc GCC_BLSP1_AHB_CLK&gt;;
+  clock-names = <span style="color: #ffa07a;">"core_clk"</span>, <span style="color: #ffa07a;">"iface_clk"</span>;
+  qcom,infinite-mode = &lt;0&gt;;
+  qcom,use-bam;
+  qcom,bam-consumer-pipe-index = &lt;4&gt;;
+  qcom,bam-producer-pipe-index = &lt;5&gt;;
+  qcom,master-id = &lt;0&gt;;
+  status = <span style="color: #ffa07a;">"disabled"</span>;
+};
+</pre>
+</div>
+<p>
+通过 <code>platform_get_irq(pdev,0)</code> 来取第一个irq号，
+<code>platform_get_irq(pdev,1)</code> 来取第二个irq号。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">pinctrl相关的设置</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+在驱动里边常常碰到驱动相关的一个或者几个gpio，在醒来或者睡眠的时候需要设置成不同的类型，醒来的时候是i2c端口，但睡眠的时候可能要设置成GPIO并把输出设置成0等。 
+</p>
+
+<p>
+这个时候pinctrl就派上用场了，这个可以大大简化驱动的编写，因为这个可以像下面这样根据 
+active和suspend来设置要配置的gpio的管脚配置，然后在驱动里边调用:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">devm_pinctrl_get_select(dev,<span style="color: #ffa07a;">"tlmm_motor_active"</span>);
+devm_pinctrl_get_select(dev,<span style="color: #ffa07a;">"tlmm_motor_suspend"</span>);
+</pre>
+</div>
+
+<p>
+来实现pinctrl-0和pinctrl-1里对应 <code>tlmm_motor_active</code> 和 <code>tlmm_motor_suspend</code>
+的配置.像下面的device tree配置的话，如果是
+<code>devm_pinctrl_get_select(dev,”tlmm_motor_active”);</code> 则应该就是把
+pinctrl-0里边的gpio相关配置都配置上去。如果是
+<code>devm_pinctrl_get_select(dev,”tlmm_motor_suspend”);</code> 的话就把pinctrl-1
+里边的设置都配置上去。 
+</p>
 
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c">&amp;soc {
+        xxx,vibrator {
+            compatible = <span style="color: #ffa07a;">"haptic_vib"</span>;
+            pinctrl-names = <span style="color: #ffa07a;">"tlmm_motor_active"</span>,<span style="color: #ffa07a;">"tlmm_motor_suspend"</span>;
+            pinctrl-0 = &lt;&amp;motor_en_active &amp;motor_pwm_active&gt;;
+            pinctrl-1 = &lt;&amp;motor_en_suspend &amp;motor_pwm_suspend&gt;;
+
+            xxx,vib_en = &lt;&amp;msm_gpio 76 0x1&gt;;
+            xxx,vib_pwm = &lt;&amp;msm_gpio 50 0x1&gt;;
+
+            xxx,vib_model = &lt;1&gt;;
+            xxx,is_pmic_vib_pwm = &lt;0&gt;;
+            xxx,pwm_period_us = &lt;40&gt;;
+            xxx,duty_us = &lt;36&gt;;
+            status = <span style="color: #ffa07a;">"ok"</span>;
+        };   
+            tlmm_motor_en {
+                qcom,pins = &lt;&amp;gp 76&gt;;
+                qcom,pin-func = &lt;0&gt;;
+                qcom,num-grp-pins = &lt;1&gt;;
+                label = <span style="color: #ffa07a;">"tlmm_motor_en"</span>;
+                <span style="color: #7fffd4;">motor_en_active</span>: motor_en_active {
+                    drive-strength = &lt;2&gt;;
+                    bias-disable = &lt;0&gt;; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">No PULL </span><span style="color: #ff7f24;">*/</span>
+                };
+                <span style="color: #7fffd4;">motor_en_suspend</span>: motor_en_suspend {
+                    drive-strength = &lt;2&gt;;
+                    bias-disable = &lt;0&gt;; <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">No PULL </span><span style="color: #ff7f24;">*/</span>
+                };
+            };
+</pre>
+</div>
+</div>
 </div>
 
-
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">操作GPIO</h2>
+<div class="outline-text-2" id="text-4">
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-c"><span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#24320;&#22987;&#25805;&#20316;GPIO&#30340;&#26102;&#20505;&#24517;&#39035;&#35201;&#20808;&#25191;&#34892;</span>
+<span style="color: #b0c4de;">#echo</span> 30 &gt; /sys/class/gpio/export
+
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#35774;&#32622;GPIO 30&#30340;&#36755;&#20837;&#36755;&#20986;</span>
+<span style="color: #b0c4de;">#echo</span> <span style="color: #ffa07a;">"out"</span> &gt; /sys/class/gpio/gpio30/direction
+<span style="color: #b0c4de;">#echo</span> <span style="color: #ffa07a;">"in"</span>  &gt; /sys/class/gpio/gpio30/direction
+
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#25913;&#21464;GPIO 30&#30340;&#20540;</span>
+<span style="color: #b0c4de;">#echo</span> 1 &gt; /sys/class/gpio/gpio30/value
+<span style="color: #b0c4de;">#echo</span> 0 &gt; /sys/class/gpio/gpio30/value
+
+<span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#25805;&#20316;&#23436;&#27605;&#38656;&#35201;&#25191;&#34892;&#22914;&#19979;&#21629;&#20196;</span>
+<span style="color: #b0c4de;">#echo</span> 30 &gt; /sys/class/gpio/unexport
+</pre>
 </div>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">GIC 中断控制器</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+ARM SMP cores are often associated with a GIC, providing per processor
+interrupts (PPI), shared processor interrupts (SPI) and software
+generated interrupts (SGI).
+</p>
+
+<p>
+GIC中断控制器的device tree定义的例子如下：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #7fffd4;">intc</span>: interrupt-controller@b000000 {
+        compatible = <span style="color: #ffa07a;">"qcom,msm-qgic2"</span>;
+        interrupt-controller; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">&#22768;&#26126;&#36825;&#20010;&#20026;&#19968;&#20010;&#20013;&#26029;&#25511;&#21046;&#22120;</span>
+<span style="color: #b0c4de;">        #interrupt</span>-cells = &lt;3&gt;; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">//&#39640;&#36890;&#30340;&#36825;&#37324;&#26159;3&#65292;&#20855;&#20307;&#30475;&#33455;&#29255;&#30340;GIC&#20013;&#26029;&#25511;&#21046;&#22120;</span>
+        reg = &lt;0x0b000000 0x1000&gt;,
+        &lt;0x0b002000 0x1000&gt;;
+};
+</pre>
+</div>
+<p>
+申请中断的例子：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">device1@f991f000{
+    compatible = <span style="color: #ffa07a;">"qcom,msm-device-v1"</span>;
+    reg = &lt;0xf991f000 0x1000&gt;;
+    interrupt-parent = &lt;&amp;intc&gt;; <span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">&#25351;&#23450;&#20013;&#26029;&#25511;&#21046;&#22120;</span>
+    interrupts = &lt;0 131 0&gt;, &lt;0 179 0&gt;;
+    interrupt-names = <span style="color: #ffa07a;">"irq"</span> ,<span style="color: #ffa07a;">"otg_irq"</span>;
+};
+</pre>
+</div>
+
+<p>
+某个高通平台的/proc/interrupts的内容:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;"># cat</span> /proc/interrupts
+          CPU0       CPU1       <span style="color: #98fb98;">CPU2</span>       <span style="color: #eedd82;">CPU3</span>
+ 20:   11501064    2634910    1450801    1172471       GIC  arch_timer
+ 35:          0          0          0          0       GIC  apps_wdog_bark
+ 39:    5643824    2599019    1701936    1316131       GIC  arch_mem_timer
+ 47:      52981          0          0          0       GIC  cpr
+ 56:          0          0          0          0       GIC  modem
+ 57:    1527948          0          0          0       GIC  qcom,<span style="color: #eedd82;">smd</span>-modem
+ 58:          5          0          0          0       GIC  qcom,<span style="color: #eedd82;">smsm</span>-modem
+ 59:          5          0          0          0       GIC  smp2p
+ 61:         10          0          0          0       GIC  sps
+ 65:      23838          0          0          0       GIC  kgsl-3d0
+ 75:          0          0          0          0       GIC  msm_iommu_global_cfg_irq, <span style="color: #eedd82;">msm_iommu_global_cfg_irq</span>
+ 76:        420          0          0          0       GIC  msm_vidc
+ 82:         10          0          0          0       GIC  cci
+ 83:          2          0          0          0       GIC  csid
+ 84:          2          0          0          0       GIC  csid
+ 89:          2          0          0          0       GIC
+102:          0          0          0          0       GIC  msm_iommu_nonsecure_irq, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_secure_irq</span>, <span style="color: #eedd82;">msm_iommu_secure_irq</span>, <span style="color: #eedd82;">msm_iommu_secure_irq</span>, <span style="color: #eedd82;">msm_iommu_secure_irq</span>, <span style="color: #eedd82;">msm_iommu_secure_irq</span>, <span style="color: #eedd82;">msm_iommu_secure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>, <span style="color: #eedd82;">msm_iommu_nonsecure_irq</span>
+104:     650484          0          0          0       GIC  MDSS
+110:          0          0          0          0       GIC  csiphy
+111:          0          0          0          0       GIC  csiphy
+127:          0          0          0          0       GIC  i2c-msm-v2-irq
+128:       7585          0          0          0       GIC  i2c-msm-v2-irq
+130:          0          0          0          0       GIC  i2c-msm-v2-irq
+131:          0          0          0          0       GIC  i2c-msm-v2-irq
+132:          0          0          0          0       GIC  i2c-msm-v2-irq
+140:     384648          0          0          0       GIC  msm_serial_hsl0
+155:   12681898          0          0          0       GIC  mmc0
+157:          0          0          0          0       GIC  mmc1
+166:       1761          0          0          0       GIC  msm_otg, <span style="color: #eedd82;">msm_hsusb</span>
+170:     263953          0          0          0       GIC  7824900.sdhci
+172:          0          0          0          0       GIC  msm_otg
+174:        207          0          0          0       GIC  qcom,<span style="color: #eedd82;">smd</span>-wcnss
+175:          5          0          0          0       GIC  smp2p
+176:          0          0          0          0       GIC  qcom,<span style="color: #eedd82;">smsm</span>-wcnss
+181:          0          0          0          0       GIC  wcnss
+200:    8461599     379482     175887     113247       GIC  qcom,<span style="color: #eedd82;">smd</span>-rpm
+203:     932778     390645     274255     170499       GIC  601d0.qcom,<span style="color: #eedd82;">mpm</span>
+216:          0          0          0          0       GIC  tsens_interrupt
+222:          7          0          0          0       GIC  200f000.qcom,<span style="color: #eedd82;">spmi</span>
+239:          0          0          0          0       GIC  sps
+240:        946          0          0          0       GIC  1000000.pinctrl
+253:          2          0          0          0       GIC  7864900.sdhci
+273:          0          0          0          0       GIC  msm_iommu_nonsecure_irq
+274:          0          0          0          0       GIC  msm_iommu_nonsecure_irq
+280:          1          0          0          0       GIC  mobicore
+288:          3          0          0          0  msm_tlmm_irq  sm5703
+290:          0          0          0          0  msm_tlmm_irq  7864900.sdhci cd
+291:          6          0          0          0  qpnp-<span style="color: #98fb98;">int</span>  qpnp_kpdpwr_status
+292:          0          0          0          0  qpnp-<span style="color: #98fb98;">int</span>  qpnp_resin_status
+294:          0          0          0          0  qpnp-<span style="color: #98fb98;">int</span>  qpnp_kpdpwr_resin_bark
+295:          0          0          0          0  qpnp-<span style="color: #98fb98;">int</span>  qpnp_rtc_alarm
+297:          0          0          0          0  qpnp-<span style="color: #98fb98;">int</span>  pm8916_tz
+299:          1          0          0          0  qpnp-<span style="color: #98fb98;">int</span>  qpnp_adc_tm_high_interrupt
+300:          0          0          0          0  qpnp-<span style="color: #98fb98;">int</span>  qpnp_adc_tm_low_interrupt
+330:          0          0          0          0  msm_tlmm_irq  k2hh_accel
+338:          0          0          0          0    sm5703  otffail
+348:          3          0          0          0    sm5703  topoff
+349:          0          0          0          0    sm5703  done
+357:          5          0          0          0  msm_tlmm_irq  sm5703 muic micro USB
+454:        932          2          1          1  msm_tlmm_irq  zt7554_ts
+455:          0          0          0          0  msm_tlmm_irq  fuelgauge-irq
+456:          0          0          0          0  msm_tlmm_irq  sx9500_irq
+457:          0          0          0          0  msm_tlmm_irq  sx9500_wifi_irq
+458:          0          0          0          0  smp2p_gpio  modem
+459:          1          0          0          0  smp2p_gpio  error_ready_interrupt
+460:          1          0          0          0  smp2p_gpio  modem
+461:          0          0          0          0  smp2p_gpio  modem
+490:          0          0          0          0  smp2p_gpio  wcnss
+491:          1          0          0          0  smp2p_gpio  error_ready_interrupt
+492:          1          0          0          0  smp2p_gpio  wcnss
+493:          0          0          0          0  smp2p_gpio  wcnss
+522:          2          0          0          0  msm_tlmm_irq  home_key
+523:          0          0          0          0  msm_tlmm_irq  volume_up
+524:          0          0          0          0  msm_tlmm_irq  sec_headset_detect
+IPI0:          0      49521      49521      49521  CPU wakeup interrupts
+IPI1:     263118     216085     322849     349358  Timer broadcast interrupts
+IPI2:    5221229   10110805    7696353    5534579  Rescheduling interrupts
+IPI3:     585272    2348936    2593715    2633820  Function call interrupts
+IPI4:       2127     403855     275707     237116  Single function call interrupts
+IPI5:          0          0          0          0  CPU stop interrupts
+IPI6:          0          0          0          0  CPU backtrace
+Err:          0
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Documentation</h2>
+<div class="outline-text-2" id="text-6">
+<ul class="org-ul">
+<li><code>Documentation/pintrl.txt</code>
+</li>
+<li><code>Documentation/devicetree/bindings/arm/gic.txt</code>
+</li>
+<li><code>Documentation/arm/msm/gpiomux.txt</code>
+</li>
+<li><code>Documentation/devicetree/bindings/gpio/gpio.txt</code>
+</li>
+<li><code>Documentation/devicetree/bindings/gpio/gpio-msm.txt</code>
+</li>
+<li><code>Documentation/devicetree/bindings/pintrl/qcom,ipq40xx-pinctrl.txt</code>
+</li>
+</ul>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-01-19 Thu 00:26</p>
+<p class="date">Created: 2017-02-06 Mon 23:26</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

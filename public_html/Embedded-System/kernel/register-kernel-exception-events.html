@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>register to different kernel exception events</title>
+<!-- 2017-02-06 Mon 23:26 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">register to different kernel exception events</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Kernel Halt, Kernel Restart and Kernel Power Off</a></li>
+<li><a href="#sec-2">Kernel Oops</a></li>
+<li><a href="#sec-3">Kernel panic</a></li>
+<li><a href="#sec-4">OOM</a></li>
+<li><a href="#sec-5">Process Signals</a></li>
+<li><a href="#sec-6">Process exit</a>
+<ul>
+<li><a href="#sec-6-1">使用 notifier</a></li>
+<li><a href="#sec-6-2">使用 kprobe</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Kernel Halt, Kernel Restart and Kernel Power Off<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-1">
+<p>
+内核提供了一个注册notifier的接口给开发者，开发者使用这个接口向内核中注册自定义的notifier回调函数，当内核发生如标题所述的三个事件是，这个回调函数就会被调用。这个接口就是：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">register_reboot_notifier</span> (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">notifier_block</span> *<span style="color: #eedd82;">nb</span>);
+</pre>
+</div>
+<p>
+在调用这个函数之前，必须先定义一个 <code>notifier_block</code> 并实现他
+<code>notifier_call</code> ，具体示例代码如下：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">your_handler</span> (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">notifier_block</span> *<span style="color: #eedd82;">self</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">val</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>)
+{
+    <span style="color: #00ffff;">switch</span> (val) {
+        <span style="color: #00ffff;">case</span> SYS_HALT:
+            handle_system_halt();
+            <span style="color: #00ffff;">break</span>;
+        <span style="color: #00ffff;">case</span> SYS_RESTART:
+            handle_system_restart();
+            <span style="color: #00ffff;">break</span>;
+        <span style="color: #00ffff;">case</span> SYS_POWER_OFF:
+            handle_system_power_off();
+            <span style="color: #00ffff;">break</span>;
+    }
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">notifier_block</span> <span style="color: #eedd82;">your_notifier</span> = {
+    .notifier_call = your_handler,
+};
+register_reboot_notifier (&amp;your_notifier);
+</pre>
+</div>
+<p>
+当内核发生halt, power off和restart异常事件时。 <code>notifier_call</code> 即
+<code>your_handler()</code> 就会被调用。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Kernel Oops</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+内核也提供了一个注册notifier的接口 <code>register_die_notifier()</code> ，当kernel
+oops发生时，内核会调用 <code>notifier_chain</code> 上的 <code>notifier_block</code> 。可以参考以下示例代码：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">register_die_notifier</span> (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">notifier_block</span> *<span style="color: #eedd82;">nb</span>);
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">your_oops_handler</span> (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">notifier_block</span> *<span style="color: #eedd82;">self</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">val</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>)
+{
+    <span style="color: #00ffff;">if</span> ((<span style="color: #98fb98;">enumdie_val</span>) val == DIE_OOPS) {
+        your_oops_handle ();
+}
+}
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">your_oops_notifier</span> = {
+    .notifier_call = your_oops_handler,
+};
+register_die_notifier(&amp;your_oops_notifier);
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Kernel panic</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+内核同样提供了notifier的机制来提供接口获取内核的Panic事件。只是内核没有直接提供注册获取内核panic的时间的直接接口。而是暴露了一个
+<code>panic_notifier_list</code> 通知链。开发者需要调用
+<code>atomic_notifier_chain_register()</code> 这个函数来注册一个 <code>notifier_block</code>
+到这个通知链上即可。在我们注册 <code>notifier_block</code> 到
+<code>panic_notifier_list</code> 之前我们需要实现 <code>notifer_block</code> 的回调函数。 
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">your_panic_handler</span> (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">notifier_block</span> *<span style="color: #eedd82;">self</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">val</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>)
+{
+    your_panic_handle();
+}
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">notifier_block</span> <span style="color: #eedd82;">your_panic_notifier</span> = {
+    .notifier_call = your_panic_handler,
+};
+
+atomic_notifier_chain_register (&amp;panic_notifier_list, &amp;your_panic_handler);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">OOM</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+Linux内核也同样提供了一个接口用来注册notifier
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">your_oom_handler</span> (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">notifier_block</span> *<span style="color: #eedd82;">self</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">val</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>)
+{
+    your_oom_handle();
+}
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">notifier_block</span> <span style="color: #eedd82;">your_oom_notifier</span> = {
+    .notifier_call = your_oom_handler,
+};
+
+register_oom_notifier (&amp;your_oom_notifier);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Process Signals</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+进程的信号和之前的异常事件不同。这些信号通常不是致命的异常事件。我们对进程的信号的获取和处理机制也与之前的那些异常事件不同。我们用kernel提供的jprobe接口来获取进程的信号。内核提供了一个叫 <code>get_signal_deliver()</code> 的接口来获取内核发送给所有进程的信号。我们可以利用 <code>jprobe</code> 向
+<code>get_signal_deliver()</code> 这个函数中插入我们自己的代码。当
+<code>get_signal_deliver()</code> 这个接口被调用时，我们自己的代码也会被调用。 
+</p>
+
+<p>
+我们首先需要实现处理这些信号的代码，就是 <code>jprobe</code> 对象的 <code>entry</code> 属性：
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">your_get_signal_and_handle</span> (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">siginfo</span> *<span style="color: #eedd82;">info</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">k_sigaction</span>, *return_ka, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">pt_regs</span> *<span style="color: #eedd82;">regs</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">cookie</span>)
+{
+    your_signal_handler();
+}
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">jprobe</span> <span style="color: #eedd82;">jp_sig</span> = {
+    .entry = your_get_signal_and_handle
+};
+</pre>
+</div>
+
+<p>
+然后通过下面一段代码将我们上面实现的 <code>jprobe</code> 结构注册到内核。
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">jprobe</span> *<span style="color: #eedd82;">jps_sig</span>[1] = {&amp;jp_sig};
+<span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">jp_addr1</span> = (<span style="color: #98fb98;">void</span> *)kallsyms_lookup_name(&#8220;get_signal_to_deliver&#8221;);
+jp_sig.kp.addr = (<span style="color: #98fb98;">kprobe_code_t</span> *) jp_addr1;
+ret = register_jprobes(jps_sig, ARRAY_SIZE(jps_sig));
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Process exit</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+有两种方法来获取Process exit事件。
+</p>
+<ul class="org-ul">
+<li>一种是通过调用=profile<sub>event</sub><sub>register</sub>()= 接口直接注册一个
+<code>notifier_block</code> 到 <code>task_exit_notifier</code> ；
+</li>
+<li>另一种方法是使用 <code>kprobe</code> 接口将我们的代码插入到系统调用 <code>do_exit()</code>
+  结尾。
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1">使用 notifier</h3>
+<div class="outline-text-3" id="text-6-1">
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">your_do_exit_handler</span> (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">notifier_block</span> *<span style="color: #eedd82;">nb</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">val</span>, <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">data</span>)
+{
+    your_exit_handle();
+}
+
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">notifier_block</span> <span style="color: #eedd82;">your_exit</span> = {
+    .notifier_call = your_do_exit_handler,
+};
+profile_event_register(PROFILE_TASK_EXIT, &amp;your_exit);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2">使用 kprobe</h3>
+<div class="outline-text-3" id="text-6-2">
+<p>
+先实现进程退出的处理函数 <code>do_exit_handle()</code> ，然后定义一个 <code>struct
+kprobe</code> 结构 <code>kp_exit</code> ，并设置 <code>kp_exit</code> 的 <code>post_handler</code> 回调函数为
+<code>do_exit_handle()</code> 。然后通过调用 <code>register_kprobe()</code> 函数，将
+<code>kp_exit</code> 结构注册到内核。当内核接口 <code>do_exit()</code> 被调用后，
+<code>do_exit_handle()</code> 就会被调用。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">your_do_exit_handle</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kprobe</span> *<span style="color: #eedd82;">p</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">pt_regs</span> *<span style="color: #eedd82;">regs</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">flags</span>)
+{
+your_exit_handle();
+}
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kprobe</span> *<span style="color: #eedd82;">kp_exit</span> = (<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kprobe</span> *)kzalloc(<span style="color: #00ffff;">sizeof</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">kprobe</span>), GFP_KERNRL);
+kp_exit-&gt;symbol_name = &#8220;do_exit&#8221;;
+kp_exit-&gt;post_handler = your_do_exit_handle;
+register_kprobe(kp_exit);
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://blog.csdn.net/liangzhenliang/article/details/49382461">http://blog.csdn.net/liangzhenliang/article/details/49382461</a>#
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-02-06 Mon 23:26</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

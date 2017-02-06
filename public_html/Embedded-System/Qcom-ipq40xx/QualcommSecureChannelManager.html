@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Secure Channel Manager</title>
+<!-- 2017-02-06 Mon 23:26 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Secure Channel Manager</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">Regular SCM Call</a></li>
+<li><a href="#sec-3">Atomic SCM Call</a></li>
+<li><a href="#sec-4">Analysing SCM calls</a></li>
+</ul>
+</div>
+</div>
+
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Overview</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+Qualcomm chose to name the channel through which the "Normal World"
+interacts with the "Secure World" via SMC opcodes - <b>SCM</b> (Secure
+Channel Manager).
+</p>
+
+<p>
+The "Secure World" is also called TrustZone. 
+</p>
+
+<p>
+According to ARM Ltd., TrustZone is:
+</p>
+
+<p>
+"&#x2026;a system-wide approach to security for a wide array of client and
+server computing platforms, including handsets, tablets, wearable
+devices and enterprise systems. Applications enabled by the technology
+are extremely varied but include payment protection technology,
+digital rights management, BYOD, and a host of secured enterprise
+solutions."
+</p>
+
+<p>
+More about TrustZone <a href="http://bits-please.blogspot.co.il/2015/03/getting-arbitrary-code-execution-in.html">here</a> and <a href="http://blog.csdn.net/hovan/article/details/42674055">here</a>.
+</p>
+
+<p>
+The documentation provided by Qualcomm in the <a href="http://androidxref.com/kernel_3.4/xref/arch/arm/mach-msm/scm.c">relevant source files</a> is
+quite extensive, and is enough to get quite a good grip on the format
+of SCM commands.
+</p>
+
+<p>
+Putting it shortly, SCM commands fall into one of two categories:<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
+</p>
+<ul class="org-ul">
+<li>Regular SCM Call
+</li>
+<li>Atomic SCM Call
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Regular SCM Call</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+These calls are used when there is information that needs to be passed
+from the "Normal World" to the "Secure World", which is needed in
+order to service the SCM call. The kernel populates the following
+structure:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * struct scm_command - one SCM command buffer</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@len</span><span style="color: #ffa07a;">: total available memory for command and response</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@buf_offset</span><span style="color: #ffa07a;">: start of command buffer</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@resp_hdr_offset</span><span style="color: #ffa07a;">: start of response buffer</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@id</span><span style="color: #ffa07a;">: command to be executed</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@buf</span><span style="color: #ffa07a;">: buffer returned from </span><span style="color: #7fffd4;">scm_get_command_buffer()</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * An SCM command is laid out in memory as follows:</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> *      ------------------- &lt;--- struct scm_command</span>
+<span style="color: #ffa07a;"> *      | command header  |</span>
+<span style="color: #ffa07a;"> *      ------------------- &lt;--- </span><span style="color: #7fffd4;">scm_get_command_buffer()</span>
+<span style="color: #ffa07a;"> *      | command buffer  |</span>
+<span style="color: #ffa07a;"> *      ------------------- &lt;--- struct scm_response and</span>
+<span style="color: #ffa07a;"> *      | response header |      </span><span style="color: #7fffd4;">scm_command_to_response()</span>
+<span style="color: #ffa07a;"> *      ------------------- &lt;--- </span><span style="color: #7fffd4;">scm_get_response_buffer()</span>
+<span style="color: #ffa07a;"> *      | response buffer |</span>
+<span style="color: #ffa07a;"> *      -------------------</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * There can be arbitrary padding between the headers and buffers so</span>
+<span style="color: #ffa07a;"> * you should always use the appropriate scm_get_*</span><span style="color: #7fffd4;">_buffer()</span><span style="color: #ffa07a;"> routines</span>
+<span style="color: #ffa07a;"> * to access the buffers in a safe manner.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">scm_command</span> {
+        <span style="color: #98fb98;">u32</span>     <span style="color: #eedd82;">len</span>;
+        <span style="color: #98fb98;">u32</span>     <span style="color: #eedd82;">buf_offset</span>;
+        <span style="color: #98fb98;">u32</span>     <span style="color: #eedd82;">resp_hdr_offset</span>;
+        <span style="color: #98fb98;">u32</span>     <span style="color: #eedd82;">id</span>;
+        <span style="color: #98fb98;">u32</span>     <span style="color: #eedd82;">buf</span>[0];
+};
+</pre>
+</div>
+<p>
+And the TrustZone kernel, after servicing the SCM call, writes the
+response back to the <code>scm_response</code> structure:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * struct scm_response - one SCM response buffer</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@len</span><span style="color: #ffa07a;">: total available memory for response</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@buf_offset</span><span style="color: #ffa07a;">: start of response data relative to start of scm_response</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@is_complete</span><span style="color: #ffa07a;">: indicates if the command has finished processing</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">scm_response</span> {
+        <span style="color: #98fb98;">u32</span>     <span style="color: #eedd82;">len</span>;
+        <span style="color: #98fb98;">u32</span>     <span style="color: #eedd82;">buf_offset</span>;
+        <span style="color: #98fb98;">u32</span>     <span style="color: #eedd82;">is_complete</span>;
+};
+</pre>
+</div>
+<p>
+In order to allocate and fill these structures, the kernel may call
+the wrapping function <code>scm_call</code>, which receives pointers to
+kernel-space buffers containing the data to be sent, the location to
+which the data should be returned, and most importantly, the service
+identifier and command identifier.
+</p>
+
+<p>
+Each SCM call has a "category", which means which TrustZone kernel
+subsystem is responsible for handling that call. This is denoted by
+the service identifier. The command identifier is the code which
+specifies, within a given service, which command was requested.
+</p>
+
+<p>
+After the <code>scm_call</code> function allocates and populates the
+<code>scm_command</code> and <code>scm_response</code> buffers, it calls an internal
+<code>__scm_call</code> function which flushes all the caches (inner and outer
+caches), and calls the <code>smc</code> function.
+</p>
+
+<p>
+This last function actually executes the SMC opcode, transferring
+control to the TrustZone kernel, like so:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">u32</span> <span style="color: #87cefa;">smc</span>(<span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">cmd_addr</span>)
+{
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">context_id</span>;
+        <span style="color: #00ffff;">register</span> <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">r0</span> <span style="color: #00ffff;">asm</span>(<span style="color: #ffa07a;">"r0"</span>) = 1;
+        <span style="color: #00ffff;">register</span> <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">r1</span> <span style="color: #00ffff;">asm</span>(<span style="color: #ffa07a;">"r1"</span>) = (<span style="color: #98fb98;">u32</span>)&amp;context_id;
+        <span style="color: #00ffff;">register</span> <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">r2</span> <span style="color: #00ffff;">asm</span>(<span style="color: #ffa07a;">"r2"</span>) = cmd_addr;
+        <span style="color: #00ffff;">do</span> {
+                <span style="color: #00ffff;">asm</span> <span style="color: #00ffff;">volatile</span>(
+                        __asmeq(<span style="color: #ffa07a;">"%0"</span>, <span style="color: #ffa07a;">"r0"</span>)
+                        __asmeq(<span style="color: #ffa07a;">"%1"</span>, <span style="color: #ffa07a;">"r0"</span>)
+                        __asmeq(<span style="color: #ffa07a;">"%2"</span>, <span style="color: #ffa07a;">"r1"</span>)
+                        __asmeq(<span style="color: #ffa07a;">"%3"</span>, <span style="color: #ffa07a;">"r2"</span>)
+<span style="color: #b0c4de;">#ifdef</span> REQUIRES_SEC
+                        <span style="color: #ffa07a;">".arch_extension sec\n"</span>
+<span style="color: #b0c4de;">#endif</span>
+                        <span style="color: #ffa07a;">"smc    #0      @ switch to secure world\n"</span>
+                        : <span style="color: #ffa07a;">"=r"</span> (r0)
+                        : <span style="color: #ffa07a;">"r"</span> (r0), <span style="color: #ffa07a;">"r"</span> (r1), <span style="color: #ffa07a;">"r"</span> (r2)
+                        : <span style="color: #ffa07a;">"r3"</span>);
+        } <span style="color: #00ffff;">while</span> (r0 == SCM_INTERRUPTED);
+
+        <span style="color: #00ffff;">return</span> r0;
+}
+</pre>
+</div>
+<p>
+Note that R0 is set to 1, R1 is set to point to a local kernel stack
+address, which is used as a "context ID" for that call, and R2 is set
+to point to the physical address of the allocated <code>scm_command</code>
+structure.
+</p>
+
+<p>
+This "magic" value set in R0 indicates that this is a regular SCM
+call, using the <code>scm_command</code> structure. However, for certain commands
+where less data is required, it would be rather wasteful to allocate
+all these data structures for no reason. In order to address this
+issue, another form of SCM calls was introduced.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Atomic SCM Call</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+For calls in which the number of arguments is quite low (up to four
+arguments), there exists an alternate way to request an SCM call.
+</p>
+
+<p>
+There are four wrapper functions, <code>scm_call_atomic_[1-4]</code>, which
+correspond to the number of arguments requested. These functions can
+be called in order to directly issue an SMC for an SCM call with the
+given service and command IDs, and the given arguments.
+</p>
+
+<p>
+Here's the code for the <code>scm_call_atomic1</code> function:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">scm_call_atomic1()</span><span style="color: #ffa07a;"> - Send an atomic SCM command with one argument</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@svc_id</span><span style="color: #ffa07a;">: service identifier</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@cmd_id</span><span style="color: #ffa07a;">: command identifier</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@arg1</span><span style="color: #ffa07a;">: first argument</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * This shall only be used with commands that are guaranteed to be</span>
+<span style="color: #ffa07a;"> * uninterruptable, atomic and SMP safe.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #98fb98;">s32</span> <span style="color: #87cefa;">scm_call_atomic1</span>(<span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">svc</span>, <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">cmd</span>, <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">arg1</span>)
+{
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">context_id</span>;
+        <span style="color: #00ffff;">register</span> <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">r0</span> <span style="color: #00ffff;">asm</span>(<span style="color: #ffa07a;">"r0"</span>) = SCM_ATOMIC(svc, cmd, 1);
+        <span style="color: #00ffff;">register</span> <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">r1</span> <span style="color: #00ffff;">asm</span>(<span style="color: #ffa07a;">"r1"</span>) = (<span style="color: #98fb98;">u32</span>)&amp;context_id;
+        <span style="color: #00ffff;">register</span> <span style="color: #98fb98;">u32</span> <span style="color: #eedd82;">r2</span> <span style="color: #00ffff;">asm</span>(<span style="color: #ffa07a;">"r2"</span>) = arg1;
+
+        <span style="color: #00ffff;">asm</span> <span style="color: #00ffff;">volatile</span>(
+                __asmeq(<span style="color: #ffa07a;">"%0"</span>, <span style="color: #ffa07a;">"r0"</span>)
+                __asmeq(<span style="color: #ffa07a;">"%1"</span>, <span style="color: #ffa07a;">"r0"</span>)
+                __asmeq(<span style="color: #ffa07a;">"%2"</span>, <span style="color: #ffa07a;">"r1"</span>)
+                __asmeq(<span style="color: #ffa07a;">"%3"</span>, <span style="color: #ffa07a;">"r2"</span>)
+<span style="color: #b0c4de;">#ifdef</span> REQUIRES_SEC
+                        <span style="color: #ffa07a;">".arch_extension sec\n"</span>
+<span style="color: #b0c4de;">#endif</span>
+                <span style="color: #ffa07a;">"smc    #0      @ switch to secure world\n"</span>
+                : <span style="color: #ffa07a;">"=r"</span> (r0)
+                : <span style="color: #ffa07a;">"r"</span> (r0), <span style="color: #ffa07a;">"r"</span> (r1), <span style="color: #ffa07a;">"r"</span> (r2)
+                : <span style="color: #ffa07a;">"r3"</span>);
+        <span style="color: #00ffff;">return</span> r0;
+}
+</pre>
+</div>
+
+<p>
+Where <code>SCM_ATOMIC</code> is defined as:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">SCM_ATOMIC</span>(<span style="color: #eedd82;">svc</span>, <span style="color: #eedd82;">cmd</span>, <span style="color: #eedd82;">n</span>) (((((svc) &lt;&lt; 10)|((cmd) &amp; 0x3ff)) &lt;&lt; 12) | \
+                                SCM_CLASS_REGISTER | \
+                                SCM_MASK_IRQS | \
+                                (n &amp; 0xf))
+</pre>
+</div>
+<p>
+Note that both the service ID and the command ID are encoded into R0,
+along with the number of arguments in the call (in this case, 1). This
+is instead of the previous "magic" value of 1 used for regular SCM
+calls.
+</p>
+
+<p>
+This different value in R0 indicates to the TrustZone kernel that the
+following SCM call is an atomic call, which means that the arguments
+will be passed in using <b>R2-R5</b> (and not using a structure pointed to by
+R2).
+</p>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Analysing SCM calls</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+Now that we understand how SCM calls work, and we've found the
+handling function in the TrustZone kernel which is used to handle
+these SCM calls, we can begin disassembling the SCM calls to try and
+find a vulnerability in one of them.
+</p>
+
+<p>
+I'll skip over most of the analysis of the SCM handling function,
+since most of it is boilerplate handling of user input, etc. However,
+After switching the stack over to the TrustZone area and saving the
+original registers with which the call was performed, the handling
+function goes on to process the service ID and the command ID in order
+to see which internal handling function should be called.
+</p>
+
+<p>
+In order to easily map between the service and command IDs and the
+relevant handling function, a static list is compiled into the
+TrustZone image's data segment, and is referenced by the SCM handling
+function. Here is a short snipped from the list:
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/scm-fun-list.png" alt="scm-fun-list.png" />
+</p>
+</div>
+
+<p>
+As you can see, the list has the following structure:
+</p>
+<ul class="org-ul">
+<li>Pointer to the string containing the name of the SCM function
+</li>
+<li>"Type" of call
+</li>
+<li>Pointer to the handling function
+</li>
+<li>Number of arguments
+</li>
+<li>Size of each argument (one DWORD for each argument)
+</li>
+<li>The Service ID and Command ID, concatenated into a single DWORD -
+For example, the <code>tz_blow_sw_fuse</code> function above, has the type
+0x2002 which means it belongs to the service ID 0x20 and its command
+ID is 0x02.
+</li>
+</ul>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://bits-please.blogspot.com/2015/08/exploring-qualcomms-trustzone.html">http://bits-please.blogspot.com/2015/08/exploring-qualcomms-trustzone.html</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-02-06 Mon 23:26</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

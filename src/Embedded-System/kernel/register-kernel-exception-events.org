@@ -1,0 +1,154 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: register to different kernel exception events
+#+OPTIONS: num:nil H:2
+
+
+* Kernel Halt, Kernel Restart and Kernel Power Off[fn:1]
+内核提供了一个注册notifier的接口给开发者，开发者使用这个接口向内核中注
+册自定义的notifier回调函数，当内核发生如标题所述的三个事件是，这个回调
+函数就会被调用。这个接口就是：
+#+begin_src c
+int register_reboot_notifier (struct notifier_block *nb);
+#+end_src
+在调用这个函数之前，必须先定义一个 =notifier_block= 并实现他
+=notifier_call= ，具体示例代码如下：
+#+begin_src c
+static int your_handler (struct notifier_block *self, unsigned long val, void *data)
+{
+    switch (val) {
+        case SYS_HALT:
+            handle_system_halt();
+            break;
+        case SYS_RESTART:
+            handle_system_restart();
+            break;
+        case SYS_POWER_OFF:
+            handle_system_power_off();
+            break;
+    }
+}
+
+static notifier_block your_notifier = {
+    .notifier_call = your_handler,
+};
+register_reboot_notifier (&your_notifier);
+#+end_src
+当内核发生halt, power off和restart异常事件时。 =notifier_call= 即
+=your_handler()= 就会被调用。
+* Kernel Oops
+内核也提供了一个注册notifier的接口 =register_die_notifier()= ，当kernel
+oops发生时，内核会调用 =notifier_chain= 上的 =notifier_block= 。可以参考以下示
+例代码：
+#+begin_src c
+int register_die_notifier (struct notifier_block *nb);
+static int your_oops_handler (struct notifier_block *self, unsigned long val, void *data)
+{
+    if ((enumdie_val) val == DIE_OOPS) {
+        your_oops_handle ();
+}
+}
+static struct your_oops_notifier = {
+    .notifier_call = your_oops_handler,
+};
+register_die_notifier(&your_oops_notifier);
+#+end_src
+
+* Kernel panic
+内核同样提供了notifier的机制来提供接口获取内核的Panic事件。只是内核没
+有直接提供注册获取内核panic的时间的直接接口。而是暴露了一个
+=panic_notifier_list= 通知链。开发者需要调用
+=atomic_notifier_chain_register()= 这个函数来注册一个 =notifier_block=
+到这个通知链上即可。在我们注册 =notifier_block= 到
+=panic_notifier_list= 之前我们需要实现 =notifer_block= 的回调函数。 
+#+begin_src c
+static int your_panic_handler (struct notifier_block *self, unsigned long val, void *data)
+{
+    your_panic_handle();
+}
+static struct notifier_block your_panic_notifier = {
+    .notifier_call = your_panic_handler,
+};
+
+atomic_notifier_chain_register (&panic_notifier_list, &your_panic_handler);
+#+end_src
+* OOM
+Linux内核也同样提供了一个接口用来注册notifier
+#+begin_src c
+static int your_oom_handler (struct notifier_block *self, unsigned long val, void *data)
+{
+    your_oom_handle();
+}
+static struct notifier_block your_oom_notifier = {
+    .notifier_call = your_oom_handler,
+};
+
+register_oom_notifier (&your_oom_notifier);
+#+end_src
+* Process Signals
+进程的信号和之前的异常事件不同。这些信号通常不是致命的异常事件。我们对
+进程的信号的获取和处理机制也与之前的那些异常事件不同。我们用kernel提供
+的jprobe接口来获取进程的信号。内核提供了一个叫 =get_signal_deliver()= 的接
+口来获取内核发送给所有进程的信号。我们可以利用 =jprobe= 向
+=get_signal_deliver()= 这个函数中插入我们自己的代码。当
+=get_signal_deliver()= 这个接口被调用时，我们自己的代码也会被调用。 
+
+我们首先需要实现处理这些信号的代码，就是 =jprobe= 对象的 =entry= 属性：
+
+#+begin_src c
+static void your_get_signal_and_handle (struct siginfo *info, struct k_sigaction, *return_ka, struct pt_regs *regs, void *cookie)
+{
+    your_signal_handler();
+}
+struct jprobe jp_sig = {
+    .entry = your_get_signal_and_handle
+};
+#+end_src
+
+然后通过下面一段代码将我们上面实现的 =jprobe= 结构注册到内核。
+#+begin_src c
+struct jprobe *jps_sig[1] = {&jp_sig};
+void *jp_addr1 = (void *)kallsyms_lookup_name(“get_signal_to_deliver”);
+jp_sig.kp.addr = (kprobe_code_t *) jp_addr1;
+ret = register_jprobes(jps_sig, ARRAY_SIZE(jps_sig));
+#+end_src
+
+* Process exit
+有两种方法来获取Process exit事件。
++ 一种是通过调用=profile_event_register()= 接口直接注册一个
+  =notifier_block= 到 =task_exit_notifier= ；
++ 另一种方法是使用 =kprobe= 接口将我们的代码插入到系统调用 =do_exit()=
+  结尾。
+** 使用 notifier
+#+begin_src c
+int your_do_exit_handler (struct notifier_block *nb, unsigned long val, void *data)
+{
+    your_exit_handle();
+}
+
+static struct notifier_block your_exit = {
+    .notifier_call = your_do_exit_handler,
+};
+profile_event_register(PROFILE_TASK_EXIT, &your_exit);
+#+end_src
+** 使用 kprobe
+先实现进程退出的处理函数 =do_exit_handle()= ，然后定义一个 =struct
+kprobe= 结构 =kp_exit= ，并设置 =kp_exit= 的 =post_handler= 回调函数为
+=do_exit_handle()= 。然后通过调用 =register_kprobe()= 函数，将
+=kp_exit= 结构注册到内核。当内核接口 =do_exit()= 被调用后，
+=do_exit_handle()= 就会被调用。
+
+#+begin_src c
+void your_do_exit_handle(struct kprobe *p, struct pt_regs *regs, unsigned long flags)
+{
+your_exit_handle();
+}
+struct kprobe *kp_exit = (struct kprobe *)kzalloc(sizeof(struct kprobe), GFP_KERNRL);
+kp_exit->symbol_name = “do_exit”;
+kp_exit->post_handler = your_do_exit_handle;
+register_kprobe(kp_exit);
+#+end_src
+
+* Footnotes
+
+[fn:1] http://blog.csdn.net/liangzhenliang/article/details/49382461#
+

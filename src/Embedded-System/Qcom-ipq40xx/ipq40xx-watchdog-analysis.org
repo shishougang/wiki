@@ -3,16 +3,280 @@
 #+OPTIONS: num:nil H:2
 
 
-* cc
-#+begin_src python
-
-#+end_src
-
-#+begin_src c++
-
-#+end_src
-
-
+* device tree
+=Documentation/devicetree/bindings/watchdog/qcom-wdt.txt=
 #+begin_src sh
-
+		watchdog@b017000 {
+			compatible = "qcom,kpss-wdt-ipq40xx";
+			reg = <0xb017000 0x40>;
+			interrupt-names = "bark_irq";
+			interrupts = <0 3 0>;
+			clocks = <&gcc_sleep_clk_src>;
+			timeout-sec = <10>;
+			wdt_res = <0x4>;
+			wdt_en = <0x8>;
+			wdt_bark_time = <0x10>;
+			wdt_bite_time = <0x14>;
+			status = "ok";
+		};
 #+end_src
+device tree内容在驱动中使用，下面节选部分驱动代码操作。
+#+begin_src c
+  irq = platform_get_irq_byname(pdev, "bark_irq");
+  res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+  wdt->base = devm_ioremap_resource(&pdev->dev, res);
+  np = of_node_get(pdev->dev.of_node);
+  
+  if (of_property_read_u32(np, "wdt_res", &val))
+    wdt->wdt_reset = wdt->base + WDT_RST;
+  else
+    wdt->wdt_reset = wdt->base + val;
+  
+  if (of_property_read_u32(np, "wdt_en", &val))
+    wdt->wdt_enable = wdt->base + WDT_EN;
+  else
+    wdt->wdt_enable = wdt->base + val;
+  
+  if (of_property_read_u32(np, "wdt_bark_time", &val))
+    wdt->wdt_bark_time = wdt->base + WDT_BARK_TIME;
+  else
+    wdt->wdt_bark_time = wdt->base + val;
+#+end_src
+
+* Watchdog source codes analysis
+** init watchdog
+In the =/drivers/watchdog/watchdog_core.c= :
+#+begin_src c
+  static struct class *watchdog_class;
+  static int __init watchdog_init(void) {
+    watchdog_class = class_create(THIS_MODULE, "watchdog");
+    ...
+        err = watchdog_dev_init();
+        ..
+            }
+  subsys_initcall(watchdog_init);
+#+end_src
+And in the =/drivers/watchdog/watchdog_dev.c=
+#+begin_src c
+static dev_t watchdog_devt;
+int __init watchdog_dev_init(void) {
+    int err = alloc_chrdev_region(&watchdog_devt, 0, MAX_DOGS, "watchdog");
+}
+#+end_src
+
+** watchdog probe function
+=/drivers/watchdog/qcom-wdt.c=
+#+begin_src c
+static int qcom_wdt_probe(struct platform_device *pdev)
+{
+	const struct of_device_id *id;
+	struct device_node *np;
+	struct qcom_wdt *wdt;
+	struct resource *res;
+	int ret, irq = 0;
+	uint32_t val;
+
+	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+	if (!wdt)
+		return -ENOMEM;
+
+	irq = platform_get_irq_byname(pdev, "bark_irq");
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	wdt->base = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(wdt->base))
+		return PTR_ERR(wdt->base);
+
+	np = of_node_get(pdev->dev.of_node);
+
+	if (of_property_read_u32(np, "wdt_res", &val))
+		wdt->wdt_reset = wdt->base + WDT_RST;
+	else
+		wdt->wdt_reset = wdt->base + val;
+
+	if (of_property_read_u32(np, "wdt_en", &val))
+		wdt->wdt_enable = wdt->base + WDT_EN;
+	else
+		wdt->wdt_enable = wdt->base + val;
+
+	if (of_property_read_u32(np, "wdt_bark_time", &val))
+		wdt->wdt_bark_time = wdt->base + WDT_BARK_TIME;
+	else
+		wdt->wdt_bark_time = wdt->base + val;
+
+	if (of_property_read_u32(np, "wdt_bite_time", &val))
+		wdt->wdt_bite_time = wdt->base + WDT_BITE_TIME;
+	else
+		wdt->wdt_bite_time = wdt->base + val;
+
+	id = of_match_device(qcom_wdt_of_table, &pdev->dev);
+	if (!id)
+		return -ENODEV;
+
+	if (id->data)
+		wdt->bite = 1;
+
+	if (irq > 0)
+		register_wdt_bark_irq(irq, wdt);
+
+	wdt->clk = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(wdt->clk)) {
+		dev_err(&pdev->dev, "failed to get input clock\n");
+		return PTR_ERR(wdt->clk);
+	}
+
+	ret = clk_prepare_enable(wdt->clk);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to setup clock\n");
+		return ret;
+	}
+
+	/*
+	 * We use the clock rate to calculate the max timeout, so ensure it's
+	 * not zero to avoid a divide-by-zero exception.
+	 *
+	 * WATCHDOG_CORE assumes units of seconds, if the WDT is clocked such
+	 * that it would bite before a second elapses it's usefulness is
+	 * limited.  Bail if this is the case.
+	 */
+	wdt->rate = clk_get_rate(wdt->clk);
+	if (wdt->rate == 0 ||
+	    wdt->rate > 0x10000000U) {
+		dev_err(&pdev->dev, "invalid clock rate\n");
+		ret = -EINVAL;
+		goto err_clk_unprepare;
+	}
+
+	ret = work_on_cpu(0, qcom_wdt_configure_bark_dump, NULL);
+
+	wdt->wdd.dev = &pdev->dev;
+	wdt->wdd.info = &qcom_wdt_info;
+	if (ret)
+		wdt->wdd.ops = &qcom_wdt_ops_nonsecure;
+	else
+		wdt->wdd.ops = &qcom_wdt_ops_secure;
+	wdt->wdd.min_timeout = 1;
+	wdt->wdd.max_timeout = 0x10000000U / wdt->rate;
+
+	/*
+	 * If 'timeout-sec' unspecified in devicetree, assume a 30 second
+	 * default, unless the max timeout is less than 30 seconds, then use
+	 * the max instead.
+	 */
+	wdt->wdd.timeout = min(wdt->wdd.max_timeout, 30U);
+	watchdog_init_timeout(&wdt->wdd, 0, &pdev->dev);
+
+	ret = watchdog_register_device(&wdt->wdd);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to register watchdog\n");
+		goto err_clk_unprepare;
+	}
+
+	/*
+	 * WDT restart notifier has priority 0 (use as a last resort)
+	 */
+	wdt->restart_nb.notifier_call = qcom_wdt_restart;
+	atomic_notifier_chain_register(&panic_notifier_list, &panic_blk);
+	ret = register_restart_handler(&wdt->restart_nb);
+	if (ret)
+		dev_err(&pdev->dev, "failed to setup restart handler\n");
+
+	platform_set_drvdata(pdev, wdt);
+	return 0;
+
+err_clk_unprepare:
+	clk_disable_unprepare(wdt->clk);
+	return ret;
+}
+#+end_src
+
+** Bark isr fucntion:
+#+begin_src c
+static irqreturn_t wdt_bark_isr(int irq, void *wdd)
+{
+	struct qcom_wdt *wdt = to_qcom_wdt(wdd);
+	unsigned long nanosec_rem;
+	unsigned long long t = sched_clock();
+
+	nanosec_rem = do_div(t, 1000000000);
+	pr_info("Watchdog bark! Now = %lu.%06lu\n", (unsigned long) t,
+							nanosec_rem / 1000);
+	pr_info("Causing a watchdog bite!");
+	writel(0, wdt->wdt_enable);
+	writel(1, wdt->wdt_bite_time);
+	mb(); /* Avoid unpredictable behaviour in concurrent executions */
+	pr_info("Configuring Watchdog Timer\n");
+	writel(1, wdt->wdt_reset);
+	writel(1, wdt->wdt_enable);
+	mb(); /* Make sure the above sequence hits hardware before Reboot. */
+	pr_info("Waiting for Reboot\n");
+
+	mdelay(1);
+	pr_err("Wdog - CTL: 0x%x, BARK TIME: 0x%x, BITE TIME: 0x%x",
+		readl(wdt->wdt_enable),
+		readl(wdt->wdt_bark_time),
+		readl(wdt->wdt_bite_time));
+	return IRQ_HANDLED;
+}
+#+end_src
+** bark dump
+#+begin_src c
+static long qcom_wdt_configure_bark_dump(void *arg)
+{
+	long ret = -ENOMEM;
+	struct {
+		unsigned addr;
+		int len;
+	} cmd_buf;
+
+	/* Area for context dump in secure mode */
+	void *scm_regsave = (void *)__get_free_page(GFP_KERNEL);
+
+	if (scm_regsave) {
+		cmd_buf.addr = virt_to_phys(scm_regsave);
+		cmd_buf.len  = PAGE_SIZE;
+
+		ret = scm_call(SCM_SVC_UTIL, SCM_CMD_SET_REGSAVE,
+			       &cmd_buf, sizeof(cmd_buf), NULL, 0);
+	}
+
+	if (ret)
+		pr_err("Setting register save address failed.\n"
+				"Registers won't be dumped on a dog bite\n");
+	return ret;
+}
+#+end_src
+** watchdog secure ops
+#+begin_src c
+static const struct watchdog_ops qcom_wdt_ops_secure = {
+	.start		= qcom_wdt_start_secure,
+	.stop		= qcom_wdt_stop,
+	.ping		= qcom_wdt_ping,
+	.set_timeout	= qcom_wdt_set_timeout,
+	.owner		= THIS_MODULE,
+};
+#+end_src
+** watchdog file operations
+#+begin_src c
+static const struct file_operations watchdog_fops = {
+    .owner      = THIS_MODULE,
+    .write      = watchdog_write,
+    .unlocked_ioctl = watchdog_ioctl,
+    .open       = watchdog_open,
+    .release    = watchdog_release,
+};
+#+end_src
+** WDT restart notifier
+use =panic_notifier_list= and =restart_handler_list= 
+#+begin_src c
+  wdt->restart_nb.notifier_call = qcom_wdt_restart;
+  atomic_notifier_chain_register(&panic_notifier_list, &panic_blk);
+  ret = register_restart_handler(&wdt->restart_nb);
+#+end_src
+#+begin_src c
+  int register_restart_handler(struct notifier_block *nb)
+  {
+    return atomic_notifier_chain_register(&restart_handler_list, nb);
+  }
+#+end_src
+
+
