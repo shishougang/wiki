@@ -35,7 +35,7 @@
          :base-directory ,note-root-dir
          :publishing-directory ,note-publish-dir
          :recursive t
-         :base-extension "css\\|js\\|png\\|jpg\\|jpeg\\|svg\\|gif\\|pdf\\|mp3\\|swf\\|zip\\|gz\\|txt\\|el\\|tar.gz\\|c\\|cpp\\|sh"
+         :base-extension "c\\|cc\\|css\\|js\\|png\\|jpg\\|jpeg\\|svg\\|gif\\|pdf\\|mp3\\|swf\\|zip\\|gz\\|txt\\|el\\|tar.gz\\|c\\|cpp\\|sh"
          :publishing-function org-publish-attachment))
 
 (add-to-list 'org-publish-project-alist

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Graph Algorithms</title>
-<!-- 2017-02-06 Mon 23:29 -->
+<!-- 2017-02-07 Tue 00:40 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -1107,10 +1107,125 @@ As discussed in the previous post, the value low[v] indicates earliest
 visited vertex reachable from subtree rooted with v. The condition for
 an edge(u, v) to be a bridge is, <code>low[v] &gt; disc[u]</code>.
 </p>
+
+<p>
+<a href="./Files/bridges-in-a-graph.cc">bridges-in-a-graph.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;list&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NIL</span> -1
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Graph</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>);
+  <span style="color: #00ffff;">virtual</span> ~<span style="color: #87cefa;">Graph</span>();
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Bridge</span>();
+
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>;    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">No. of vertices</span>
+  <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt; *<span style="color: #eedd82;">adj</span>;
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">BridgeUtil</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">visited</span>[], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">disc</span>[], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">low</span>[],
+                  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">parent</span>[]);
+};
+
+<span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>) {
+  <span style="color: #00ffff;">this</span>-&gt;V = V;
+  adj = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;[V];
+}
+
+<span style="color: #7fffd4;">Graph</span>::~<span style="color: #87cefa;">Graph</span>() {
+  <span style="color: #00ffff;">delete</span>[] adj;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">w</span>) {
+  adj[v].push_back(w);
+  adj[w].push_back(v);  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Note: the graph is undirected</span>
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">BridgeUtil</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">visited</span>[], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">disc</span>[], 
+                       <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">low</span>[], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">parent</span>[]) {
+  <span style="color: #00ffff;">static</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">time</span> = 0;
+  visited[u] = <span style="color: #7fffd4;">true</span>;
+  disc[u] = low[u] = ++time;
+
+  <span style="color: #7fffd4;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it</span>;
+  <span style="color: #00ffff;">for</span> (it = adj[u].begin(); it != adj[u].end(); ++it) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = *it;
+    <span style="color: #00ffff;">if</span> (!visited[v]) {
+      parent[v] = u;
+      BridgeUtil(v, visited, disc, low, parent);
+      low[u]  = min(low[u], low[v]);
+      <span style="color: #00ffff;">if</span> (low[v] &gt; disc[u]) {
+        cout &lt;&lt; u &lt;&lt;<span style="color: #ffa07a;">" "</span> &lt;&lt; v &lt;&lt; endl;
+      }
+    } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (v != parent[u]) {
+      low[u]  = min(low[u], disc[v]);
+    }
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">Bridge</span>() {
+  <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">visited</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">bool</span>[V];
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">disc</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[V];
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">low</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[V];
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">parent</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[V];
+
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; i++) {
+    parent[i] = NIL;
+    visited[i] = <span style="color: #7fffd4;">false</span>;
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; i++) { 
+    <span style="color: #00ffff;">if</span> (visited[i] == <span style="color: #7fffd4;">false</span>) {
+      BridgeUtil(i, visited, disc, low, parent);
+    }
+  }
+  <span style="color: #00ffff;">delete</span>[] visited;
+  <span style="color: #00ffff;">delete</span>[] disc;
+  <span style="color: #00ffff;">delete</span>[] low;
+  <span style="color: #00ffff;">delete</span>[] parent;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  cout &lt;&lt; <span style="color: #ffa07a;">"\nBridges in first graph \n"</span>;
+  <span style="color: #98fb98;">Graph</span> <span style="color: #eedd82;">g1</span>(5);
+  g1.AddEdge(1, 0);
+  g1.AddEdge(0, 2);
+  g1.AddEdge(2, 1);
+  g1.AddEdge(0, 3);
+  g1.AddEdge(3, 4);
+  g1.Bridge();
+
+  cout &lt;&lt; <span style="color: #ffa07a;">"\nBridges in second graph \n"</span>;
+  <span style="color: #98fb98;">Graph</span> <span style="color: #eedd82;">g2</span>(4);
+  g2.AddEdge(0, 1);
+  g2.AddEdge(1, 2);
+  g2.AddEdge(2, 3);
+  g2.Bridge();
+
+  cout &lt;&lt; <span style="color: #ffa07a;">"\nBridges in third graph \n"</span>;
+  <span style="color: #98fb98;">Graph</span> <span style="color: #eedd82;">g3</span>(7);
+  g3.AddEdge(0, 1);
+  g3.AddEdge(1, 2);
+  g3.AddEdge(2, 0);
+  g3.AddEdge(1, 3);
+  g3.AddEdge(1, 4);
+  g3.AddEdge(1, 6);
+  g3.AddEdge(3, 5);
+  g3.AddEdge(4, 5);
+  g3.Bridge();
+
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
 </div>
-
-
+</div>
 
 <div id="outline-container-sec-11" class="outline-2">
 <h2 id="sec-11">Tarjan's strongly connected components algorithm</h2>
@@ -1354,7 +1469,7 @@ the component.
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-02-06 Mon 23:29</p>
+<p class="date">Created: 2017-02-07 Tue 00:40</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
