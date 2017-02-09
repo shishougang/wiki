@@ -1,0 +1,206 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: per-CPU Parameters
+#+OPTIONS: num:nil H:2
+
+
+* Overview
+per-cpu变量,系统中的每一个处理器都会拥有该变量的独有副本.所以对它的访
+问几乎不需要锁.
+
+内核是抢占式的,所以在访问per-CPU变量时，应使用特定的API来避免抢占，即
+避免它被切换到另一个CPU上被处理。
+
+主要定义于 =<linux/percpu.h>= .
+* 静态创建
+** 定义和声明每个CPU变量：
+#+begin_src c
+DEFINE_PER_CPU(type, name);
+#+end_src
+这语句为系统的每个CPU都创建了一个类型为type，名字为name的变量。如果需
+要在别处声明此变量，以防编译时的警告，可使用下面的宏：
+
+#+begin_src c
+  #define DEFINE_PER_CPU(type, name) \
+    __attribute__((__section__(".data.percpu"))) __typeof__(type) per_cpu__##name
+#+end_src
+
+从上面的代码我们可以看出，手工定义的所有per-cpu变量都是放在
+=.data.percpu= 段的。注意上面的宏只是在SMP体系结构下才如此定义。如果不
+是SMP结构的计算机那么只是简单的把所有的per-cpu变量放到全局变量应该放到
+的地方。
+
+在系统初始化期间, =start_kernel()= 函数中调用 =setup_per_cpu_areas()=
+函数，用于为每个cpu的per-cpu变量副本分配空间，
+
+#+begin_src c
+void __init setup_per_cpu_areas(void)
+{
+	unsigned long delta;
+	unsigned int cpu;
+	int rc;
+
+	/*
+	 * Always reserve area for module percpu variables.  That's
+	 * what the legacy allocator did.
+	 */
+	rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
+				    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE, NULL,
+				    pcpu_dfl_fc_alloc, pcpu_dfl_fc_free);
+	if (rc < 0)
+		panic("Failed to initialize percpu areas.");
+
+	delta = (unsigned long)pcpu_base_addr - (unsigned long)__per_cpu_start;
+	for_each_possible_cpu(cpu)
+		__per_cpu_offset[cpu] = delta + pcpu_unit_offsets[cpu];
+}
+#+end_src
+
+上述函数，在分配好每个cpu的per-cpu变量副本所占用的物理空间的同时，也
+对 =__per_cpu_offset[NR_CPUS]= 数组进行了初始化用于以后找到指定CPU的这些
+per-cpu变量副本。
+
+#+begin_src c
+DECLARE_PER_CPU(type, name);
+#+end_src
+** 操作每个CPU的变量和指针
++ =get_cpu_var(name);=  //返回当前处理器上的指定变量name的值, 同时将他禁止抢占；
++ =put_cpu_var(name);= //与get_cpu_var(name)相对应，重新激活抢占；
+
+#+begin_src c
+/*
+ * Must be an lvalue. Since @var must be a simple identifier,
+ * we force a syntax error here if it isn't.
+ */
+#define get_cpu_var(var) (*({				\
+	preempt_disable();				\
+	&__get_cpu_var(var); }))
+
+/*
+ * The weird & is necessary because sparse considers (void)(var) to be
+ * a direct dereference of percpu variable (var).
+ */
+#define put_cpu_var(var) do {				\
+	(void)&(var);					\
+	preempt_enable();				\
+} while (0)
+#+end_src
+
+通过指针来操作每个CPU的数据：
++ =get_cpu_ptr(var);= --- 返回一个void类型的指针，指向CPU ptr处的数据
++ =put_cpu_ptr(var);= --- 操作完成后，重新激活内核抢占。
+#+begin_src c
+#define get_cpu_ptr(var) ({				\
+	preempt_disable();				\
+	this_cpu_ptr(var); })
+
+#define put_cpu_ptr(var) do {				\
+	(void)(var);					\
+	preempt_enable();				\
+} while (0)
+#+end_src
+** 获得别的处理器上的name变量的值
+=per_cpu(name, cpu);=   //返回别的处理器cpu上变量name的值；
+** per-CPU变量导出，供模块使用
+#+begin_src c
+  EXPORT_PER_CPU_SYMBOL(per_cpu_var);
+  EXPORT_PER_CPU_SYMBOL_GPL(per_cpu_var);
+#+end_src
+
+
+* 动态创建
++ 给系统中每个处理器分配一个指定类型的对象： =alloc_percpu(type)=
+
+参数为type, 就是指定的需要分配的类型，通过类型，可以得出
+=__alloc_percpu()= 的两个参数：
++ =size =  sizeof(type);=
++ =align = __alignof__(type);=
+  =__alignof__()= 是gcc的一个功能，它会返回指定类型或lvalue所需的对齐
+  字节数。
+
+#+begin_src c
+#define alloc_percpu(type)	\
+	(typeof(type) __percpu *)__alloc_percpu(sizeof(type), __alignof__(type))
+
+/**
+ * __alloc_percpu - allocate dynamic percpu area
+ * @size: size of area to allocate in bytes
+ * @align: alignment of area (max PAGE_SIZE)
+ *
+ * Allocate zero-filled percpu area of @size bytes aligned at @align.
+ * Might sleep.  Might trigger writeouts.
+ *
+ * CONTEXT:
+ * Does GFP_KERNEL allocation.
+ *
+ * RETURNS:
+ * Percpu pointer to the allocated area on success, NULL on failure.
+ */
+void __percpu *__alloc_percpu(size_t size, size_t align)
+{
+	return pcpu_alloc(size, align, false);
+}
+EXPORT_SYMBOL_GPL(__alloc_percpu);
+#+end_src
+
++ 相应的释放所有处理器上指定的每个CPU数据：free_percpu();
+
+#+begin_src c
+/**
+ * free_percpu - free percpu area
+ * @ptr: pointer to area to free
+ *
+ * Free percpu area @ptr.
+ *
+ * CONTEXT:
+ * Can be called from atomic context.
+ */
+void free_percpu(void __percpu *ptr)
+{
+	void *addr;
+	struct pcpu_chunk *chunk;
+	unsigned long flags;
+	int off;
+
+	if (!ptr)
+		return;
+
+	addr = __pcpu_ptr_to_addr(ptr);
+
+	spin_lock_irqsave(&pcpu_lock, flags);
+
+	chunk = pcpu_chunk_addr_search(addr);
+	off = addr - chunk->base_addr;
+
+	pcpu_free_area(chunk, off);
+
+	/* if there are more than one fully free chunks, wake up grim reaper */
+	if (chunk->free_size == pcpu_unit_size) {
+		struct pcpu_chunk *pos;
+
+		list_for_each_entry(pos, &pcpu_slot[pcpu_nr_slots - 1], list)
+			if (pos != chunk) {
+				schedule_work(&pcpu_reclaim_work);
+				break;
+			}
+	}
+
+	spin_unlock_irqrestore(&pcpu_lock, flags);
+}
+EXPORT_SYMBOL_GPL(free_percpu);
+#+end_src
+
+* Misc
+** =get_cpu()/put_cpu()= --- 获得处理器编号
++ =get_cpu()= 在返回当前处理器编号之前，先回关闭内核抢占。
++ =put_cpu()= 重新打开内核抢占。
+
+#+begin_src c
+#define get_cpu()		({ preempt_disable(); smp_processor_id(); })
+#define put_cpu()		preempt_enable()
+#+end_src
+
+* cc
+
+#+begin_src c
+
+#+end_src

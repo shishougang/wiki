@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>per-CPU Parameters</title>
+<!-- 2017-02-09 Thu 20:53 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+<script type="text/javascript">
+    function rpl(expr,a,b) {
+      var i=0
+      while (i!=-1) {
+         i=expr.indexOf(a,i);
+         if (i>=0) {
+            expr=expr.substring(0,i)+b+expr.substring(i+a.length);
+            i+=b.length;
+         }
+      }
+      return expr
+    }
+
+    function show_org_source(){
+       document.location.href = rpl(document.location.href,"html","org.html");
+    }
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">per-CPU Parameters</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">静态创建</a>
+<ul>
+<li><a href="#sec-2-1">定义和声明每个CPU变量：</a></li>
+<li><a href="#sec-2-2">操作每个CPU的变量和指针</a></li>
+<li><a href="#sec-2-3">获得别的处理器上的name变量的值</a></li>
+<li><a href="#sec-2-4">per-CPU变量导出，供模块使用</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">动态创建</a></li>
+<li><a href="#sec-4">Misc</a>
+<ul>
+<li><a href="#sec-4-1"><code>get_cpu()/put_cpu()</code> &#x2014; 获得处理器编号</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">cc</a></li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Overview</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+per-cpu变量,系统中的每一个处理器都会拥有该变量的独有副本.所以对它的访问几乎不需要锁.
+</p>
+
+<p>
+内核是抢占式的,所以在访问per-CPU变量时，应使用特定的API来避免抢占，即避免它被切换到另一个CPU上被处理。
+</p>
+
+<p>
+主要定义于 <code>&lt;linux/percpu.h&gt;</code> .
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">静态创建</h2>
+<div class="outline-text-2" id="text-2">
+</div><div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">定义和声明每个CPU变量：</h3>
+<div class="outline-text-3" id="text-2-1">
+<div class="org-src-container">
+
+<pre class="src src-c">DEFINE_PER_CPU(type, name);
+</pre>
+</div>
+<p>
+这语句为系统的每个CPU都创建了一个类型为type，名字为name的变量。如果需要在别处声明此变量，以防编译时的警告，可使用下面的宏：
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">DEFINE_PER_CPU</span>(<span style="color: #eedd82;">type</span>, <span style="color: #eedd82;">name</span>) \
+  <span style="color: #00ffff;">__attribute__</span>((__section__(<span style="color: #ffa07a;">".data.percpu"</span>))) <span style="color: #98fb98;">__typeof__</span>(<span style="color: #eedd82;">type</span>) per_cpu__##name
+</pre>
+</div>
+
+<p>
+从上面的代码我们可以看出，手工定义的所有per-cpu变量都是放在
+<code>.data.percpu</code> 段的。注意上面的宏只是在SMP体系结构下才如此定义。如果不是SMP结构的计算机那么只是简单的把所有的per-cpu变量放到全局变量应该放到的地方。
+</p>
+
+<p>
+在系统初始化期间, <code>start_kernel()</code> 函数中调用 <code>setup_per_cpu_areas()</code>
+函数，用于为每个cpu的per-cpu变量副本分配空间，
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__init</span> setup_per_cpu_areas(<span style="color: #98fb98;">void</span>)
+{
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">delta</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">cpu</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rc</span>;
+
+        <span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;">         * Always reserve area for module percpu variables.  That's</span>
+<span style="color: #ff7f24;">         * what the legacy allocator did.</span>
+<span style="color: #ff7f24;">         </span><span style="color: #ff7f24;">*/</span>
+        rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
+                                    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE, <span style="color: #7fffd4;">NULL</span>,
+                                    pcpu_dfl_fc_alloc, pcpu_dfl_fc_free);
+        <span style="color: #00ffff;">if</span> (rc &lt; 0)
+                panic(<span style="color: #ffa07a;">"Failed to initialize percpu areas."</span>);
+
+        delta = (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>)pcpu_base_addr - (<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>)__per_cpu_start;
+        for_each_possible_cpu(cpu)
+                __per_cpu_offset[cpu] = delta + pcpu_unit_offsets[cpu];
+}
+</pre>
+</div>
+
+<p>
+上述函数，在分配好每个cpu的per-cpu变量副本所占用的物理空间的同时，也对 <code>__per_cpu_offset[NR_CPUS]</code> 数组进行了初始化用于以后找到指定CPU的这些
+per-cpu变量副本。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c">DECLARE_PER_CPU(type, name);
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">操作每个CPU的变量和指针</h3>
+<div class="outline-text-3" id="text-2-2">
+<ul class="org-ul">
+<li><code>get_cpu_var(name);</code>  //返回当前处理器上的指定变量name的值, 同时将他禁止抢占；
+</li>
+<li><code>put_cpu_var(name);</code> //与get<sub>cpu</sub><sub>var</sub>(name)相对应，重新激活抢占；
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * Must be an lvalue. Since @var must be a simple identifier,</span>
+<span style="color: #ff7f24;"> * we force a syntax error here if it isn't.</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">get_cpu_var</span>(<span style="color: #eedd82;">var</span>) (*({                           \
+        preempt_disable();                              \
+        &amp;__get_cpu_var(var); }))
+
+<span style="color: #ff7f24;">/*</span>
+<span style="color: #ff7f24;"> * The weird &amp; is necessary because sparse considers (void)(var) to be</span>
+<span style="color: #ff7f24;"> * a direct dereference of percpu variable (var).</span>
+<span style="color: #ff7f24;"> </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">put_cpu_var</span>(<span style="color: #eedd82;">var</span>) <span style="color: #00ffff;">do</span> {                           \
+        (<span style="color: #98fb98;">void</span>)&amp;(var);                                   \
+        preempt_enable();                               \
+} <span style="color: #00ffff;">while</span> (0)
+</pre>
+</div>
+
+<p>
+通过指针来操作每个CPU的数据：
+</p>
+<ul class="org-ul">
+<li><code>get_cpu_ptr(var);</code> &#x2014; 返回一个void类型的指针，指向CPU ptr处的数据
+</li>
+<li><code>put_cpu_ptr(var);</code> &#x2014; 操作完成后，重新激活内核抢占。
+</li>
+</ul>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">get_cpu_ptr</span>(<span style="color: #eedd82;">var</span>) ({                             \
+        preempt_disable();                              \
+        this_cpu_ptr(var); })
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">put_cpu_ptr</span>(<span style="color: #eedd82;">var</span>) <span style="color: #00ffff;">do</span> {                           \
+        (<span style="color: #98fb98;">void</span>)(var);                                    \
+        preempt_enable();                               \
+} <span style="color: #00ffff;">while</span> (0)
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">获得别的处理器上的name变量的值</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+<code>per_cpu(name, cpu);</code>   //返回别的处理器cpu上变量name的值；
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">per-CPU变量导出，供模块使用</h3>
+<div class="outline-text-3" id="text-2-4">
+<div class="org-src-container">
+
+<pre class="src src-c">EXPORT_PER_CPU_SYMBOL(per_cpu_var);
+EXPORT_PER_CPU_SYMBOL_GPL(per_cpu_var);
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">动态创建</h2>
+<div class="outline-text-2" id="text-3">
+<ul class="org-ul">
+<li>给系统中每个处理器分配一个指定类型的对象： <code>alloc_percpu(type)</code>
+</li>
+</ul>
+
+<p>
+参数为type, 就是指定的需要分配的类型，通过类型，可以得出
+<code>__alloc_percpu()</code> 的两个参数：
+</p>
+<ul class="org-ul">
+<li><code>size =  sizeof(type);</code>
+</li>
+<li><code>align = __alignof__(type);</code>
+<code>__alignof__()</code> 是gcc的一个功能，它会返回指定类型或lvalue所需的对齐字节数。
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">alloc_percpu</span>(<span style="color: #eedd82;">type</span>)      \
+        (typeof(type) __percpu *)__alloc_percpu(<span style="color: #00ffff;">sizeof</span>(type), __alignof__(type))
+
+<span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * __alloc_percpu - allocate dynamic percpu area</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@size</span><span style="color: #ffa07a;">: size of area to allocate in bytes</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@align</span><span style="color: #ffa07a;">: alignment of area (max PAGE_SIZE)</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * Allocate zero-filled percpu area of </span><span style="color: #7fffd4;">@size</span><span style="color: #ffa07a;"> bytes aligned at </span><span style="color: #7fffd4;">@align</span><span style="color: #ffa07a;">.</span>
+<span style="color: #ffa07a;"> * Might sleep.  Might trigger writeouts.</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">CONTEXT</span><span style="color: #ffa07a;">:</span>
+<span style="color: #ffa07a;"> * Does GFP_KERNEL allocation.</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">RETURNS</span><span style="color: #ffa07a;">:</span>
+<span style="color: #ffa07a;"> * Percpu pointer to the allocated area on success, NULL on failure.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">__percpu</span> *__alloc_percpu(<span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">size</span>, <span style="color: #98fb98;">size_t</span> <span style="color: #eedd82;">align</span>)
+{
+        <span style="color: #00ffff;">return</span> pcpu_alloc(size, align, <span style="color: #7fffd4;">false</span>);
+}
+EXPORT_SYMBOL_GPL(__alloc_percpu);
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>相应的释放所有处理器上指定的每个CPU数据：free<sub>percpu</sub>();
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ffa07a;">/**</span>
+<span style="color: #ffa07a;"> * free_percpu - free percpu area</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">@ptr</span><span style="color: #ffa07a;">: pointer to area to free</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * Free percpu area </span><span style="color: #7fffd4;">@ptr</span><span style="color: #ffa07a;">.</span>
+<span style="color: #ffa07a;"> *</span>
+<span style="color: #ffa07a;"> * </span><span style="color: #7fffd4;">CONTEXT</span><span style="color: #ffa07a;">:</span>
+<span style="color: #ffa07a;"> * Can be called from atomic context.</span>
+<span style="color: #ffa07a;"> */</span>
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">free_percpu</span>(<span style="color: #98fb98;">void</span> <span style="color: #eedd82;">__percpu</span> *ptr)
+{
+        <span style="color: #98fb98;">void</span> *<span style="color: #eedd82;">addr</span>;
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">pcpu_chunk</span> *<span style="color: #eedd82;">chunk</span>;
+        <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">flags</span>;
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">off</span>;
+
+        <span style="color: #00ffff;">if</span> (!ptr)
+                <span style="color: #00ffff;">return</span>;
+
+        addr = __pcpu_ptr_to_addr(ptr);
+
+        spin_lock_irqsave(&amp;pcpu_lock, flags);
+
+        chunk = pcpu_chunk_addr_search(addr);
+        off = addr - chunk-&gt;base_addr;
+
+        pcpu_free_area(chunk, off);
+
+        <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">if there are more than one fully free chunks, wake up grim reaper </span><span style="color: #ff7f24;">*/</span>
+        <span style="color: #00ffff;">if</span> (chunk-&gt;free_size == pcpu_unit_size) {
+                <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">pcpu_chunk</span> *<span style="color: #eedd82;">pos</span>;
+
+                list_for_each_entry(pos, &amp;pcpu_slot[pcpu_nr_slots - 1], list)
+                        <span style="color: #00ffff;">if</span> (pos != chunk) {
+                                schedule_work(&amp;pcpu_reclaim_work);
+                                <span style="color: #00ffff;">break</span>;
+                        }
+        }
+
+        spin_unlock_irqrestore(&amp;pcpu_lock, flags);
+}
+EXPORT_SYMBOL_GPL(free_percpu);
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Misc</h2>
+<div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1"><code>get_cpu()/put_cpu()</code> &#x2014; 获得处理器编号</h3>
+<div class="outline-text-3" id="text-4-1">
+<ul class="org-ul">
+<li><code>get_cpu()</code> 在返回当前处理器编号之前，先回关闭内核抢占。
+</li>
+<li><code>put_cpu()</code> 重新打开内核抢占。
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">get_cpu</span>()               ({ preempt_disable(); smp_processor_id(); })
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">put_cpu</span>()               preempt_enable()
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">cc</h2>
+<div class="outline-text-2" id="text-5">
+<div class="org-src-container">
+
+<pre class="src src-c"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-02-09 Thu 20:53</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

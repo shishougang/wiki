@@ -120,15 +120,126 @@
 
 
 * cc
-#+begin_src python
 
+#+begin_src c
+static const struct net_device_ops edma_axi_netdev_ops = {
+	.ndo_open               = edma_open,
+	.ndo_stop               = edma_close,
+	.ndo_start_xmit         = edma_xmit,
+	.ndo_set_mac_address    = edma_set_mac_addr,
+	.ndo_select_queue	= edma_select_xps_queue,
+#ifdef CONFIG_RFS_ACCEL
+	.ndo_rx_flow_steer      = edma_rx_flow_steer,
+	.ndo_register_rfs_filter = edma_register_rfs_filter,
+	.ndo_get_default_vlan_tag = edma_get_default_vlan_tag,
+#endif
+	.ndo_get_stats          = edma_get_stats,
+	.ndo_change_mtu		= edma_change_mtu,
+};
+#+end_src
+#+begin_src c
+static struct platform_driver edma_axi_driver = {
+	.driver = {
+		.name    = edma_axi_driver_name,
+		.owner   = THIS_MODULE,
+		.of_match_table = edma_of_mtable,
+	},
+	.probe    = edma_axi_probe,
+	.remove   = edma_axi_remove,
+	.shutdown = edma_axi_shutdown,
+};
 #+end_src
 
-#+begin_src c++
-
-#+end_src
 
 
+=CONFIG_RFS_ACCEL=
+Accelerated RFS
+# Documentation/networking/scaling.txt
+# https://www.kernel.org/doc/Documentation/networking/scaling.txt
+  RFS: Receive Flow Steering
+  RSS: Receive Side Scaling
+  RPS: Receive Packet Steering
+
+*RFS: Receive Flow Steering*
+While RPS steers packets solely based on hash, and thus generally
+provides good load distribution, it does not take into account
+application locality. This is accomplished by Receive Flow Steering
+(RFS). The *goal of RFS* is to *increase datacache hitrate* by steering
+kernel processing of packets to the CPU where the application thread
+consuming the packet is running. RFS relies on the same RPS mechanisms
+to enqueue packets onto the backlog of another CPU and to wake up that
+CPU.
+
+*Accelerated RFS*
+
+
+Accelerated RFS is to RFS what RSS is to RPS: a hardware-accelerated load
+balancing mechanism that uses soft state to steer flows based on where
+the application thread consuming the packets of each flow is running.
+Accelerated RFS should perform better than RFS since packets are sent
+directly to a CPU local to the thread consuming the data. The target CPU
+will either be the same CPU where the application runs, or at least a CPU
+which is local to the application thread’s CPU in the cache hierarchy.
 #+begin_src sh
+root@OpenWrt:/# cat /proc/interrupts 
+           CPU0       CPU1       CPU2       CPU3       
+ 20:   36300197     208695    2407496      78552       GIC  20  arch_timer
+ 35:          0          0          0          0       GIC  35  watchdog bark
+ 97:          0          0          0          0       GIC  97  edma_eth_tx0
+ 98:          0          0          0          0       GIC  98  edma_eth_tx1
+ 99:          0          0        738          0       GIC  99  edma_eth_tx2
+100:          0          0          0          0       GIC 100  edma_eth_tx3
+101:          0          0          0          0       GIC 101  edma_eth_tx4
+102:          0          0          0          0       GIC 102  edma_eth_tx5
+103:          0          0          0        797       GIC 103  edma_eth_tx6
+104:          0          0          0          6       GIC 104  edma_eth_tx7
+105:          0          0          0          0       GIC 105  edma_eth_tx8
+106:          0          0          0          0       GIC 106  edma_eth_tx9
+107:         73          0          0          0       GIC 107  edma_eth_tx10
+108:          0          0          0          0       GIC 108  edma_eth_tx11
+109:          0          0          0          0       GIC 109  edma_eth_tx12
+110:          0          0          0          0       GIC 110  edma_eth_tx13
+111:          0          9          0          0       GIC 111  edma_eth_tx14
+112:          0          0          0          0       GIC 112  edma_eth_tx15
+127:      52330          0          0          0       GIC 127  78b5000.spi
+129:         24          0          0          0       GIC 129  i2c-msm-v2-irq
+133:          0          0          0          0       GIC 133  sps
+139:       1148          0          0          0       GIC 139  msm_serial_hsl0
+155:          0          0          0          0       GIC 155  mmc0
+164:          0          0          0          0       GIC 164  xhci-hcd:usb1
+168:         29          0          0          0       GIC 168  xhci-hcd:usb3
+173:          0          0          0          0       GIC 173  int_msi
+174:       2103      48023          0          0       GIC 174  wifi2
+183:          0          0          0          0       GIC 183  int_pls_link_down
+200:       3367          0    2982303          0       GIC 200  wifi0
+201:       3244          0          0      24028       GIC 201  wifi1
+239:          0          0          0          0       GIC 239  sps
+270:      15220          0          0          0       GIC 270  sps
+272:      23697          0          0          0       GIC 272  edma_eth_rx0
+274:          0       5607          0          0       GIC 274  edma_eth_rx2
+276:          0          0       5424          0       GIC 276  edma_eth_rx4
+278:          0          0          0       5911       GIC 278  edma_eth_rx6
+306:          0          0          0          0   msmgpio  18  wps
+310:          0          0          0          0   msmgpio  22  7824900.sdhci cd
+IPI0:          0          0          0          0  CPU wakeup interrupts
+IPI1:          0          0          0          0  Timer broadcast interrupts
+IPI2:      63422      52002      19887      46408  Rescheduling interrupts
+IPI3:          5          7          7          5  Function call interrupts
+IPI4:          4          2          4          2  Single function call interrupts
+IPI5:          0          0          0          0  CPU stop interrupts
+IPI6:      12161      14746       7912       6997  IRQ work interrupts
+IPI7:          0          0          0          0  completion interrupts
+Err:          0
+#+end_src
+
+#+begin_src c
 
 #+end_src
+
+
+#+begin_src c
+
+#+end_src
+
+
+
