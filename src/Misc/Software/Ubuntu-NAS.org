@@ -1,0 +1,122 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Configure Ubuntu to the NAS
+#+OPTIONS: num:nil H:2
+
+
+https://www.zhihu.com/question/26509858
+
+* SAMBA[fn:1]
+#+begin_src sh
+$ sudo apt-get update
+$ sudo apt-get install samba
+#+end_src
+
+** 创建一个 Anonymous share
+#+begin_src c++
+sudo vi /etc/samba/smb.conf
+#+end_src
+在文件末尾添加如下内容:
+#+begin_src sh
+[share] 
+    comment = Ubuntu File Server 
+    path = /srv/samba/share 
+    browsable = yes 
+    guest ok = yes 
+    read only = no
+#+end_src
+创建 share 目录,对该目录的Others权限添加w
+#+begin_src sh
+$ sudo mkdir -p /srv/samba/share
+$ sudo chmod o+w /srv/samba/share
+#+end_src
+重启Samba服务使配置生效
+#+begin_src sh
+$ sudo restart smbd
+$ sudo restart nmbd
+#+end_src
+
+Samba服务器配置完成，现在，可以在Windows Explorer 的地址栏中输入Samba
+服务器所在主机的主机名:
+#+begin_src sh
+\\hostname
+or
+\\IP
+#+end_src
+** 创建一个 Secured share
+#+begin_src sh
+$ mkdir -p /srv/samba/secret
+#+end_src
+
+创建一个用于访问这个 secured share 的用户，下面创建一个名为sambauser1
+的用户, 将用户 sambauser1 加入到本地的 smbpasswd file:
+
+#+begin_src sh
+$ sudo useradd sambauser1 -s /usr/sbin/nologin
+$ sudo smbpasswd -a sambauser1
+#+end_src
+
+修改共享目录的User为sambauser1
+#+begin_src sh
+$ sudo chown sambauser1:sambauser1 /srv/samba/secret
+#+end_src
+
+修改 Samba 配置文件
+#+begin_src sh
+sudo vi /etc/samba/smb.conf 
+
+[secret]
+    comment = Secret File
+    path = /srv/samba/secret
+    valid user = sambauser1
+    guest ok = no
+    writable = yes
+    browsable = yes
+#+end_src
+
+#+begin_src sh
+$ sudo restart smbd
+$ sudo restart nmbd
+#+end_src
+* bt: rtorrent + rutorrent
+https://linux.cn/article-2064-1.html
+
+
+
+* NFS服务器
+* dnsmasq+dnscrypt
+
+http://lixingcong.github.io/2016/05/01/DNSCrypt-with-dnsmasq/
+
+https://blog.phoenixlzx.com/2016/04/27/better-dns-with-unbound/
+
+https://www.dommyet.me/dnsmasq-dnscrypt-smart-dns
+
+
+* 外网怎么和内网的NAS进行互通
++ 花生壳动态域名解析, nat123
+  http://www.cnblogs.com/umasuo/archive/2012/06/13/ubuntu-oray-install.html
+  http://service.oray.com/question/116.html
++ 在NAS上或是在自家路由器架设VPN,以后要存取NAS资源的时候就先建立VPN连
+  线
++ ngrok。这个开源的软件，可以搜索部署安装一下，原理是通过一台公网机器，
+  内网机器与公网机器建立并保持一个tcp连接，公网通过这个连接转发流量至
+  内网机器
+
+
+
+
+
+* cc
+#+begin_src c++
+
+#+end_src
+
+
+#+begin_src sh
+
+#+end_src
+
+* Footnotes
+
+[fn:1] https://www.techforgeek.info/how_to_setup_samba_in_ubuntu_14_04.html
+
