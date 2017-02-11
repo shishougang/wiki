@@ -1,0 +1,586 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>Configure Ubuntu to the NAS</title>
+<!-- 2017-02-12 Sun 00:07 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">Configure Ubuntu to the NAS</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">系统配置</a>
+<ul>
+<li><a href="#sec-1-1">基础服务</a></li>
+<li><a href="#sec-1-2">XBMC</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">数据盘</a>
+<ul>
+<li><a href="#sec-2-1">btrfs file system[TODO]</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">SAMBA</a>
+<ul>
+<li><a href="#sec-3-1">创建一个 Anonymous share</a></li>
+<li><a href="#sec-3-2">创建一个 Secured share</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">bt: rtorrent + rutorrent</a>
+<ul>
+<li><a href="#sec-4-1">rtorrent</a></li>
+<li><a href="#sec-4-2">rutorrent</a></li>
+<li><a href="#sec-4-3">一键安装rtorrent+rutorrent+Web</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">NFS服务器</a></li>
+<li><a href="#sec-6">DLNA服务器</a></li>
+<li><a href="#sec-7">BitTorrent Sync （闭源软件）</a></li>
+<li><a href="#sec-8">tagspace</a></li>
+<li><a href="#sec-9"><span class="todo TODO">TODO</span> </a></li>
+<li><a href="#sec-10">外网怎么和内网的NAS进行互通[TODO]</a></li>
+<li><a href="#sec-11">DNS服务器: dnsmasq+dnscrypt[TODO]</a></li>
+<li><a href="#sec-12">CardDAV、CalDAV服务器(手机通讯录同步) [TODO]</a>
+<ul>
+<li><a href="#sec-12-1">HTTPS apache ssl模块安装，baikal使用HTTPS连接</a></li>
+</ul>
+</li>
+<li><a href="#sec-13">cc</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">系统配置</h2>
+<div class="outline-text-2" id="text-1">
+<ol class="org-ol">
+<li>IP修改成固定IP，域名解析修改为本地路由器。 /etc/network ,
+/etc/resolvconf
+</li>
+<li>apt源修改为本地镜像，修正extras源的no-pubkey的错误。 /etc/apt
+</li>
+<li>双网卡: 修改网络配置为双网卡绑定，mode 6。/etc/modules, modprobe
+bonding, /etc/network
+</li>
+</ol>
+</div>
+
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">基础服务</h3>
+<div class="outline-text-3" id="text-1-1">
+<ul class="org-ul">
+<li>openssh-server：SSH服务
+</li>
+<li>iotop：监控硬盘IO
+</li>
+<li>lm-sensors：CPU温度监控
+</li>
+<li>hddtemp：硬盘温度监控
+</li>
+<li>exfat-fuse：挂载exfat分区
+</li>
+<li>trash-cli：替代rm命令，安全第一
+</li>
+<li>screen
+</li>
+<li>LAMP: sudo tasksel
+</li>
+<li>hdparm: linux下硬盘休眠通过hdparm的-B参数设定硬盘的advanced power
+managemant值。0-127之间是允许休眠，128-254之间是不休眠，值越大相对功耗就越大，但性能高。原来的相当于设定在254，所以硬盘一直在全速转，导致温度长期居高不下。有鉴于此，将此值设定为127，为了重启后有效，还需修改 <code>/etc/hdparm.conf</code> 配置文件。
+</li>
+<li>aria2：最好的HTTP下载
+</li>
+<li>forked-daapd：iTunes媒体共享
+</li>
+<li>webmin: 网页管理系统
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2">XBMC</h3>
+<div class="outline-text-3" id="text-1-2">
+<ul class="org-ul">
+<li>xinit xorg alsa-utils pulseaudio：X Server，未来可以用wayland了
+</li>
+<li>xbmc xbmc-standalone：XBMC
+</li>
+<li>upower acpi-support：XBMC的关机支持
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">数据盘</h2>
+<div class="outline-text-2" id="text-2">
+<ol class="org-ol">
+<li>挂载数据盘LVM文件系统。 VMware RDM, lvm, rescan scsi, /etc/fstab
+</li>
+<li>vmtools安装。 apt-get install open-vm-tools
+</li>
+<li>数据冗余/容错：
+<ul class="org-ul">
+<li>安装LVM，使用LVM RAID1，制作镜像，LVM技术成熟，基本不会丢数据。
+</li>
+<li>或者安装ZFS，使用ZFS制作ZRAID1/RAID5等数据冗余，相较于LVM，ZFS管理较为方便（只需要两条命令），但是对内存开销较大.另外值得注意的是，由于OS DataBlock大小的关系，在创建ZPool的时候，记得加上 -o
+ashift=12 参数，以大幅提升ZFS的性能。
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo add-apt-repository ppa:zfs-native/stable
+sudo aptitude update
+sudo aptitude install ubuntu-zfs
+</pre>
+</div>
+</li>
+</ul>
+</li>
+</ol>
+</div>
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">btrfs file system[TODO]</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+Test.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">SAMBA<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-3">
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo apt-get update
+$ sudo apt-get install samba
+</pre>
+</div>
+</div>
+
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">创建一个 Anonymous share</h3>
+<div class="outline-text-3" id="text-3-1">
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">sudo</span> <span style="color: #eedd82;">vi</span> /etc/samba/smb.conf
+</pre>
+</div>
+<p>
+在文件末尾添加如下内容:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">[share] 
+    <span style="color: #eedd82;">comment</span> = Ubuntu File Server 
+    <span style="color: #eedd82;">path</span> = /srv/samba/share 
+    <span style="color: #eedd82;">browsable</span> = yes 
+    guest <span style="color: #eedd82;">ok</span> = yes 
+    <span style="color: #b0c4de;">read</span> <span style="color: #eedd82;">only</span> = no
+</pre>
+</div>
+<p>
+创建 share 目录,对该目录的Others权限添加w
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo mkdir -p /srv/samba/share
+$ sudo chmod o+w /srv/samba/share
+</pre>
+</div>
+<p>
+重启Samba服务使配置生效
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo restart smbd
+$ sudo restart nmbd
+</pre>
+</div>
+
+<p>
+Samba服务器配置完成，现在，可以在Windows Explorer 的地址栏中输入Samba
+服务器所在主机的主机名:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ffa07a;">\\</span>hostname
+or
+<span style="color: #ffa07a;">\\</span>IP
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">创建一个 Secured share</h3>
+<div class="outline-text-3" id="text-3-2">
+<div class="org-src-container">
+
+<pre class="src src-sh">$ mkdir -p /srv/samba/secret
+</pre>
+</div>
+
+<p>
+创建一个用于访问这个 secured share 的用户，下面创建一个名为sambauser1
+的用户, 将用户 sambauser1 加入到本地的 smbpasswd file:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo useradd sambauser1 -s /usr/sbin/nologin
+$ sudo smbpasswd -a sambauser1
+</pre>
+</div>
+
+<p>
+修改共享目录的User为sambauser1
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo chown sambauser1:sambauser1 /srv/samba/secret
+</pre>
+</div>
+
+<p>
+修改 Samba 配置文件
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo vi /etc/samba/smb.conf 
+
+[secret]
+    <span style="color: #eedd82;">comment</span> = Secret File
+    <span style="color: #eedd82;">path</span> = /srv/samba/secret
+    valid <span style="color: #eedd82;">user</span> = sambauser1
+    guest <span style="color: #eedd82;">ok</span> = no
+    <span style="color: #eedd82;">writable</span> = yes
+    <span style="color: #eedd82;">browsable</span> = yes
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo restart smbd
+$ sudo restart nmbd
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">bt: rtorrent + rutorrent</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+替代transmission-daemon BT/PT下载.
+</p>
+</div>
+<div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">rtorrent</h3>
+<div class="outline-text-3" id="text-4-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt-get install rtorrent
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">rutorrent</h3>
+<div class="outline-text-3" id="text-4-2">
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3">一键安装rtorrent+rutorrent+Web</h3>
+<div class="outline-text-3" id="text-4-3">
+<div class="org-src-container">
+
+<pre class="src src-sh">wget &#8211;no-check-certificate -O autodl-setup http://sourceforge.net/projects/autodl-irssi/files/autodl-setup/download
+sudo sh autodl-setup
+</pre>
+</div>
+<p>
+在安装的过程中一般直接按回车采用默认方式就可以了。 安装到一定程度会提示 你输入rut的用户名 和密码，请填写一个本机存在的用户名称，这里可以添加多用户，如果不需要，在添加一个完毕之后添加下一个的时候按回车跳过，否则会无限循环（或者使用useradd命令添加一个新用户，如果添加新用户，请在安装之前）
+</p>
+
+<p>
+最后还会提示输入webmin的用户名和密码，注意不要和rut的混淆。 然后，然后么在浏览器中输入 ip/rutorrent 就可以开始使用了，就是这么简单。
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">NFS服务器</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+服务器端:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt-get install nfs-kernel-server
+</pre>
+</div>
+<p>
+/etc/exports
+</p>
+
+<p>
+客户端:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt-get install nfs-common
+</pre>
+</div>
+<p>
+修改 /etc/fstab 自动挂载分区:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">example.hostname.com:/ubuntu /local/ubuntu nfs <span style="color: #eedd82;">rsize</span>=8192,<span style="color: #eedd82;">wsize</span>=8192,<span style="color: #eedd82;">timeo</span>=14,intr
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">DLNA服务器</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+minidlna
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt-get install minidlna
+</pre>
+</div>
+<p>
+/etc/minidlna.conf
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">BitTorrent Sync （闭源软件）</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+下载Linux版，解压缩即可执行，修改/etc/rc.local实现开机执行:
+<a href="https://www.resilio.com/individuals/">https://www.resilio.com/individuals/</a>
+</p>
+
+<p>
+or:
+Installing Sync Package On Linux:
+<a href="https://help.getsync.com/hc/en-us/articles/206178924">https://help.getsync.com/hc/en-us/articles/206178924</a>
+</p>
+
+<p>
+Guide To Linux, And Sync Peculiarities:
+<a href="https://help.getsync.com/hc/en-us/articles/204762449-Guide-to-Linux">https://help.getsync.com/hc/en-us/articles/204762449-Guide-to-Linux</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">tagspace</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+不需要在服务器安装，只需要在手机、台式机、笔记本等终端安装，同时使用
+btsync配合可以实现取代evernote等云笔记的功能
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9"><span class="todo TODO">TODO</span> </h2>
+</div>
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10">外网怎么和内网的NAS进行互通[TODO]</h2>
+<div class="outline-text-2" id="text-10">
+<ul class="org-ul">
+<li>花生壳动态域名解析, nat123
+<a href="http://www.cnblogs.com/umasuo/archive/2012/06/13/ubuntu-oray-install.html">http://www.cnblogs.com/umasuo/archive/2012/06/13/ubuntu-oray-install.html</a>
+<a href="http://service.oray.com/question/116.html">http://service.oray.com/question/116.html</a>
+</li>
+<li>在NAS上或是在自家路由器架设VPN,以后要存取NAS资源的时候就先建立VPN连线
+</li>
+<li>ngrok。这个开源的软件，可以搜索部署安装一下，原理是通过一台公网机器，内网机器与公网机器建立并保持一个tcp连接，公网通过这个连接转发流量至内网机器
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-11" class="outline-2">
+<h2 id="sec-11">DNS服务器: dnsmasq+dnscrypt[TODO]</h2>
+<div class="outline-text-2" id="text-11">
+<p>
+<a href="http://lixingcong.github.io/2016/05/01/DNSCrypt-with-dnsmasq/">http://lixingcong.github.io/2016/05/01/DNSCrypt-with-dnsmasq/</a>
+</p>
+
+<p>
+<a href="https://blog.phoenixlzx.com/2016/04/27/better-dns-with-unbound/">https://blog.phoenixlzx.com/2016/04/27/better-dns-with-unbound/</a>
+</p>
+
+<p>
+<a href="https://www.dommyet.me/dnsmasq-dnscrypt-smart-dns">https://www.dommyet.me/dnsmasq-dnscrypt-smart-dns</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-12" class="outline-2">
+<h2 id="sec-12">CardDAV、CalDAV服务器(手机通讯录同步) [TODO]<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup></h2>
+<div class="outline-text-2" id="text-12">
+<ul class="org-ul">
+<li>安装 sqlite: <code>sudo apt-get install sqlit3 php5-sqlite</code>
+</li>
+<li>从baikal 的官方网站下载 baikal-regular
+</li>
+<li>安装baikal: 根据压缩包中的INSTALL.md文档进行安装
+</li>
+<li>记住sqlite3的数据库文件必须放在web服务器无法访问的地方。
+</li>
+<li>手机客户端使用DAVDorid
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-12-1" class="outline-3">
+<h3 id="sec-12-1">HTTPS apache ssl模块安装，baikal使用HTTPS连接</h3>
+<div class="outline-text-3" id="text-12-1">
+<ul class="org-ul">
+<li>修改 /etc/ssl/openssl.cnf 配置，确认如下设置
+<code>basicConstraints=CA:TRUE</code> ，便于做CA自签名证书
+</li>
+<li>生成证书
+<div class="org-src-container">
+
+<pre class="src src-sh">openssl req -x509 -newkey rsa:1024 -keyout /etc/ssl/private/apache.pem -out /etc/ssl/private/apache.pem -nodes -days 999
+</pre>
+</div>
+</li>
+<li>修改apache的关于baikal的vhost配置，加入
+<div class="org-src-container">
+
+<pre class="src src-sh">SSLEngine on
+SSLCertificateFile    /etc/ssl/private/apache.pem
+</pre>
+</div>
+</li>
+<li>重启apache服务器浏览器中测试https连接。
+</li>
+<li>在浏览器中出现证书为自签名不可信时，将证书输出导入到信任的根证书中。
+</li>
+<li>导出证书给手机客户端使用
+<div class="org-src-container">
+
+<pre class="src src-sh">openssl x509 -in apache.pem -outform DER -out tigerhill.crt
+</pre>
+</div>
+</li>
+<li>手机客户端，在 设置&gt;安全&gt;导入证书中将导出的证书导入系统，如成功导入，但不显示，则需确认第一步是否将openssl的配置basicConstraints设置为
+CA:TRUE
+</li>
+<li>手机客户端中配置为https开始同步
+</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-13" class="outline-2">
+<h2 id="sec-13">cc</h2>
+<div class="outline-text-2" id="text-13">
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="https://www.techforgeek.info/how_to_setup_samba_in_ubuntu_14_04.html">https://www.techforgeek.info/how_to_setup_samba_in_ubuntu_14_04.html</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="https://www.zhihu.com/question/26509858">https://www.zhihu.com/question/26509858</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-02-12 Sun 00:07</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

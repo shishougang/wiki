@@ -2,8 +2,52 @@
 #+TITLE: Configure Ubuntu to the NAS
 #+OPTIONS: num:nil H:2
 
+* 系统配置
+1. IP修改成固定IP，域名解析修改为本地路由器。 /etc/network ,
+   /etc/resolvconf
+2. apt源修改为本地镜像，修正extras源的no-pubkey的错误。 /etc/apt
+3. 双网卡: 修改网络配置为双网卡绑定，mode 6。/etc/modules, modprobe
+   bonding, /etc/network
 
-https://www.zhihu.com/question/26509858
+** 基础服务
++ openssh-server：SSH服务
++ iotop：监控硬盘IO
++ lm-sensors：CPU温度监控
++ hddtemp：硬盘温度监控
++ exfat-fuse：挂载exfat分区
++ trash-cli：替代rm命令，安全第一
++ screen
++ LAMP: sudo tasksel
++ hdparm: linux下硬盘休眠通过hdparm的-B参数设定硬盘的advanced power
+  managemant值。0-127之间是允许休眠，128-254之间是不休眠，值越大相对功
+  耗就越大，但性能高。原来的相当于设定在254，所以硬盘一直在全速转，导
+  致温度长期居高不下。有鉴于此，将此值设定为127，为了重启后有效，还需
+  修改 =/etc/hdparm.conf= 配置文件。
++ aria2：最好的HTTP下载
++ forked-daapd：iTunes媒体共享
++ webmin: 网页管理系统
+
+** XBMC
++ xinit xorg alsa-utils pulseaudio：X Server，未来可以用wayland了
++ xbmc xbmc-standalone：XBMC
++ upower acpi-support：XBMC的关机支持
+
+* 数据盘
+1. 挂载数据盘LVM文件系统。 VMware RDM, lvm, rescan scsi, /etc/fstab
+2. vmtools安装。 apt-get install open-vm-tools
+3. 数据冗余/容错：
+   + 安装LVM，使用LVM RAID1，制作镜像，LVM技术成熟，基本不会丢数据。
+   + 或者安装ZFS，使用ZFS制作ZRAID1/RAID5等数据冗余，相较于LVM，ZFS管
+     理较为方便（只需要两条命令），但是对内存开销较大.另外值得注意的是，
+     由于OS DataBlock大小的关系，在创建ZPool的时候，记得加上 -o
+     ashift=12 参数，以大幅提升ZFS的性能。
+     #+begin_src sh
+       sudo add-apt-repository ppa:zfs-native/stable
+       sudo aptitude update
+       sudo aptitude install ubuntu-zfs
+     #+end_src
+** btrfs file system[TODO]
+Test.
 
 * SAMBA[fn:1]
 #+begin_src sh
@@ -78,21 +122,73 @@ $ sudo restart smbd
 $ sudo restart nmbd
 #+end_src
 * bt: rtorrent + rutorrent
-https://linux.cn/article-2064-1.html
+替代transmission-daemon BT/PT下载.
+** rtorrent
+#+begin_src sh
+sudo apt-get install rtorrent
+#+end_src
 
+** rutorrent
+#+begin_src sh
 
+#+end_src
+
+** 一键安装rtorrent+rutorrent+Web
+#+begin_src sh
+  wget –no-check-certificate -O autodl-setup http://sourceforge.net/projects/autodl-irssi/files/autodl-setup/download
+  sudo sh autodl-setup
+#+end_src
+在安装的过程中一般直接按回车采用默认方式就可以了。 安装到一定程度会提
+示 你输入rut的用户名 和密码，请填写一个本机存在的用户名称，这里可以添
+加多用户，如果不需要，在添加一个完毕之后添加下一个的时候按回车跳过，否
+则会无限循环（或者使用useradd命令添加一个新用户，如果添加新用户，请在
+安装之前）
+
+最后还会提示输入webmin的用户名和密码，注意不要和rut的混淆。 然后，然后
+么在浏览器中输入 ip/rutorrent 就可以开始使用了，就是这么简单。
 
 * NFS服务器
-* dnsmasq+dnscrypt
+服务器端:
+#+begin_src sh
+ sudo apt-get install nfs-kernel-server
+#+end_src
+/etc/exports
 
-http://lixingcong.github.io/2016/05/01/DNSCrypt-with-dnsmasq/
+客户端:
+#+begin_src sh
+sudo apt-get install nfs-common
+#+end_src
+修改 /etc/fstab 自动挂载分区:
 
-https://blog.phoenixlzx.com/2016/04/27/better-dns-with-unbound/
+#+begin_src sh
+  example.hostname.com:/ubuntu /local/ubuntu nfs rsize=8192,wsize=8192,timeo=14,intr
+#+end_src
 
-https://www.dommyet.me/dnsmasq-dnscrypt-smart-dns
+* DLNA服务器
+minidlna
+#+begin_src sh
+sudo apt-get install minidlna
+#+end_src
+/etc/minidlna.conf
 
+* BitTorrent Sync （闭源软件）
 
-* 外网怎么和内网的NAS进行互通
+下载Linux版，解压缩即可执行，修改/etc/rc.local实现开机执行:
+https://www.resilio.com/individuals/
+
+or:
+Installing Sync Package On Linux:
+https://help.getsync.com/hc/en-us/articles/206178924
+
+Guide To Linux, And Sync Peculiarities:
+https://help.getsync.com/hc/en-us/articles/204762449-Guide-to-Linux
+
+* tagspace
+不需要在服务器安装，只需要在手机、台式机、笔记本等终端安装，同时使用
+btsync配合可以实现取代evernote等云笔记的功能
+
+* TODO
+* 外网怎么和内网的NAS进行互通[TODO]
 + 花生壳动态域名解析, nat123
   http://www.cnblogs.com/umasuo/archive/2012/06/13/ubuntu-oray-install.html
   http://service.oray.com/question/116.html
@@ -102,16 +198,44 @@ https://www.dommyet.me/dnsmasq-dnscrypt-smart-dns
   内网机器与公网机器建立并保持一个tcp连接，公网通过这个连接转发流量至
   内网机器
 
+* DNS服务器: dnsmasq+dnscrypt[TODO]
 
+http://lixingcong.github.io/2016/05/01/DNSCrypt-with-dnsmasq/
 
+https://blog.phoenixlzx.com/2016/04/27/better-dns-with-unbound/
 
+https://www.dommyet.me/dnsmasq-dnscrypt-smart-dns
+
+* CardDAV、CalDAV服务器(手机通讯录同步) [TODO][fn:2]
++ 安装 sqlite: =sudo apt-get install sqlit3 php5-sqlite=
++ 从baikal 的官方网站下载 baikal-regular
++ 安装baikal: 根据压缩包中的INSTALL.md文档进行安装
++ 记住sqlite3的数据库文件必须放在web服务器无法访问的地方。
++ 手机客户端使用DAVDorid
+** HTTPS apache ssl模块安装，baikal使用HTTPS连接
++ 修改 /etc/ssl/openssl.cnf 配置，确认如下设置
+  =basicConstraints=CA:TRUE= ，便于做CA自签名证书
++ 生成证书
+  #+begin_src sh
+    openssl req -x509 -newkey rsa:1024 -keyout /etc/ssl/private/apache.pem -out /etc/ssl/private/apache.pem -nodes -days 999
+  #+end_src
++ 修改apache的关于baikal的vhost配置，加入
+  #+begin_src sh
+    SSLEngine on
+    SSLCertificateFile    /etc/ssl/private/apache.pem
+  #+end_src
++ 重启apache服务器浏览器中测试https连接。
++ 在浏览器中出现证书为自签名不可信时，将证书输出导入到信任的根证书中。
++ 导出证书给手机客户端使用
+  #+begin_src sh
+    openssl x509 -in apache.pem -outform DER -out tigerhill.crt
+  #+end_src
++ 手机客户端，在 设置>安全>导入证书中将导出的证书导入系统，如成功导入，
+  但不显示，则需确认第一步是否将openssl的配置basicConstraints设置为
+  CA:TRUE
++ 手机客户端中配置为https开始同步
 
 * cc
-#+begin_src c++
-
-#+end_src
-
-
 #+begin_src sh
 
 #+end_src
@@ -119,4 +243,6 @@ https://www.dommyet.me/dnsmasq-dnscrypt-smart-dns
 * Footnotes
 
 [fn:1] https://www.techforgeek.info/how_to_setup_samba_in_ubuntu_14_04.html
+
+[fn:2] https://www.zhihu.com/question/26509858
 
