@@ -1,22 +1,315 @@
 #+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
-#+TITLE: vultr
+#+TITLE: vultr Setup with Ubuntu 16.04
 #+OPTIONS: num:nil H:2
-
 
 
 http://blog.tianya.cn/blog-7097285-1.shtml
 
 
+* How To Add Swap on Ubuntu
+** Check for Swap Space
+#+begin_src sh
+sudo swapon -s
+#An empty list will confirm that you have no swap files enabled:
+#+end_src
+
+#+begin_src sh
+root@dreamrunner:~# sudo dd if=/dev/zero of=/swapfile bs=1024 count=512k
+524288+0 records in
+524288+0 records out
+536870912 bytes (537 MB, 512 MiB) copied, 2.16994 s, 247 MB/s
+root@dreamrunner:~# 
+root@dreamrunner:~# sudo mkswap /swapfile
+Setting up swapspace version 1, size = 512 MiB (536866816 bytes)
+no label, UUID=df941039-665b-4c02-9d19-bfa10d45a5f4
+root@dreamrunner:~# sudo swapon /swapfile
+swapon: /swapfile: insecure permissions 0644, 0600 suggested.
+root@dreamrunner:~# sudo chmod 600 /swapfile
+root@dreamrunner:~# swapon -s
+Filename				Type		Size	Used	Priority
+/swapfile                              	file    	524284	0	-1
+#+end_src
+
+Make your swap file permanent. Add the line below to the bottom of the
+fstab file.
+#+begin_src sh
+sudo nano /etc/fstab
+#Paste in the following line:
+/swapfile   none    swap    sw    0   0
+#+end_src
+* Initial Server Setup with Ubuntu
+** Step One—Root Login
+Once you know your IP address and root password, login as the main
+user, root.
+#+begin_src sh
+ssh root@123.45.67.890
+#+end_src
+
+** Step Two—Change Your Password
+The first thing to do is change it to one of your choice.
+#+begin_src sh
+passwd
+#+end_src
+** Step Three— Create a New User
+After you have logged in and changed your password, you will not need
+to login again as root. n this step we will make a new user and give
+them all of the root capabilities.
+#+begin_src sh
+adduser demo
+#+end_src
+After you set the password, you do not need to enter any further
+information about the new user. You can leave all the lines blank if
+you wish
+
+** Step Four— Root Privileges
+As of yet, only root has all of the administrative capabilities. We
+are going to give the new user the root privileges.
+
+Let’s go ahead and edit the sudo configuration. This can be done
+through the default editor, which in Ubuntu is called ‘nano’
+#+begin_src sh
+visudo
+#+end_src
+
+Find the section called user privilege specification. It will look
+like this:
+#+begin_src sh
+# User privilege specification
+root    ALL=(ALL:ALL) ALL
+#+end_src
+
+Under there, add the following line, granting all the permissions to
+your new user:
+#+begin_src sh
+demo    ALL=(ALL:ALL) ALL
+#+end_src
+** Step Five— Configure SSH (OPTIONAL)
+Now it’s time to make the server more secure. *These steps are optional. Please keep in mind that changing the port and restricting
+root login may make logging in more difficult in the future.*
+
+Open the configuration file
+#+begin_src sh
+nano /etc/ssh/sshd_config
+#+end_src
+
+Find the following sections and change the information where
+applicable:
+#+begin_src sh
+Port 25000
+Protocol 2
+PermitRootLogin no
+# or 
+PermitRootLogin without-password
+#+end_src
+
+Port: Although port 22 is the default, you can change this to any
+number between 1025 and 65536. In this example, I am using port 25000.
+Make sure you make a note of the new port number. This change will
+make it more difficult for unauthorized people to log in.
+
+PermitRootLogin: change this from yes to no to stop future root login.
+You will now only be logging on as the new user.
+
+Add these lines to the bottom of the document, replacing *demo* in the
+AllowUsers line with your username. (AllowUsers will limit login to
+*only* the users on that line. To avoid this, skip this line):
+
+#+begin_src sh
+UseDNS no
+AllowUsers demo
+#+end_src
+Save and Exit
+** Step Six— Reload and Done!
+#+begin_src sh
+sudo service ssh restart
+#+end_src
+
+#+begin_src sh
+ssh -p 25000 demo@123.45.67.890
+#+end_src
+* How To Install Linux, nginx, MySQL, PHP (LEMP) stack on Ubuntu 16.04[fn:1]
+** Step 1: Install the Nginx Web Server
+#+begin_src sh
+sudo apt-get update
+sudo apt-get install nginx
+#+end_src
+Try the VPS IP:
+#+begin_src sh
+http://server_IP
+#+end_src
+** Step 2: Install MySQL to Manage Site Data
+#+begin_src sh
+sudo apt-get install mysql-server
+#+end_src
+You will be asked to supply a root (administrative) password for use
+within the MySQL system.
+
+To secure the installation, we can run a simple security script that
+will ask whether we want to modify some insecure defaults. Begin the
+script by typing:
+#+begin_src sh
+sudo mysql_secure_installation
+#+end_src
+
+You will be asked to enter the password you set for the MySQL root
+account. Next, you will be asked if you want to configure the
+*VALIDATE PASSWORD PLUGIN*.
+
+#+begin_html
+<p class="warning">
+Warning: Enabling this feature is something of a judgment call. If enabled, passwords which don't match the specified criteria will be rejected by MySQL with an error. This will cause issues if you use a weak password in conjunction with software which automatically configures MySQL user credentials, such as the Ubuntu packages for phpMyAdmin. It is safe to leave validation disabled, but you should always use strong, unique passwords for database credentials.
+</p>
+#+end_html
+
+Answer y for yes, or anything else to continue without enabling.
+
+If you've enabled validation, you'll be asked to select a level of
+password validation. Keep in mind that if you enter *2*, for the
+strongest level, you will receive errors when attempting to set any
+password which does not contain numbers, upper and lowercase letters,
+and special characters, or which is based on common dictionary words.
+
+#+begin_src sh
+here are three levels of password validation policy:
+
+LOW    Length >= 8
+MEDIUM Length >= 8, numeric, mixed case, and special characters
+STRONG Length >= 8, numeric, mixed case, special characters and dictionary                  file
+
+Please enter 0 = LOW, 1 = MEDIUM and 2 = STRONG: 1
+#+end_src
+
+For the rest of the questions, you should press *Y* and hit the *Enter*
+key at each prompt. This will remove some anonymous users and the test
+database, disable remote root logins, and load these new rules so that
+MySQL immediately respects the changes we have made.
+** Step 3: Install PHP for Processing
+Since Nginx does not contain native PHP processing like some other web
+servers, we will need to install =php-fpm=, which stands for "fastCGI
+process manager". We will tell Nginx to pass PHP requests to this
+software for processing
+#+begin_src sh
+sudo apt-get install php-fpm php-mysql
+#+end_src
+*** Configure the PHP Processor
+#+begin_src sh
+sudo nano /etc/php/7.0/fpm/php.ini
+cgi.fix_pathinfo=0
+#+end_src
+This is an extremely insecure setting because it tells PHP to attempt
+to execute the closest file it can find if the requested PHP file
+cannot be found. This basically would allow users to craft PHP
+requests in a way that would allow them to execute scripts that they
+shouldn't be allowed to execute.
+
+#+begin_src sh
+sudo systemctl restart php7.0-fpm
+#+end_src
+** Step 4: Configure Nginx to Use the PHP Processor
+#+begin_src sh
+sudo nano /etc/nginx/sites-available/default
+#+end_src
+Currently, with the comments removed, the Nginx default server block
+file looks like this:
+#+begin_src sh
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    root /var/www/html;
+    index index.html index.htm index.nginx-debian.html;
+
+    server_name _;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}
+#+end_src
+
++ We will also uncomment the location block dealing with .htaccess
+  files. Nginx doesn't process these files. If any of these files
+  happen to find their way into the document root, they should not be
+  served to visitors
+
+The changes that you need to make below:
+#+begin_src sh
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    root /var/www/html;
+    index index.php index.html index.htm index.nginx-debian.html;
+
+    server_name server_domain_or_IP;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php7.0-fpm.sock;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+#+end_src
+
+Test your configuration file for syntax errors by typing:
+#+begin_src sh
+sudo nginx -t
+#+end_src
+
+When you are ready, reload Nginx to make the necessary changes:
+#+begin_src sh
+sudo systemctl reload nginx
+#+end_src
+** Step 5: Create a PHP File to Test Configuration
+We can do this by creating a test PHP file in our document root. Open
+a new file called info.php within your document root in your text
+editor:
+
+#+begin_src sh
+sudo nano /var/www/html/info.php
+#+end_src
+
+Type or paste the following lines into the new file.
+#+begin_src sh
+<?php
+phpinfo();
+#+end_src
+
+#+begin_src sh
+http://server_IP/info.php
+#+end_src
+
+After verifying that Nginx renders the page correctly, it's best to
+remove the file you created as it can actually give unauthorized users
+some hints about your configuration that may help them try to break
+in. 
+
+#+begin_src sh
+sudo rm /var/www/html/info.php
+#+end_src
+* Migrate Your Current VPS (Linode, Rackspace, AWS EC2) to DigitalOcean
+https://www.digitalocean.com/community/tutorials/migrate-your-current-vps-linode-rackspace-aws-ec2-to-digitalocean
+
+https://www.digitalocean.com/community/tutorials/how-to-migrate-wordpress-from-shared-hosting-to-a-cloud-server-with-zero-downtime
+
+http://dba.stackexchange.com/questions/101292/need-for-backing-up-mysql-databases-information-schema-performance-schema-mysq
+
+https://www.digitalocean.com/community/tutorials/how-to-migrate-a-mysql-database-to-a-new-server-on-ubuntu-14-04
+
 * cc
-#+begin_src python
-
-#+end_src
-
-#+begin_src c++
-
-#+end_src
-
 
 #+begin_src sh
 
 #+end_src
+
+* Footnotes
+
+[fn:1] https://www.digitalocean.com/community/tutorials/how-to-install-linux-nginx-mysql-php-lemp-stack-in-ubuntu-16-04
+
