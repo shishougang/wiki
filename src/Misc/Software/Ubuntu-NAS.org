@@ -121,7 +121,7 @@ sudo vi /etc/samba/smb.conf
 $ sudo restart smbd
 $ sudo restart nmbd
 #+end_src
-* bt: rtorrent + rutorrent[fn:3]
+* bt: rtorrent + rutorrent[fn:3][fn:4]
 替代transmission-daemon(http://localhost:9091/transmission/web/) BT/PT
 下载. 这里以nginx测试
 
@@ -145,6 +145,20 @@ mkdir -p "$basedir"/{.session,download,log,watch/load,watch/start}
 curl -s https://raw.githubusercontent.com/wiki/rakshasa/rtorrent/CONFIG-Template.md \
     | grep -A9999 '^######' | grep -B9999 '^### END' >~/.rtorrent.rc
 #+end_src
+
+*** rtorrent xmlrpc-c 配置为rutorrent连接
+xmlrpc-c 配置可参见官方文档《Using XMLRPC with rtorrent》本文以Nginx为
+例来说明。
+
+#+begin_src sh
+cat >>~/.rtorrent.rc<<EOF
+execute_nothrow=rm,/tmp/rpc.socket
+scgi_local = /tmp/rpc.socket
+schedule = chmod,0,0,"execute=chmod,777,/tmp/rpc.socket"
+EOF
+#+end_src
+最后的基本配置为: [[./Files/rtorrent.rc][.rtorrent.rc]]
+
 *** rtorrent 运行方法
 **** method1
 下载此脚本 [[./Files/rtorrent.sh]]
@@ -163,17 +177,7 @@ chmod a+x /etc/init.d/rtorrent
 ** rutorrent
 安装配置ruTorrent需保证，支持php和xmlrpc-c的Web环境已经配置好，否则出
 错。
-*** rtorrent xmlrpc-c 配置
-xmlrpc-c 配置可参见官方文档《Using XMLRPC with rtorrent》本文以Nginx为
-例来说明。
 
-#+begin_src sh
-cat >>~/.rtorrent.rc<<EOF
-execute_nothrow=rm,/tmp/rpc.socket
-scgi_local = /tmp/rpc.socket
-schedule = chmod,0,0,"execute=chmod,777,/tmp/rpc.socket"
-EOF
-#+end_src
 *** Nginx配置
 #+begin_src sh
 sudo mkdir /var/www
@@ -187,8 +191,15 @@ sudo usermod -a -G www-data USERNAME
 
 修改nginx配置文件 =/etc/nginx/sites-available/default=
 #+begin_src sh
-root /var/www;
-index index.php index.html index.htm;
+  root /var/www;
+  index index.php index.html index.htm;
+
+          location ~ \.php$ {
+                  fastcgi_split_path_info ^(.+\.php)(/.+)$;
+                  fastcgi_pass unix:/var/run/php5-fpm.sock;
+                  fastcgi_index index.php;
+                  include fastcgi_params;
+          }
 #+end_src
 
 在server字段加入下面内容。
@@ -201,6 +212,12 @@ location /RPC2 {
 #+end_src
 *** rutorrent安装
 #+begin_src sh
+#需要的一些依赖包:
+sudo add-apt-repository ppa:mc3man/trusty-media
+sudo apt-get update
+sudo apt-get install ffmpeg mediainfo curl
+
+
 wget http://dl.bintray.com/novik65/generic/rutorrent-3.6.tar.gz
 wget http://dl.bintray.com/novik65/generic/plugins-3.6.tar.gz
 sudo tar xvf rutorrent-3.6.tar.gz -C /var/www
@@ -210,6 +227,9 @@ sudo chown www-data:www-data -R /var/www/rutorrent
 sed -i 's/\/\/ $scgi/$scgi/g' /var/www/rutorrent/conf/config.php
 sed -i 's/$scgi_port = 5000/\/\/ $scgi_port = 5000/g' /var/www/rutorrent/conf/config.php
 sed -i 's/$scgi_host = "127/\/\/ $scgi_host = "127/g' /var/www/rutorrent/conf/config.php
+# change below lines
+"curl" ==> '/usr/bin/curl', // Something like /usr/bin/curl. If empty, will be found in PATH.
+"stat" ==> '/usr/bin/stat', // Something like /usr/bin/stat. If empty, will be found in PATH.
 #+end_src
 *** ruTorrent 访问密码保护
 #+begin_src sh
@@ -225,6 +245,15 @@ location /rtorrent {
     auth_basic "ruTorrent login";
     auth_basic_user_file /var/www/rtorrent/.htpasswds;
 }
+#+end_src
+
+最后nginx的default文件: [[./Files/nginx_default][default]]
+
+#+begin_src sh
+sudo service nginx start
+sudo service php5-fpm start
+# 访问
+http://localhost/rutorrent/
 #+end_src
 
 ** 一键安装rtorrent+rutorrent+Web
@@ -244,7 +273,7 @@ location /rtorrent {
 * NFS服务器
 服务器端:
 #+begin_src sh
- sudo apt-get install nfs-kernel-server
+sudo apt-get install nfs-kernel-server
 #+end_src
 /etc/exports
 
@@ -259,15 +288,16 @@ sudo apt-get install nfs-common
 #+end_src
 
 * DLNA服务器
-https://www.dennysu.com/wordpress/2014/09/16/cubietruck%E5%A6%82%E4%BD%95%E5%9C%A8ubuntu-14-04%E5%AE%89%E8%A3%9D-minidlna-%E5%A5%97%E4%BB%B6/
-
-3、DLNA服务：plexmediaserve
-
-minidlna
+use minidlna
 #+begin_src sh
 sudo apt-get install minidlna
+sudo service minidlna restart
 #+end_src
-/etc/minidlna.conf
+=/etc/minidlna.conf=
+#+begin_src sh
+friendly_name=MediaCentre	代表在別的設備上要看到的名稱
+inotify=yes	把前面 #號去掉，代表 inode一旦有改變，就會更改到資料庫上。
+#+end_src
 
 * BitTorrent Sync （闭源软件）
 
@@ -283,32 +313,29 @@ https://help.getsync.com/hc/en-us/articles/204762449-Guide-to-Linux
 
 * Xware Desktop迅雷下载
 http://www.gebi1.com/thread-240934-1-1.html
+
+http://diary.taskinghouse.com/posts/736252-using-docker-installed-xware-for-synology-dsm-6-with-thunder-remote-download
+
+http://gavinliu.cn/2015/06/18/%E5%9C%A8Ubuntu%E4%B8%AD%E5%AE%89%E8%A3%85Xware%E8%BF%85%E9%9B%B7%E8%BF%9C%E7%A8%8B%E4%B8%8B%E8%BD%BD/
+
 * bcloud 百度云
 http://www.gebi1.com/thread-240934-1-1.html
 * tagspace
 不需要在服务器安装，只需要在手机、台式机、笔记本等终端安装，同时使用
 btsync配合可以实现取代evernote等云笔记的功能
 
-* TODO
-* 外网怎么和内网的NAS进行互通[TODO]
+* 外网怎么和内网的NAS进行互通
 外網穿透是為了能從外網（比如單位、旅行路上）訪問家裡NAS，上傳照片，遠
 程下載等。
 ** DDNS
-現在IPV4地址已經接近枯竭，很多家裡的寬頻在公網上並沒有獨立的IP位址，
-DDNS就是把隨運營商動態變化的地址映射成一個固定的域名，這樣通過域名就能
-找到自己的機器了。
+ngrok
 
-+ 花生壳动态域名解析, nat123
-  http://www.cnblogs.com/umasuo/archive/2012/06/13/ubuntu-oray-install.html
-  http://service.oray.com/question/116.html
+https://xicheng412.github.io/2016/09/27/ngrok-config/
 
-** VPN
-+ ngrok。这个开源的软件，可以搜索部署安装一下，原理是通过一台公网机器，
-  内网机器与公网机器建立并保持一个tcp连接，公网通过这个连接转发流量至
-  内网机器
-+ 在NAS上或是在自家路由器架设VPN,以后要存取NAS资源的时候就先建立VPN连
-  线
+https://aotu.io/notes/2016/02/19/ngrok/
 
+
+* TODO
 * DNS服务器: dnsmasq+dnscrypt[TODO]
 
 http://lixingcong.github.io/2016/05/01/DNSCrypt-with-dnsmasq/
@@ -358,4 +385,6 @@ https://www.dommyet.me/dnsmasq-dnscrypt-smart-dns
 [fn:2] https://www.zhihu.com/question/26509858
 
 [fn:3] http://www.juanjchong.com/2014/setting-up-rtorrentrutorrent-on-ubuntu-14-04-using-ngnix/
+
+[fn:4] http://www.it610.com/article/5421173.htm
 

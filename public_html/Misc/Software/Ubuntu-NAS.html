@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Configure Ubuntu to the NAS</title>
-<!-- 2017-02-15 Wed 21:43 -->
+<!-- 2017-02-16 Thu 00:19 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -97,13 +97,12 @@ for the JavaScript code in this tag.
 <li><a href="#sec-8">Xware Desktop迅雷下载</a></li>
 <li><a href="#sec-9">bcloud 百度云</a></li>
 <li><a href="#sec-10">tagspace</a></li>
-<li><a href="#sec-11"><span class="todo TODO">TODO</span> </a></li>
-<li><a href="#sec-12">外网怎么和内网的NAS进行互通[TODO]</a>
+<li><a href="#sec-11">外网怎么和内网的NAS进行互通</a>
 <ul>
-<li><a href="#sec-12-1">DDNS</a></li>
-<li><a href="#sec-12-2">VPN</a></li>
+<li><a href="#sec-11-1">DDNS</a></li>
 </ul>
 </li>
+<li><a href="#sec-12"><span class="todo TODO">TODO</span> </a></li>
 <li><a href="#sec-13">DNS服务器: dnsmasq+dnscrypt[TODO]</a></li>
 <li><a href="#sec-14">CardDAV、CalDAV服务器(手机通讯录同步) [TODO]</a>
 <ul>
@@ -335,7 +334,7 @@ $ sudo restart nmbd
 </div>
 </div>
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">bt: rtorrent + rutorrent<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup></h2>
+<h2 id="sec-4">bt: rtorrent + rutorrent<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup><sup>, </sup><sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup></h2>
 <div class="outline-text-2" id="text-4">
 <p>
 替代transmission-daemon(<a href="http://localhost:9091/transmission/web/">http://localhost:9091/transmission/web/</a>) BT/PT
@@ -378,7 +377,28 @@ curl -s https://raw.githubusercontent.com/wiki/rakshasa/rtorrent/CONFIG-Template
 </div>
 </div>
 </li>
-<li><a id="sec-4-2-2" name="sec-4-2-2"></a>rtorrent 运行方法<br  /><ul class="org-ul"><li><a id="sec-4-2-2-1" name="sec-4-2-2-1"></a>method1<br  /><div class="outline-text-5" id="text-4-2-2-1">
+
+<li><a id="sec-4-2-2" name="sec-4-2-2"></a>rtorrent xmlrpc-c 配置为rutorrent连接<br  /><div class="outline-text-4" id="text-4-2-2">
+<p>
+xmlrpc-c 配置可参见官方文档《Using XMLRPC with rtorrent》本文以Nginx为例来说明。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">cat &gt;&gt;~/.rtorrent.rc&lt;&lt;EOF
+<span style="color: #ffff00; font-weight: bold;">execute_nothrow=rm,/tmp/rpc.socket</span>
+<span style="color: #ffff00; font-weight: bold;">scgi_local = /tmp/rpc.socket</span>
+<span style="color: #ffff00; font-weight: bold;">schedule = chmod,0,0,"execute=chmod,777,/tmp/rpc.socket"</span>
+<span style="color: #ffff00; font-weight: bold;">EOF</span>
+</pre>
+</div>
+<p>
+最后的基本配置为: <a href="./Files/rtorrent.rc">.rtorrent.rc</a>
+</p>
+</div>
+</li>
+
+<li><a id="sec-4-2-3" name="sec-4-2-3"></a>rtorrent 运行方法<br  /><ul class="org-ul"><li><a id="sec-4-2-3-1" name="sec-4-2-3-1"></a>method1<br  /><div class="outline-text-5" id="text-4-2-3-1">
 <p>
 下载此脚本 <a href="./Files/rtorrent.sh">./Files/rtorrent.sh</a>
 </p>
@@ -390,13 +410,13 @@ chmod a+x /etc/init.d/rtorrent
 </div>
 </div>
 </li>
-<li><a id="sec-4-2-2-2" name="sec-4-2-2-2"></a>method2<br  /><div class="outline-text-5" id="text-4-2-2-2">
+<li><a id="sec-4-2-3-2" name="sec-4-2-3-2"></a>method2<br  /><div class="outline-text-5" id="text-4-2-3-2">
 <p>
 通过Screen使用rTorrent，然后通过+A+D挂起、screen -r 恢复
 </p>
 </div>
 </li>
-<li><a id="sec-4-2-2-3" name="sec-4-2-2-3"></a>method3<br  /><div class="outline-text-5" id="text-4-2-2-3">
+<li><a id="sec-4-2-3-3" name="sec-4-2-3-3"></a>method3<br  /><div class="outline-text-5" id="text-4-2-3-3">
 <p>
 直接在终端运行，然后通过+Q 退出
 </p>
@@ -417,23 +437,8 @@ chmod a+x /etc/init.d/rtorrent
 安装配置ruTorrent需保证，支持php和xmlrpc-c的Web环境已经配置好，否则出错。
 </p>
 </div>
-<ul class="org-ul"><li><a id="sec-4-3-1" name="sec-4-3-1"></a>rtorrent xmlrpc-c 配置<br  /><div class="outline-text-4" id="text-4-3-1">
-<p>
-xmlrpc-c 配置可参见官方文档《Using XMLRPC with rtorrent》本文以Nginx为例来说明。
-</p>
 
-<div class="org-src-container">
-
-<pre class="src src-sh">cat &gt;&gt;~/.rtorrent.rc&lt;&lt;EOF
-<span style="color: #ffff00; font-weight: bold;">execute_nothrow=rm,/tmp/rpc.socket</span>
-<span style="color: #ffff00; font-weight: bold;">scgi_local = /tmp/rpc.socket</span>
-<span style="color: #ffff00; font-weight: bold;">schedule = chmod,0,0,"execute=chmod,777,/tmp/rpc.socket"</span>
-<span style="color: #ffff00; font-weight: bold;">EOF</span>
-</pre>
-</div>
-</div>
-</li>
-<li><a id="sec-4-3-2" name="sec-4-3-2"></a>Nginx配置<br  /><div class="outline-text-4" id="text-4-3-2">
+<ul class="org-ul"><li><a id="sec-4-3-1" name="sec-4-3-1"></a>Nginx配置<br  /><div class="outline-text-4" id="text-4-3-1">
 <div class="org-src-container">
 
 <pre class="src src-sh">sudo mkdir /var/www
@@ -457,6 +462,13 @@ Add user to ww-data group:
 
 <pre class="src src-sh">root /var/www;
 index index.php index.html index.htm;
+
+        location ~ <span style="color: #ffa07a;">\.</span>php$ {
+                fastcgi_split_path_info ^(.+<span style="color: #ffa07a;">\.</span>php)(/.+)$;
+                fastcgi_pass unix:/var/run/php5-fpm.sock;
+                fastcgi_index index.php;
+                include fastcgi_params;
+        }
 </pre>
 </div>
 
@@ -474,10 +486,16 @@ index index.php index.html index.htm;
 </div>
 </div>
 </li>
-<li><a id="sec-4-3-3" name="sec-4-3-3"></a>rutorrent安装<br  /><div class="outline-text-4" id="text-4-3-3">
+<li><a id="sec-4-3-2" name="sec-4-3-2"></a>rutorrent安装<br  /><div class="outline-text-4" id="text-4-3-2">
 <div class="org-src-container">
 
-<pre class="src src-sh">wget http://dl.bintray.com/novik65/generic/rutorrent-3.6.tar.gz
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">&#38656;&#35201;&#30340;&#19968;&#20123;&#20381;&#36182;&#21253;:</span>
+sudo add-apt-repository ppa:mc3man/trusty-media
+sudo apt-get update
+sudo apt-get install ffmpeg mediainfo curl
+
+
+wget http://dl.bintray.com/novik65/generic/rutorrent-3.6.tar.gz
 wget http://dl.bintray.com/novik65/generic/plugins-3.6.tar.gz
 sudo tar xvf rutorrent-3.6.tar.gz -C /var/www
 sudo tar xvf plugins-3.6.tar.gz -C /var/www/rutorrent
@@ -486,11 +504,14 @@ sudo chown www-data:www-data -R /var/www/rutorrent
 sed -i <span style="color: #ffa07a;">'s/\/\/ $scgi/$scgi/g'</span> /var/www/rutorrent/conf/config.php
 sed -i <span style="color: #ffa07a;">'s/$scgi_port = 5000/\/\/ $scgi_port = 5000/g'</span> /var/www/rutorrent/conf/config.php
 sed -i <span style="color: #ffa07a;">'s/$scgi_host = "127/\/\/ $scgi_host = "127/g'</span> /var/www/rutorrent/conf/config.php
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">change below lines</span>
+<span style="color: #ffa07a;">"curl"</span> ==&gt; <span style="color: #ffa07a;">'/usr/bin/curl'</span>, // Something like /usr/bin/curl. If empty, will be found<span style="color: #00ffff;"> in</span> PATH.
+<span style="color: #ffa07a;">"stat"</span> ==&gt; <span style="color: #ffa07a;">'/usr/bin/stat'</span>, // Something like /usr/bin/stat. If empty, will be found<span style="color: #00ffff;"> in</span> PATH.
 </pre>
 </div>
 </div>
 </li>
-<li><a id="sec-4-3-4" name="sec-4-3-4"></a>ruTorrent 访问密码保护<br  /><div class="outline-text-4" id="text-4-3-4">
+<li><a id="sec-4-3-3" name="sec-4-3-3"></a>ruTorrent 访问密码保护<br  /><div class="outline-text-4" id="text-4-3-3">
 <div class="org-src-container">
 
 <pre class="src src-sh">sudo apt-get install apache2-utils
@@ -509,6 +530,19 @@ sudo chown www-data:www-data /var/www/rutorrent/.htpasswd
     auth_basic <span style="color: #ffa07a;">"ruTorrent login"</span>;
     auth_basic_user_file /var/www/rtorrent/.htpasswds;
 }
+</pre>
+</div>
+
+<p>
+最后nginx的default文件: <a href="./Files/nginx_default">default</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo service nginx start
+sudo service php5-fpm start
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#35775;&#38382;</span>
+http://localhost/rutorrent/
 </pre>
 </div>
 </div>
@@ -574,24 +608,23 @@ sudo sh autodl-setup
 <h2 id="sec-6">DLNA服务器</h2>
 <div class="outline-text-2" id="text-6">
 <p>
-<a href="https://www.dennysu.com/wordpress/2014/09/16/cubietruck%E5%A6%82%E4%BD%95%E5%9C%A8ubuntu-14-04%E5%AE%89%E8%A3%9D-minidlna-%E5%A5%97%E4%BB%B6/">https://www.dennysu.com/wordpress/2014/09/16/cubietruck%E5%A6%82%E4%BD%95%E5%9C%A8ubuntu-14-04%E5%AE%89%E8%A3%9D-minidlna-%E5%A5%97%E4%BB%B6/</a>
-</p>
-
-<p>
-3、DLNA服务：plexmediaserve
-</p>
-
-<p>
-minidlna
+use minidlna
 </p>
 <div class="org-src-container">
 
 <pre class="src src-sh">sudo apt-get install minidlna
+sudo service minidlna restart
 </pre>
 </div>
 <p>
-/etc/minidlna.conf
+<code>/etc/minidlna.conf</code>
 </p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">friendly_name</span>=MediaCentre       &#20195;&#34920;&#22312;&#21029;&#30340;&#35373;&#20633;&#19978;&#35201;&#30475;&#21040;&#30340;&#21517;&#31281;
+<span style="color: #eedd82;">inotify</span>=yes     &#25226;&#21069;&#38754; <span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">&#34399;&#21435;&#25481;&#65292;&#20195;&#34920; inode&#19968;&#26086;&#26377;&#25913;&#35722;&#65292;&#23601;&#26371;&#26356;&#25913;&#21040;&#36039;&#26009;&#24235;&#19978;&#12290;</span>
+</pre>
+</div>
 </div>
 </div>
 
@@ -622,8 +655,17 @@ Guide To Linux, And Sync Peculiarities:
 <p>
 <a href="http://www.gebi1.com/thread-240934-1-1.html">http://www.gebi1.com/thread-240934-1-1.html</a>
 </p>
+
+<p>
+<a href="http://diary.taskinghouse.com/posts/736252-using-docker-installed-xware-for-synology-dsm-6-with-thunder-remote-download">http://diary.taskinghouse.com/posts/736252-using-docker-installed-xware-for-synology-dsm-6-with-thunder-remote-download</a>
+</p>
+
+<p>
+<a href="http://gavinliu.cn/2015/06/18/%E5%9C%A8Ubuntu%E4%B8%AD%E5%AE%89%E8%A3%85Xware%E8%BF%85%E9%9B%B7%E8%BF%9C%E7%A8%8B%E4%B8%8B%E8%BD%BD/">http://gavinliu.cn/2015/06/18/%E5%9C%A8Ubuntu%E4%B8%AD%E5%AE%89%E8%A3%85Xware%E8%BF%85%E9%9B%B7%E8%BF%9C%E7%A8%8B%E4%B8%8B%E8%BD%BD/</a>
+</p>
 </div>
 </div>
+
 <div id="outline-container-sec-9" class="outline-2">
 <h2 id="sec-9">bcloud 百度云</h2>
 <div class="outline-text-2" id="text-9">
@@ -643,45 +685,34 @@ btsync配合可以实现取代evernote等云笔记的功能
 </div>
 
 <div id="outline-container-sec-11" class="outline-2">
-<h2 id="sec-11"><span class="todo TODO">TODO</span> </h2>
-</div>
-<div id="outline-container-sec-12" class="outline-2">
-<h2 id="sec-12">外网怎么和内网的NAS进行互通[TODO]</h2>
-<div class="outline-text-2" id="text-12">
+<h2 id="sec-11">外网怎么和内网的NAS进行互通</h2>
+<div class="outline-text-2" id="text-11">
 <p>
 外網穿透是為了能從外網（比如單位、旅行路上）訪問家裡NAS，上傳照片，遠程下載等。
 </p>
 </div>
-<div id="outline-container-sec-12-1" class="outline-3">
-<h3 id="sec-12-1">DDNS</h3>
-<div class="outline-text-3" id="text-12-1">
+<div id="outline-container-sec-11-1" class="outline-3">
+<h3 id="sec-11-1">DDNS</h3>
+<div class="outline-text-3" id="text-11-1">
 <p>
-現在IPV4地址已經接近枯竭，很多家裡的寬頻在公網上並沒有獨立的IP位址，
-DDNS就是把隨運營商動態變化的地址映射成一個固定的域名，這樣通過域名就能找到自己的機器了。
+ngrok
 </p>
 
-<ul class="org-ul">
-<li>花生壳动态域名解析, nat123
-<a href="http://www.cnblogs.com/umasuo/archive/2012/06/13/ubuntu-oray-install.html">http://www.cnblogs.com/umasuo/archive/2012/06/13/ubuntu-oray-install.html</a>
-<a href="http://service.oray.com/question/116.html">http://service.oray.com/question/116.html</a>
-</li>
-</ul>
-</div>
-</div>
+<p>
+<a href="https://xicheng412.github.io/2016/09/27/ngrok-config/">https://xicheng412.github.io/2016/09/27/ngrok-config/</a>
+</p>
 
-<div id="outline-container-sec-12-2" class="outline-3">
-<h3 id="sec-12-2">VPN</h3>
-<div class="outline-text-3" id="text-12-2">
-<ul class="org-ul">
-<li>ngrok。这个开源的软件，可以搜索部署安装一下，原理是通过一台公网机器，内网机器与公网机器建立并保持一个tcp连接，公网通过这个连接转发流量至内网机器
-</li>
-<li>在NAS上或是在自家路由器架设VPN,以后要存取NAS资源的时候就先建立VPN连线
-</li>
-</ul>
+<p>
+<a href="https://aotu.io/notes/2016/02/19/ngrok/">https://aotu.io/notes/2016/02/19/ngrok/</a>
+</p>
 </div>
 </div>
 </div>
 
+
+<div id="outline-container-sec-12" class="outline-2">
+<h2 id="sec-12"><span class="todo TODO">TODO</span> </h2>
+</div>
 <div id="outline-container-sec-13" class="outline-2">
 <h2 id="sec-13">DNS服务器: dnsmasq+dnscrypt[TODO]</h2>
 <div class="outline-text-2" id="text-13">
@@ -700,7 +731,7 @@ DDNS就是把隨運營商動態變化的地址映射成一個固定的域名，�
 </div>
 
 <div id="outline-container-sec-14" class="outline-2">
-<h2 id="sec-14">CardDAV、CalDAV服务器(手机通讯录同步) [TODO]<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup></h2>
+<h2 id="sec-14">CardDAV、CalDAV服务器(手机通讯录同步) [TODO]<sup><a id="fnr.4" name="fnr.4" class="footref" href="#fn.4">4</a></sup></h2>
 <div class="outline-text-2" id="text-14">
 <ul class="org-ul">
 <li>安装 sqlite: <code>sudo apt-get install sqlit3 php5-sqlite</code>
@@ -780,6 +811,10 @@ CA:TRUE
 </p></div>
 
 <div class="footdef"><sup><a id="fn.3" name="fn.3" class="footnum" href="#fnr.3">3</a></sup> <p class="footpara">
+<a href="http://www.it610.com/article/5421173.htm">http://www.it610.com/article/5421173.htm</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.4" name="fn.4" class="footnum" href="#fnr.4">4</a></sup> <p class="footpara">
 <a href="https://www.zhihu.com/question/26509858">https://www.zhihu.com/question/26509858</a>
 </p></div>
 
@@ -788,7 +823,7 @@ CA:TRUE
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-02-15 Wed 21:43</p>
+<p class="date">Created: 2017-02-16 Thu 00:19</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
