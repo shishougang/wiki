@@ -2,6 +2,7 @@
 #+TITLE: Configure Ubuntu to the NAS
 #+OPTIONS: num:nil H:2
 
+
 * 系统配置
 1. IP修改成固定IP，域名解析修改为本地路由器。 /etc/network ,
    /etc/resolvconf
@@ -22,7 +23,7 @@
   managemant值。0-127之间是允许休眠，128-254之间是不休眠，值越大相对功
   耗就越大，但性能高。原来的相当于设定在254，所以硬盘一直在全速转，导
   致温度长期居高不下。有鉴于此，将此值设定为127，为了重启后有效，还需
-  修改 =/etc/hdparm.conf= 配置文件。
+  修改 =/etc/hdparm.conf= 配置文件。 (http://hd-idle.sourceforge.net/)
 + aria2：最好的HTTP下载
 + forked-daapd：iTunes媒体共享
 + webmin: 网页管理系统
@@ -312,29 +313,123 @@ Guide To Linux, And Sync Peculiarities:
 https://help.getsync.com/hc/en-us/articles/204762449-Guide-to-Linux
 
 * Xware Desktop迅雷下载
-http://www.gebi1.com/thread-240934-1-1.html
-
-http://diary.taskinghouse.com/posts/736252-using-docker-installed-xware-for-synology-dsm-6-with-thunder-remote-download
-
-http://gavinliu.cn/2015/06/18/%E5%9C%A8Ubuntu%E4%B8%AD%E5%AE%89%E8%A3%85Xware%E8%BF%85%E9%9B%B7%E8%BF%9C%E7%A8%8B%E4%B8%8B%E8%BD%BD/
-
++ [[http://www.gebi1.com/thread-240934-1-1.html][Xware Desktop迅雷下载]]
+[[http://diary.taskinghouse.com/posts/736252-using-docker-installed-xware-for-synology-dsm-6-with-thunder-remote-download][+ Docker 安裝 Xware 實現 DSM 6.0 迅雷遠程下載]]
++ [[http://gavinliu.cn/2015/06/18/%E5%9C%A8Ubuntu%E4%B8%AD%E5%AE%89%E8%A3%85Xware%E8%BF%85%E9%9B%B7%E8%BF%9C%E7%A8%8B%E4%B8%8B%E8%BD%BD/][在Ubuntu中安装Xware迅雷远程下载]]
 * bcloud 百度云
-http://www.gebi1.com/thread-240934-1-1.html
+[[https://github.com/LiuLang/bcloud][bcloud百度云原始Git]] 没有进一步更新，使用 [[https://github.com/Yufeikang/bcloud][Yufeikang的bcloud Git]]
+
+#+begin_src sh
+sudo apt-get install python3-pip
+sudo pip3 install cssselect
+git clone git@github.com:Yufeikang/bcloud.git
+cd bcloud
+python3 setup.py install
+#+end_src
+
 * tagspace
 不需要在服务器安装，只需要在手机、台式机、笔记本等终端安装，同时使用
 btsync配合可以实现取代evernote等云笔记的功能
 
-* 外网怎么和内网的NAS进行互通
-外網穿透是為了能從外網（比如單位、旅行路上）訪問家裡NAS，上傳照片，遠
-程下載等。
-** DDNS
-ngrok
+* 外网访问
+use ngrok.
 
-https://xicheng412.github.io/2016/09/27/ngrok-config/
+** Modify your DNS
+Use the DNS management tools to create an *A record* which points
+*.ngrok.dreamrunner.org to the IP address of the server that runs ngrokd.
 
-https://aotu.io/notes/2016/02/19/ngrok/
+** server编译
+#+begin_src sh
+sudo apt-get install mercurial git gcc golang make
+#+end_src
+#+begin_src sh
+git clone https://github.com/inconshreveable/ngrok.git
+#+end_src
 
+证书生成:
+#+begin_src sh
+cd ～/ngrok
 
+NGROK_DOMAIN="ngrok.dreamrunner.com"
+
+openssl genrsa -out rootCA.key 2048
+openssl req -x509 -new -nodes -key rootCA.key -subj "/CN=$NGROK_DOMAIN" -days 5000 -out rootCA.pem
+openssl genrsa -out device.key 2048
+openssl req -new -key device.key -subj "/CN=$NGROK_DOMAIN" -out device.csr
+openssl x509 -req -in device.csr -CA rootCA.pem -CAkey rootCA.key -CAcreateserial -out device.crt -days 5000
+#+end_src
+执行完以上命令，在ngrok目录下就会新生成6个文件：
+#+begin_src sh
+device.crt  device.csr  device.key
+rootCA.key  rootCA.pem  rootCA.srl
+#+end_src
+
+#+begin_src sh
+cp  rootCA.pem assets/client/tls/ngrokroot.crt
+cp  device.crt assets/server/tls/snakeoil.crt
+cp  device.key assets/server/tls/snakeoil.key
+make release-server
+#+end_src
+
+** 编译客户端的 ngrok
+#+begin_src sh
+GOOS=linux GOARCH=amd64 make release-client
+GOOS=windows GOARCH=amd64 make release-client
+GOOS=linux GOARCH=arm make release-client
+#+end_src
++ Linux 平台 32 位系统：GOOS=linux GOARCH=386
++ Linux 平台 64 位系统：GOOS=linux GOARCH=amd64
+
++ Windows 平台 32 位系统：GOOS=windows GOARCH=386
++ Windows 平台 64 位系统：GOOS=windows GOARCH=amd64
+
++ MAC 平台 32 位系统：GOOS=darwin GOARCH=386
++ MAC 平台 64 位系统：GOOS=darwin GOARCH=amd64
+
++ ARM 平台：GOOS=linux GOARCH=arm
+
+#+begin_src sh
+tar -zcvf Bin.tar.gz ./bin/
+#+end_src
+通过scp之类的工具下载。
+
++ 服务端: ngrokd
++ 客户端: ngrok
+** 运行ngrokd服务
+#+begin_src sh
+NGROK_DOMAIN="ngrok.dreamrunner.org"
+#http
+bin/ngrokd -domain="$NGROK_DOMAIN" -httpAddr=":6060" -httpsAddr=":6061" -tunnelAddr=":6062" 
+#https设置了tls
+#bin/ngrokd -domain="$NGROK_DOMAIN" -httpAddr=":6060" -httpsAddr=":6061" -tunnelAddr=":6062" -tlsKey=./device.key -tlsCrt=./device.crt
+#+end_src
+
++ httpAddr 是访问普通的http使用的端口号，用后面用 子域
+  名.ngrok.dreamrunner.org:6060 来访问服务
++ httpsAddr 是访问的https使用的端口号,同上，只不过是需要https的服务访
+  问才用这个端口
++ tunnelAddr 是通道的端口号，这个端口是Ngrok用来通信的，所以这个端口在
+  服务器上和客户端上设置必须要对应才可以正常的链接，默认不填写是4433
+
+验证一下端口是否打开:
+#+begin_src sh
+nc -v -w 10 -z 127.0.0.1 6060-6062
+#+end_src
+
+如果需要打开防火墙:
+#+begin_src sh
+iptables -A INPUT -p tcp --dport 6060-6062 -j ACCEPT
+iptables -A OUTPUT -p tcp --sport 6060-6062 -j ACCEPT
+#+end_src
+** Ubuntu运行ngrok客户端
+=ngrok.cfg=
+#+begin_src sh
+server_addr: "ngrok.dreamrunner.org:6062"
+trust_host_root_certs: false
+#+end_src
+#+begin_src sh
+ngrok -log=ngrok_log.txt -subdomain=test -config="ngrok.cfg" 80
+#+end_src
 * TODO
 * DNS服务器: dnsmasq+dnscrypt[TODO]
 
