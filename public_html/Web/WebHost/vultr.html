@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>vultr Setup with Ubuntu 16.04</title>
-<!-- 2017-02-17 Fri 00:13 -->
+<!-- 2017-02-17 Fri 23:53 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -91,12 +91,21 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4-5">Step 5: Create a PHP File to Test Configuration</a></li>
 </ul>
 </li>
-<li><a href="#sec-5">Migrate Your Current VPS (Linode, Rackspace, AWS EC2) to DigitalOcean</a></li>
+<li><a href="#sec-5">Migrate Your Current VPS (Linode, Rackspace, AWS EC2) to Vultr</a>
+<ul>
+<li><a href="#sec-5-1">Rsync Installation on both VPS</a></li>
+<li><a href="#sec-5-2">Transfer the SSH key to the new VPS</a></li>
+<li><a href="#sec-5-3">Transferring Site Files</a></li>
+<li><a href="#sec-5-4">MySQL Database Transfer</a></li>
+<li><a href="#sec-5-5">More</a></li>
+</ul>
+</li>
 <li><a href="#sec-6">Choose location</a></li>
-<li><a href="#sec-7">cc</a></li>
 </ul>
 </div>
 </div>
+
+
 
 <div id="outline-container-sec-1" class="outline-2">
 <h2 id="sec-1">Vultr Promo Code</h2>
@@ -590,41 +599,175 @@ in.
 </div>
 </div>
 <div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">Migrate Your Current VPS (Linode, Rackspace, AWS EC2) to DigitalOcean</h2>
+<h2 id="sec-5">Migrate Your Current VPS (Linode, Rackspace, AWS EC2) to Vultr<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup></h2>
 <div class="outline-text-2" id="text-5">
 <p>
-<a href="https://www.digitalocean.com/community/tutorials/migrate-your-current-vps-linode-rackspace-aws-ec2-to-digitalocean">https://www.digitalocean.com/community/tutorials/migrate-your-current-vps-linode-rackspace-aws-ec2-to-digitalocean</a>
-</p>
-
-<p>
-<a href="https://www.digitalocean.com/community/tutorials/how-to-migrate-wordpress-from-shared-hosting-to-a-cloud-server-with-zero-downtime">https://www.digitalocean.com/community/tutorials/how-to-migrate-wordpress-from-shared-hosting-to-a-cloud-server-with-zero-downtime</a>
-</p>
-
-<p>
-<a href="http://dba.stackexchange.com/questions/101292/need-for-backing-up-mysql-databases-information-schema-performance-schema-mysq">http://dba.stackexchange.com/questions/101292/need-for-backing-up-mysql-databases-information-schema-performance-schema-mysq</a>
-</p>
-
-<p>
-<a href="https://www.digitalocean.com/community/tutorials/how-to-migrate-a-mysql-database-to-a-new-server-on-ubuntu-14-04">https://www.digitalocean.com/community/tutorials/how-to-migrate-a-mysql-database-to-a-new-server-on-ubuntu-14-04</a>
+Assuming the IP of new VPS: 111.222.333.444
 </p>
 </div>
+<div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Rsync Installation on both VPS</h3>
+<div class="outline-text-3" id="text-5-1">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">both sides</span>
+sudo apt-get install rsync
+</pre>
 </div>
+</div>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">Transfer the SSH key to the new VPS</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+If use user name + password to transfer files, omit this step.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">old VPS</span>
+ssh-copy-id 111.222.333.444
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3">Transferring Site Files</h3>
+<div class="outline-text-3" id="text-5-3">
+<p>
+Find the wordpress site folder in the old VPS
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">old VPS</span>
+rsync -avP wordpress 111.222.333.444:/var/www/html/
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">or use username + password + ssh port 25000</span>
+rsync -avP -e <span style="color: #ffa07a;">'ssh -p 25000'</span> wordpress username@111.222.333.444:/var/www/html/
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5-4" class="outline-3">
+<h3 id="sec-5-4">MySQL Database Transfer</h3>
+<div class="outline-text-3" id="text-5-4">
+<p>
+First, we will see what databases we need to dump. Log into MySQL:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">old VPS</span>
+mysql -u root -p
+show databases;
+
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| wordpress          |
++--------------------+
+3 rows<span style="color: #00ffff;"> in</span> set (0.00 sec)
+
+<span style="color: #00ffff;">exit</span>
+</pre>
+</div>
+<p>
+We would like to transfer our "wordpress" database, which contains our
+site information, and also our "mysql" database, which will transfer
+all of our user info, etc. The "information<sub>schema</sub>" is just data
+structure information, and we don't need to hold onto that.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">mysqldump -u root -p -QqeR --add-drop-table --databases mysql wordpress | bzip2 -v9 - &gt; siteData.sql.bz2
+</pre>
+</div>
+
+<p>
+And be careful with <code>mysql</code>. If they are different versions of MySQL,
+it may cause some compatible issues. Check: <a href="http://dba.stackexchange.com/questions/101292/need-for-backing-up-mysql-databases-information-schema-performance-schema-mysq">Becareful with mysql</a>.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">rsync -avP siteData.sql.bz2 111.222.333.444:/home/username
+</pre>
+</div>
+
+<p>
+Log into your new VPS:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">new VPS</span>
+<span style="color: #b0c4de;">cd</span> ~
+bunzip2 siteData.sql.bz2
+mysql -u root -p &lt; siteData.sql
+mysql -u root -p
+show databases;
+
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| test               |
+| wordpress          |
++--------------------+
+5 rows<span style="color: #00ffff;"> in</span> set (0.00 sec)
+
+<span style="color: #00ffff;">exit</span>
+</pre>
+</div>
+
+<p>
+As you can see, our "wordpress" database is present. The previous
+"mysql" database has been replaced with the one from our old VPS.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo service mysql restart
+sudo service nginx restart
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5-5" class="outline-3">
+<h3 id="sec-5-5">More</h3>
+<div class="outline-text-3" id="text-5-5">
+<p>
+check the database users:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">mysql -u root -p
+SELECT user FROM mysql.user;
+</pre>
+</div>
+
+<p>
+And more reference:
+</p>
+<ul class="org-ul">
+<li><a href="https://www.digitalocean.com/community/tutorials/how-to-migrate-wordpress-from-shared-hosting-to-a-cloud-server-with-zero-downtime/"> How To Migrate WordPress from Shared Hosting to a Cloud Server with
+Zero Downtime</a>
+</li>
+<li><a href="https://www.digitalocean.com/community/tutorials/how-to-migrate-a-mysql-database-to-a-new-server-on-ubuntu-14-04"> How To Migrate a MySQL Database To A New Server On Ubuntu 14.04</a>
+</li>
+</ul>
+</div>
+</div>
+</div>
+
 <div id="outline-container-sec-6" class="outline-2">
 <h2 id="sec-6">Choose location</h2>
 <div class="outline-text-2" id="text-6">
 <p>
 submarine cable map: <a href="http://www.cablemap.info/">http://www.cablemap.info/</a>
 </p>
-</div>
-</div>
-
-<div id="outline-container-sec-7" class="outline-2">
-<h2 id="sec-7">cc</h2>
-<div class="outline-text-2" id="text-7">
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
-</div>
 </div>
 </div>
 <div id="footnotes">
@@ -635,12 +778,16 @@ submarine cable map: <a href="http://www.cablemap.info/">http://www.cablemap.inf
 <a href="https://www.digitalocean.com/community/tutorials/how-to-install-linux-nginx-mysql-php-lemp-stack-in-ubuntu-16-04">https://www.digitalocean.com/community/tutorials/how-to-install-linux-nginx-mysql-php-lemp-stack-in-ubuntu-16-04</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="https://www.digitalocean.com/community/tutorials/migrate-your-current-vps-linode-rackspace-aws-ec2-to-digitalocean">https://www.digitalocean.com/community/tutorials/migrate-your-current-vps-linode-rackspace-aws-ec2-to-digitalocean</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-02-17 Fri 00:13</p>
+<p class="date">Created: 2017-02-17 Fri 23:53</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

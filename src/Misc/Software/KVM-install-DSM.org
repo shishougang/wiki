@@ -12,31 +12,83 @@ lvm做存储后端，是最简单、可控性最高、性能也较好的方案�
 
 首先检查自己的机器是否支持VT,
 #+begin_src sh
-egrep -o ‘(vmx|svm)’ /proc/cpuinfo
+egrep -o '(vmx|svm)' /proc/cpuinfo
 #+end_src
 http://hovertree.com/h/bjaf/hkddosoq.htm
 
 http://jksoftcn.com/category/linux.html
-
 https://www.chiphell.com/thread-1370577-1-1.html
 http://jksoftcn.com/kvman-zhuang-hei-qun-hui.html
 
 
-
-https://www.1fishsauce.com/archives/638
-
-
 http://jamyy.us.to/blog/2013/05/4866.html
 
+http://www.u-share.cn/forum.php?mod=viewthread&tid=26495&extra=page%3D1
 
+#+begin_src sh
+apt-get install qemu-kvm libvirt-bin bridge-utils \
+sysv-rc-conf virtinst  tightvncserver
+#+end_src
+#+begin_src sh
+cat << EOF >> /etc/network/interfaces
+
+auto br0
+iface br0 inet dhcp
+        bridge_ports eth0
+        bridge_stp off
+        bridge_fd 0
+        bridge_maxwait 0
+
+EOF
+
+reboot
+#+end_src
+#+begin_src sh
+qemu-img create -f qcow2 /data/vm/DSM-1.qcow2 500G
+qemu-img create -f qcow2 /data/vm/DSM-2.qcow2 500G
+#载到/data/vm/XPEnoboot_DS3615xs_5.2-5592.2.iso
+# virt-install创建出一个模板
+virsh define /data/vm/DSM.xml
+virsh start DSM
+#+end_src
+
+#+begin_src sh
+   apt-get install qemu-kvm libvirt-bin virt-manager bridge-utils
+#   其中：virt-manager为GUI管理窗口，bridge-utils:用于网络桥接。
+
+#   执行下面的命令看KVM是否安装成功：
+   kvm-ok
+
+# 验证KVM内核是否加载成功：
+   lsmod | grep kvm
+
+# 证实KVM正常运行
+   virsh -c qemu:///system list
+
+# 如果提示你没权限操作，则需要将当前操作账户添加进libvirtd组，命令为：
+   sudo usermod -G libvirtd -a fdc
+
+#启动KVM GUI
+   virt-manager
+
+#确认libvirtld后台服务是否启动
+servicelibvirt-bin status
+
+#+end_src
+
+
+#+begin_src sh
+
+#+end_src
+#+begin_src sh
+
+#+end_src
 * cc
-#+begin_src python
 
-#+end_src
+https://www.howtoforge.com/installing-kvm-guests-with-virt-install-on-ubuntu-11.04-server
 
-#+begin_src c++
 
-#+end_src
+https://raymii.org/s/articles/virt-install_introduction_and_copy_paste_distro_install_commands.html
 
 
 #+begin_src sh

@@ -2,6 +2,8 @@
 #+TITLE: vultr Setup with Ubuntu 16.04
 #+OPTIONS: num:nil H:2
 
+
+
 * Vultr Promo Code
 [[http://www.vultr.com/?ref=7106919][Vultr]]
 #+begin_html
@@ -303,24 +305,110 @@ in.
 #+begin_src sh
 sudo rm /var/www/html/info.php
 #+end_src
-* Migrate Your Current VPS (Linode, Rackspace, AWS EC2) to DigitalOcean
-https://www.digitalocean.com/community/tutorials/migrate-your-current-vps-linode-rackspace-aws-ec2-to-digitalocean
+* Migrate Your Current VPS (Linode, Rackspace, AWS EC2) to Vultr[fn:2]
+Assuming the IP of new VPS: 111.222.333.444
+** Rsync Installation on both VPS
+#+begin_src sh
+# both sides
+sudo apt-get install rsync
+#+end_src
+** Transfer the SSH key to the new VPS
+If use user name + password to transfer files, omit this step.
+#+begin_src sh
+# old VPS
+ssh-copy-id 111.222.333.444
+#+end_src
+** Transferring Site Files
+Find the wordpress site folder in the old VPS
+#+begin_src sh
+# old VPS
+rsync -avP wordpress 111.222.333.444:/var/www/html/
+# or use username + password + ssh port 25000
+rsync -avP -e 'ssh -p 25000' wordpress username@111.222.333.444:/var/www/html/
+#+end_src
+** MySQL Database Transfer
+First, we will see what databases we need to dump. Log into MySQL:
+#+begin_src sh
+# old VPS
+mysql -u root -p
+show databases;
 
-https://www.digitalocean.com/community/tutorials/how-to-migrate-wordpress-from-shared-hosting-to-a-cloud-server-with-zero-downtime
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| wordpress          |
++--------------------+
+3 rows in set (0.00 sec)
 
-http://dba.stackexchange.com/questions/101292/need-for-backing-up-mysql-databases-information-schema-performance-schema-mysq
-
-https://www.digitalocean.com/community/tutorials/how-to-migrate-a-mysql-database-to-a-new-server-on-ubuntu-14-04
-* Choose location
-submarine cable map: http://www.cablemap.info/
-
-* cc
+exit
+#+end_src
+We would like to transfer our "wordpress" database, which contains our
+site information, and also our "mysql" database, which will transfer
+all of our user info, etc. The "information_schema" is just data
+structure information, and we don't need to hold onto that.
 
 #+begin_src sh
-
+mysqldump -u root -p -QqeR --add-drop-table --databases mysql wordpress | bzip2 -v9 - > siteData.sql.bz2
 #+end_src
+
+And be careful with =mysql=. If they are different versions of MySQL,
+it may cause some compatible issues. Check: [[http://dba.stackexchange.com/questions/101292/need-for-backing-up-mysql-databases-information-schema-performance-schema-mysq][Becareful with mysql]].
+
+#+begin_src sh
+rsync -avP siteData.sql.bz2 111.222.333.444:/home/username
+#+end_src
+
+Log into your new VPS:
+#+begin_src sh
+# new VPS
+cd ~
+bunzip2 siteData.sql.bz2
+mysql -u root -p < siteData.sql
+mysql -u root -p
+show databases;
+
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| test               |
+| wordpress          |
++--------------------+
+5 rows in set (0.00 sec)
+
+exit
+#+end_src
+
+As you can see, our "wordpress" database is present. The previous
+"mysql" database has been replaced with the one from our old VPS.
+
+#+begin_src sh
+sudo service mysql restart
+sudo service nginx restart
+#+end_src
+
+** More
+check the database users:
+#+begin_src sh
+mysql -u root -p
+SELECT user FROM mysql.user;
+#+end_src
+
+And more reference:
++ [[https://www.digitalocean.com/community/tutorials/how-to-migrate-wordpress-from-shared-hosting-to-a-cloud-server-with-zero-downtime/][ How To Migrate WordPress from Shared Hosting to a Cloud Server with
+  Zero Downtime]]
++ [[https://www.digitalocean.com/community/tutorials/how-to-migrate-a-mysql-database-to-a-new-server-on-ubuntu-14-04][ How To Migrate a MySQL Database To A New Server On Ubuntu 14.04]]
+
+* Choose location
+submarine cable map: http://www.cablemap.info/
 
 * Footnotes
 
 [fn:1] https://www.digitalocean.com/community/tutorials/how-to-install-linux-nginx-mysql-php-lemp-stack-in-ubuntu-16-04
+
+[fn:2] https://www.digitalocean.com/community/tutorials/migrate-your-current-vps-linode-rackspace-aws-ec2-to-digitalocean
 

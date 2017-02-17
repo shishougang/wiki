@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>KVM和KVM安装黑群晖</title>
-<!-- 2017-02-17 Fri 00:13 -->
+<!-- 2017-02-17 Fri 23:54 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -91,7 +91,7 @@ lvm做存储后端，是最简单、可控性最高、性能也较好的方案�
 </p>
 <div class="org-src-container">
 
-<pre class="src src-sh">egrep -o &#8216;(vmx|svm)&#8217; /proc/cpuinfo
+<pre class="src src-sh">egrep -o <span style="color: #ffa07a;">'(vmx|svm)'</span> /proc/cpuinfo
 </pre>
 </div>
 <p>
@@ -100,39 +100,99 @@ lvm做存储后端，是最简单、可控性最高、性能也较好的方案�
 
 <p>
 <a href="http://jksoftcn.com/category/linux.html">http://jksoftcn.com/category/linux.html</a>
-</p>
-
-<p>
 <a href="https://www.chiphell.com/thread-1370577-1-1.html">https://www.chiphell.com/thread-1370577-1-1.html</a>
 <a href="http://jksoftcn.com/kvman-zhuang-hei-qun-hui.html">http://jksoftcn.com/kvman-zhuang-hei-qun-hui.html</a>
-</p>
-
-
-
-<p>
-<a href="https://www.1fishsauce.com/archives/638">https://www.1fishsauce.com/archives/638</a>
 </p>
 
 
 <p>
 <a href="http://jamyy.us.to/blog/2013/05/4866.html">http://jamyy.us.to/blog/2013/05/4866.html</a>
 </p>
+
+<p>
+<a href="http://www.u-share.cn/forum.php?mod=viewthread&tid=26495&extra=page=1">http://www.u-share.cn/forum.php?mod=viewthread&tid=26495&extra=page=1</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">apt-get install qemu-kvm libvirt-bin bridge-utils <span style="color: #ffa07a;">\</span>
+sysv-rc-conf virtinst  tightvncserver
+</pre>
 </div>
+<div class="org-src-container">
+
+<pre class="src src-sh">cat &lt;&lt; EOF &gt;&gt; /etc/network/interfaces
+
+<span style="color: #ffff00; font-weight: bold;">auto br0</span>
+<span style="color: #ffff00; font-weight: bold;">iface br0 inet dhcp</span>
+<span style="color: #ffff00; font-weight: bold;">        bridge_ports eth0</span>
+<span style="color: #ffff00; font-weight: bold;">        bridge_stp off</span>
+<span style="color: #ffff00; font-weight: bold;">        bridge_fd 0</span>
+<span style="color: #ffff00; font-weight: bold;">        bridge_maxwait 0</span>
+
+<span style="color: #ffff00; font-weight: bold;">EOF</span>
+
+reboot
+</pre>
+</div>
+<div class="org-src-container">
+
+<pre class="src src-sh">qemu-img create -f qcow2 /data/vm/DSM-1.qcow2 500G
+qemu-img create -f qcow2 /data/vm/DSM-2.qcow2 500G
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">&#36733;&#21040;/data/vm/XPEnoboot_DS3615xs_5.2-5592.2.iso</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">virt-install&#21019;&#24314;&#20986;&#19968;&#20010;&#27169;&#26495;</span>
+virsh define /data/vm/DSM.xml
+virsh start DSM
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">   apt-get install qemu-kvm libvirt-bin virt-manager bridge-utils
+<span style="color: #ff7f24;">#   </span><span style="color: #ff7f24;">&#20854;&#20013;&#65306;virt-manager&#20026;GUI&#31649;&#29702;&#31383;&#21475;&#65292;bridge-utils:&#29992;&#20110;&#32593;&#32476;&#26725;&#25509;&#12290;</span>
+
+<span style="color: #ff7f24;">#   </span><span style="color: #ff7f24;">&#25191;&#34892;&#19979;&#38754;&#30340;&#21629;&#20196;&#30475;KVM&#26159;&#21542;&#23433;&#35013;&#25104;&#21151;&#65306;</span>
+   kvm-ok
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#39564;&#35777;KVM&#20869;&#26680;&#26159;&#21542;&#21152;&#36733;&#25104;&#21151;&#65306;</span>
+   lsmod | grep kvm
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#35777;&#23454;KVM&#27491;&#24120;&#36816;&#34892;</span>
+   virsh -c qemu:///system list
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#22914;&#26524;&#25552;&#31034;&#20320;&#27809;&#26435;&#38480;&#25805;&#20316;&#65292;&#21017;&#38656;&#35201;&#23558;&#24403;&#21069;&#25805;&#20316;&#36134;&#25143;&#28155;&#21152;&#36827;libvirtd&#32452;&#65292;&#21629;&#20196;&#20026;&#65306;</span>
+   sudo usermod -G libvirtd -a fdc
+
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">&#21551;&#21160;KVM GUI</span>
+   virt-manager
+
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">&#30830;&#35748;libvirtld&#21518;&#21488;&#26381;&#21153;&#26159;&#21542;&#21551;&#21160;</span>
+servicelibvirt-bin status
+</pre>
 </div>
 
 
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">cc</h2>
 <div class="outline-text-2" id="text-2">
-<div class="org-src-container">
+<p>
+<a href="https://www.howtoforge.com/installing-kvm-guests-with-virt-install-on-ubuntu-11.04-server">https://www.howtoforge.com/installing-kvm-guests-with-virt-install-on-ubuntu-11.04-server</a>
+</p>
 
-<pre class="src src-python"></pre>
-</div>
 
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
+<p>
+<a href="https://raymii.org/s/articles/virt-install_introduction_and_copy_paste_distro_install_commands.html">https://raymii.org/s/articles/virt-install_introduction_and_copy_paste_distro_install_commands.html</a>
+</p>
 
 
 <div class="org-src-container">
@@ -144,7 +204,7 @@ lvm做存储后端，是最简单、可控性最高、性能也较好的方案�
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-02-17 Fri 00:13</p>
+<p class="date">Created: 2017-02-17 Fri 23:54</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
