@@ -19,9 +19,8 @@ http://jksoftcn.com/category/linux.html
 https://www.chiphell.com/thread-1370577-1-1.html
 http://jksoftcn.com/kvman-zhuang-hei-qun-hui.html
 
-
+example:
 http://jamyy.us.to/blog/2013/05/4866.html
-
 http://www.u-share.cn/forum.php?mod=viewthread&tid=26495&extra=page%3D1
 
 
@@ -95,6 +94,7 @@ sudo apt-get install qemu-kvm libvirt-bin bridge-utils \
 virtinst
 # virt-manager: GUI管理窗口
 # bridge-utils:用于网络桥接
+# virtinst: support virt-install
 #+end_src
 
 #+begin_src sh
@@ -109,21 +109,177 @@ virtinst
 
 * Configure and install DSM
 如果安装 =virt-manager= 直接启动 =virt-manager= 来GUI操作KVM.
+
+The KVM hypervisor supports qcow2. qcow2 images support compression,
+snapshots and a few other nice things like growing on demand (thin
+provisioning, sparse file) and a read only base image. There was a
+performance overhead but nowdays that is almost negligent. To create
+an 8 GB qcow2 image:
+
+#+begin_src sh
+qemu-img create -f qcow2 ./name.qcow2 8G
+#+end_src
+
+#+begin_src sh
+
+#+end_src
+* More
+** =virt-install= examples[fn:1]
+*Debian 8*
+#+begin_src sh
+virt-install \
+--name debian8 \
+--ram 1024 \
+--disk path=./debian8.qcow2,size=8 \
+--vcpus 1 \
+--os-type linux \
+--os-variant generic \
+--network bridge=virbr0 \
+--graphics none \
+--console pty,target_type=serial \
+--location 'http://ftp.nl.debian.org/debian/dists/jessie/main/installer-amd64/' \
+--extra-args 'console=ttyS0,115200n8 serial'
+#+end_src
+
+*CentOS 7*
+#+begin_src sh
+virt-install \
+--name centos7 \
+--ram 1024 \
+--disk path=./centos7.qcow2,size=8 \
+--vcpus 1 \
+--os-type linux \
+--os-variant centos7 \
+--network bridge=virbr0 \
+--graphics none \
+--console pty,target_type=serial \
+--location 'http://mirror.i3d.net/pub/centos/7/os/x86_64/' \
+--extra-args 'console=ttyS0,115200n8 serial'
+#+end_src
+
+*Ubuntu 14.04*
+#+begin_src sh
+virt-install \
+--name ubuntu1404 \
+--ram 1024 \
+--disk path=./ubuntu1404.qcow2,size=8 \
+--vcpus 1 \
+--os-type linux \
+--os-variant generic \
+--network bridge=virbr0 \
+--graphics none \
+--console pty,target_type=serial \
+--location 'http://archive.ubuntu.com/ubuntu/dists/trusty/main/installer-amd64/' \
+--extra-args 'console=ttyS0,115200n8 serial'
+#+end_src
+
+*OpenSUSE 13*
+#+begin_src sh
+virt-install \
+--name opensuse13 \
+--ram 1024 \
+--disk path=./opensuse13.qcow2,size=8 \
+--vcpus 1 \
+--os-type linux \
+--os-variant generic \
+--network bridge=virbr0 \
+--graphics none \
+--console pty,target_type=serial \
+--location 'http://download.opensuse.org/distribution/13.2/repo/oss/' \
+--extra-args 'console=ttyS0,115200n8 serial'
+#+end_src
+
+*Generic ISO*
+Download an ISO file and give the filename to the ~--cdrom=~ parameter.
+This is used instead of ~--location~. A VNC console is available on
+localhost, port =5999= for you to use.
+
+#+begin_src sh
+virt-install \
+--name freebsd10 \
+--ram 1024 \
+--disk path=./freebsd10.qcow2,size=8 \
+--vcpus 1 \
+--os-type generic \
+--os-variant generic \
+--network bridge=virbr0 \
+--graphics vnc,port=5999 \
+--console pty,target_type=serial \
+--cdrom ./FreeBSD-10.1-RELEASE-amd64-dvd1.iso \
+#+end_src
+** os-variant
+You can get a list of supported operating system variants with the
+=osinfo-query os= command
+#+begin_src sh
+sudo apt-get install libosinfo-bin
+#+end_src
+
+#+begin_src sh
+$ osinfo-query os
+ Short ID             | Name                                               | Version  | ID                                      
+----------------------+----------------------------------------------------+----------+-----------------------------------------
+ altlinux1.0          | Mandrake RE Spring 2001                            | 1.0      | http://altlinux.org/altlinux/1.0        
+ altlinux2.0          | ALT Linux 2.0                                      | 2.0      | http://altlinux.org/altlinux/2.0        
+ altlinux2.2          | ALT Linux 2.2                                      | 2.2      | http://altlinux.org/altlinux/2.2        
+ altlinux2.4          | ALT Linux 2.4                                      | 2.4      | http://altlinux.org/altlinux/2.4        
+ altlinux3.0          | ALT Linux 3.0                                      | 3.0      | http://altlinux.org/altlinux/3.0        
+ altlinux4.0          | ALT Linux 4.0                                      | 4.0      | http://altlinux.org/altlinux/4.0        
+ altlinux4.1          | ALT Linux 4.1                                      | 4.1      | http://altlinux.org/altlinux/4.1        
+....
+#+end_src
+** start, stop and remove VM
+#+begin_src sh
+$ virsh start centos7
+$ virsh list --all
+# To stop a VM, you give the (unintuitive) command
+$ virsh destroy centos7
+#  remove the VM from the virsh list
+$ virsh undefine centos7
+#+end_src
+** misc
+#+begin_src sh
+sudo virsh dumpxml centos7 > ./centos7.xml
+#+end_src
+** todo
+
 #+begin_src sh
 
 #+end_src
 
 #+begin_src sh
 
+#+end_src
+#+begin_src sh
+
+#+end_src
+
+#+begin_src sh
+
+#+end_src
+
+#+begin_src sh
+virt-install \
+--name DSM \
+--ram 1024 \
+--disk path=./dsm.qcow2 \
+--os-type linux \
+--network bridge=br0 \
+--graphics vnc,port=5999 \
+--console pty,target_type=serial \
+--cdrom ./XPEnoboot_DS3615xs_5.2-5592.2.iso
+
+virsh destroy DSM
+
+ virsh undefine DSM
 #+end_src
 * cc
 
-https://www.howtoforge.com/installing-kvm-guests-with-virt-install-on-ubuntu-11.04-server
-
-
-https://raymii.org/s/articles/virt-install_introduction_and_copy_paste_distro_install_commands.html
-
 
 #+begin_src sh
 
 #+end_src
+
+* Footnotes
+
+[fn:1] https://raymii.org/s/articles/virt-install_introduction_and_copy_paste_distro_install_commands.html
+

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>KVM和KVM安装黑群晖</title>
-<!-- 2017-02-21 Tue 23:07 -->
+<!-- 2017-02-22 Wed 21:08 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -69,7 +69,16 @@ for the JavaScript code in this tag.
 <li><a href="#sec-1">Overview</a></li>
 <li><a href="#sec-2">install</a></li>
 <li><a href="#sec-3">Configure and install DSM</a></li>
-<li><a href="#sec-4">cc</a></li>
+<li><a href="#sec-4">More</a>
+<ul>
+<li><a href="#sec-4-1"><code>virt-install</code> examples</a></li>
+<li><a href="#sec-4-2">os-variant</a></li>
+<li><a href="#sec-4-3">start, stop and remove VM</a></li>
+<li><a href="#sec-4-4">misc</a></li>
+<li><a href="#sec-4-5">todo</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
 </div>
@@ -103,12 +112,9 @@ lvm做存储后端，是最简单、可控性最高、性能也较好的方案�
 <a href="http://jksoftcn.com/kvman-zhuang-hei-qun-hui.html">http://jksoftcn.com/kvman-zhuang-hei-qun-hui.html</a>
 </p>
 
-
 <p>
+example:
 <a href="http://jamyy.us.to/blog/2013/05/4866.html">http://jamyy.us.to/blog/2013/05/4866.html</a>
-</p>
-
-<p>
 <a href="http://www.u-share.cn/forum.php?mod=viewthread&tid=26495&extra=page=1">http://www.u-share.cn/forum.php?mod=viewthread&tid=26495&extra=page=1</a>
 </p>
 
@@ -202,6 +208,7 @@ $ sudo dhclient br0
 virtinst
 <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">virt-manager: GUI&#31649;&#29702;&#31383;&#21475;</span>
 <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">bridge-utils:&#29992;&#20110;&#32593;&#32476;&#26725;&#25509;</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">virtinst: support virt-install</span>
 </pre>
 </div>
 
@@ -225,9 +232,19 @@ virtinst
 <p>
 如果安装 <code>virt-manager</code> 直接启动 <code>virt-manager</code> 来GUI操作KVM.
 </p>
+
+<p>
+The KVM hypervisor supports qcow2. qcow2 images support compression,
+snapshots and a few other nice things like growing on demand (thin
+provisioning, sparse file) and a read only base image. There was a
+performance overhead but nowdays that is almost negligent. To create
+an 8 GB qcow2 image:
+</p>
+
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-sh">qemu-img create -f qcow2 ./name.qcow2 8G
+</pre>
 </div>
 
 <div class="org-src-container">
@@ -237,28 +254,235 @@ virtinst
 </div>
 </div>
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">cc</h2>
+<h2 id="sec-4">More</h2>
 <div class="outline-text-2" id="text-4">
+</div><div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1"><code>virt-install</code> examples<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h3>
+<div class="outline-text-3" id="text-4-1">
 <p>
-<a href="https://www.howtoforge.com/installing-kvm-guests-with-virt-install-on-ubuntu-11.04-server">https://www.howtoforge.com/installing-kvm-guests-with-virt-install-on-ubuntu-11.04-server</a>
+<b>Debian 8</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">virt-install <span style="color: #ffa07a;">\</span>
+--name debian8 <span style="color: #ffa07a;">\</span>
+--ram 1024 <span style="color: #ffa07a;">\</span>
+--disk <span style="color: #eedd82;">path</span>=./debian8.qcow2,<span style="color: #eedd82;">size</span>=8 <span style="color: #ffa07a;">\</span>
+--vcpus 1 <span style="color: #ffa07a;">\</span>
+--os-type linux <span style="color: #ffa07a;">\</span>
+--os-variant generic <span style="color: #ffa07a;">\</span>
+--network <span style="color: #eedd82;">bridge</span>=virbr0 <span style="color: #ffa07a;">\</span>
+--graphics none <span style="color: #ffa07a;">\</span>
+--console pty,<span style="color: #eedd82;">target_type</span>=serial <span style="color: #ffa07a;">\</span>
+--location <span style="color: #ffa07a;">'http://ftp.nl.debian.org/debian/dists/jessie/main/installer-amd64/'</span> <span style="color: #ffa07a;">\</span>
+--extra-args <span style="color: #ffa07a;">'console=ttyS0,115200n8 serial'</span>
+</pre>
+</div>
+
+<p>
+<b>CentOS 7</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">virt-install <span style="color: #ffa07a;">\</span>
+--name centos7 <span style="color: #ffa07a;">\</span>
+--ram 1024 <span style="color: #ffa07a;">\</span>
+--disk <span style="color: #eedd82;">path</span>=./centos7.qcow2,<span style="color: #eedd82;">size</span>=8 <span style="color: #ffa07a;">\</span>
+--vcpus 1 <span style="color: #ffa07a;">\</span>
+--os-type linux <span style="color: #ffa07a;">\</span>
+--os-variant centos7 <span style="color: #ffa07a;">\</span>
+--network <span style="color: #eedd82;">bridge</span>=virbr0 <span style="color: #ffa07a;">\</span>
+--graphics none <span style="color: #ffa07a;">\</span>
+--console pty,<span style="color: #eedd82;">target_type</span>=serial <span style="color: #ffa07a;">\</span>
+--location <span style="color: #ffa07a;">'http://mirror.i3d.net/pub/centos/7/os/x86_64/'</span> <span style="color: #ffa07a;">\</span>
+--extra-args <span style="color: #ffa07a;">'console=ttyS0,115200n8 serial'</span>
+</pre>
+</div>
+
+<p>
+<b>Ubuntu 14.04</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">virt-install <span style="color: #ffa07a;">\</span>
+--name ubuntu1404 <span style="color: #ffa07a;">\</span>
+--ram 1024 <span style="color: #ffa07a;">\</span>
+--disk <span style="color: #eedd82;">path</span>=./ubuntu1404.qcow2,<span style="color: #eedd82;">size</span>=8 <span style="color: #ffa07a;">\</span>
+--vcpus 1 <span style="color: #ffa07a;">\</span>
+--os-type linux <span style="color: #ffa07a;">\</span>
+--os-variant generic <span style="color: #ffa07a;">\</span>
+--network <span style="color: #eedd82;">bridge</span>=virbr0 <span style="color: #ffa07a;">\</span>
+--graphics none <span style="color: #ffa07a;">\</span>
+--console pty,<span style="color: #eedd82;">target_type</span>=serial <span style="color: #ffa07a;">\</span>
+--location <span style="color: #ffa07a;">'http://archive.ubuntu.com/ubuntu/dists/trusty/main/installer-amd64/'</span> <span style="color: #ffa07a;">\</span>
+--extra-args <span style="color: #ffa07a;">'console=ttyS0,115200n8 serial'</span>
+</pre>
+</div>
+
+<p>
+<b>OpenSUSE 13</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">virt-install <span style="color: #ffa07a;">\</span>
+--name opensuse13 <span style="color: #ffa07a;">\</span>
+--ram 1024 <span style="color: #ffa07a;">\</span>
+--disk <span style="color: #eedd82;">path</span>=./opensuse13.qcow2,<span style="color: #eedd82;">size</span>=8 <span style="color: #ffa07a;">\</span>
+--vcpus 1 <span style="color: #ffa07a;">\</span>
+--os-type linux <span style="color: #ffa07a;">\</span>
+--os-variant generic <span style="color: #ffa07a;">\</span>
+--network <span style="color: #eedd82;">bridge</span>=virbr0 <span style="color: #ffa07a;">\</span>
+--graphics none <span style="color: #ffa07a;">\</span>
+--console pty,<span style="color: #eedd82;">target_type</span>=serial <span style="color: #ffa07a;">\</span>
+--location <span style="color: #ffa07a;">'http://download.opensuse.org/distribution/13.2/repo/oss/'</span> <span style="color: #ffa07a;">\</span>
+--extra-args <span style="color: #ffa07a;">'console=ttyS0,115200n8 serial'</span>
+</pre>
+</div>
+
+<p>
+<b>Generic ISO</b>
+Download an ISO file and give the filename to the <code>--cdrom=</code> parameter.
+This is used instead of <code>--location</code>. A VNC console is available on
+localhost, port <code>5999</code> for you to use.
 </p>
 
+<div class="org-src-container">
 
+<pre class="src src-sh">virt-install <span style="color: #ffa07a;">\</span>
+--name freebsd10 <span style="color: #ffa07a;">\</span>
+--ram 1024 <span style="color: #ffa07a;">\</span>
+--disk <span style="color: #eedd82;">path</span>=./freebsd10.qcow2,<span style="color: #eedd82;">size</span>=8 <span style="color: #ffa07a;">\</span>
+--vcpus 1 <span style="color: #ffa07a;">\</span>
+--os-type generic <span style="color: #ffa07a;">\</span>
+--os-variant generic <span style="color: #ffa07a;">\</span>
+--network <span style="color: #eedd82;">bridge</span>=virbr0 <span style="color: #ffa07a;">\</span>
+--graphics vnc,<span style="color: #eedd82;">port</span>=5999 <span style="color: #ffa07a;">\</span>
+--console pty,<span style="color: #eedd82;">target_type</span>=serial <span style="color: #ffa07a;">\</span>
+--cdrom ./FreeBSD-10.1-RELEASE-amd64-dvd1.iso <span style="color: #ffa07a;">\</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">os-variant</h3>
+<div class="outline-text-3" id="text-4-2">
 <p>
-<a href="https://raymii.org/s/articles/virt-install_introduction_and_copy_paste_distro_install_commands.html">https://raymii.org/s/articles/virt-install_introduction_and_copy_paste_distro_install_commands.html</a>
+You can get a list of supported operating system variants with the
+<code>osinfo-query os</code> command
 </p>
+<div class="org-src-container">
 
+<pre class="src src-sh">sudo apt-get install libosinfo-bin
+</pre>
+</div>
 
+<div class="org-src-container">
+
+<pre class="src src-sh">$ osinfo-query os
+ Short ID             | Name                                               | Version  | ID                                      
+----------------------+----------------------------------------------------+----------+-----------------------------------------
+ altlinux1.0          | Mandrake RE Spring 2001                            | 1.0      | http://altlinux.org/altlinux/1.0        
+ altlinux2.0          | ALT Linux 2.0                                      | 2.0      | http://altlinux.org/altlinux/2.0        
+ altlinux2.2          | ALT Linux 2.2                                      | 2.2      | http://altlinux.org/altlinux/2.2        
+ altlinux2.4          | ALT Linux 2.4                                      | 2.4      | http://altlinux.org/altlinux/2.4        
+ altlinux3.0          | ALT Linux 3.0                                      | 3.0      | http://altlinux.org/altlinux/3.0        
+ altlinux4.0          | ALT Linux 4.0                                      | 4.0      | http://altlinux.org/altlinux/4.0        
+ altlinux4.1          | ALT Linux 4.1                                      | 4.1      | http://altlinux.org/altlinux/4.1        
+....
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-3" class="outline-3">
+<h3 id="sec-4-3">start, stop and remove VM</h3>
+<div class="outline-text-3" id="text-4-3">
+<div class="org-src-container">
+
+<pre class="src src-sh">$ virsh start centos7
+$ virsh list --all
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">To stop a VM, you give the (unintuitive) command</span>
+$ virsh destroy centos7
+<span style="color: #ff7f24;">#  </span><span style="color: #ff7f24;">remove the VM from the virsh list</span>
+$ virsh undefine centos7
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-4" class="outline-3">
+<h3 id="sec-4-4">misc</h3>
+<div class="outline-text-3" id="text-4-4">
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo virsh dumpxml centos7 &gt; ./centos7.xml
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4-5" class="outline-3">
+<h3 id="sec-4-5">todo</h3>
+<div class="outline-text-3" id="text-4-5">
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">virt-install <span style="color: #ffa07a;">\</span>
+--name DSM <span style="color: #ffa07a;">\</span>
+--ram 1024 <span style="color: #ffa07a;">\</span>
+--disk <span style="color: #eedd82;">path</span>=./dsm.qcow2 <span style="color: #ffa07a;">\</span>
+--os-type linux <span style="color: #ffa07a;">\</span>
+--network <span style="color: #eedd82;">bridge</span>=br0 <span style="color: #ffa07a;">\</span>
+--graphics vnc,<span style="color: #eedd82;">port</span>=5999 <span style="color: #ffa07a;">\</span>
+--console pty,<span style="color: #eedd82;">target_type</span>=serial <span style="color: #ffa07a;">\</span>
+--cdrom ./XPEnoboot_DS3615xs_5.2-5592.2.iso
+
+virsh destroy DSM
+
+ virsh undefine DSM
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">cc</h2>
+<div class="outline-text-2" id="text-5">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
 </div>
 </div>
 </div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="https://raymii.org/s/articles/virt-install_introduction_and_copy_paste_distro_install_commands.html">https://raymii.org/s/articles/virt-install_introduction_and_copy_paste_distro_install_commands.html</a>
+</p></div>
+
+
 </div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-02-21 Tue 23:07</p>
+<p class="date">Created: 2017-02-22 Wed 21:08</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
