@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>KVM和KVM安装黑群晖</title>
-<!-- 2017-02-23 Thu 23:34 -->
+<!-- 2017-02-24 Fri 00:03 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -108,14 +108,6 @@ lvm做存储后端，是最简单、可控性最高、性能也较好的方案�
 
 <p>
 <a href="http://jksoftcn.com/category/linux.html">http://jksoftcn.com/category/linux.html</a>
-<a href="https://www.chiphell.com/thread-1370577-1-1.html">https://www.chiphell.com/thread-1370577-1-1.html</a>
-<a href="http://jksoftcn.com/kvman-zhuang-hei-qun-hui.html">http://jksoftcn.com/kvman-zhuang-hei-qun-hui.html</a>
-</p>
-
-<p>
-example:
-<a href="http://jamyy.us.to/blog/2013/05/4866.html">http://jamyy.us.to/blog/2013/05/4866.html</a>
-<a href="http://www.u-share.cn/forum.php?mod=viewthread&tid=26495&extra=page=1">http://www.u-share.cn/forum.php?mod=viewthread&tid=26495&extra=page=1</a>
 </p>
 
 
@@ -134,62 +126,10 @@ example:
 <a href="https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Virtualization_Deployment_and_Administration_Guide/sect-Guest_virtual_machine_installation_overview-Creating_guests_with_virt_install.html">https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Virtualization_Deployment_and_Administration_Guide/sect-Guest_virtual_machine_installation_overview-Creating_guests_with_virt_install.html</a>
 <a href="http://www.ibm.com/support/knowledgecenter/en/linuxonibm/liaai.kvminstall/liaaikvminstallvirtinstall.htm">http://www.ibm.com/support/knowledgecenter/en/linuxonibm/liaai.kvminstall/liaaikvminstallvirtinstall.htm</a>
 </p>
-
-
-<div class="org-src-container">
-
-<pre class="src src-sh">apt-get install qemu-kvm libvirt-bin bridge-utils <span style="color: #ffa07a;">\</span>
-sysv-rc-conf virtinst  tightvncserver
-</pre>
-</div>
-
-
-<div class="org-src-container">
-
-<pre class="src src-sh">cat &lt;&lt; EOF &gt;&gt; /etc/network/interfaces
-
-<span style="color: #ffff00; font-weight: bold;">auto br0</span>
-<span style="color: #ffff00; font-weight: bold;">iface br0 inet dhcp</span>
-<span style="color: #ffff00; font-weight: bold;">        bridge_ports eth0</span>
-<span style="color: #ffff00; font-weight: bold;">        bridge_stp off</span>
-<span style="color: #ffff00; font-weight: bold;">        bridge_fd 0</span>
-<span style="color: #ffff00; font-weight: bold;">        bridge_maxwait 0</span>
-
-<span style="color: #ffff00; font-weight: bold;">EOF</span>
-
-reboot
-</pre>
-</div>
-
-
-<div class="org-src-container">
-
-<pre class="src src-sh">qemu-img create -f qcow2 /data/vm/DSM-1.qcow2 500G
-qemu-img create -f qcow2 /data/vm/DSM-2.qcow2 500G
-<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">&#36733;&#21040;/data/vm/XPEnoboot_DS3615xs_5.2-5592.2.iso</span>
-<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">virt-install&#21019;&#24314;&#20986;&#19968;&#20010;&#27169;&#26495;</span>
-virsh define /data/vm/DSM.xml
-virsh start DSM
-</pre>
-</div>
-
-
-<div class="org-src-container">
-
-<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">&#21551;&#21160;KVM GUI</span>
-   virt-manager
-
-<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">&#30830;&#35748;libvirtld&#21518;&#21488;&#26381;&#21153;&#26159;&#21542;&#21551;&#21160;</span>
-servicelibvirt-bin status
-
-$ sudo ifconfig eth0 0.0.0.0 up
-$ sudo brctl addbr br0
-$ sudo brctl addif br0 eth0
-$ sudo dhclient br0
-</pre>
 </div>
 </div>
-</div>
+
+
 
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">install</h2>
@@ -210,9 +150,40 @@ virtinst
    lsmod | grep kvm
 <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#35777;&#23454;KVM&#27491;&#24120;&#36816;&#34892;</span>
    virsh -c qemu:///system list
-
 <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#22914;&#26524;&#25552;&#31034;&#20320;&#27809;&#26435;&#38480;&#25805;&#20316;&#65292;&#21017;&#38656;&#35201;&#23558;&#24403;&#21069;&#25805;&#20316;&#36134;&#25143;&#28155;&#21152;&#36827;libvirtd&#32452;&#65292;&#21629;&#20196;&#20026;&#65306;</span>
    sudo usermod -G libvirtd -a username
+</pre>
+</div>
+
+<p>
+安装完后默认会生成一个网桥virbr0, 这里自己创建一个NAT的网桥br0
+</p>
+
+<p>
+<code>/etc/network/interfaces</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">auto br0
+iface br0 inet dhcp
+        bridge_ports eth0
+        bridge_stp off
+        bridge_fd 0
+        bridge_maxwait 0
+
+EOF
+</pre>
+</div>
+
+<p>
+或者手动临时测试配置:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo ifconfig eth0 0.0.0.0 up
+$ sudo brctl addbr br0
+$ sudo brctl addif br0 eth0
+$ sudo dhclient br0
 </pre>
 </div>
 </div>
@@ -230,21 +201,49 @@ The KVM hypervisor supports qcow2. qcow2 images support compression,
 snapshots and a few other nice things like growing on demand (thin
 provisioning, sparse file) and a read only base image. There was a
 performance overhead but nowdays that is almost negligent. To create
-an 8 GB qcow2 image:
+an 10GB qcow2 image:
 </p>
 
 <div class="org-src-container">
 
-<pre class="src src-sh">qemu-img create -f qcow2 ./name.qcow2 10G
+<pre class="src src-sh">qemu-img create -f qcow2 ./dsm.qcow2 10G
 </pre>
 </div>
 
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-sh">virt-install <span style="color: #ffa07a;">\</span>
+--name DSM <span style="color: #ffa07a;">\</span>
+--ram 1024 <span style="color: #ffa07a;">\</span>
+--disk <span style="color: #eedd82;">path</span>=./dsm.qcow2,<span style="color: #eedd82;">format</span>=qcow2 <span style="color: #ffa07a;">\</span>
+--os-type linux <span style="color: #ffa07a;">\</span>
+--network <span style="color: #eedd82;">bridge</span>=br0,<span style="color: #eedd82;">mac</span>=00:11:22:33:44:55 <span style="color: #ffa07a;">\</span>
+--graphics vnc,<span style="color: #eedd82;">port</span>=5999 <span style="color: #ffa07a;">\</span>
+--console pty,<span style="color: #eedd82;">target_type</span>=serial <span style="color: #ffa07a;">\</span>
+--cdrom ./XPEnoboot_DS3615xs_5.2-5967.1.iso
+</pre>
+</div>
+
+<p>
+从 <a href="https://www.synology.com/en-us/support/download/DS3615xs">https://www.synology.com/en-us/support/download/DS3615xs</a> 下载
+Synology Assistant. 或者 <a href="http://find.synology.com/">http://find.synology.com/</a> .
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">stop</span>
+virsh destroy DSM
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">start</span>
+virsh start DSM
+</pre>
+</div>
+
+<p>
+如果迟迟没有看到新设备，可以用vnc客户端连接host的5999端口，查看虚拟机的屏幕。
+</p>
 </div>
 </div>
-</div>
+
 <div id="outline-container-sec-4" class="outline-2">
 <h2 id="sec-4">More</h2>
 <div class="outline-text-2" id="text-4">
@@ -413,13 +412,6 @@ $ virsh undefine centos7
 <div id="outline-container-sec-4-5" class="outline-3">
 <h3 id="sec-4-5">todo</h3>
 <div class="outline-text-3" id="text-4-5">
-<p>
-<a href="https://www.synology.com/en-us/support/download/DS3615xs">https://www.synology.com/en-us/support/download/DS3615xs</a>
-Synology Assistant        
-<a href="http://find.synology.com/">http://find.synology.com/</a>
-</p>
-
-
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -429,36 +421,10 @@ Synology Assistant
 
 <pre class="src src-sh"></pre>
 </div>
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
-</div>
-
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
-</div>
-
-<div class="org-src-container">
-
-<pre class="src src-sh">virt-install <span style="color: #ffa07a;">\</span>
---name DSM <span style="color: #ffa07a;">\</span>
---ram 1024 <span style="color: #ffa07a;">\</span>
---disk <span style="color: #eedd82;">path</span>=./dsm.qcow2,<span style="color: #eedd82;">format</span>=qcow2 <span style="color: #ffa07a;">\</span>
---os-type linux <span style="color: #ffa07a;">\</span>
---network <span style="color: #eedd82;">bridge</span>=br0 <span style="color: #ffa07a;">\</span>
---graphics vnc,<span style="color: #eedd82;">port</span>=5999 <span style="color: #ffa07a;">\</span>
---console pty,<span style="color: #eedd82;">target_type</span>=serial <span style="color: #ffa07a;">\</span>
---cdrom ./XPEnoboot_DS3615xs_5.2-5967.1.iso
-
-virsh destroy DSM
-
-virsh undefine DSM
-</pre>
 </div>
 </div>
 </div>
-</div>
+
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">cc</h2>
 <div class="outline-text-2" id="text-5">
@@ -481,7 +447,7 @@ virsh undefine DSM
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-02-23 Thu 23:34</p>
+<p class="date">Created: 2017-02-24 Fri 00:03</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

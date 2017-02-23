@@ -16,12 +16,6 @@ egrep -o '(vmx|svm)' /proc/cpuinfo
 #+end_src
 
 http://jksoftcn.com/category/linux.html
-https://www.chiphell.com/thread-1370577-1-1.html
-http://jksoftcn.com/kvman-zhuang-hei-qun-hui.html
-
-example:
-http://jamyy.us.to/blog/2013/05/4866.html
-http://www.u-share.cn/forum.php?mod=viewthread&tid=26495&extra=page%3D1
 
 
 http://forum.ubuntu.org.cn/viewtopic.php?t=154792
@@ -35,51 +29,6 @@ https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/7/html/Vi
 http://www.ibm.com/support/knowledgecenter/en/linuxonibm/liaai.kvminstall/liaaikvminstallvirtinstall.htm
 
 
-#+begin_src sh
-apt-get install qemu-kvm libvirt-bin bridge-utils \
-sysv-rc-conf virtinst  tightvncserver
-#+end_src
-
-
-#+begin_src sh
-cat << EOF >> /etc/network/interfaces
-
-auto br0
-iface br0 inet dhcp
-        bridge_ports eth0
-        bridge_stp off
-        bridge_fd 0
-        bridge_maxwait 0
-
-EOF
-
-reboot
-#+end_src
-
-
-#+begin_src sh
-qemu-img create -f qcow2 /data/vm/DSM-1.qcow2 500G
-qemu-img create -f qcow2 /data/vm/DSM-2.qcow2 500G
-#载到/data/vm/XPEnoboot_DS3615xs_5.2-5592.2.iso
-# virt-install创建出一个模板
-virsh define /data/vm/DSM.xml
-virsh start DSM
-#+end_src
-
-
-#+begin_src sh
-
-#启动KVM GUI
-   virt-manager
-
-#确认libvirtld后台服务是否启动
-servicelibvirt-bin status
-
-$ sudo ifconfig eth0 0.0.0.0 up
-$ sudo brctl addbr br0
-$ sudo brctl addif br0 eth0
-$ sudo dhclient br0
-#+end_src
 
 * install
 #+begin_src sh
@@ -95,9 +44,30 @@ virtinst
      lsmod | grep kvm
   # 证实KVM正常运行
      virsh -c qemu:///system list
-
   # 如果提示你没权限操作，则需要将当前操作账户添加进libvirtd组，命令为：
      sudo usermod -G libvirtd -a username
+#+end_src
+
+安装完后默认会生成一个网桥virbr0, 这里自己创建一个NAT的网桥br0
+
+=/etc/network/interfaces=
+#+begin_src sh
+auto br0
+iface br0 inet dhcp
+        bridge_ports eth0
+        bridge_stp off
+        bridge_fd 0
+        bridge_maxwait 0
+
+EOF
+#+end_src
+
+或者手动临时测试配置:
+#+begin_src sh
+$ sudo ifconfig eth0 0.0.0.0 up
+$ sudo brctl addbr br0
+$ sudo brctl addif br0 eth0
+$ sudo dhclient br0
 #+end_src
 
 * Configure and install DSM
@@ -107,15 +77,37 @@ The KVM hypervisor supports qcow2. qcow2 images support compression,
 snapshots and a few other nice things like growing on demand (thin
 provisioning, sparse file) and a read only base image. There was a
 performance overhead but nowdays that is almost negligent. To create
-an 8 GB qcow2 image:
+an 10GB qcow2 image:
 
 #+begin_src sh
-qemu-img create -f qcow2 ./name.qcow2 10G
+qemu-img create -f qcow2 ./dsm.qcow2 10G
 #+end_src
 
 #+begin_src sh
-
+virt-install \
+--name DSM \
+--ram 1024 \
+--disk path=./dsm.qcow2,format=qcow2 \
+--os-type linux \
+--network bridge=br0,mac=00:11:22:33:44:55 \
+--graphics vnc,port=5999 \
+--console pty,target_type=serial \
+--cdrom ./XPEnoboot_DS3615xs_5.2-5967.1.iso
 #+end_src
+
+从 https://www.synology.com/en-us/support/download/DS3615xs 下载
+Synology Assistant. 或者 http://find.synology.com/ .
+
+#+begin_src sh
+# stop
+virsh destroy DSM
+# start
+virsh start DSM
+#+end_src
+
+如果迟迟没有看到新设备，可以用vnc客户端连接host的5999端口，查看虚拟机
+的屏幕。
+
 * More
 ** =virt-install= examples[fn:1]
 *Debian 8*
@@ -234,10 +226,6 @@ $ virsh undefine centos7
 sudo virsh dumpxml centos7 > ./centos7.xml
 #+end_src
 ** todo
- https://www.synology.com/en-us/support/download/DS3615xs
-Synology Assistant	
-http://find.synology.com/
-
 
 #+begin_src sh
 
@@ -246,31 +234,8 @@ http://find.synology.com/
 #+begin_src sh
 
 #+end_src
-#+begin_src sh
 
-#+end_src
-
-#+begin_src sh
-
-#+end_src
-
-#+begin_src sh
-virt-install \
---name DSM \
---ram 1024 \
---disk path=./dsm.qcow2,format=qcow2 \
---os-type linux \
---network bridge=br0 \
---graphics vnc,port=5999 \
---console pty,target_type=serial \
---cdrom ./XPEnoboot_DS3615xs_5.2-5967.1.iso
-
-virsh destroy DSM
-
-virsh undefine DSM
-#+end_src
 * cc
-
 
 #+begin_src sh
 
