@@ -2,32 +2,141 @@
 #+TITLE: LVM(Logical Volume Management) summarize
 #+OPTIONS: num:nil H:2
 
+* Overview
+LVM stands for Logical Volume Management. It is a system of managing
+logical volumes, or file system.[fn:1] LVM是用来方便管理的，不会提供
+额外的安全保证。
 
-https://wiki.ubuntu.com/Lvm
+LVM的基本组成块如下：[fn:2]
++ 物理卷Physical volume (PV)：可以在上面建立卷组的媒介，可以是硬盘分区，
+  也可以是硬盘本身或者回环文件（loopback file）。物理卷包括一个特殊的
+  header，其余部分被切割为一块块物理区域（physical extents）。
++ 卷组Volume group (VG)：将一组物理卷收集为一个管理单元。
++ 逻辑卷Logical volume (LV)：虚拟分区，由物理区域（physical extents）
+  组成。
++ 物理区域Physical extent (PE)：硬盘可供指派给逻辑卷的最小单位（通常为
+  4MB）。
 
-https://www.howtoforge.com/linux_lvm
+[[./Files/LVM-overview.png]]
 
-http://tldp.org/HOWTO/LVM-HOWTO/
+** 优点
+比起正常的硬盘分区管理，LVM更富于弹性：
++ 使用卷组(VG)，使众多硬盘空间看起来像一个大硬盘。
++ 使用逻辑卷（LV），可以创建跨越众多硬盘空间的分区。
++ 可以创建小的逻辑卷（LV），在空间不足时再动态调整它的大小。
++ 在调整逻辑卷（LV）大小时可以不用考虑逻辑卷在硬盘上的位置，不用担心没
+  有可用的连续空间。
++ 可以在线（online）对逻辑卷（LV）和卷组（VG）进行创建、删除、调整大小
+  等操作。LVM上的文件系统也需要重新调整大小，某些文件系统也支持这样的
+  在线操作。
++ 无需重新启动服务，就可以将服务中用到的逻辑卷（LV）在线（online）/动
+  态（live）迁移至别的硬盘上。
++ 允许创建快照，可以保存文件系统的备份，同时使服务的下线时间（downtime）
+  降低到最小。
+这些优点使得LVM对服务器的管理非常有用，对于桌面系统管理的帮助则没有那
+么显著，你需要根据实际情况进行取舍。
 
-https://www.digitalocean.com/community/tutorials/an-introduction-to-lvm-concepts-terminology-and-operations
+* 软RAID
+RAID是英文Redundant Array of Independent Disks的缩写，翻译成中文意思是
+“独立磁盘冗余阵列”，有时也简称磁盘阵列(Disk Array)。
 
-https://www.howtogeek.com/howto/40702/how-to-manage-and-use-lvm-logical-volume-management-in-ubuntu/
+** RAID创建
+*** 创建raid硬盘阵列
+#+begin_src sh
+#mdadm -C /dev/md0 -ayes -l0 -n2  /dev/sd[a,b]1
 
-http://www.swanlinux.net/2013/02/12/linux_raid_lvm/
+-C :表示创建RAID
+/dev/md0 :表示创建生成的RAID分区
+-ayes :表示创建过程中并且激活该RAID分区
+-ln :表示创建级别为n的RAID
+-nn :表示创建RAID所参与的硬盘设备个数
+/dev/sd[a,b]1 :表示参与的硬盘设备
+#+end_src
 
-http://kennywong.blog.51cto.com/715953/1430356
+创建raid1用/dev/sdb1 /dev/sdb2
+#+begin_src sh
+mdadm -C /dev/md1 -ayes -l1 -n2 /dev/sdb{1..2}
+#cat /proc/mdstat命令查看创建进度，到100%时就好了
+#+end_src
+*** 创建文件系统
+#+begin_src sh
+mkfs.ext4 /dev/md0
+#+end_src
+*** 挂载分区
+#+begin_src sh
+mount /dev/md0 /mnt
+# 自动挂载,可以修改一下/etc/fstab文件,添加一行!
+/dev/md0 /raid5disk ext3 defaults 0 0
+#+end_src
+*** 删除一个阵列
+#+begin_src sh
+umount [挂载目录]
+mdadm -S [RAID设备]
+mdadm –zero-superblock [生成RAID的硬盘设备]
 
-http://www.quwenqing.com/read-3.html
-
-https://wiki.archlinux.org/index.php/LVM_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)
-
-http://blog.csdn.net/u011758585/article/details/50695802
-
-
-* cc
-
-
+umount /raid5
+mdadm -S /dev/md0
+mdadm –zero-superblock /dev/sda{3..5}
+#+end_src
 
 #+begin_src sh
-
+# 查看RAID
+mdadm -D /dev/md0或cat /proc/mdstat
 #+end_src
+* LVM
+** 创建
+#+begin_src sh
+# 创建 LVM 类型的分区
+fdisk /dev/sda
+pvcreate /dev/sdb1
+
+#vgcreate <卷组名> <物理卷设备名> [<物理卷设备名> ...]
+vgcreate vg0 /dev/sda1 /dev/sdb1
+
+lvcreate –n data –L +500M vg0 
+lvcreate –n data –l 127 vg0
+lvdisplay /dev/vg0/data
+mkfs.ext4 /dev/vg0/data
+mount /dev/vg0/data /mnt
+vi /etc/fstab
+#+end_src
+
+** 扩容
+#+begin_src sh
+lvextend  –L +200M /dev/vg0/data    添加200M的
+
+e2fsck –f /dev/vg0/data            下面2条是在线扩容(不用停止掉挂载目录)
+resize2fs /dev/vg0/data
+#+end_src
+
+** 快照
+#+begin_src sh
+ lvcreate --size 100M --snapshot --name snap01 /dev/mapper/vg0-pv
+
+# Reverting the modified 'pv' logical volume to the state when the 'snap01' snapshot was taken can be done with
+lvconvert --merge /dev/vg0/snap01
+#+end_src
+
+** Misc
+#+begin_src sh
+# 删除逻辑卷
+lvremove /dev/vg0/data
+
+# 休眠和激活卷组
+vgchange –an /dev/vg0   休眠
+vgchange –ay /dev/vg0   激活
+#+end_src
+
+* More
++ [[https://www.howtoforge.com/how-to-set-up-software-raid1-on-a-running-lvm-system-incl-grub2-configuration-ubuntu-10.04-p2][Set Up Software RAID1 On A Running LVM System]]
++ [[http://tldp.org/HOWTO/LVM-HOWTO/index.html][LVM HOWTO]]
++ [[http://blog.csdn.net/u011758585/article/details/50695802][在Raid1+LVM的基础上再添加两块硬盘]]
++ [[https://wiki.archlinux.org/index.php/LVM][LVM wiki in the archlinux]]
++ [[https://www.howtoforge.com/linux_lvm_p6][LVM On RAID1]]
+
+* Footnotes
+
+[fn:1] https://wiki.ubuntu.com/Lvm
+
+[fn:2] https://wiki.archlinux.org/index.php/LVM_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)
+

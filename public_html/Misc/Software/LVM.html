@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>LVM(Logical Volume Management) summarize</title>
-<!-- 2017-02-25 Sat 00:12 -->
+<!-- 2017-02-26 Sun 22:46 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -66,64 +66,272 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">cc</a></li>
+<li><a href="#sec-1">Overview</a>
+<ul>
+<li><a href="#sec-1-1">优点</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">软RAID</a>
+<ul>
+<li><a href="#sec-2-1">RAID创建</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">LVM</a>
+<ul>
+<li><a href="#sec-3-1">创建</a></li>
+<li><a href="#sec-3-2">扩容</a></li>
+<li><a href="#sec-3-3">快照</a></li>
+<li><a href="#sec-3-4">Misc</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">More</a></li>
 </ul>
 </div>
 </div>
-<p>
-<a href="https://wiki.ubuntu.com/Lvm">https://wiki.ubuntu.com/Lvm</a>
-</p>
-
-<p>
-<a href="https://www.howtoforge.com/linux_lvm">https://www.howtoforge.com/linux_lvm</a>
-</p>
-
-<p>
-<a href="http://tldp.org/HOWTO/LVM-HOWTO/">http://tldp.org/HOWTO/LVM-HOWTO/</a>
-</p>
-
-<p>
-<a href="https://www.digitalocean.com/community/tutorials/an-introduction-to-lvm-concepts-terminology-and-operations">https://www.digitalocean.com/community/tutorials/an-introduction-to-lvm-concepts-terminology-and-operations</a>
-</p>
-
-<p>
-<a href="https://www.howtogeek.com/howto/40702/how-to-manage-and-use-lvm-logical-volume-management-in-ubuntu/">https://www.howtogeek.com/howto/40702/how-to-manage-and-use-lvm-logical-volume-management-in-ubuntu/</a>
-</p>
-
-<p>
-<a href="http://www.swanlinux.net/2013/02/12/linux_raid_lvm/">http://www.swanlinux.net/2013/02/12/linux_raid_lvm/</a>
-</p>
-
-<p>
-<a href="http://kennywong.blog.51cto.com/715953/1430356">http://kennywong.blog.51cto.com/715953/1430356</a>
-</p>
-
-<p>
-<a href="http://www.quwenqing.com/read-3.html">http://www.quwenqing.com/read-3.html</a>
-</p>
-
-<p>
-<a href="https://wiki.archlinux.org/index.php/LVM_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)">https://wiki.archlinux.org/index.php/LVM_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)</a>
-</p>
-
-<p>
-<a href="http://blog.csdn.net/u011758585/article/details/50695802">http://blog.csdn.net/u011758585/article/details/50695802</a>
-</p>
-
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">cc</h2>
+<h2 id="sec-1">Overview</h2>
 <div class="outline-text-2" id="text-1">
+<p>
+LVM stands for Logical Volume Management. It is a system of managing
+logical volumes, or file system.<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup> LVM是用来方便管理的，不会提供额外的安全保证。
+</p>
+
+<p>
+LVM的基本组成块如下：<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup>
+</p>
+<ul class="org-ul">
+<li>物理卷Physical volume (PV)：可以在上面建立卷组的媒介，可以是硬盘分区，也可以是硬盘本身或者回环文件（loopback file）。物理卷包括一个特殊的
+header，其余部分被切割为一块块物理区域（physical extents）。
+</li>
+<li>卷组Volume group (VG)：将一组物理卷收集为一个管理单元。
+</li>
+<li>逻辑卷Logical volume (LV)：虚拟分区，由物理区域（physical extents）组成。
+</li>
+<li>物理区域Physical extent (PE)：硬盘可供指派给逻辑卷的最小单位（通常为
+4MB）。
+</li>
+</ul>
+
+
+<div class="figure">
+<p><img src="./Files/LVM-overview.png" alt="LVM-overview.png" />
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">优点</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+比起正常的硬盘分区管理，LVM更富于弹性：
+</p>
+<ul class="org-ul">
+<li>使用卷组(VG)，使众多硬盘空间看起来像一个大硬盘。
+</li>
+<li>使用逻辑卷（LV），可以创建跨越众多硬盘空间的分区。
+</li>
+<li>可以创建小的逻辑卷（LV），在空间不足时再动态调整它的大小。
+</li>
+<li>在调整逻辑卷（LV）大小时可以不用考虑逻辑卷在硬盘上的位置，不用担心没有可用的连续空间。
+</li>
+<li>可以在线（online）对逻辑卷（LV）和卷组（VG）进行创建、删除、调整大小等操作。LVM上的文件系统也需要重新调整大小，某些文件系统也支持这样的在线操作。
+</li>
+<li>无需重新启动服务，就可以将服务中用到的逻辑卷（LV）在线（online）/动态（live）迁移至别的硬盘上。
+</li>
+<li>允许创建快照，可以保存文件系统的备份，同时使服务的下线时间（downtime）降低到最小。
+</li>
+</ul>
+<p>
+这些优点使得LVM对服务器的管理非常有用，对于桌面系统管理的帮助则没有那么显著，你需要根据实际情况进行取舍。
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">软RAID</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+RAID是英文Redundant Array of Independent Disks的缩写，翻译成中文意思是“独立磁盘冗余阵列”，有时也简称磁盘阵列(Disk Array)。
+</p>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">RAID创建</h3>
+<div class="outline-text-3" id="text-2-1">
+</div><ul class="org-ul"><li><a id="sec-2-1-1" name="sec-2-1-1"></a>创建raid硬盘阵列<br  /><div class="outline-text-4" id="text-2-1-1">
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">mdadm -C /dev/md0 -ayes -l0 -n2  /dev/sd[a,b]1</span>
+
+-C :&#34920;&#31034;&#21019;&#24314;RAID
+/dev/md0 :&#34920;&#31034;&#21019;&#24314;&#29983;&#25104;&#30340;RAID&#20998;&#21306;
+-ayes :&#34920;&#31034;&#21019;&#24314;&#36807;&#31243;&#20013;&#24182;&#19988;&#28608;&#27963;&#35813;RAID&#20998;&#21306;
+-ln :&#34920;&#31034;&#21019;&#24314;&#32423;&#21035;&#20026;n&#30340;RAID
+-nn :&#34920;&#31034;&#21019;&#24314;RAID&#25152;&#21442;&#19982;&#30340;&#30828;&#30424;&#35774;&#22791;&#20010;&#25968;
+/dev/sd[a,b]1 :&#34920;&#31034;&#21442;&#19982;&#30340;&#30828;&#30424;&#35774;&#22791;
+</pre>
+</div>
+
+<p>
+创建raid1用/dev/sdb1 /dev/sdb2
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">mdadm -C /dev/md1 -ayes -l1 -n2 /dev/sdb{1..2}
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">cat /proc/mdstat&#21629;&#20196;&#26597;&#30475;&#21019;&#24314;&#36827;&#24230;&#65292;&#21040;100%&#26102;&#23601;&#22909;&#20102;</span>
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-2-1-2" name="sec-2-1-2"></a>创建文件系统<br  /><div class="outline-text-4" id="text-2-1-2">
+<div class="org-src-container">
+
+<pre class="src src-sh">mkfs.ext4 /dev/md0
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-2-1-3" name="sec-2-1-3"></a>挂载分区<br  /><div class="outline-text-4" id="text-2-1-3">
+<div class="org-src-container">
+
+<pre class="src src-sh">mount /dev/md0 /mnt
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#33258;&#21160;&#25346;&#36733;,&#21487;&#20197;&#20462;&#25913;&#19968;&#19979;/etc/fstab&#25991;&#20214;,&#28155;&#21152;&#19968;&#34892;!</span>
+/dev/md0 /raid5disk ext3 defaults 0 0
+</pre>
+</div>
+</div>
+</li>
+<li><a id="sec-2-1-4" name="sec-2-1-4"></a>删除一个阵列<br  /><div class="outline-text-4" id="text-2-1-4">
+<div class="org-src-container">
+
+<pre class="src src-sh">umount [&#25346;&#36733;&#30446;&#24405;]
+mdadm -S [RAID&#35774;&#22791;]
+mdadm &#8211;zero-superblock [&#29983;&#25104;RAID&#30340;&#30828;&#30424;&#35774;&#22791;]
+
+umount /raid5
+mdadm -S /dev/md0
+mdadm &#8211;zero-superblock /dev/sda{3..5}
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#26597;&#30475;RAID</span>
+mdadm -D /dev/md0&#25110;cat /proc/mdstat
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">LVM</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">创建</h3>
+<div class="outline-text-3" id="text-3-1">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#21019;&#24314; LVM &#31867;&#22411;&#30340;&#20998;&#21306;</span>
+fdisk /dev/sda
+pvcreate /dev/sdb1
+
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">vgcreate &lt;&#21367;&#32452;&#21517;&gt; &lt;&#29289;&#29702;&#21367;&#35774;&#22791;&#21517;&gt; [&lt;&#29289;&#29702;&#21367;&#35774;&#22791;&#21517;&gt; ...]</span>
+vgcreate vg0 /dev/sda1 /dev/sdb1
+
+lvcreate &#8211;n data &#8211;L +500M vg0 
+lvcreate &#8211;n data &#8211;l 127 vg0
+lvdisplay /dev/vg0/data
+mkfs.ext4 /dev/vg0/data
+mount /dev/vg0/data /mnt
+vi /etc/fstab
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">扩容</h3>
+<div class="outline-text-3" id="text-3-2">
+<div class="org-src-container">
+
+<pre class="src src-sh">lvextend  &#8211;L +200M /dev/vg0/data    &#28155;&#21152;200M&#30340;
+
+e2fsck &#8211;f /dev/vg0/data            &#19979;&#38754;2&#26465;&#26159;&#22312;&#32447;&#25193;&#23481;(&#19981;&#29992;&#20572;&#27490;&#25481;&#25346;&#36733;&#30446;&#24405;)
+resize2fs /dev/vg0/data
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">快照</h3>
+<div class="outline-text-3" id="text-3-3">
+<div class="org-src-container">
+
+<pre class="src src-sh"> lvcreate --size 100M --snapshot --name snap01 /dev/mapper/vg0-pv
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Reverting the modified 'pv' logical volume to the state when the 'snap01' snapshot was taken can be done with</span>
+lvconvert --merge /dev/vg0/snap01
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">Misc</h3>
+<div class="outline-text-3" id="text-3-4">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#21024;&#38500;&#36923;&#36753;&#21367;</span>
+lvremove /dev/vg0/data
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#20241;&#30496;&#21644;&#28608;&#27963;&#21367;&#32452;</span>
+vgchange &#8211;an /dev/vg0   &#20241;&#30496;
+vgchange &#8211;ay /dev/vg0   &#28608;&#27963;
+</pre>
 </div>
 </div>
 </div>
 </div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">More</h2>
+<div class="outline-text-2" id="text-4">
+<ul class="org-ul">
+<li><a href="https://www.howtoforge.com/how-to-set-up-software-raid1-on-a-running-lvm-system-incl-grub2-configuration-ubuntu-10.04-p2">Set Up Software RAID1 On A Running LVM System</a>
+</li>
+<li><a href="http://tldp.org/HOWTO/LVM-HOWTO/index.html">LVM HOWTO</a>
+</li>
+<li><a href="http://blog.csdn.net/u011758585/article/details/50695802">在Raid1+LVM的基础上再添加两块硬盘</a>
+</li>
+<li><a href="https://wiki.archlinux.org/index.php/LVM">LVM wiki in the archlinux</a>
+</li>
+<li><a href="https://www.howtoforge.com/linux_lvm_p6">LVM On RAID1</a>
+</li>
+</ul>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="https://wiki.ubuntu.com/Lvm">https://wiki.ubuntu.com/Lvm</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="https://wiki.archlinux.org/index.php/LVM_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)">https://wiki.archlinux.org/index.php/LVM_(%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87)</a>
+</p></div>
+
+
+</div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-02-25 Sat 00:12</p>
+<p class="date">Created: 2017-02-26 Sun 22:46</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
