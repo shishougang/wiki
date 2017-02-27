@@ -2,9 +2,6 @@
 #+TITLE: IPQ4xx Ethernet Analysis
 #+OPTIONS: num:nil H:2
 
-=/net/ethernet/eth.c=
-=/drivers/net/ethernet/qcom/essedma/=
-=/drivers/net/phy/mdio-ipq40xx.c=
 
 
 * Device tree
@@ -117,13 +114,70 @@
 		};
 #+end_src
 
-* init
-init_module
+* source files
++ =/net/ethernet/eth.c=
++ =/drivers/net/ethernet/qcom/essedma/=
++ =/drivers/net/phy/mdio-ipq40xx.c=
+* =CONFIG_RFS_ACCEL=
+It macro controls the Accelerated RFS(Receive Flow Steering). And the kernel documents
+related it are:
++ [[https://www.kernel.org/doc/Documentation/networking/scaling.txt][Documentation/networking/scaling.txt]]
+
+And other complementary techniques in the Linux networking stack to
+increase parallelism and improve performance for multi-processor
+systems.
+
++ RFS: Receive Flow Steering
++ RSS: Receive Side Scaling
++ RPS: Receive Packet Steering
+
+
+*Receive Flow Steering*
+
+While RPS steers packets solely based on hash, and thus generally
+provides good load distribution, it does not take into account
+application locality. This is accomplished by Receive Flow Steering
+(RFS). The *goal of RFS* is to *increase datacache hitrate* by steering
+kernel processing of packets to the CPU where the application thread
+consuming the packet is running. RFS relies on the same RPS mechanisms
+to enqueue packets onto the backlog of another CPU and to wake up that
+CPU.
+
+*Accelerated RFS*
+
+Accelerated RFS is to RFS what RSS is to RPS: a hardware-accelerated load
+balancing mechanism that uses soft state to steer flows based on where
+the application thread consuming the packets of each flow is running.
+Accelerated RFS should perform better than RFS since packets are sent
+directly to a CPU local to the thread consuming the data. The target CPU
+will either be the same CPU where the application runs, or at least a CPU
+which is local to the application thread’s CPU in the cache
+hierarchy.
+
+* init module
+#+begin_src c
 ret = platform_driver_register(&edma_axi_driver);
+#+end_src
+
+#+begin_src c
+static struct platform_driver edma_axi_driver = {
+	.driver = {
+		.name    = edma_axi_driver_name,
+		.owner   = THIS_MODULE,
+		.of_match_table = edma_of_mtable,
+	},
+	.probe    = edma_axi_probe,
+	.remove   = edma_axi_remove,
+	.shutdown = edma_axi_shutdown,
+};
+#+end_src
+
+* Eth driver probe
 
 
 
-* cc
+
+* net device ops
 
 #+begin_src c
 static const struct net_device_ops edma_axi_netdev_ops = {
@@ -141,49 +195,64 @@ static const struct net_device_ops edma_axi_netdev_ops = {
 	.ndo_change_mtu		= edma_change_mtu,
 };
 #+end_src
+
+
+
+* control table
 #+begin_src c
-static struct platform_driver edma_axi_driver = {
-	.driver = {
-		.name    = edma_axi_driver_name,
-		.owner   = THIS_MODULE,
-		.of_match_table = edma_of_mtable,
+// struct ctl_table_header *edma_ctl_table_hdr;
+// edma_cinfo->edma_ctl_table_hdr = register_net_sysctl(&init_net, "net/edma", edma_table);
+static struct ctl_table edma_table[] = {
+	{
+		.procname       = "default_lan_tag",
+		.data           = &edma_default_ltag,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = edma_change_default_lan_vlan
 	},
-	.probe    = edma_axi_probe,
-	.remove   = edma_axi_remove,
-	.shutdown = edma_axi_shutdown,
+	{
+		.procname       = "default_wan_tag",
+		.data           = &edma_default_wtag,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = edma_change_default_wan_vlan
+	},
+	{
+		.procname       = "weight_assigned_to_queues",
+		.data           = &edma_weight_assigned_to_q,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = edma_weight_assigned_to_queues
+	},
+	{
+		.procname       = "queue_to_virtual_queue_map",
+		.data           = &edma_queue_to_virtual_q,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = edma_queue_to_virtual_queue_map
+	},
+	{
+		.procname       = "enable_stp_rstp",
+		.data           = &edma_enable_rstp,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = edma_enable_stp_rstp
+	},
+	{
+		.procname       = "athr_hdr_eth_type",
+		.data           = &edma_athr_hdr_eth_type,
+		.maxlen         = sizeof(int),
+		.mode           = 0644,
+		.proc_handler   = edma_ath_hdr_eth_type
+	},
+	{}
 };
 #+end_src
 
+* Eth IRQ
++ 16 queues of eth tx
++ 4 queues of eth rx
 
-
-=CONFIG_RFS_ACCEL=
-Accelerated RFS
-# Documentation/networking/scaling.txt
-# https://www.kernel.org/doc/Documentation/networking/scaling.txt
-  RFS: Receive Flow Steering
-  RSS: Receive Side Scaling
-  RPS: Receive Packet Steering
-
-*RFS: Receive Flow Steering*
-While RPS steers packets solely based on hash, and thus generally
-provides good load distribution, it does not take into account
-application locality. This is accomplished by Receive Flow Steering
-(RFS). The *goal of RFS* is to *increase datacache hitrate* by steering
-kernel processing of packets to the CPU where the application thread
-consuming the packet is running. RFS relies on the same RPS mechanisms
-to enqueue packets onto the backlog of another CPU and to wake up that
-CPU.
-
-*Accelerated RFS*
-
-
-Accelerated RFS is to RFS what RSS is to RPS: a hardware-accelerated load
-balancing mechanism that uses soft state to steer flows based on where
-the application thread consuming the packets of each flow is running.
-Accelerated RFS should perform better than RFS since packets are sent
-directly to a CPU local to the thread consuming the data. The target CPU
-will either be the same CPU where the application runs, or at least a CPU
-which is local to the application thread’s CPU in the cache hierarchy.
 #+begin_src sh
 root@OpenWrt:/# cat /proc/interrupts 
            CPU0       CPU1       CPU2       CPU3       
@@ -236,57 +305,7 @@ IPI7:          0          0          0          0  completion interrupts
 Err:          0
 #+end_src
 
-
-#+begin_src c
-// struct ctl_table_header *edma_ctl_table_hdr;
-// edma_cinfo->edma_ctl_table_hdr = register_net_sysctl(&init_net, "net/edma", edma_table);
-static struct ctl_table edma_table[] = {
-	{
-		.procname       = "default_lan_tag",
-		.data           = &edma_default_ltag,
-		.maxlen         = sizeof(int),
-		.mode           = 0644,
-		.proc_handler   = edma_change_default_lan_vlan
-	},
-	{
-		.procname       = "default_wan_tag",
-		.data           = &edma_default_wtag,
-		.maxlen         = sizeof(int),
-		.mode           = 0644,
-		.proc_handler   = edma_change_default_wan_vlan
-	},
-	{
-		.procname       = "weight_assigned_to_queues",
-		.data           = &edma_weight_assigned_to_q,
-		.maxlen         = sizeof(int),
-		.mode           = 0644,
-		.proc_handler   = edma_weight_assigned_to_queues
-	},
-	{
-		.procname       = "queue_to_virtual_queue_map",
-		.data           = &edma_queue_to_virtual_q,
-		.maxlen         = sizeof(int),
-		.mode           = 0644,
-		.proc_handler   = edma_queue_to_virtual_queue_map
-	},
-	{
-		.procname       = "enable_stp_rstp",
-		.data           = &edma_enable_rstp,
-		.maxlen         = sizeof(int),
-		.mode           = 0644,
-		.proc_handler   = edma_enable_stp_rstp
-	},
-	{
-		.procname       = "athr_hdr_eth_type",
-		.data           = &edma_athr_hdr_eth_type,
-		.maxlen         = sizeof(int),
-		.mode           = 0644,
-		.proc_handler   = edma_ath_hdr_eth_type
-	},
-	{}
-};
-#+end_src
-
+* todo
 #+begin_src c
 
 #+end_src

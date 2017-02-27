@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>IPQ4xx Ethernet Analysis</title>
-<!-- 2017-02-27 Mon 23:46 -->
+<!-- 2017-02-28 Tue 00:20 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -67,16 +67,18 @@ for the JavaScript code in this tag.
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">Device tree</a></li>
-<li><a href="#sec-2">init</a></li>
-<li><a href="#sec-3">cc</a></li>
+<li><a href="#sec-2">source files</a></li>
+<li><a href="#sec-3"><code>CONFIG_RFS_ACCEL</code></a></li>
+<li><a href="#sec-4">init module</a></li>
+<li><a href="#sec-5">Eth driver probe</a></li>
+<li><a href="#sec-6">net device ops</a></li>
+<li><a href="#sec-7">control table</a></li>
+<li><a href="#sec-8">Eth IRQ</a></li>
+<li><a href="#sec-9">todo</a></li>
 </ul>
 </div>
 </div>
-<p>
-<code>/net/ethernet/eth.c</code>
-<code>/drivers/net/ethernet/qcom/essedma/</code>
-<code>/drivers/net/phy/mdio-ipq40xx.c</code>
-</p>
+
 
 
 <div id="outline-container-sec-1" class="outline-2">
@@ -202,20 +204,114 @@ mdio@90000 {
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">init</h2>
+<h2 id="sec-2">source files</h2>
 <div class="outline-text-2" id="text-2">
+<ul class="org-ul">
+<li><code>/net/ethernet/eth.c</code>
+</li>
+<li><code>/drivers/net/ethernet/qcom/essedma/</code>
+</li>
+<li><code>/drivers/net/phy/mdio-ipq40xx.c</code>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3"><code>CONFIG_RFS_ACCEL</code></h2>
+<div class="outline-text-2" id="text-3">
 <p>
-init<sub>module</sub>
-ret = platform<sub>driver</sub><sub>register</sub>(&amp;edma<sub>axi</sub><sub>driver</sub>);
+It macro controls the Accelerated RFS(Receive Flow Steering). And the kernel documents
+related it are:
+</p>
+<ul class="org-ul">
+<li><a href="https://www.kernel.org/doc/Documentation/networking/scaling.txt">Documentation/networking/scaling.txt</a>
+</li>
+</ul>
+
+<p>
+And other complementary techniques in the Linux networking stack to
+increase parallelism and improve performance for multi-processor
+systems.
+</p>
+
+<ul class="org-ul">
+<li>RFS: Receive Flow Steering
+</li>
+<li>RSS: Receive Side Scaling
+</li>
+<li>RPS: Receive Packet Steering
+</li>
+</ul>
+
+
+<p>
+<b>Receive Flow Steering</b>
+</p>
+
+<p>
+While RPS steers packets solely based on hash, and thus generally
+provides good load distribution, it does not take into account
+application locality. This is accomplished by Receive Flow Steering
+(RFS). The <b>goal of RFS</b> is to <b>increase datacache hitrate</b> by steering
+kernel processing of packets to the CPU where the application thread
+consuming the packet is running. RFS relies on the same RPS mechanisms
+to enqueue packets onto the backlog of another CPU and to wake up that
+CPU.
+</p>
+
+<p>
+<b>Accelerated RFS</b>
+</p>
+
+<p>
+Accelerated RFS is to RFS what RSS is to RPS: a hardware-accelerated load
+balancing mechanism that uses soft state to steer flows based on where
+the application thread consuming the packets of each flow is running.
+Accelerated RFS should perform better than RFS since packets are sent
+directly to a CPU local to the thread consuming the data. The target CPU
+will either be the same CPU where the application runs, or at least a CPU
+which is local to the application thread’s CPU in the cache
+hierarchy.
 </p>
 </div>
 </div>
 
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">init module</h2>
+<div class="outline-text-2" id="text-4">
+<div class="org-src-container">
+
+<pre class="src src-c">ret = platform_driver_register(&amp;edma_axi_driver);
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">platform_driver</span> <span style="color: #eedd82;">edma_axi_driver</span> = {
+        .driver = {
+                .name    = edma_axi_driver_name,
+                .owner   = THIS_MODULE,
+                .of_match_table = edma_of_mtable,
+        },
+        .probe    = edma_axi_probe,
+        .remove   = edma_axi_remove,
+        .shutdown = edma_axi_shutdown,
+};
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Eth driver probe</h2>
+</div>
 
 
-<div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">cc</h2>
-<div class="outline-text-2" id="text-3">
+
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">net device ops</h2>
+<div class="outline-text-2" id="text-6">
 <div class="org-src-container">
 
 <pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">const</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">net_device_ops</span> <span style="color: #eedd82;">edma_axi_netdev_ops</span> = {
@@ -234,59 +330,78 @@ ret = platform<sub>driver</sub><sub>register</sub>(&amp;edma<sub>axi</sub><sub>d
 };
 </pre>
 </div>
-<div class="org-src-container">
-
-<pre class="src src-c"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">platform_driver</span> <span style="color: #eedd82;">edma_axi_driver</span> = {
-        .driver = {
-                .name    = edma_axi_driver_name,
-                .owner   = THIS_MODULE,
-                .of_match_table = edma_of_mtable,
-        },
-        .probe    = edma_axi_probe,
-        .remove   = edma_axi_remove,
-        .shutdown = edma_axi_shutdown,
-};
-</pre>
+</div>
 </div>
 
 
 
-<p>
-<code>CONFIG_RFS_ACCEL</code>
-Accelerated RFS
-</p>
-<p>
-RFS: Receive Flow Steering
-RSS: Receive Side Scaling
-RPS: Receive Packet Steering
-</p>
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">control table</h2>
+<div class="outline-text-2" id="text-7">
+<div class="org-src-container">
 
-<p>
-<b>RFS: Receive Flow Steering</b>
-While RPS steers packets solely based on hash, and thus generally
-provides good load distribution, it does not take into account
-application locality. This is accomplished by Receive Flow Steering
-(RFS). The <b>goal of RFS</b> is to <b>increase datacache hitrate</b> by steering
-kernel processing of packets to the CPU where the application thread
-consuming the packet is running. RFS relies on the same RPS mechanisms
-to enqueue packets onto the backlog of another CPU and to wake up that
-CPU.
-</p>
+<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">struct ctl_table_header *edma_ctl_table_hdr;</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">edma_cinfo-&gt;edma_ctl_table_hdr = register_net_sysctl(&amp;init_net, "net/edma", edma_table);</span>
+<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">ctl_table</span> <span style="color: #eedd82;">edma_table</span>[] = {
+        {
+                .procname       = <span style="color: #ffa07a;">"default_lan_tag"</span>,
+                .data           = &amp;edma_default_ltag,
+                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
+                .mode           = 0644,
+                .proc_handler   = edma_change_default_lan_vlan
+        },
+        {
+                .procname       = <span style="color: #ffa07a;">"default_wan_tag"</span>,
+                .data           = &amp;edma_default_wtag,
+                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
+                .mode           = 0644,
+                .proc_handler   = edma_change_default_wan_vlan
+        },
+        {
+                .procname       = <span style="color: #ffa07a;">"weight_assigned_to_queues"</span>,
+                .data           = &amp;edma_weight_assigned_to_q,
+                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
+                .mode           = 0644,
+                .proc_handler   = edma_weight_assigned_to_queues
+        },
+        {
+                .procname       = <span style="color: #ffa07a;">"queue_to_virtual_queue_map"</span>,
+                .data           = &amp;edma_queue_to_virtual_q,
+                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
+                .mode           = 0644,
+                .proc_handler   = edma_queue_to_virtual_queue_map
+        },
+        {
+                .procname       = <span style="color: #ffa07a;">"enable_stp_rstp"</span>,
+                .data           = &amp;edma_enable_rstp,
+                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
+                .mode           = 0644,
+                .proc_handler   = edma_enable_stp_rstp
+        },
+        {
+                .procname       = <span style="color: #ffa07a;">"athr_hdr_eth_type"</span>,
+                .data           = &amp;edma_athr_hdr_eth_type,
+                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
+                .mode           = 0644,
+                .proc_handler   = edma_ath_hdr_eth_type
+        },
+        {}
+};
+</pre>
+</div>
+</div>
+</div>
 
-<p>
-<b>Accelerated RFS</b>
-</p>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">Eth IRQ</h2>
+<div class="outline-text-2" id="text-8">
+<ul class="org-ul">
+<li>16 queues of eth tx
+</li>
+<li>4 queues of eth rx
+</li>
+</ul>
 
-
-<p>
-Accelerated RFS is to RFS what RSS is to RPS: a hardware-accelerated load
-balancing mechanism that uses soft state to steer flows based on where
-the application thread consuming the packets of each flow is running.
-Accelerated RFS should perform better than RFS since packets are sent
-directly to a CPU local to the thread consuming the data. The target CPU
-will either be the same CPU where the application runs, or at least a CPU
-which is local to the application thread’s CPU in the cache hierarchy.
-</p>
 <div class="org-src-container">
 
 <pre class="src src-sh">root@OpenWrt:/# cat /proc/interrupts 
@@ -340,60 +455,12 @@ IPI7:          0          0          0          0  completion interrupts
 Err:          0
 </pre>
 </div>
-
-
-<div class="org-src-container">
-
-<pre class="src src-c"><span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">struct ctl_table_header *edma_ctl_table_hdr;</span>
-<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">edma_cinfo-&gt;edma_ctl_table_hdr = register_net_sysctl(&amp;init_net, "net/edma", edma_table);</span>
-<span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">ctl_table</span> <span style="color: #eedd82;">edma_table</span>[] = {
-        {
-                .procname       = <span style="color: #ffa07a;">"default_lan_tag"</span>,
-                .data           = &amp;edma_default_ltag,
-                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
-                .mode           = 0644,
-                .proc_handler   = edma_change_default_lan_vlan
-        },
-        {
-                .procname       = <span style="color: #ffa07a;">"default_wan_tag"</span>,
-                .data           = &amp;edma_default_wtag,
-                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
-                .mode           = 0644,
-                .proc_handler   = edma_change_default_wan_vlan
-        },
-        {
-                .procname       = <span style="color: #ffa07a;">"weight_assigned_to_queues"</span>,
-                .data           = &amp;edma_weight_assigned_to_q,
-                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
-                .mode           = 0644,
-                .proc_handler   = edma_weight_assigned_to_queues
-        },
-        {
-                .procname       = <span style="color: #ffa07a;">"queue_to_virtual_queue_map"</span>,
-                .data           = &amp;edma_queue_to_virtual_q,
-                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
-                .mode           = 0644,
-                .proc_handler   = edma_queue_to_virtual_queue_map
-        },
-        {
-                .procname       = <span style="color: #ffa07a;">"enable_stp_rstp"</span>,
-                .data           = &amp;edma_enable_rstp,
-                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
-                .mode           = 0644,
-                .proc_handler   = edma_enable_stp_rstp
-        },
-        {
-                .procname       = <span style="color: #ffa07a;">"athr_hdr_eth_type"</span>,
-                .data           = &amp;edma_athr_hdr_eth_type,
-                .maxlen         = <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">int</span>),
-                .mode           = 0644,
-                .proc_handler   = edma_ath_hdr_eth_type
-        },
-        {}
-};
-</pre>
+</div>
 </div>
 
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">todo</h2>
+<div class="outline-text-2" id="text-9">
 <div class="org-src-container">
 
 <pre class="src src-c"></pre>
@@ -409,7 +476,7 @@ Err:          0
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-02-27 Mon 23:46</p>
+<p class="date">Created: 2017-02-28 Tue 00:20</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
