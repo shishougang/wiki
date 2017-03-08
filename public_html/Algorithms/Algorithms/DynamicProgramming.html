@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Dynamic Programming</title>
-<!-- 2017-03-07 Tue 22:24 -->
+<!-- 2017-03-08 Wed 22:25 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -74,6 +74,10 @@ for the JavaScript code in this tag.
 <li><a href="#sec-6">Partition a set into two subsets such that the difference of subset sums is minimum</a></li>
 <li><a href="#sec-7">Count number of ways to cover a distance</a></li>
 <li><a href="#sec-8">Find the longest path in a matrix</a></li>
+<li><a href="#sec-9">Subset Sum Problem</a></li>
+<li><a href="#sec-10">Optimal Strategy for a Game</a></li>
+<li><a href="#sec-11">0-1 Knapsack Problem</a></li>
+<li><a href="#sec-12">cc</a></li>
 </ul>
 </div>
 </div>
@@ -465,6 +469,193 @@ Output: 7
 </div>
 <div id="outline-container-sec-8" class="outline-2">
 <h2 id="sec-8">Find the longest path in a matrix</h2>
+<div class="outline-text-2" id="text-8">
+<p>
+Given a n*n matrix where numbers all numbers are distinct and are
+distributed from range 1 to n2, find the maximum length path (starting
+from any cell) such that all cells along the path are increasing order
+with a difference of 1.
+</p>
+
+<p>
+We can move in 4 directions from a given cell (i, j), i.e., we can
+move to (i+1, j) or (i, j+1) or (i-1, j) or (i, j-1) with the
+condition that the adjacent.
+</p>
+
+<p>
+<a href="./Files/find_longest_path.cc">./Files/find_longest_path.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstring&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">n</span> 3
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FindLongestFromACell</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mat</span>[n][n], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dp</span>[n][n]) {
+  <span style="color: #00ffff;">if</span> (i &lt; 0 || i &gt;= n ||
+      j &lt; 0 || j &gt;= n) {
+    <span style="color: #00ffff;">return</span> 0;
+  }
+  <span style="color: #00ffff;">if</span> (dp[i][j] != -1) {
+    <span style="color: #00ffff;">return</span> dp[i][j];
+  }
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Since all numbers are unique and in range from 1 to n*n,</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">there is atmost one possible direction from any cell</span>
+  <span style="color: #00ffff;">if</span> (i &gt; 0 &amp;&amp; (mat[i][j] + 1 == mat[i-1][j])) {
+    <span style="color: #00ffff;">return</span> dp[i][j] = 1 + FindLongestFromACell(i-1, j, mat, dp);
+  }
+  <span style="color: #00ffff;">if</span> (i &lt; n - 1 &amp;&amp; (mat[i][j] + 1 == mat[i+1][j])) {
+    <span style="color: #00ffff;">return</span> dp[i][j] = 1 + FindLongestFromACell(i+1, j, mat, dp);
+  }
+  <span style="color: #00ffff;">if</span> (j &gt; 0 &amp;&amp; (mat[i][j] + 1 == mat[i][j-1])) {
+    <span style="color: #00ffff;">return</span> dp[i][j] = 1 + FindLongestFromACell(i, j-1, mat, dp);
+  }
+  <span style="color: #00ffff;">if</span> (j &lt; n-1 &amp;&amp; ((mat[i][j] + 1) == mat[i][j+1])) {
+    <span style="color: #00ffff;">return</span> dp[i][j] = 1 + FindLongestFromACell(i, j+1, mat, dp);
+  }
+  <span style="color: #00ffff;">return</span> dp[i][j] = 1;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FindLongestPath</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mat</span>[n][n]) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">longest_path</span> = 1;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dp</span>[n][n];
+  memset(dp, -1, <span style="color: #00ffff;">sizeof</span>(dp));
+
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; n; ++i) {
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = 0; j &lt; n; ++j) {
+      <span style="color: #00ffff;">if</span> (dp[i][j] == -1) {
+        FindLongestFromACell(i, j, mat, dp);
+      }
+      longest_path = max(longest_path, dp[i][j]);
+    }
+  }
+  <span style="color: #00ffff;">return</span> longest_path;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mat</span>[n][n] = {{1, 2, 9},
+                   {5, 3, 8},
+                   {4, 6, 7}};
+  cout &lt;&lt; <span style="color: #ffa07a;">"Length of the longest path is "</span>
+       &lt;&lt; FindLongestPath(mat) &lt;&lt; endl;;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">Subset Sum Problem</h2>
+<div class="outline-text-2" id="text-9">
+<p>
+Given a set of non-negative integers, and a value sum, determine if
+there is a subset of the given set with sum equal to given sum.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">Examples: set[] = {3, 34, 4, 12, 5, 2}, <span style="color: #eedd82;">sum</span> = 9
+Output:  True  //There is a subset (4, 5) with sum 9.
+</pre>
+</div>
+
+<p>
+<a href="./Files/subset_sum.cc">./Files/subset_sum.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;vector&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">IsSubsetSum</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">int</span>&gt; &amp;<span style="color: #eedd82;">vec</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">sum</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span> = vec.size();
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dp</span>[len+1][sum+1];
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>, <span style="color: #eedd82;">j</span>;
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt;= len; ++i) {
+    dp[i][0] = <span style="color: #7fffd4;">true</span>;
+  }
+  <span style="color: #00ffff;">for</span> (i = 1; i &lt;= sum; ++i) {
+    dp[0][i] = <span style="color: #7fffd4;">false</span>;
+  }
+  <span style="color: #00ffff;">for</span> (i = 1; i &lt;= len; ++i) {
+    <span style="color: #00ffff;">for</span> (j = 1; j &lt;= sum; ++j) {
+      dp[i][j] = dp[i-1][j];
+      <span style="color: #00ffff;">if</span> (vec[i-1] &lt;= j) {
+        dp[i][j] = dp[i][j] || dp[i-1][j-vec[i-1]];
+      }
+    }
+    <span style="color: #00ffff;">if</span> (dp[i][sum] == <span style="color: #7fffd4;">true</span>) {
+      <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+    }
+  }
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">set</span>[] = {3, 5, 4, 12, 34, 2};
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">sum</span> = 9;
+  <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">vec</span>(<span style="color: #98fb98;">set</span>, set + <span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">set</span>)/<span style="color: #00ffff;">sizeof</span>(<span style="color: #98fb98;">set</span>[0]));
+  <span style="color: #00ffff;">if</span> (IsSubsetSum(vec, sum) == <span style="color: #7fffd4;">true</span>) {
+    cout &lt;&lt; <span style="color: #ffa07a;">"Found a subset with given sum"</span> &lt;&lt; endl;
+  } <span style="color: #00ffff;">else</span> {
+    cout &lt;&lt; <span style="color: #ffa07a;">"No subset with given sum"</span> &lt;&lt; endl;
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10">Optimal Strategy for a Game</h2>
+<div class="outline-text-2" id="text-10">
+<p>
+Problem statement: Consider a row of n coins of values v1 . . . vn,
+where n is even. We play a game against an opponent by alternating
+turns. In each turn, a player selects either the first or last coin
+from the row, removes it from the row permanently, and receives the
+value of the coin. Determine the maximum possible amount of money we
+can definitely win if we move first.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #87cefa;">F</span>(i, j)  represents the maximum value the user can collect from 
+         i<span style="color: #ffa07a;">'th coin to j'</span>th coin.
+
+    F(i, j)  = Max(Vi + min(F(i+2, j), F(i+1, j-1) ), 
+                   Vj + min(F(i+1, j-1), F(i, j-2) )) 
+Base Cases
+    F(i, j)  = Vi           If <span style="color: #eedd82;">j</span> == i
+    F(i, j)  = max(Vi, Vj)  If <span style="color: #eedd82;">j</span> == i+1
+</pre>
+</div>
+</div>
+</div>
+
+
+
+
+<div id="outline-container-sec-11" class="outline-2">
+<h2 id="sec-11">0-1 Knapsack Problem</h2>
+</div>
+
+
+<div id="outline-container-sec-12" class="outline-2">
+<h2 id="sec-12">cc</h2>
+<div class="outline-text-2" id="text-12">
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+</div>
 </div>
 <div id="footnotes">
 <h2 class="footnotes">Footnotes: </h2>
@@ -483,7 +674,7 @@ Output: 7
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-03-07 Tue 22:24</p>
+<p class="date">Created: 2017-03-08 Wed 22:25</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
