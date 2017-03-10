@@ -22,8 +22,23 @@ int FindMinInsertions(char *str, int l, int h) {
   }
 }
 
+
+int FindMinInsertions(char *str, int n) {
+  int dp[n][n];
+  int gap, i, j;
+  memset(dp, 0, sizeof(dp));
+  for (gap = 1; gap < n; ++gap) {
+    for (i = 0, j = gap; j < n; ++i, ++j) {
+      dp[i][j] = (str[i] == str[j]) ? dp[i+1][j-1] :
+                 (min(dp[i][j-1], dp[i+1][j]) + 1);
+    }
+  }
+  return dp[0][n-1];
+}
+
 int main() {
   char str[] = "geeks";
   cout << FindMinInsertions(str, 0, strlen(str)-1) << endl;
+  cout << FindMinInsertions(str, strlen(str)) << endl;
   return 0;
 }
