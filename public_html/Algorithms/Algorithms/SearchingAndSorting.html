@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Searching and Sorting</title>
-<!-- 2017-03-11 Sat 22:18 -->
+<!-- 2017-03-12 Sun 23:22 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -66,15 +66,128 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">cc</a></li>
+<li><a href="#sec-1">KMP Algorithm</a></li>
+<li><a href="#sec-2"></a></li>
+<li><a href="#sec-3">cc</a></li>
 </ul>
 </div>
 </div>
 
-
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">cc</h2>
+<h2 id="sec-1">KMP Algorithm</h2>
 <div class="outline-text-2" id="text-1">
+<p>
+The KMP matching algorithm uses degenerating property (pattern having
+same sub-patterns appearing more than once in the pattern) of the
+pattern and improves the worst case complexity to O(n). The basic idea
+behind KMP’s algorithm is: whenever we detect a mismatch (after some
+matches), we already know some of the characters in the text of next
+window. We take advantage of this information to avoid matching the
+characters that we know will anyway match. 
+</p>
+
+<p>
+<b>Preprocessing Overview:</b>
+</p>
+<ul class="org-ul">
+<li>KMP algorithm does preproceses pat[] and constructs an auxiliary
+<code>lps[]</code> of size m (same as size of pattern) which is used to skip
+characters while matching.
+</li>
+<li><b>name lps indicates longest proper prefix which is also suffix</b>.. A
+proper prefix is prefix with whole string not allowed. For example,
+prefixes of “ABC” are “”, “A”, “AB” and “ABC”. Proper
+prefixes are “”, “A” and “AB”. Suffixes of the string are
+“”, “C”, “BC” and “ABC”.
+</li>
+<li>For each sub-pattern pat[0..i] where i = 0 to m-1, lps[i] stores
+length of the maximum matching proper prefix which is also a suffix
+of the sub-pattern pat[0..i].
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">lps</span>[i] = the longest proper prefix of pat[0..i] 
+           <span style="color: #b0c4de;">which</span> is also a suffix of pat[0..i].
+</pre>
+</div>
+</li>
+</ul>
+
+
+<p>
+<a href="./Files/kmp_search.cc">./Files/kmp_search.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">ComputeLPS</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>&amp; <span style="color: #eedd82;">pat</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">lps</span>) {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">length of the previous longest prefix suffix</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span> = 0;
+  lps[0] = 0;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 1;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span> = pat.size();
+  <span style="color: #00ffff;">while</span> (i &lt; m) {
+    <span style="color: #00ffff;">if</span> (pat[i] == pat[len]) {
+      ++len;
+      lps[i] = len;
+      ++i;
+    } <span style="color: #00ffff;">else</span> {
+      <span style="color: #00ffff;">if</span> (len != 0) {
+        len = lps[len-1];
+      } <span style="color: #00ffff;">else</span> {
+        lps[i] = 0;
+        ++i;
+      }
+    }
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">KMPSearch</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>&amp; <span style="color: #eedd82;">txt</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>&amp; <span style="color: #eedd82;">pat</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span> = pat.size();
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = txt.size();
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">lps</span>[m];
+  ComputeLPS(pat, lps);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = 0;
+  <span style="color: #00ffff;">while</span> (i &lt; n) {
+    <span style="color: #00ffff;">if</span> (txt[i] == pat[j]) {
+      ++i;
+      ++j;
+    }
+    <span style="color: #00ffff;">if</span> (j == m) {
+      cout &lt;&lt; <span style="color: #ffa07a;">"Found pattern at index "</span> &lt;&lt; i - j &lt;&lt; endl;
+      j = lps[j-1];
+    } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (i &lt; n &amp;&amp; txt[i] != pat[j]) {
+      <span style="color: #00ffff;">if</span> (j != 0 ) {
+        j = lps[j-1];
+      } <span style="color: #00ffff;">else</span> {
+        ++i;
+      }
+    }
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">txt</span> = <span style="color: #ffa07a;">"ABABDABACDABABCABAB"</span>;
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">pat</span> = <span style="color: #ffa07a;">"ABABCABAB"</span>;
+  KMPSearch(txt, pat);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2"></h2>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">cc</h2>
+<div class="outline-text-2" id="text-3">
 <p>
 <del>INCLUDE: "./Files/" src c+</del>
 </p>
@@ -94,7 +207,7 @@ for the JavaScript code in this tag.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-03-11 Sat 22:18</p>
+<p class="date">Created: 2017-03-12 Sun 23:22</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

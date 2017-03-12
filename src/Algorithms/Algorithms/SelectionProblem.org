@@ -1,0 +1,159 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Selection Problem
+#+OPTIONS: num:nil H:2
+
+
+
+* K’th Smallest/Largest Element in Unsorted Array
+
+** Method 1 (Simple Solution) 
+
+** Method 2 (Using Min Heap – HeapSelect)
+
+** Method 3 (Using Max-Heap)
+
+** Method 4 (QuickSelect) 
+
+
+*** picks a random pivot element 
+#+begin_src c++
+  int randomPartition(int arr[], int l, int r)
+  {
+      int n = r-l+1;
+      int pivot = rand() % n;
+      swap(&arr[l + pivot], &arr[r]);
+      return partition(arr, l, r);
+  }
+#+end_src
+** Method 5 (Divide, Sort and find)
+#+begin_src sh
+kthSmallest(arr[0..n-1], k)
+
+1) Divide arr[] into ⌈n/5⌉ ceil; groups where size of each group is 5 
+   except possibly the last group which may have less  than 5 elements.  
+
+2) Sort the above created ⌈n/5⌉ groups and find median 
+   of all groups. Create an auxiliary array 'median[]' and store medians 
+   of all ⌈n/5⌉ groups in this median array.
+
+// Recursively call this method to find median of median[0..⌈n/5⌉-1]
+3) medOfMed = kthSmallest(median[0..⌈n/5⌉-1], ⌈n/10⌉)
+
+4) Partition arr[] around medOfMed and obtain its position.
+     pos = partition(arr, n, medOfMed)
+
+5) If pos == k return medOfMed 
+6) If pos < k return kthSmallest(arr[l..pos-1], k) 
+7) If poa > k return kthSmallest(arr[pos+1..r], k-pos+l-1)
+#+end_src
+
+More: [[http://www.geeksforgeeks.org/kth-smallestlargest-element-unsorted-array-set-3-worst-case-linear-time/][Worst Case Linear Time]]
+
+* k-th Smallest Element in the Union of Two Sorted Arrays
+http://leetcode.com/2011/01/find-k-th-smallest-element-in-union-of.html
+
+* Median of two sorted arrays
+http://www.geeksforgeeks.org/median-of-two-sorted-arrays/
+
+* Median of two sorted arrays of different sizes
+
+http://sagarkarnati.wordpress.com/2012/07/07/find-median-of-2-sorted-arrays/
+http://leetcode.com/2011/03/median-of-two-sorted-arrays.html
+http://www.geeksforgeeks.org/median-of-two-sorted-arrays-of-different-sizes/
+http://stackoverflow.com/questions/12584648/understanding-the-algorithm-of-median-of-two-sorted-arrays
+http://blog.unieagle.net/2012/10/04/leetcode%E9%A2%98%E7%9B%AE%EF%BC%9Amedian-of-two-sorted-arrays/
+http://ideone.com/FtqjM
+
+* Random Selection 
+算法平均时间复杂度： O(n) 。
+
+#+begin_src c++
+unsigned int seed = time(NULL);
+int randint(int m, int n) {
+  return m + rand_r(&seed) / (RAND_MAX / (n + 1 - m) + 1);
+}
+
+void RandomSelectionK(int *array, int l, int u, int k) {
+  if (l >= u) {
+    return;
+  }
+  swap(array[l], array[randint(l, u)]);
+  int pivot = array[l];
+  int i = l;
+  int j = u + 1;
+  while (true) {
+    do {
+      ++i;
+    } while (i <= u && array[i] < pivot);
+    do {
+      --j;
+    } while (array[j] > pivot);
+    if (i > j) {
+      break;
+    }
+    swap(array[i], array[j]);
+  }
+  swap(array[l], array[j]);
+  if (j < k) {
+    RandomSelectionK(array, j + 1, u, k);
+  } else if (j > k) {
+    RandomSelectionK(array, l, j - 1, k);
+  }
+}
+#+end_src
+* BFPRT[fn:1]
+在乱序数组中找寻中间元素，算法复杂度O(n).
+
+算法刊登在[[http://people.csail.mit.edu/rivest/pubs/BFPRT73.pdf][Blum et al. (Tarjan)]]。经常称为BFPRT，以论文作者最后名字这和
+组合而来。
+
+#+begin_src c++
+#include <algorithm>
+using std::swap;
+
+void BubbleSort(int *array, int left, int right) {
+  int bound = right;
+  while (1) {
+    int tmp = 0;
+    for (int i = left; i <= right; ++i) {
+      if (array[i] > array[i + 1]) {
+        swap(array[i], array[i + 1]);
+        tmp = i;
+      }
+    }
+    if (tmp == 0) {
+      break;
+    }
+    bound = tmp;
+  }
+}
+  
+int FindMedian(int *array, int left, int right) {
+  const int kGroupSize = 5;
+  int size = right - left + 1;
+  if (size <= kGroupSize) {
+    BubbleSort(array, left, right);
+    return array[(size - 1) / 2 + 1];
+  }
+  int num_group = (size - kGroupSize + 1) / kGroupSize;
+  for (int i = 0; i < num_group; ++i) {
+    int sub_left = left + kGroupSize * i;
+    int sub_right = sub_left + kGroupSize - 1;
+    if (sub_right > right) {
+      sub_right = right;
+    }
+    BubbleSort(array, sub_left, sub_right);
+    swap(array[left + i], array[(right + left - 1) / 2 + 1]);
+  }
+  return FindMedian(array, left, left + num_group - 1);
+}
+#+end_src
+* Tournament Algorithm
+** Find the second-largest element 
+算法复杂度O(n+logn);
+** Find the k-largest element
+算法复杂度O(n+klogn);
+* Footnotes
+
+[fn:1] http://en.wikipedia.org/wiki/Median_of_medians
+
