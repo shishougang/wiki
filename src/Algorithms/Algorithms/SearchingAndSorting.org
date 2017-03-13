@@ -32,7 +32,94 @@ characters that we know will anyway match.
 [[./Files/kmp_search.cc]]
 
 #+INCLUDE: "./Files/kmp_search.cc" src c++
-* 
+* Rabin-Karp Algorithm
+Like the Naive Algorithm, Rabin-Karp algorithm also slides the pattern
+one by one. But unlike the Naive algorithm, Rabin Karp algorithm
+matches the hash value of the pattern with the hash value of current
+substring of text, and if the hash values match then only it starts
+matching individual characters. So Rabin Karp algorithm needs to
+calculate hash values for following strings.
+
+1) Pattern itself.
+2) All the substrings of text of length m.
+
+Rehashing is done using the following formula.
+#+begin_src sh
+hash( txt[s+1 .. s+m] ) = d ( hash( txt[s .. s+m-1]) – txt[s]*h ) + txt[s + m] ) mod q
+
+hash( txt[s .. s+m-1] ) : Hash value at shift s.
+hash( txt[s+1 .. s+m] ) : Hash value at next shift (or shift s+1)
+d: Number of characters in the alphabet
+q: A prime number
+h: d^(m-1)
+#+end_src
+
+The average and best case running time of the Rabin-Karp algorithm is
+*O(n+m)*, but its worst-case time is *O(nm)*. Worst case of Rabin-Karp
+algorithm occurs when all characters of pattern and text are same as
+the hash values of all the substrings of txt[] match with hash value
+of pat[]. 
+
+[[./Files/rabin-karp.cc]]
+
+#+INCLUDE: "./Files/rabin-karp.cc" src c++
+* Z algorithm
+An element Z[i] of Z array stores length of the longest substring
+starting from str[i] which is also a prefix of str[0..n-1]. 
+
+#+begin_src sh
+Examples:
+str  = "aaaaaa"
+Z[]  = {x, 5, 4, 3, 2, 1}
+
+str = "aabaacd"
+Z[] = {x, 1, 0, 2, 1, 0, 0}
+
+str = "abababab"
+Z[] = {x, 0, 6, 0, 4, 0, 2, 0}
+#+end_src
+
+The idea is to concatenate pattern and text, and create a string
+“P$T” where P is pattern, $ is a special character should not be
+present in pattern and text, and T is text. Build the Z array for
+concatenated string. In Z array, if Z value at any point is equal to
+pattern length, then pattern is present at that point.
+
+We can construct Z array in linear time.
+#+begin_src sh
+The idea is to maintain an interval [L, R] which is the interval with max R
+such that [L,R] is prefix substring (substring which is also prefix). 
+
+Steps for maintaining this interval are as follows – 
+
+1) If i > R then there is no prefix substring that starts before i and 
+   ends after i, so we reset L and R and compute new [L,R] by comparing 
+   str[0..] to str[i..] and get Z[i] (= R-L+1).
+
+2) If i <= R then let K = i-L,  now Z[i] >= min(Z[K], R-i+1)  because 
+   str[i..] matches with str[K..] for atleast R-i+1 characters (they are in
+   [L,R] interval which we know is a prefix substring).     
+   Now two sub cases arise – 
+      a) If Z[K] < R-i+1  then there is no prefix substring starting at 
+         str[i] (otherwise Z[K] would be larger)  so  Z[i] = Z[K]  and 
+         interval [L,R] remains same.
+      b) If Z[K] >= R-i+1 then it is possible to extend the [L,R] interval
+         thus we will set L as i and start matching from str[R]  onwards  and
+         get new R then we will update interval [L,R] and calculate Z[i] (=R-L+1).
+#+end_src
+
+[[./Files/z_algorithm.cc]]
+
+#+INCLUDE: "./Files/z_algorithm.cc" src c++
+
+* Aho-Corasick Algorithm for Pattern Searching
+Given an input text and an array of k words, arr[], find all
+occurrences of all words in the input text. Let n be the length of
+text and m be the total number characters in all words, i.e. ~m =
+length(arr[0]) + length(arr[1]) + .. + O(n + length(arr[k-1])~ . Here k
+is total numbers of input words.
+
+
 
 * cc
 

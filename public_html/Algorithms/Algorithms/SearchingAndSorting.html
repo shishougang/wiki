@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Searching and Sorting</title>
-<!-- 2017-03-12 Sun 23:22 -->
+<!-- 2017-03-14 Tue 00:37 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -67,8 +67,10 @@ for the JavaScript code in this tag.
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">KMP Algorithm</a></li>
-<li><a href="#sec-2"></a></li>
-<li><a href="#sec-3">cc</a></li>
+<li><a href="#sec-2">Rabin-Karp Algorithm</a></li>
+<li><a href="#sec-3">Z algorithm</a></li>
+<li><a href="#sec-4">Aho-Corasick Algorithm for Pattern Searching</a></li>
+<li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
 </div>
@@ -182,12 +184,244 @@ of the sub-pattern pat[0..i].
 </div>
 </div>
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2"></h2>
+<h2 id="sec-2">Rabin-Karp Algorithm</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Like the Naive Algorithm, Rabin-Karp algorithm also slides the pattern
+one by one. But unlike the Naive algorithm, Rabin Karp algorithm
+matches the hash value of the pattern with the hash value of current
+substring of text, and if the hash values match then only it starts
+matching individual characters. So Rabin Karp algorithm needs to
+calculate hash values for following strings.
+</p>
+
+<ol class="org-ol">
+<li>Pattern itself.
+</li>
+<li>All the substrings of text of length m.
+</li>
+</ol>
+
+<p>
+Rehashing is done using the following formula.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #b0c4de;">hash</span>( txt[s+1 .. s+m] ) = d ( <span style="color: #b0c4de;">hash</span>( txt[s .. s+m-1]) &#8211; txt[s]*h ) + txt[s + m] ) mod q
+
+<span style="color: #b0c4de;">hash</span>( txt[s .. s+m-1] ) : Hash value at shift s.
+<span style="color: #b0c4de;">hash</span>( txt[s+1 .. s+m] ) : Hash value at next shift (or shift s+1)
+d: Number of characters<span style="color: #00ffff;"> in</span> the alphabet
+q: A prime number
+h: d^(m-1)
+</pre>
 </div>
 
+<p>
+The average and best case running time of the Rabin-Karp algorithm is
+<b>O(n+m)</b>, but its worst-case time is <b>O(nm)</b>. Worst case of Rabin-Karp
+algorithm occurs when all characters of pattern and text are same as
+the hash values of all the substrings of txt[] match with hash value
+of pat[]. 
+</p>
+
+<p>
+<a href="./Files/rabin-karp.cc">./Files/rabin-karp.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">D</span> 256
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Search</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>&amp; <span style="color: #eedd82;">txt</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>&amp; <span style="color: #eedd82;">pat</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">q</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = txt.size();
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span> = pat.size();
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>, <span style="color: #eedd82;">j</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">p</span> = 0; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">hash value for pattern</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span> = 0; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">hash value for txt</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">h</span> = 1;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">The value of h would be "pow(d, M-1)%q"</span>
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt; m-1; ++i) {
+    h = (h * D) % q;
+  }
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt; m; ++i) {
+    p = (D * p + pat[i]) % q;
+    t = (D * t + txt[i]) % q;
+  }
+  <span style="color: #00ffff;">for</span> (i = 0; i &lt;= n - m; ++i) {
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Check the hash values of current window of text</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">and pattern.</span>
+    <span style="color: #00ffff;">if</span> (p == t) {
+      <span style="color: #00ffff;">for</span> (j = 0; j &lt; m; ++j) {
+        <span style="color: #00ffff;">if</span> (txt[i+j] != pat[j]) {
+          <span style="color: #00ffff;">break</span>;
+        }
+      }
+      <span style="color: #00ffff;">if</span> (j == m) {
+        cout &lt;&lt; <span style="color: #ffa07a;">"Pattern found at index "</span> &lt;&lt; i &lt;&lt; endl;
+      }
+    }
+    <span style="color: #00ffff;">if</span> (i &lt; n - m) {
+      t = (D * (t - txt[i] * h) + txt[i+m]) % q;
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">might get negative value of t, converting it</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">to positive</span>
+      <span style="color: #00ffff;">if</span> (t &lt; 0) {
+        t += q;
+      }
+    }
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">txt</span> = <span style="color: #ffa07a;">"GEEKS FOR GEEKS"</span>;
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">pat</span> = <span style="color: #ffa07a;">"GEEK"</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">q</span> = 101; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A prime number</span>
+  Search(txt, pat, q);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">cc</h2>
+<h2 id="sec-3">Z algorithm</h2>
 <div class="outline-text-2" id="text-3">
+<p>
+An element Z[i] of Z array stores length of the longest substring
+starting from str[i] which is also a prefix of str[0..n-1]. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">Examples:
+<span style="color: #eedd82;">str</span>  = <span style="color: #ffa07a;">"aaaaaa"</span>
+Z[]  = {x, 5, 4, 3, 2, 1}
+
+<span style="color: #eedd82;">str</span> = <span style="color: #ffa07a;">"aabaacd"</span>
+Z[] = {x, 1, 0, 2, 1, 0, 0}
+
+<span style="color: #eedd82;">str</span> = <span style="color: #ffa07a;">"abababab"</span>
+Z[] = {x, 0, 6, 0, 4, 0, 2, 0}
+</pre>
+</div>
+
+<p>
+The idea is to concatenate pattern and text, and create a string
+“P$T” where P is pattern, $ is a special character should not be
+present in pattern and text, and T is text. Build the Z array for
+concatenated string. In Z array, if Z value at any point is equal to
+pattern length, then pattern is present at that point.
+</p>
+
+<p>
+We can construct Z array in linear time.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">The idea is to maintain an interval [L, R] which is the interval with max R
+such that [L,R] is prefix substring (substring which is also prefix). 
+
+Steps for maintaining this interval are as follows &#8211; 
+
+1) If i &gt; R then there is no prefix substring that starts before i and 
+   ends after i, so we reset L and R and compute new [L,R] by comparing 
+   str[0..] to str[i..] and get Z[i] (= R-L+1).
+
+2) If i &lt;= R then let <span style="color: #eedd82;">K</span> = i-L,  now Z[i] &gt;= min(Z[K], R-i+1)  because 
+   str[i..] matches with str[K..] for atleast R-i+1 characters (they are<span style="color: #00ffff;"> in</span>
+   [L,R] interval which we know is a prefix substring).     
+   Now two sub cases arise &#8211; 
+      a) If Z[K] &lt; R-i+1  then there is no prefix substring starting at 
+         <span style="color: #eedd82;">str</span>[i] (otherwise Z[K] would be larger)  so  Z[i] = Z[K]  and 
+         interval [L,R] remains same.
+      b) If Z[K] &gt;= R-i+1 then it is possible to extend the [L,R] interval
+         thus we will set L as i and start matching from str[R]  onwards  and
+         get new R then we will update interval [L,R] and calculate Z[i] (=R-L+1).
+</pre>
+</div>
+
+<p>
+<a href="./Files/z_algorithm.cc">./Files/z_algorithm.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">GetZ</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>&amp; <span style="color: #eedd82;">str</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">z</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span> = str.size();
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>, <span style="color: #eedd82;">L</span>, <span style="color: #eedd82;">R</span>;
+  L = R = 0;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 1; i &lt; len; ++i) {
+    <span style="color: #00ffff;">if</span> (i &gt; R) {
+      L = R = i;
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">if i&gt;R nothing matches so we will calculate Z[i] using naive way.</span>
+      <span style="color: #00ffff;">while</span> (R &lt; len &amp;&amp; str[R-L] == str[R]) {
+        ++R;
+      }
+      z[i] = R - L;
+      --R;
+    } <span style="color: #00ffff;">else</span> {
+      k = i - L;
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">if Z[k] is less than remaining interval</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">then Z[i] will be equal to Z[k].</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">For example, str = "ababab", i = 3, R = 5</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">and L = 2</span>
+      <span style="color: #00ffff;">if</span> (z[k] &lt; R - i + 1) {
+        z[i] = z[k];
+      } <span style="color: #00ffff;">else</span> {
+        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">For example str = "aaaaaa" and i = 2, R is 5,</span>
+        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">L is 0</span>
+        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">else start from R and check manually</span>
+        L = i;
+        <span style="color: #00ffff;">while</span> (R &lt; len &amp;&amp; str[R-L] == str[R]) {
+          ++R;
+        }
+        z[i] = R - L;
+        --R;
+      }
+    }
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Search</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>&amp; <span style="color: #eedd82;">text</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>&amp; <span style="color: #eedd82;">pattern</span>) {
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">concat</span> = pattern + <span style="color: #ffa07a;">"$"</span> + text;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">len</span> = concat.size();
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">z</span>[len];
+  GetZ(concat, z);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = pattern.size(); i &lt; len; ++i) {
+    <span style="color: #00ffff;">if</span> (z[i] == pattern.size()) {
+      cout &lt;&lt; <span style="color: #ffa07a;">"Pattern found at index "</span>
+           &lt;&lt; i - pattern.size() - 1 &lt;&lt; endl;
+    }
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">text</span> = <span style="color: #ffa07a;">"GEEKS FOR GEEKS"</span>;
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">pattern</span> = <span style="color: #ffa07a;">"GEEK"</span>;
+  Search(text, pattern);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Aho-Corasick Algorithm for Pattern Searching</h2>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">cc</h2>
+<div class="outline-text-2" id="text-5">
 <p>
 <del>INCLUDE: "./Files/" src c+</del>
 </p>
@@ -207,7 +441,7 @@ of the sub-pattern pat[0..i].
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-03-12 Sun 23:22</p>
+<p class="date">Created: 2017-03-14 Tue 00:37</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
