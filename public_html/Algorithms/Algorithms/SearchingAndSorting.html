@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Searching and Sorting</title>
-<!-- 2017-03-14 Tue 00:37 -->
+<!-- 2017-03-15 Wed 23:36 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -416,8 +416,212 @@ Steps for maintaining this interval are as follows &#8211;
 </div>
 
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">Aho-Corasick Algorithm for Pattern Searching</h2>
+<h2 id="sec-4">Aho-Corasick Algorithm for Pattern Searching<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
+<div class="outline-text-2" id="text-4">
+<p>
+Given an input text and an array of k words, arr[], find all
+occurrences of all words in the input text. Let n be the length of
+text and m be the total number characters in all words, i.e. <code>m =
+length(arr[0]) + length(arr[1]) + .. + O(n + length(arr[k-1])</code> . Here k
+is total numbers of input words.
+</p>
+
+<p>
+If we use a linear time searching algorithm like KMP,  time complexity
+can be written as O(n*k + m).
+</p>
+
+<p>
+<b>Aho-Corasick Algorithm</b> finds all words in O(n + m + z) time where z is
+total number of occurrences of words in text. 
+</p>
+
+<ol class="org-ol">
+<li>Prepocessing : Build an automaton of all words in arr[] The
+automaton has mainly three functions:
+<div class="org-src-container">
+
+<pre class="src src-sh">Go To :   This <span style="color: #00ffff;">function</span> <span style="color: #87cefa;">simply</span> follows edges
+          of Trie of all words<span style="color: #00ffff;"> in</span> arr[]. It is
+          represented as 2D array g[][] where
+          we store next state for current state 
+          and character.
+
+Failure : This <span style="color: #00ffff;">function</span> <span style="color: #87cefa;">stores</span> all edges that are
+          followed when current character doesn<span style="color: #ffa07a;">'t</span>
+<span style="color: #ffa07a;">          have edge in Trie.  It is represented as</span>
+<span style="color: #ffa07a;">          1D array f[] where we store next state for</span>
+<span style="color: #ffa07a;">          current state. </span>
+
+<span style="color: #ffa07a;">Output :  Stores indexes of all words that end at </span>
+<span style="color: #ffa07a;">          current state. It is represented as 1D </span>
+<span style="color: #ffa07a;">          array o[] where we store indexes</span>
+<span style="color: #ffa07a;">          of all matching words as a bitmap for </span>
+<span style="color: #ffa07a;">          current state.</span>
+</pre>
 </div>
+</li>
+
+<li>Matching : Traverse the given text over built automaton to find all
+matching words.
+</li>
+</ol>
+
+<p>
+<b>Preprocessing:</b>
+</p>
+
+<p>
+Build a Tire and extend it into an automaton to support linear time
+matching.
+</p>
+
+<p>
+Example:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Input: <span style="color: #eedd82;">text</span> = <span style="color: #ffa07a;">"ahishers"</span>    
+       arr[] = {<span style="color: #ffa07a;">"he"</span>, <span style="color: #ffa07a;">"she"</span>, <span style="color: #ffa07a;">"hers"</span>, <span style="color: #ffa07a;">"his"</span>}
+
+Output:
+   Word his appears from 1 to 3
+   Word he appears from 4 to 5
+   Word she appears from 3 to 5
+   Word hers appears from 4 to 7
+</pre>
+</div>
+
+<p>
+<img src="./Files/aho-corasick1.png" alt="aho-corasick1.png" />
+<img src="./Files/aho-corasick2.png" alt="aho-corasick2.png" />
+</p>
+
+<p>
+<a href="./Files/aho-corasick_algorithm.cc">./Files/aho-corasick_algorithm.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;queue&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstring&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Max number of states in the matching machine.</span>
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">MAXS</span> = 500;
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Maximum number of characters in input alphabet</span>
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">MAXC</span> = 26;
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Bit i in this mask is one if the word with index i</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">appears when the machine enters this state.</span>
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">out</span>[MAXS];
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">FAILURE FUNCTION</span>
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">f</span>[MAXS];
+
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">g</span>[MAXS][MAXC];
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">BuildMatchingMachine</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>* <span style="color: #eedd82;">arr</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>) {
+  memset(out, 0, <span style="color: #00ffff;">sizeof</span>(out));
+  memset(g, -1, <span style="color: #00ffff;">sizeof</span>(g));
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">states</span> = 1;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; k; ++i) {
+    <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span> &amp;<span style="color: #eedd82;">word</span> = arr[i];
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">current_state</span> = 0;
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = 0; j &lt; word.size(); ++j) {
+      <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ch</span> = word[j] - <span style="color: #ffa07a;">'a'</span>;
+      <span style="color: #00ffff;">if</span> (g[current_state][ch] == -1) {
+        g[current_state][ch] = states++;
+      }
+      current_state = g[current_state][ch];
+    }
+    out[current_state] |= (1 &lt;&lt; i);
+  }
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">For all characters which don't have an edge from</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">root (or state 0) in Trie, add a goto edge to state</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">0 itself</span>
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ch</span> = 0; ch &lt; MAXC; ++ch) {
+    <span style="color: #00ffff;">if</span> (g[0][ch] == -1) {
+      g[0][ch] = 0;
+    }
+  }
+  memset(f, -1, <span style="color: #00ffff;">sizeof</span>(f));
+  <span style="color: #98fb98;">queue</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">q</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ch</span> = 0; ch &lt; MAXC; ++ch) {
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">All nodes of depth 1 have failure function value</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">as 0. For example, in above diagram we move to 0</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">from states 1 and 3.</span>
+    <span style="color: #00ffff;">if</span> (g[0][ch] != 0) {
+      f[g[0][ch]] = 0;
+      q.push(g[0][ch]);
+    }
+  }
+  <span style="color: #00ffff;">while</span> (q.size()) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">state</span> = q.front();
+    q.pop();
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">For the removed state, find failure function for</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">all those characters for which goto function is</span>
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">not defined.</span>
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ch</span> = 0; ch &lt;= MAXC; ++ch) {
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If goto function is defined for character 'ch'</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">and 'state'</span>
+      <span style="color: #00ffff;">if</span> (g[state][ch] != -1) {
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">failure</span> = f[state];
+        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Find the deepest node abeled by proper</span>
+        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">suffix of string from root to current state.</span>
+        <span style="color: #00ffff;">while</span> (g[failure][ch] == -1) {
+          failure = f[failure];
+        }
+        failure = g[failure][ch];
+        f[g[state][ch]] = failure;
+        out[g[state][ch]] |= out[failure];
+        q.push(g[state][ch]);
+      }
+    }
+  }
+}
+
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FindNextState</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">current_state</span>, <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">next</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">answer</span> = current_state;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ch</span> = next - <span style="color: #ffa07a;">'a'</span>;
+  <span style="color: #00ffff;">while</span> (g[answer][ch] == -1) {
+    answer = f[answer];
+  }
+  <span style="color: #00ffff;">return</span> g[answer][ch];
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">SearchWords</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>&amp; <span style="color: #eedd82;">text</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">string</span>* <span style="color: #eedd82;">arr</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>) {
+    BuildMatchingMachine(arr, k);
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">current_state</span> = 0;
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; text.size(); ++i) {
+      current_state = FindNextState(current_state, text[i]);
+      <span style="color: #00ffff;">if</span> (out[current_state] == 0) {
+        <span style="color: #00ffff;">continue</span>;
+      }
+      <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = 0; j &lt; k; ++j) {
+        <span style="color: #00ffff;">if</span> (out[current_state] &amp; (1 &lt;&lt; j)) {
+          cout &lt;&lt; <span style="color: #ffa07a;">"Word "</span> &lt;&lt; arr[j] &lt;&lt; <span style="color: #ffa07a;">" appears from "</span>
+               &lt;&lt; i - arr[j].size() + 1 &lt;&lt; <span style="color: #ffa07a;">" to "</span> &lt;&lt; i &lt;&lt; endl;
+        }
+      }
+    }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">arr</span>[] = {<span style="color: #ffa07a;">"he"</span>, <span style="color: #ffa07a;">"she"</span>, <span style="color: #ffa07a;">"hers"</span>, <span style="color: #ffa07a;">"his"</span>};
+  <span style="color: #98fb98;">string</span> <span style="color: #eedd82;">text</span> = <span style="color: #ffa07a;">"ahishers"</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span> = <span style="color: #00ffff;">sizeof</span>(arr)/<span style="color: #00ffff;">sizeof</span>(arr[0]);
+  SearchWords(text, arr, k);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
 
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">cc</h2>
@@ -438,10 +642,20 @@ Steps for maintaining this interval are as follows &#8211;
 </div>
 </div>
 </div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://www.geeksforgeeks.org/aho-corasick-algorithm-pattern-searching/">http://www.geeksforgeeks.org/aho-corasick-algorithm-pattern-searching/</a>
+</p></div>
+
+
 </div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-03-14 Tue 00:37</p>
+<p class="date">Created: 2017-03-15 Wed 23:36</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
