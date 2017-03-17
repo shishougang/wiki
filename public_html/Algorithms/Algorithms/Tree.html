@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Tree</title>
-<!-- 2017-01-26 Thu 19:38 -->
+<!-- 2017-03-17 Fri 23:36 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -66,19 +66,101 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">cc</a></li>
+<li><a href="#sec-1">Maximum Path Sum in a Binary Tree</a></li>
+<li><a href="#sec-2">cc</a></li>
 </ul>
 </div>
 </div>
 
 
+
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">cc</h2>
+<h2 id="sec-1">Maximum Path Sum in a Binary Tree</h2>
 <div class="outline-text-2" id="text-1">
+<p>
+Given a binary tree, find the maximum path sum. The path may start and
+end at any node in the tree.
+</p>
+
+<p>
+For each node there can be four ways that the max path goes through the node:
+</p>
+<ol class="org-ol">
+<li>Node only
+</li>
+<li>Max path through Left Child + Node
+</li>
+<li>Max path through Right Child + Node
+</li>
+<li>Max path through Left Child + Node + Max path through Right Child
+</li>
+</ol>
+
+<p>
+<a href="./Files/max_path_sum_in_tree.cc">./Files/max_path_sum_in_tree.cc</a>
+</p>
+
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;limits&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Node</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">data</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Node</span>* <span style="color: #eedd82;">left</span>, *<span style="color: #eedd82;">right</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Node</span>* <span style="color: #87cefa;">NewNode</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">data</span>) {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Node</span>* <span style="color: #eedd82;">new_node</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Node</span>;
+  new_node-&gt;data = data;
+  new_node-&gt;left = new_node-&gt;right = <span style="color: #7fffd4;">NULL</span>;
+  <span style="color: #00ffff;">return</span> new_node;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FindMaxHelper</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Node</span>* <span style="color: #eedd82;">root</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">res</span>) {
+  <span style="color: #00ffff;">if</span> (root == <span style="color: #7fffd4;">NULL</span>) {
+    <span style="color: #00ffff;">return</span> 0;
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span> = FindMaxHelper(root-&gt;left, res);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r</span> = FindMaxHelper(root-&gt;right, res);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">This path must include at-most one child of root</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">max_single</span> = max(max(l, r) + root-&gt;data, root-&gt;data);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">max_root</span> = max((l + r + root-&gt;data), max_single);
+  *res = max(*res, max_root);
+  <span style="color: #00ffff;">return</span> max_single;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FindMaxSum</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Node</span>* <span style="color: #eedd82;">root</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">res</span> = <span style="color: #7fffd4;">numeric_limits</span>&lt;<span style="color: #98fb98;">int</span>&gt;::min();
+  FindMaxHelper(root, &amp;res);
+  <span style="color: #00ffff;">return</span> res;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">void</span>) {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">root</span> = NewNode(10);
+  root-&gt;left        = NewNode(2);
+  root-&gt;right       = NewNode(10);
+  root-&gt;left-&gt;left  = NewNode(20);
+  root-&gt;left-&gt;right = NewNode(1);
+  root-&gt;right-&gt;right = NewNode(-25);
+  root-&gt;right-&gt;right-&gt;left   = NewNode(3);
+  root-&gt;right-&gt;right-&gt;right  = NewNode(4);
+  cout &lt;&lt; <span style="color: #ffa07a;">"Max path sum is "</span> &lt;&lt; FindMaxSum(root) &lt;&lt; endl;;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">cc</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+<del>INCLUDE: "./Files/" src c+</del>
+</p>
 
 <div class="org-src-container">
 
@@ -95,7 +177,7 @@ for the JavaScript code in this tag.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-01-26 Thu 19:38</p>
+<p class="date">Created: 2017-03-17 Fri 23:36</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
