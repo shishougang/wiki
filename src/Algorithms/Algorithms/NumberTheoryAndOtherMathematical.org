@@ -3,6 +3,134 @@
 #+OPTIONS: num:nil H:2
 
 
+* Primality Test
+** Optimized
+1. Instead of checking till n, we can check till √n because a larger
+   factor of n must be a multiple of smaller factor that has been
+   already checked
+2. The algorithm can be improved further by observing that all primes
+   are of the form 6k ± 1, with the exception of 2 and 3. This is
+   because all integers can be expressed as (6k + i) for some integer
+   k and for i = -1, 0, 1, 2, 3, or 4; 2 divides (6k + 0), (6k + 2),
+   (6k + 4); and 3 divides (6k + 3). So a more efficient method is to
+   test if n is divisible by 2 or 3, then to check through all the
+   numbers of form 6k ± 1.
+
+#+begin_src c++
+bool isPrime(int n) {
+  if (n <= 1)  return false;
+  if (n <= 3)  return true;
+ 
+  if (n%2 == 0 || n%3 == 0) return false;
+  for (int i = 5; i*i <= n; i = i+6) { 
+    if (n%i == 0 || n%(i+2) == 0) {
+      return false;
+    }
+  }
+  return true;
+}
+#+end_src
+** Fermat’s method
+This method is a probabilistic method and is based on below [[https://en.wikipedia.org/wiki/Fermat's_little_theorem][Fermat’s
+Little Theorem]].
+
+#+begin_src sh
+Fermat's Little Theorem:
+If n is a prime number, then for every a, 1 <= a < n,
+
+an-1 ≡ 1 (mod n)
+ OR 
+an-1 % n = 1 
+ 
+
+Example: Since 5 is prime, 24 ≡ 1 (mod 5) [or 24%5 = 1],
+         34 ≡ 1 (mod 5) and 44 ≡ 1 (mod 5) 
+
+         Since 7 is prime, 26 ≡ 1 (mod 7),
+         36 ≡ 1 (mod 7), 46 ≡ 1 (mod 7) 
+         56 ≡ 1 (mod 7) and 66 ≡ 1 (mod 7) 
+#+end_src
+
+If a given number is prime, then this method always returns true. If
+given number is composite (or non-prime), then it may return true or
+false, but the probability of producing incorrect result for composite
+is low and can be reduced by doing more iterations.
+
+[[./Files/fermat_is_prime.cc]]
+
+#+INCLUDE: "./Files/fermat_is_prime.cc" src c++
+** Miller–Rabin[fn:1]
+This method is a probabilistic method (Like Fermat), but it generally
+preferred over Fermat’s method.
+#+begin_src sh
+// It returns false if n is composite and returns true if n
+// is probably prime.  k is an input parameter that determines
+// accuracy level. Higher value of k indicates more accuracy.
+bool isPrime(int n, int k)
+1) Handle base cases for n < 3
+2) If n is even, return false.
+3) Find an odd number d such that n-1 can be written as d*2r. 
+   Note that since, n is odd (n-1) must be even and r must be 
+   greater than 0.
+4) Do following k times
+     if (millerTest(n, d) == false)
+          return false
+5) Return true.
+
+// This function is called for all k trials. It returns 
+// false if n is composite and returns false if n is probably
+// prime.  
+// d is an odd number such that  d*2r = n-1 for some r >= 1
+bool millerTest(int n, int d)
+1) Pick a random number 'a' in range [2, n-2]
+2) Compute: x = pow(a, d) % n
+3) If x == 1 or x == n-1, return true.
+
+// Below loop mainly runs 'r-1' times.
+4) Do following while d doesn't become n-1.
+     a) x = (x*x) % n.
+     b) If (x == 1) return false.
+     c) If (x == n-1) return true. 
+#+end_src
+
+Example:
+#+begin_src sh
+Input: n = 13,  k = 2.
+
+1) Compute d and r such that d*2r = n-1, 
+     d = 3, r = 2. 
+2) Call millerTest k times.
+
+1st Iteration:
+1) Pick a random number 'a' in range [2, n-2]
+      Suppose a = 4
+
+2) Compute: x = pow(a, d) % n
+     x = 43 % 13 = 12
+
+3) Since x = (n-1), return true.
+
+IInd Iteration:
+1) Pick a random number 'a' in range [2, n-2]
+      Suppose a = 5
+
+2) Compute: x = pow(a, d) % n
+     x = 53 % 13 = 8
+
+3) x neither 1 nor 12.
+
+4) Do following (r-1) = 1 times
+   a) x = (x * x) % 13 = (8 * 8) % 13 = 12
+   b) Since x = (n-1), return true.
+
+Since both iterations return true, we return true.
+#+end_src
+
+[[./Files/miller-rabin_prime.cc]]
+
+#+INCLUDE: "./Files/miller-rabin_prime.cc" src c++
+
+* 
 * 不用除法和求模运算，判断一个数能否被3整除
 ** method1
 这个数的每一个位上的数字加起来后，和为3的倍数。 
@@ -50,3 +178,14 @@ bool parse(unsigned int n)
 #+end_src
 
 * BIT Manipulation
+* cc
+#+begin_src sh
+
+#+end_src
+
++INCLUDE: "./Files/" src c++
+
+* Footnotes
+
+[fn:1] http://www.geeksforgeeks.org/primality-test-set-3-miller-rabin/
+
