@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Tree</title>
-<!-- 2017-03-17 Fri 23:36 -->
+<!-- 2017-03-20 Mon 23:29 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -67,7 +67,8 @@ for the JavaScript code in this tag.
 <div id="text-table-of-contents">
 <ul>
 <li><a href="#sec-1">Maximum Path Sum in a Binary Tree</a></li>
-<li><a href="#sec-2">cc</a></li>
+<li><a href="#sec-2">if a given array can represent Preorder Traversal of Binary Search Tree</a></li>
+<li><a href="#sec-3">cc</a></li>
 </ul>
 </div>
 </div>
@@ -156,8 +157,100 @@ For each node there can be four ways that the max path goes through the node:
 </div>
 
 <div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">cc</h2>
+<h2 id="sec-2">if a given array can represent Preorder Traversal of Binary Search Tree</h2>
 <div class="outline-text-2" id="text-2">
+<p>
+Given an array of numbers, return true if given array can represent
+preorder traversal of a Binary Search Tree, else return false.
+Expected time complexity is O(n).
+</p>
+
+<p>
+A Simple Solution is to do following for every node pre[i] starting
+from first one. Time Complexity of the above solution is O(n<sup>2</sup>)
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">1) Find the first greater value on right side of current node. 
+   Let the index of this node be j. Return true if following 
+   conditions hold. Else return false
+    (i)  All values after the above found greater value are 
+         greater than current node.
+    (ii) Recursive calls for the subarrays pre[i+1..j-1] and 
+         pre[j+1..n-1] also return true.
+</pre>
+</div>
+<p>
+An Efficient Solution can solve this problem in O(n) time. The idea is
+to use a stack.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">1) Create an empty stack.
+2) Initialize root as INT_MIN.
+3) Do following for every element pre[i]
+     a) If pre[i] is smaller than current root, return false.
+     b) Keep removing elements from stack while pre[i] is greater
+        <span style="color: #00ffff;">then</span> stack top. Make the last removed item as new root (to
+        be compared next).
+        At this point, pre[i] is greater than the removed root
+        (That is why if we see a smaller element<span style="color: #00ffff;"> in</span> step a), we 
+        <span style="color: #00ffff;">return </span><span style="color: #b0c4de;">false</span>)
+     c) push pre[i] to stack (All elements<span style="color: #00ffff;"> in</span> stack are<span style="color: #00ffff;"> in</span> decreasing
+        order)
+</pre>
+</div>
+
+<p>
+<a href="./Files/represent_preorder_tree.cc">./Files/represent_preorder_tree.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stack&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;limits&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">CanRepresentBST</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">pre</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>) {
+  <span style="color: #98fb98;">stack</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">stk</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">root</span> = <span style="color: #7fffd4;">numeric_limits</span>&lt;<span style="color: #98fb98;">int</span>&gt;::min();
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; n; ++i) {
+    <span style="color: #00ffff;">if</span> (root &gt; pre[i]) {
+      <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+    }
+    <span style="color: #00ffff;">while</span> (!stk.empty() &amp;&amp; stk.top() &lt; pre[i]) {
+      root = stk.top();
+      stk.pop();
+    }
+    stk.push(pre[i]);
+  }
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pre1</span>[] = {40, 30, 35, 80, 100};
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = <span style="color: #00ffff;">sizeof</span>(pre1)/<span style="color: #00ffff;">sizeof</span>(pre1[0]);
+  CanRepresentBST(pre1, n)? cout &lt;&lt; <span style="color: #ffa07a;">"true\n"</span>:
+      cout &lt;&lt; <span style="color: #ffa07a;">"false\n"</span>;
+
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pre2</span>[] = {40, 30, 35, 20, 80, 100};
+  n = <span style="color: #00ffff;">sizeof</span>(pre2)/<span style="color: #00ffff;">sizeof</span>(pre2[0]);
+  CanRepresentBST(pre2, n)? cout &lt;&lt; <span style="color: #ffa07a;">"true\n"</span>:
+      cout &lt;&lt; <span style="color: #ffa07a;">"false\n"</span>;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">cc</h2>
+<div class="outline-text-2" id="text-3">
 <p>
 <del>INCLUDE: "./Files/" src c+</del>
 </p>
@@ -177,7 +270,7 @@ For each node there can be four ways that the max path goes through the node:
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-03-17 Fri 23:36</p>
+<p class="date">Created: 2017-03-20 Mon 23:29</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
