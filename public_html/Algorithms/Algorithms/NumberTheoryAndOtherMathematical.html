@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Number theory and Other Mathematical</title>
-<!-- 2017-03-20 Mon 23:29 -->
+<!-- 2017-03-24 Fri 22:42 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -118,14 +118,20 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2">Sieve of Eratosthenes</a></li>
 <li><a href="#sec-3">Wilson’s Theorem</a></li>
 <li><a href="#sec-4">Pollard’s Rho Algorithm for Prime Factorization</a></li>
-<li><a href="#sec-5">不用除法和求模运算，判断一个数能否被3整除</a>
+<li><a href="#sec-5">Basic and Extended Euclidean algorithms</a>
 <ul>
-<li><a href="#sec-5-1">method1</a></li>
-<li><a href="#sec-5-2">method2</a></li>
+<li><a href="#sec-5-1">Extended Euclidean Algorithm</a></li>
 </ul>
 </li>
-<li><a href="#sec-6">BIT Manipulation</a></li>
-<li><a href="#sec-7">cc</a></li>
+<li><a href="#sec-6">Modular multiplicative inverse</a></li>
+<li><a href="#sec-7">不用除法和求模运算，判断一个数能否被3整除</a>
+<ul>
+<li><a href="#sec-7-1">method1</a></li>
+<li><a href="#sec-7-2">method2</a></li>
+</ul>
+</li>
+<li><a href="#sec-8">BIT Manipulation</a></li>
+<li><a href="#sec-9">cc</a></li>
 </ul>
 </div>
 </div>
@@ -494,7 +500,7 @@ if and only if
 </div>
 
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">Pollard’s Rho Algorithm for Prime Factorization</h2>
+<h2 id="sec-4">Pollard’s Rho Algorithm for Prime Factorization<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup></h2>
 <div class="outline-text-2" id="text-4">
 <p>
 Given a positive integer n, and that it is composite, find a divisor
@@ -606,13 +612,129 @@ remarkable success was the factorization of eighth Fermat number:
 </div>
 </div>
 </div>
-
 <div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">不用除法和求模运算，判断一个数能否被3整除</h2>
+<h2 id="sec-5">Basic and Extended Euclidean algorithms</h2>
 <div class="outline-text-2" id="text-5">
-</div><div id="outline-container-sec-5-1" class="outline-3">
-<h3 id="sec-5-1">method1</h3>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span> <span style="color: #87cefa;">gcd</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">b</span>) {
+  <span style="color: #00ffff;">if</span> (a == 0)
+    <span style="color: #00ffff;">return</span> b;
+  <span style="color: #00ffff;">return</span> gcd(b % a, a);
+}
+</pre>
+</div>
+</div>
+<div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Extended Euclidean Algorithm</h3>
 <div class="outline-text-3" id="text-5-1">
+<p>
+Extended Euclidean algorithm also finds integer coefficients x and y
+such that:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">ax + <span style="color: #eedd82;">by</span> = gcd(a, b)
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">As seen above, x and y are results for inputs a and b,
+   a.x + b.y = gcd                      ----(1)  
+
+And x1 and y1 are results for inputs b%a and a
+   (b%a).x1 + a.y1 = gcd   
+
+When we put b%<span style="color: #eedd82;">a</span> = (b - (&#8970;b/a&#8971;).a) <span style="color: #00ffff;">in</span> above, 
+we get following. Note that &#8970;b/a&#8971; is floor(a/b)
+
+   (b - (&#8970;b/a&#8971;).a).x1 + a.y1  = gcd
+
+Above equation can also be written as below
+   b.x1 + a.(y1 - (&#8970;b/a&#8971;).x1) = gcd      ---(2)
+
+After comparing coefficients of <span style="color: #ffa07a;">'a'</span> and <span style="color: #ffa07a;">'b'</span><span style="color: #00ffff;"> in</span> (1) and 
+(2), we get following
+   <span style="color: #eedd82;">x</span> = y1 - &#8970;b/a&#8971; * x1
+   <span style="color: #eedd82;">y</span> = x1
+</pre>
+</div>
+
+<p>
+<a href="./Files/gcd_extended.cc">./Files/gcd_extended.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">ax + by = gcd(a, b) */</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">GCDExtended</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">b</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">y</span>) {
+  <span style="color: #00ffff;">if</span> (a == 0) {
+    *x = 0;
+    *y = 1;
+    <span style="color: #00ffff;">return</span> b;
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x1</span>, <span style="color: #eedd82;">y1</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">gcd</span> = GCDExtended(b % a, b, &amp;x1, &amp;y1);
+  *x = y1 - (b / a) * x1;
+  *y = x1;
+  <span style="color: #00ffff;">return</span> gcd;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #eedd82;">y</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span> = 35, <span style="color: #eedd82;">b</span> = 15;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">g</span> = GCDExtended(a, b, &amp;x, &amp;y);
+  printf(<span style="color: #ffa07a;">"gcd(%d, %d) = %d, x = %d, y = %d\n"</span>,
+         a, b, g, x, y);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Modular multiplicative inverse</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+Given two integers ‘a’ and ‘m’, find modular multiplicative
+inverse of ‘a’ under modulo ‘m’.
+</p>
+
+<p>
+The modular multiplicative inverse is an integer ‘x’ such that.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">a x &#8801; 1 (mod m)
+</pre>
+</div>
+<p>
+The value of x should be in {0, 1, 2, … m-1},
+</p>
+
+<p>
+The multiplicative inverse of “a modulo m” exists if and only if a
+and m are relatively prime (i.e., if gcd(a, m) = 1).
+</p>
+</div>
+</div>
+
+
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">不用除法和求模运算，判断一个数能否被3整除</h2>
+<div class="outline-text-2" id="text-7">
+</div><div id="outline-container-sec-7-1" class="outline-3">
+<h3 id="sec-7-1">method1</h3>
+<div class="outline-text-3" id="text-7-1">
 <p>
 这个数的每一个位上的数字加起来后，和为3的倍数。每个位相加，然后不断减去3,看结果是不是等于0
 </p>
@@ -641,9 +763,9 @@ remarkable success was the factorization of eighth Fermat number:
 </div>
 </div>
 
-<div id="outline-container-sec-5-2" class="outline-3">
-<h3 id="sec-5-2">method2</h3>
-<div class="outline-text-3" id="text-5-2">
+<div id="outline-container-sec-7-2" class="outline-3">
+<h3 id="sec-7-2">method2</h3>
+<div class="outline-text-3" id="text-7-2">
 <p>
 3 = 0B11
 如果a能被3整除，a=b×3,则a的最低位和b的最低位相同，a的次低位=b的次低位
@@ -670,12 +792,12 @@ remarkable success was the factorization of eighth Fermat number:
 </div>
 </div>
 
-<div id="outline-container-sec-6" class="outline-2">
-<h2 id="sec-6">BIT Manipulation</h2>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">BIT Manipulation</h2>
 </div>
-<div id="outline-container-sec-7" class="outline-2">
-<h2 id="sec-7">cc</h2>
-<div class="outline-text-2" id="text-7">
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">cc</h2>
+<div class="outline-text-2" id="text-9">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -694,12 +816,16 @@ remarkable success was the factorization of eighth Fermat number:
 <a href="http://www.geeksforgeeks.org/primality-test-set-3-miller-rabin/">http://www.geeksforgeeks.org/primality-test-set-3-miller-rabin/</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="http://www.geeksforgeeks.org/pollards-rho-algorithm-prime-factorization/">http://www.geeksforgeeks.org/pollards-rho-algorithm-prime-factorization/</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-03-20 Mon 23:29</p>
+<p class="date">Created: 2017-03-24 Fri 22:42</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
