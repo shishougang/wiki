@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Number theory and Other Mathematical</title>
-<!-- 2017-03-25 Sat 22:21 -->
+<!-- 2017-03-26 Sun 23:22 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -130,14 +130,26 @@ for the JavaScript code in this tag.
 </ul>
 </li>
 <li><a href="#sec-7">Euler’s Totient Function</a></li>
-<li><a href="#sec-8">不用除法和求模运算，判断一个数能否被3整除</a>
+<li><a href="#sec-8">Chinese Remainder Theorem</a></li>
+<li><a href="#sec-9">Compute nCr % p</a>
 <ul>
-<li><a href="#sec-8-1">method1</a></li>
-<li><a href="#sec-8-2">method2</a></li>
+<li><a href="#sec-9-1">Dynamic Programming</a></li>
+<li><a href="#sec-9-2">Lucas Theorem</a></li>
 </ul>
 </li>
-<li><a href="#sec-9">BIT Manipulation</a></li>
-<li><a href="#sec-10">cc</a></li>
+<li><a href="#sec-10"></a></li>
+<li><a href="#sec-11">不用除法和求模运算，判断一个数能否被3整除</a>
+<ul>
+<li><a href="#sec-11-1">method1</a></li>
+<li><a href="#sec-11-2">method2</a></li>
+</ul>
+</li>
+<li><a href="#sec-12">BIT Manipulation</a>
+<ul>
+<li><a href="#sec-12-1"></a></li>
+</ul>
+</li>
+<li><a href="#sec-13">cc</a></li>
 </ul>
 </div>
 </div>
@@ -829,6 +841,47 @@ multiplicative inverse of ‘a’
 <p>
 <b>Iterative Implementation:</b>
 </p>
+
+<p>
+<a href="./Files/mode_inverse_iterative.cc">./Files/mode_inverse_iterative.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ModInverse</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m0</span> = m, <span style="color: #eedd82;">t</span>, <span style="color: #eedd82;">q</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span> = 0, <span style="color: #eedd82;">y</span> = 1;
+  <span style="color: #00ffff;">if</span> (m == 1) {
+    <span style="color: #00ffff;">return</span> 0;
+  }
+  <span style="color: #00ffff;">while</span> (m &gt; 0) {
+    q = a / m;
+    t = m;
+    m = a % m;
+    a = t;
+
+    t = x;
+    x = y - q * x;
+    y = t;
+  }
+  <span style="color: #00ffff;">if</span> (y &lt; 0) {
+    y += m0;
+  }
+  <span style="color: #00ffff;">return</span> y;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span> = 3, <span style="color: #eedd82;">m</span> = 11;
+  cout &lt;&lt; <span style="color: #ffa07a;">"Modular multiplicative inverse is "</span> &lt;&lt;
+      ModInverse(a, m) &lt;&lt; endl;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
 </div>
 </div>
 
@@ -984,11 +1037,247 @@ of totient functions is below product over all prime factors p of n.
 </div>
 
 <div id="outline-container-sec-8" class="outline-2">
-<h2 id="sec-8">不用除法和求模运算，判断一个数能否被3整除</h2>
+<h2 id="sec-8">Chinese Remainder Theorem</h2>
 <div class="outline-text-2" id="text-8">
-</div><div id="outline-container-sec-8-1" class="outline-3">
-<h3 id="sec-8-1">method1</h3>
-<div class="outline-text-3" id="text-8-1">
+<p>
+We are given two arrays num[0..k-1] and rem[0..k-1]. In num[0..k-1],
+every pair is coprime (gcd for every pair is 1). We need to find
+minimum positive number x such that:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">x % <span style="color: #eedd82;">num</span>[0]    =  rem[0], 
+x % <span style="color: #eedd82;">num</span>[1]    =  rem[1], 
+.......................
+x % <span style="color: #eedd82;">num</span>[k-1]  =  rem[k-1]
+</pre>
+</div>
+
+<p>
+Chinise Remainder Theorem states that there always exists an x that
+satisfies given congruences.<sup><a id="fnr.6" name="fnr.6" class="footref" href="#fn.6">6</a></sup>
+</p>
+
+<p>
+A <b>Naive Approach</b> to find x is to start with 1 and one by one increment
+it and check if dividing it with given elements in num[] produces
+corresponding remainders in rem[]. Once we find such a x, we return
+it.
+</p>
+
+<p>
+An efficient solution is based on below formula.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">x</span> =  ( &#8721; (rem[i]*pp[i]*inv[i]) ) % prod
+   Where 0 &lt;= i &lt;= n-1
+
+rem[i] is given array of remainders
+
+prod is product of all given numbers
+<span style="color: #eedd82;">prod</span> = num[0] * num[1] * ... * num[k-1]
+
+pp[i] is product of all but num[i]
+<span style="color: #eedd82;">pp</span>[i] = prod / num[i]
+
+<span style="color: #eedd82;">inv</span>[i] = Modular Multiplicative Inverse of 
+         pp[i] with respect to num[i]
+</pre>
+</div>
+
+<p>
+<a href="./Files/chinese_remainder.cc">./Files/chinese_remainder.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">ModInverse</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m0</span> = m, <span style="color: #eedd82;">t</span>, <span style="color: #eedd82;">q</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span> = 0, <span style="color: #eedd82;">y</span> = 1;
+  <span style="color: #00ffff;">if</span> (m == 1) {
+    <span style="color: #00ffff;">return</span> 0;
+  }
+  <span style="color: #00ffff;">while</span> (m &gt; 0) {
+    q = a / m;
+    t = m;
+    m = a % m;
+    a = t;
+
+    t = x;
+    x = y - q * x;
+    y = t;
+  }
+  <span style="color: #00ffff;">if</span> (y &lt; 0) {
+    y += m0;
+  }
+  <span style="color: #00ffff;">return</span> y;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FindMinX</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">num</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">rem</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">prod</span> = 1;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; k; ++i) {
+    prod *= num[i];
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">res</span> = 0;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; k; ++i) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">pp</span> = prod / num[i];
+    res += rem[i] * ModInverse(pp, num[i]) * pp;
+  }
+  <span style="color: #00ffff;">return</span> res % prod;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">void</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">num</span>[] = {3, 4, 5};
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rem</span>[] = {2, 3, 1};
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span> = <span style="color: #00ffff;">sizeof</span>(num)/<span style="color: #00ffff;">sizeof</span>(num[0]);
+  cout &lt;&lt; <span style="color: #ffa07a;">"x is "</span> &lt;&lt; FindMinX(num, rem, k);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">Compute nCr % p</h2>
+<div class="outline-text-2" id="text-9">
+<p>
+Given three numbers n, r and p, compute value of nCr mod p.
+Example:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Input:  <span style="color: #eedd82;">n</span> = 10, <span style="color: #eedd82;">r</span> = 2, <span style="color: #eedd82;">p</span> = 13
+Output: 6
+Explanation: 10C2 is 45 and 45 % 13 is 6.
+</pre>
+</div>
+</div>
+
+<div id="outline-container-sec-9-1" class="outline-3">
+<h3 id="sec-9-1">Dynamic Programming</h3>
+<div class="outline-text-3" id="text-9-1">
+<p>
+The idea is to compute nCr using below formula:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #87cefa;">C</span>(n, r) = C(n-1, r-1) + C(n-1, r)
+<span style="color: #87cefa;">C</span>(n, 0) = C(n, n) = 1
+</pre>
+</div>
+<p>
+Time complexity of above solution is O(n*r) and it requires O(n)
+space.
+</p>
+
+<p>
+<a href="./Files/ncr_dynamic.cc">./Files/ncr_dynamic.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstring&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">nCrModP</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">p</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">C</span>[r+1];
+  memset(C, 0, <span style="color: #00ffff;">sizeof</span>(C));
+
+  C[0] = 1;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 1; i &lt;= n; ++i) {
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = min(i, r); j &gt; 0; --j) {
+      C[j] = (C[j] + C[j-1]) % p;
+    }
+  }
+  <span style="color: #00ffff;">return</span> C[r];
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = 10, <span style="color: #eedd82;">r</span> = 2, <span style="color: #eedd82;">p</span> = 13;
+  cout &lt;&lt; <span style="color: #ffa07a;">"Value of nCr % p is "</span> &lt;&lt; nCrModP(n, r, p);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-9-2" class="outline-3">
+<h3 id="sec-9-2">Lucas Theorem</h3>
+<div class="outline-text-3" id="text-9-2">
+<p>
+Lucas Theorem:
+<img src="./Files/lucas-theorem.png" alt="lucas-theorem.png" />
+</p>
+
+<p>
+<b>Time Complexity</b>: Time complexity of this solution is O(p<sup>2</sup> * Logp n).
+There are O(Logp n) digits in base p representation of n. Each of
+these digits is smaller than p, therefore, computations for individual
+digits take O(p<sup>2</sup>). 
+</p>
+
+<p>
+<a href="./Files/ncr_lucas.cc">./Files/ncr_lucas.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstring&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">nCrModPDP</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">p</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">C</span>[r+1];
+  memset(C, 0, <span style="color: #00ffff;">sizeof</span>(C));
+
+  C[0] = 1;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 1; i &lt;= n; ++i) {
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = min(i, r); j &gt; 0; --j) {
+      C[j] = (C[j] + C[j-1]) % p;
+    }
+  }
+  <span style="color: #00ffff;">return</span> C[r];
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">nCrModPLucas</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">p</span>) {
+  <span style="color: #00ffff;">if</span> (r == 0) {
+    <span style="color: #00ffff;">return</span> 1;
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ni</span> = n % p;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">ri</span> = r % p;
+  <span style="color: #00ffff;">return</span> (nCrModPLucas(n/p, r/p, p) *
+          nCrModPDP(ni, ri, p)) % p;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = 1000, <span style="color: #eedd82;">r</span> = 900, <span style="color: #eedd82;">p</span> = 13;
+  cout &lt;&lt; <span style="color: #ffa07a;">"Value of nCr % p is "</span> &lt;&lt; nCrModPLucas(n, r, p);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10"></h2>
+</div>
+<div id="outline-container-sec-11" class="outline-2">
+<h2 id="sec-11">不用除法和求模运算，判断一个数能否被3整除</h2>
+<div class="outline-text-2" id="text-11">
+</div><div id="outline-container-sec-11-1" class="outline-3">
+<h3 id="sec-11-1">method1</h3>
+<div class="outline-text-3" id="text-11-1">
 <p>
 这个数的每一个位上的数字加起来后，和为3的倍数。每个位相加，然后不断减去3,看结果是不是等于0
 </p>
@@ -1017,9 +1306,9 @@ of totient functions is below product over all prime factors p of n.
 </div>
 </div>
 
-<div id="outline-container-sec-8-2" class="outline-3">
-<h3 id="sec-8-2">method2</h3>
-<div class="outline-text-3" id="text-8-2">
+<div id="outline-container-sec-11-2" class="outline-3">
+<h3 id="sec-11-2">method2</h3>
+<div class="outline-text-3" id="text-11-2">
 <p>
 3 = 0B11
 如果a能被3整除，a=b×3,则a的最低位和b的最低位相同，a的次低位=b的次低位
@@ -1046,12 +1335,16 @@ of totient functions is below product over all prime factors p of n.
 </div>
 </div>
 
-<div id="outline-container-sec-9" class="outline-2">
-<h2 id="sec-9">BIT Manipulation</h2>
+<div id="outline-container-sec-12" class="outline-2">
+<h2 id="sec-12">BIT Manipulation</h2>
+<div class="outline-text-2" id="text-12">
+</div><div id="outline-container-sec-12-1" class="outline-3">
+<h3 id="sec-12-1"></h3>
 </div>
-<div id="outline-container-sec-10" class="outline-2">
-<h2 id="sec-10">cc</h2>
-<div class="outline-text-2" id="text-10">
+</div>
+<div id="outline-container-sec-13" class="outline-2">
+<h2 id="sec-13">cc</h2>
+<div class="outline-text-2" id="text-13">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -1086,12 +1379,16 @@ of totient functions is below product over all prime factors p of n.
 <a href="http://e-maxx.ru/algo/euler_function">http://e-maxx.ru/algo/euler_function</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.6" name="fn.6" class="footnum" href="#fnr.6">6</a></sup> <p class="footpara">
+<a href="https://en.wikipedia.org/wiki/Chinese_remainder_theorem">https://en.wikipedia.org/wiki/Chinese_remainder_theorem</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-03-25 Sat 22:21</p>
+<p class="date">Created: 2017-03-26 Sun 23:22</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

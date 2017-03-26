@@ -274,6 +274,10 @@ multiplicative inverse of ‘a’
 
 *Iterative Implementation:*
 
+[[./Files/mode_inverse_iterative.cc]]
+
+#+INCLUDE: "./Files/mode_inverse_iterative.cc" src c++
+
 ** Works when m is prime
 If we know m is prime, then we can also use Fermats’s little theorem
 to find the inverse.
@@ -311,6 +315,81 @@ of totient functions is below product over all prime factors p of n.
 
 #+INCLUDE: "./Files/eduler_totient.cc" src c++
 
+* Chinese Remainder Theorem
+We are given two arrays num[0..k-1] and rem[0..k-1]. In num[0..k-1],
+every pair is coprime (gcd for every pair is 1). We need to find
+minimum positive number x such that:
+#+begin_src sh
+     x % num[0]    =  rem[0], 
+     x % num[1]    =  rem[1], 
+     .......................
+     x % num[k-1]  =  rem[k-1] 
+#+end_src
+
+Chinise Remainder Theorem states that there always exists an x that
+satisfies given congruences.[fn:6]
+
+A *Naive Approach* to find x is to start with 1 and one by one increment
+it and check if dividing it with given elements in num[] produces
+corresponding remainders in rem[]. Once we find such a x, we return
+it.
+
+An efficient solution is based on below formula.
+#+begin_src sh
+x =  ( ∑ (rem[i]*pp[i]*inv[i]) ) % prod
+   Where 0 <= i <= n-1
+
+rem[i] is given array of remainders
+
+prod is product of all given numbers
+prod = num[0] * num[1] * ... * num[k-1]
+
+pp[i] is product of all but num[i]
+pp[i] = prod / num[i]
+
+inv[i] = Modular Multiplicative Inverse of 
+         pp[i] with respect to num[i]
+#+end_src
+
+[[./Files/chinese_remainder.cc]]
+
+#+INCLUDE: "./Files/chinese_remainder.cc" src c++
+* Compute nCr % p
+Given three numbers n, r and p, compute value of nCr mod p.
+Example:
+#+begin_src sh
+Input:  n = 10, r = 2, p = 13
+Output: 6
+Explanation: 10C2 is 45 and 45 % 13 is 6.
+#+end_src
+
+** Dynamic Programming
+The idea is to compute nCr using below formula:
+#+begin_src sh
+   C(n, r) = C(n-1, r-1) + C(n-1, r)
+   C(n, 0) = C(n, n) = 1
+#+end_src
+Time complexity of above solution is O(n*r) and it requires O(n)
+space.
+
+[[./Files/ncr_dynamic.cc]]
+
+#+INCLUDE: "./Files/ncr_dynamic.cc" src c++
+
+** Lucas Theorem
+Lucas Theorem:
+[[./Files/lucas-theorem.png]]
+
+*Time Complexity*: Time complexity of this solution is O(p^2 * Logp n).
+There are O(Logp n) digits in base p representation of n. Each of
+these digits is smaller than p, therefore, computations for individual
+digits take O(p^2). 
+
+[[./Files/ncr_lucas.cc]]
+
+#+INCLUDE: "./Files/ncr_lucas.cc" src c++
+
+* 
 * 不用除法和求模运算，判断一个数能否被3整除
 ** method1
 这个数的每一个位上的数字加起来后，和为3的倍数。 
@@ -358,6 +437,7 @@ bool parse(unsigned int n)
 #+end_src
 
 * BIT Manipulation
+** 
 * cc
 #+begin_src sh
 
@@ -376,4 +456,6 @@ bool parse(unsigned int n)
 [fn:4] https://en.wikipedia.org/wiki/Euler%27s_totient_function
 
 [fn:5] http://e-maxx.ru/algo/euler_function
+
+[fn:6] https://en.wikipedia.org/wiki/Chinese_remainder_theorem
 
