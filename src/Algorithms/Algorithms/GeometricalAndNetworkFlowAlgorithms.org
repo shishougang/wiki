@@ -2,9 +2,110 @@
 #+TITLE: Geometrical and Network Flow Algorithms
 #+OPTIONS: num:nil H:2
 
+* Orientation of 3 ordered points
+Orientation of an ordered triplet of points in the plane can be
++ counterclockwise
++ clockwise
++ colinear
 
+Given three points p1, p2 and p3, find orientation of (p1, p2, p3).
+
+[[./Files/Orientation.png]]
+
+#+begin_src sh
+The idea is to use slope.  
+
+Slope of line segment (p1, p2): σ = (y2 - y1)/(x2 - x1)
+Slope of line segment (p2, p3): τ = (y3 - y2)/(x3 - x2)
+
+If  σ < τ, the orientation is counterclockwise (left turn)
+If  σ = τ, the orientation is collinear
+If  σ > τ, the orientation is clockwise (right turn)
+
+Using above values of σ and τ, we can conclude that, 
+the orientation depends on sign of  below expression: 
+
+(y2 - y1)*(x3 - x2) - (y3 - y2)*(x2 - x1)
+
+Above expression is negative when σ < τ, i.e., counterclockwise
+Above expression is 0 when σ = τ, i.e., collinear
+Above expression is positive when σ > τ, i.e., clockwise
+#+end_src
+
+[[./Files/orientattion.cc]]
+
+#+INCLUDE: "./Files/orientattion.cc" src c++
 
 * Convex Hull
+** Jarvis’s Algorithm
+Given a set of points in the plane. the convex hull of the set is the
+smallest convex polygon that contains all the points of it.
+
+[[./Files/ConvexHull1.png]]
+
+The idea of Jarvis’s Algorithm is simple:
+
+1) Initialize p as leftmost point.
+2) Do following while we don’t come back to the first (or leftmost)
+   point.
+   + The next point q is the point such that the triplet (p, q, r) is
+     counterclockwise for any other point r.
+   + next[p] = q (Store q as next of p in the output convex hull).
+   + p = q (Set p as q for next iteration).
+
+Time Complexity: For every point on the hull we examine all the other
+points to determine the next point. Time complexity is O(m * n) where
+n is number of input points and m is number of output or hull points
+(m <= n). In worst case, time complexity is O(n 2). 
+
+[[./Files/convex_hull_jarvis.cc]]
+
+#+INCLUDE: "./Files/convex_hull_jarvis.cc" src c++
+** Graham Scan
+*Time Complexity:* Let n be the number of input points. The algorithm
+takes O(nLogn) time if we use a O(nLogn) sorting algorithm.
+
+Following is Graham’s algorithm
+
+Let points[0..n-1] be the input array.
+
+1) Find the bottom-most point by comparing y coordinate of all points.
+   If there are two points with same y value, then the point with
+   smaller x coordinate value is considered. Let the bottom-most point
+   be P0. Put P0 at first position in output hull.
+2) Consider the remaining n-1 points and sort them by polor angle in
+   counterclockwise order around =points[0]=. If polor angle of two
+   points is same, then put the nearest point first.
+3) After sorting, check if two or more points have same angle. If two
+   more points have same angle, then remove all same angle points
+   except the point farthest from P0. Let the size of new array be m.
+4) If m is less than 3, return (Convex Hull not possible)
+5) Create an empty stack ‘S’ and push =points[0]=, =points[1]= and
+   =points[2]= to S.
+6) Process remaining m-3 points one by one. Do following for every
+   point ‘points[i]’
+   6.1) Keep removing points from stack while orientation of
+   following 3 points is not counterclockwise (or they don’t make a
+   left turn).
+            1) Point next to top in stack
+            2) Point at the top of stack
+            3) points[i]
+   6.2) Push points[i] to S
+7) Print contents of S
+
+
+*Phase 2 (Accept or Reject Points):* For remaining points, we keep
+track of recent three points, and find the angle formed by them. Let
+the three points be prev(p), curr(c) and next(n). If orientation of
+these points (considering them in same order) is not counterclockwise,
+we discard c, otherwise we keep it.
+
+[[./Files/Graham1.png]]
+
+
+[[./Files/convex_hull_graham.cc]]
+
+#+INCLUDE: "./Files/convex_hull_graham.cc" src c++
 
 
 * cc
