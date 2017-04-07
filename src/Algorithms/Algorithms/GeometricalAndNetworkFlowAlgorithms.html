@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Geometrical and Network Flow Algorithms</title>
-<!-- 2017-04-07 Fri 23:27 -->
+<!-- 2017-04-06 Thu 23:47 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -74,7 +74,7 @@ for the JavaScript code in this tag.
 </ul>
 </li>
 <li><a href="#sec-3">How to check if two given line segments intersect?</a></li>
-<li><a href="#sec-4">Interval Tree</a></li>
+<li><a href="#sec-4"></a></li>
 <li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
@@ -511,80 +511,14 @@ collinear and
 <p><img src="./Files/examplesSpecialCase1.png" alt="examplesSpecialCase1.png" />
 </p>
 </div>
-
-<p>
-<a href="./Files/segments_intersect.cc">./Files/segments_intersect.cc</a>
-</p>
-
-<div class="org-src-container">
-
-<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
-<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
-
-<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Point</span> {
-  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>;
-  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>;
-};
-
-<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">checks if point q lies on line segment 'pr'</span>
-<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">OnSegment</span>(<span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">p</span>, <span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">r</span>) {
-  <span style="color: #00ffff;">if</span> (q.x &lt;= max(p.x, r.x) &amp;&amp; q.x &gt;= min(p.x, r.x) &amp;&amp;
-      q.y &lt;= max(p.y, r.y) &amp;&amp; q.y &gt;= min(p.y, r.y))
-    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
-  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
-}
-
-<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">Orientation</span>(<span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">p</span>, <span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">r</span>) {
-  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">val</span> = (q.y - p.y) * (r.x - q.x) -
-            (q.x - p.x) * (r.y - q.y);
-  <span style="color: #00ffff;">if</span> (val == 0) <span style="color: #00ffff;">return</span> 0; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">colinear</span>
-  <span style="color: #00ffff;">return</span> (val &gt; 0)? 1: 2; <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">clock or counterclock wise</span>
-}
-
-<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">SegmentsIntersect</span>(<span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">p1</span>, <span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">q1</span>, <span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">p2</span>, <span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">q2</span>) {
-  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">o1</span> = Orientation(p1, q1, p2);
-  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">o2</span> = Orientation(p1, q1, q2);
-  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">o3</span> = Orientation(p2, q2, p1);
-  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">o4</span> = Orientation(p2, q2, q1);
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">General case</span>
-  <span style="color: #00ffff;">if</span> (o1 != o2 &amp;&amp; o3 != o4) {
-    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
-  }
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Special Cases</span>
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">p1, q1 and p2 are colinear and p2 lies on segment p1q1</span>
-  <span style="color: #00ffff;">if</span> (o1 == 0 &amp;&amp; OnSegment(p1, p2, q1)) <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">p1, q1 and p2 are colinear and q2 lies on segment p1q1</span>
-  <span style="color: #00ffff;">if</span> (o2 == 0 &amp;&amp; OnSegment(p1, q2, q1)) <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">p2, q2 and p1 are colinear and p1 lies on segment p2q2</span>
-  <span style="color: #00ffff;">if</span> (o3 == 0 &amp;&amp; OnSegment(p2, p1, q2)) <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
-  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">p2, q2 and q1 are colinear and q1 lies on segment p2q2</span>
-  <span style="color: #00ffff;">if</span> (o4 == 0 &amp;&amp; OnSegment(p2, q1, q2)) <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
-  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
-}
-
-
-<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
-  <span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">p1</span> = {1, 1}, <span style="color: #eedd82;">q1</span> = {10, 1};
-  <span style="color: #98fb98;">Point</span> <span style="color: #eedd82;">p2</span> = {1, 2}, <span style="color: #eedd82;">q2</span> = {10, 2};
-  SegmentsIntersect(p1, q1, p2, q2) ? cout &lt;&lt; <span style="color: #ffa07a;">"Yes\n"</span> : cout &lt;&lt; <span style="color: #ffa07a;">"No\n"</span>;
-
-  p1 = {10, 0}, q1 = {0, 10};
-  p2 = {0, 0}, q2 = {10, 10};
-  SegmentsIntersect(p1, q1, p2, q2) ? cout &lt;&lt; <span style="color: #ffa07a;">"Yes\n"</span> : cout &lt;&lt; <span style="color: #ffa07a;">"No\n"</span>;
-
-  p1 = {-5, -5}, q1 = {0, 0};
-  p2 = {1, 1}, q2 = {10, 10};
-  SegmentsIntersect(p1, q1, p2, q2) ? cout &lt;&lt; <span style="color: #ffa07a;">"Yes\n"</span> : cout &lt;&lt; <span style="color: #ffa07a;">"No\n"</span>;
-  <span style="color: #00ffff;">return</span> 0;
-}
-</pre>
 </div>
 </div>
-</div>
+
+
+
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">Interval Tree</h2>
+<h2 id="sec-4"></h2>
 </div>
-
 
 <div id="outline-container-sec-5" class="outline-2">
 <h2 id="sec-5">cc</h2>
@@ -602,7 +536,7 @@ collinear and
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-04-07 Fri 23:27</p>
+<p class="date">Created: 2017-04-06 Thu 23:47</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
