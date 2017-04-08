@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Geometrical and Network Flow Algorithms</title>
-<!-- 2017-04-07 Fri 23:27 -->
+<!-- 2017-04-08 Sat 21:22 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -74,8 +74,10 @@ for the JavaScript code in this tag.
 </ul>
 </li>
 <li><a href="#sec-3">How to check if two given line segments intersect?</a></li>
-<li><a href="#sec-4">Interval Tree</a></li>
-<li><a href="#sec-5">cc</a></li>
+<li><a href="#sec-4">Ford-Fulkerson Algorithm for Maximum Flow Problem</a></li>
+<li><a href="#sec-5">Dinic’s algorithm for Maximum Flow</a></li>
+<li><a href="#sec-6">Find minimum s-t cut in a flow network</a></li>
+<li><a href="#sec-7">cc</a></li>
 </ul>
 </div>
 </div>
@@ -582,13 +584,169 @@ collinear and
 </div>
 </div>
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">Interval Tree</h2>
+<h2 id="sec-4">Ford-Fulkerson Algorithm for Maximum Flow Problem</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+Given a graph which represents a flow network where every edge has a
+capacity. Also given two vertices source ‘s’ and sink ‘t’ in the
+graph, find the maximum possible flow from s to t with following
+constraints:
+</p>
+<ol class="org-ol">
+<li>Flow on an edge doesn’t exceed the given capacity of the edge.
+</li>
+<li>Incoming flow is equal to outgoing flow for every vertex except s
+and t.
+</li>
+</ol>
+
+<p>
+For example, consider the following graph.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/ford_fulkerson1.png" alt="ford_fulkerson1.png" />
+</p>
+</div>
+
+<p>
+The maximum possible flow in the above graph is 23.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/ford_fulkerson2.png" alt="ford_fulkerson2.png" />
+</p>
+</div>
+
+<p>
+<b>Residual Graph</b> of a flow network is a graph which indicates additional
+possible flow. If there is a path from source to sink in residual
+graph, then it is possible to add flow. Every edge of a residual graph
+has a value called <b>residual capacity</b> which is equal to original
+capacity of the edge minus current flow. Residual capacity is
+basically the current capacity of the edge.
+</p>
+
+<p>
+The important thing is, we need to update residual capacities in the
+residual graph. We subtract path flow from all edges along the path
+and we add path flow along the reverse edges We need to add path flow
+along reverse edges because may later need to send flow in reverse
+direction.
+</p>
+
+<p>
+The above implementation of Ford Fulkerson Algorithm is called
+<a href="https://en.wikipedia.org/wiki/Edmonds%E2%80%93Karp_algorithm">Edmonds-Karp Algorithm</a>. The idea of Edmonds-Karp is to use BFS in Ford
+Fulkerson implementation as BFS always picks a path with minimum
+number of edges. When BFS is used, the worst case time complexity can
+be reduced to O(VE2). The above implementation uses adjacency matrix
+representation though where BFS takes O(V2) time, the time complexity
+of the above implementation is O(EV3) 
+</p>
+
+<p>
+<a href="./Files/ford_fulkersion.cc">./Files/ford_fulkersion.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstring&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;queue&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;limits&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">V</span> 6
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Returns true if there is a path from source 's' to sink 'd' in</span>
+<span style="color: #ff7f24;">  residual graph. Also fills parent[] to store the path */</span>
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">Bfs</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">res_graph</span>[V][V], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">d</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">parent</span>) {
+  <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">visited</span>[V];
+  memset(visited, 0, <span style="color: #00ffff;">sizeof</span>(visited));
+  <span style="color: #98fb98;">queue</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">q</span>;
+  q.push(s);
+  visited[s] = <span style="color: #7fffd4;">true</span>;
+  parent[s] = -1;
+  <span style="color: #00ffff;">while</span> (!q.empty()) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = q.front();
+    q.pop();
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt; V; ++v) {
+      <span style="color: #00ffff;">if</span> (visited[v] == <span style="color: #7fffd4;">false</span> &amp;&amp; res_graph[u][v] &gt; 0) {
+        q.push(v);
+        parent[v] = u;
+        visited[v] = <span style="color: #7fffd4;">true</span>;
+      }
+    }
+  }
+  <span style="color: #00ffff;">return</span> (visited[d] == <span style="color: #7fffd4;">true</span>);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FordFulkerson</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[V][V], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">d</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #eedd82;">v</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">res_graph</span>[V][V];
+  <span style="color: #00ffff;">for</span> (u = 0; u &lt; V; ++u) {
+    <span style="color: #00ffff;">for</span> (v = 0; v &lt; V; ++v) {
+      res_graph[u][v] = graph[u][v];
+    }
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">parent</span>[V];
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">max_flow</span> = 0;
+  <span style="color: #00ffff;">while</span> (Bfs(res_graph, s, d, parent)) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">path_flow</span> = <span style="color: #7fffd4;">numeric_limits</span>&lt;<span style="color: #98fb98;">int</span>&gt;::max();
+    <span style="color: #00ffff;">for</span> (v = d; v != s; v = parent[v]) {
+      u = parent[v];
+      path_flow = min(path_flow, res_graph[u][v]);
+    }
+    <span style="color: #00ffff;">for</span> (v = d; v != s; v = parent[v]) {
+      u = parent[v];
+      res_graph[u][v] -= path_flow;
+      res_graph[v][u] += path_flow;
+    }
+    max_flow += path_flow;
+  }
+  <span style="color: #00ffff;">return</span> max_flow;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[V][V] = { {0, 16, 13, 0, 0, 0},
+                      {0, 0, 10, 12, 0, 0},
+                      {0, 4, 0, 0, 14, 0},
+                      {0, 0, 9, 0, 0, 20},
+                      {0, 0, 0, 7, 0, 4},
+                      {0, 0, 0, 0, 0, 0}
+  };
+  cout &lt;&lt; <span style="color: #ffa07a;">"The maximum possible flow is "</span> &lt;&lt; FordFulkerson(graph, 0, 5);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Dinic’s algorithm for Maximum Flow</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+<a href="http://www.geeksforgeeks.org/dinics-algorithm-maximum-flow/">http://www.geeksforgeeks.org/dinics-algorithm-maximum-flow/</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Find minimum s-t cut in a flow network</h2>
 </div>
 
 
-<div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">cc</h2>
-<div class="outline-text-2" id="text-5">
+
+
+
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">cc</h2>
+<div class="outline-text-2" id="text-7">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -602,7 +760,7 @@ collinear and
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-04-07 Fri 23:27</p>
+<p class="date">Created: 2017-04-08 Sat 21:22</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

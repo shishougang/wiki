@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Tree</title>
-<!-- 2017-03-20 Mon 23:29 -->
+<!-- 2017-04-08 Sat 21:22 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -68,11 +68,12 @@ for the JavaScript code in this tag.
 <ul>
 <li><a href="#sec-1">Maximum Path Sum in a Binary Tree</a></li>
 <li><a href="#sec-2">if a given array can represent Preorder Traversal of Binary Search Tree</a></li>
-<li><a href="#sec-3">cc</a></li>
+<li><a href="#sec-3">Interval Tree</a></li>
+<li><a href="#sec-4"></a></li>
+<li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
 </div>
-
 
 
 <div id="outline-container-sec-1" class="outline-2">
@@ -249,8 +250,149 @@ to use a stack.
 </div>
 
 <div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">cc</h2>
+<h2 id="sec-3">Interval Tree</h2>
 <div class="outline-text-2" id="text-3">
+<p>
+Consider a situation where we have a set of intervals and we need
+following operations to be implemented efficiently. 
+</p>
+
+<ol class="org-ol">
+<li>Add an interval
+</li>
+<li>Remove an interval
+</li>
+<li>Given an interval x, find if x overlaps with any of the existing
+intervals.
+</li>
+</ol>
+
+<p>
+Every node of Interval Tree stores following information.
+</p>
+<ol class="org-ol">
+<li>i: An interval which is represented as a pair [low, high]
+</li>
+<li>max: Maximum high value in subtree rooted with this node.
+</li>
+<li>The low value of an interval is used as key to maintain order in
+BST. 
+</li>
+</ol>
+
+<p>
+The main operation is to search for an overlapping interval. Following
+is algorithm for searching an overlapping interval x in an Interval
+tree rooted with root.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Interval overlappingIntervalSearch(root, x)
+1) If x overlaps with root<span style="color: #ffa07a;">'s interval, return the root'</span>s interval.
+
+2) If left child of root is not empty and the max <span style="color: #00ffff;"> in</span> left child 
+is greater than x<span style="color: #ffa07a;">'s low value, recur for left child</span>
+
+<span style="color: #ffa07a;">3) Else recur for right child.</span>
+</pre>
+</div>
+
+<p>
+<a href="./Files/interval_tree.cc">./Files/interval_tree.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Interval</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">low</span>, <span style="color: #eedd82;">high</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Node</span> {
+  <span style="color: #98fb98;">Interval</span> *<span style="color: #eedd82;">i</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">max</span>;
+  <span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">left</span>, *<span style="color: #eedd82;">right</span>;
+};
+
+<span style="color: #98fb98;">Node</span>* <span style="color: #87cefa;">NewNode</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">Interval</span>&amp; <span style="color: #eedd82;">i</span>) {
+  <span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">temp</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Node</span>;
+  temp-&gt;i = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Interval</span>(i);
+  temp-&gt;max = i.high;
+  temp-&gt;left = temp-&gt;right = <span style="color: #7fffd4;">NULL</span>;
+  <span style="color: #00ffff;">return</span> temp;
+}
+
+<span style="color: #98fb98;">Node</span>* <span style="color: #87cefa;">Insert</span>(<span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">root</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">Interval</span> &amp;<span style="color: #eedd82;">i</span>) {
+  <span style="color: #00ffff;">if</span> (root == <span style="color: #7fffd4;">NULL</span>) {
+    <span style="color: #00ffff;">return</span> NewNode(i);
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span> = root-&gt;i-&gt;low;
+  <span style="color: #00ffff;">if</span> (i.low &lt; l) {
+    root-&gt;left = Insert(root-&gt;left, i);
+  } <span style="color: #00ffff;">else</span> {
+    root-&gt;right = Insert(root-&gt;right, i);
+  }
+  <span style="color: #00ffff;">if</span> (root-&gt;max &lt; i.high) {
+    root-&gt;max = i.high;
+  }
+  <span style="color: #00ffff;">return</span> root;
+}
+
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">Overlap</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">Interval</span> &amp;<span style="color: #eedd82;">i1</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">Interval</span> &amp;<span style="color: #eedd82;">i2</span>) {
+  <span style="color: #00ffff;">if</span> (i2.low &gt;= i1.low &amp;&amp; i2.low &lt;= i1.high) {
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+  } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (i2.high &gt;= i1.low &amp;&amp; i2.high &lt;= i1.high) {
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+  }
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+}
+
+<span style="color: #98fb98;">Interval</span>* <span style="color: #87cefa;">OverlapSearch</span>(<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">root</span>, <span style="color: #00ffff;">const</span> <span style="color: #98fb98;">Interval</span> &amp;<span style="color: #eedd82;">i</span>) {
+  <span style="color: #00ffff;">if</span> (root == <span style="color: #7fffd4;">NULL</span>) {
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">NULL</span>;
+  }
+  <span style="color: #00ffff;">if</span> (Overlap(*(root-&gt;i), i)) {
+    <span style="color: #00ffff;">return</span> root-&gt;i;
+  }
+  <span style="color: #00ffff;">if</span> (root-&gt;left != <span style="color: #7fffd4;">NULL</span> &amp;&amp; root-&gt;left-&gt;max &gt;= i.low) {
+    <span style="color: #00ffff;">return</span> OverlapSearch(root-&gt;left, i);
+  }
+  <span style="color: #00ffff;">return</span> OverlapSearch(root-&gt;right, i);
+}
+
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">Interval</span> <span style="color: #eedd82;">ints</span>[] = {{15, 20}, {10, 30}, {17, 19},
+                     {5, 20}, {12, 15}, {30, 40}};
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = <span style="color: #00ffff;">sizeof</span>(ints)/<span style="color: #00ffff;">sizeof</span>(ints[0]);
+  <span style="color: #98fb98;">Node</span> *<span style="color: #eedd82;">root</span> = <span style="color: #7fffd4;">NULL</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; n; i++) {
+    root = Insert(root, ints[i]);
+  }
+  <span style="color: #98fb98;">Interval</span> <span style="color: #eedd82;">x</span> = {6, 7};
+  cout &lt;&lt; <span style="color: #ffa07a;">"Searching for interval ["</span> &lt;&lt; x.low &lt;&lt; <span style="color: #ffa07a;">","</span> &lt;&lt; x.high &lt;&lt; <span style="color: #ffa07a;">"]"</span>;
+  <span style="color: #98fb98;">Interval</span> *<span style="color: #eedd82;">res</span> = OverlapSearch(root, x);
+  <span style="color: #00ffff;">if</span> (res == <span style="color: #7fffd4;">NULL</span>) {
+    cout &lt;&lt; <span style="color: #ffa07a;">"\nNo Overlapping Interval"</span>;
+  } <span style="color: #00ffff;">else</span> {
+    cout &lt;&lt; <span style="color: #ffa07a;">"\nOverlaps with ["</span> &lt;&lt; res-&gt;low &lt;&lt; <span style="color: #ffa07a;">", "</span> &lt;&lt; res-&gt;high &lt;&lt; <span style="color: #ffa07a;">"]"</span>;
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4"></h2>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">cc</h2>
+<div class="outline-text-2" id="text-5">
 <p>
 <del>INCLUDE: "./Files/" src c+</del>
 </p>
@@ -270,7 +412,7 @@ to use a stack.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-03-20 Mon 23:29</p>
+<p class="date">Created: 2017-04-08 Sat 21:22</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

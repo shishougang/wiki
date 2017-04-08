@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Number theory and Other Mathematical</title>
-<!-- 2017-04-06 Thu 23:38 -->
+<!-- 2017-04-08 Sat 21:22 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -160,7 +160,9 @@ for the JavaScript code in this tag.
 <li><a href="#sec-15-2">Using Binomial Coefficient</a></li>
 </ul>
 </li>
-<li><a href="#sec-16">cc</a></li>
+<li><a href="#sec-16">Matrix Exponentiation</a></li>
+<li><a href="#sec-17"></a></li>
+<li><a href="#sec-18">cc</a></li>
 </ul>
 </div>
 </div>
@@ -1972,8 +1974,117 @@ We can also use below formula to find nth catalan number in O(n) time.
 </div>
 </div>
 <div id="outline-container-sec-16" class="outline-2">
-<h2 id="sec-16">cc</h2>
+<h2 id="sec-16">Matrix Exponentiation</h2>
 <div class="outline-text-2" id="text-16">
+<p>
+Find n’th Fibonacci Number in O(Log n) time using Matrix
+Exponentiation. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">For solving the matrix exponentiation we are assuming a
+linear recurrence equation like below:
+
+<span style="color: #87cefa;">F</span>(n) = a*F(n-1) + b*F(n-2) + c*F(n-3)   <span style="color: #00ffff;">for</span> n &gt;= 3 
+                                 . . . . . Equation (1)
+where a, b and c are constants. 
+
+For this recurrence relation it depends on three previous values. 
+Now we will try to represent Equation (1) <span style="color: #00ffff;">in</span> terms of matrix. 
+
+[First Matrix] = [Second matrix] * [Third Matrix]
+| F(n)   |     =   Matrix <span style="color: #ffa07a;">'C'</span>    *  | F(n-1) |
+| F(n-1) |                          | F(n-2) |
+| F(n-2) |                          | F(n-3) |
+
+[First Matrix]  [Second matrix]       [Third Matrix]
+| F(n)   |  =  | a b c |  *           | F(n-1) |
+| F(n-1) |     | 1 0 0 |              | F(n-2) |
+| F(n-2) |     | 0 1 0 |              | F(n-3) |
+
+| F(n)   |  =  [ | a b c | ] ^ (n-2)   *  | F(2) |
+| F(n-1) |     [ | 1 0 0 | ]              | F(1) |
+| F(n-2) |     [ | 0 1 0 | ]              | F(0) |
+
+Putting <span style="color: #eedd82;">a</span> = 1, <span style="color: #eedd82;">b</span> = 1 and <span style="color: #eedd82;">c</span> = 1<span style="color: #00ffff;"> in</span> above formula
+
+| F(n)   |  =  [ | 1 1 1 | ] ^ (n-2)   *  | F(2) |
+| F(n-1) |     [ | 1 0 0 | ]              | F(1) |
+| F(n-2) |     [ | 0 1 0 | ]              | F(0) |
+</pre>
+</div>
+
+<p>
+<a href="./Files/matrix_exponentiation.cc">./Files/matrix_exponentiation.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">N</span> 3
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Multiply</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>[N][N], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">b</span>[N][N]) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">mul</span>[N][N];
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; N; ++i) {
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = 0; j &lt; N; ++j) {
+      mul[i][j] = 0;
+      <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span> = 0; k &lt; N; ++k) {
+        mul[i][j] += a[i][k] * b[k][j];
+      }
+    }
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; N; ++i) {
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = 0; j &lt; N; ++j) {
+      a[i][j] = mul[i][j];
+    }
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">Power</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">F</span>[3][3], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>) {
+  <span style="color: #00ffff;">if</span> (n == 1) {
+    <span style="color: #00ffff;">return</span> F[0][0] + F[0][1];
+  }
+  Power(F, n / 2);
+  Multiply(F, F);
+  <span style="color: #00ffff;">if</span> (n % 2 != 0) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">M</span>[3][3] = {{1,1,1}, {1,0,0}, {0,1,0}};
+    Multiply(F, M);
+  }
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">F(0) = 0, F(1) = 1, F(2) = 1</span>
+  <span style="color: #00ffff;">return</span> F[0][0] + F[0][1];
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">f(n) = f(n-1) + f(n-2) + f(n-3), n&gt;=3</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Base Cases :</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">f(0) = 0, f(1) = 1, f(2) = 1</span>
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">FindNth</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>) {
+  <span style="color: #00ffff;">if</span> (n == 0) {
+    <span style="color: #00ffff;">return</span> 0;
+  } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (n == 1 || n == 2) {
+    <span style="color: #00ffff;">return</span> 1;
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">F</span>[3][3] = {{1,1,1}, {1,0,0}, {0,1,0}} ;
+  <span style="color: #00ffff;">return</span> Power(F, n-2);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = 5;
+  cout &lt;&lt; <span style="color: #ffa07a;">"F(5) is "</span> &lt;&lt; FindNth(n);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-17" class="outline-2">
+<h2 id="sec-17"></h2>
+</div>
+<div id="outline-container-sec-18" class="outline-2">
+<h2 id="sec-18">cc</h2>
+<div class="outline-text-2" id="text-18">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -2017,7 +2128,7 @@ We can also use below formula to find nth catalan number in O(n) time.
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-04-06 Thu 23:38</p>
+<p class="date">Created: 2017-04-08 Sat 21:22</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
