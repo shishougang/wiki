@@ -278,18 +278,125 @@ constraints:
 2) Incoming flow is equal to outgoing flow for every vertex except s
    and t.
 
+For example, consider the following graph.
+
+[[./Files/ford_fulkerson1.png]]
+
+The maximum possible flow in the above graph is 23.
+
+[[./Files/ford_fulkerson2.png]]
+
+*Residual Graph* of a flow network is a graph which indicates additional
+possible flow. If there is a path from source to sink in residual
+graph, then it is possible to add flow. Every edge of a residual graph
+has a value called *residual capacity* which is equal to original
+capacity of the edge minus current flow. Residual capacity is
+basically the current capacity of the edge.
+
+The important thing is, we need to update residual capacities in the
+residual graph. We subtract path flow from all edges along the path
+and we add path flow along the reverse edges We need to add path flow
+along reverse edges because may later need to send flow in reverse
+direction.
+
+The above implementation of Ford Fulkerson Algorithm is called
+[[https://en.wikipedia.org/wiki/Edmonds%E2%80%93Karp_algorithm][Edmonds-Karp Algorithm]]. The idea of Edmonds-Karp is to use BFS in Ford
+Fulkerson implementation as BFS always picks a path with minimum
+number of edges. When BFS is used, the worst case time complexity can
+be reduced to O(VE^2). The above implementation uses adjacency matrix
+representation though where BFS takes O(V^2) time, the time complexity
+of the above implementation is O(EV^3) 
+
 [[./Files/ford-fulkerson.cc]]
 
 #+INCLUDE: "./Files/ford-fulkerson.cc" src c++
 
+* Find minimum s-t cut in a flow network
+In a flow network, an s-t cut is a cut that requires the source ‘s’
+and the sink ‘t’ to be in different subsets, and it consists of
+edges going from the source’s side to the sink’s side. The capacity
+of an s-t cut is defined by the sum of capacity of each edge in the
+cut-set.[fn:2]
+
+The problem discussed here is to find minimum capacity s-t cut of the
+given network. Expected output is all edges of the minimum cut.
+
+For example, in the following flow network, example s-t cuts are {{0
+,1}, {0, 2}}, {{0, 2}, {1, 2}, {1, 3}}, etc. The minimum s-t cut is
+{{1, 3}, {4, 3}, {4 5}} which has capacity as 12+7+4 = 23.
+
+[[./Files/minCut.png]]
+
+Like Maximum Bipartite Matching, this is another problem which can
+solved using Ford-Fulkerson Algorithm. This is based on max-flow
+min-cut theorem.
+
+The max-flow min-cut theorem states that in a flow network, the amount
+of maximum flow is equal to capacity of the minimum cut. See CLRS book
+for proof of this theorem.
+
+From Ford-Fulkerson, we get capacity of minimum cut. How to print all
+edges that form the minimum cut? The idea is to use residual graph.
+
+Following are steps to print all edges of minimum cut.
+1) Run Ford-Fulkerson algorithm and consider the final residual graph.
+2) Find the set of vertices that are reachable from source in the
+   residual graph.
+3) All edges which are from a reachable vertex to non-reachable vertex
+   are minimum cut edges. Print all such edges.
+
+[[./Files/min_cut_flow.cc]]
+
+#+INCLUDE: "./Files/min_cut_flow.cc" src c++
+
+* Dinic’s algorithm for Maximum Flow
+http://www.geeksforgeeks.org/dinics-algorithm-maximum-flow/
+
+http://e-maxx.ru/algo/dinic
+
+* Check whether a given graph is Bipartite or not
+A [[https://en.wikipedia.org/wiki/Bipartite_graph][Bipartite Graph]] is a graph whose vertices can be divided into two
+independent sets, U and V such that every edge (u, v) either connects
+a vertex from U to V or a vertex from V to U. In other words, for
+every edge (u, v), either u belongs to U and v to V, or u belongs to V
+and v to U. We can also say that there is no edge that connects
+vertices of same set.
+
+[[./Files/Bipartite1.png]]
+
+A bipartite graph is possible if the graph coloring is possible using
+two colors such that vertices in a set are colored with the same
+color.
+
+Following is a simple algorithm to find out whether a given graph is
+Birpartite or not using Breadth First Search (BFS).
+1. Assign RED color to the source vertex (putting into set U).
+2. Color all the neighbors with BLUE color (putting into set V).
+3. While assigning colors, if we find a neighbor which is colored with
+   same color as current vertex, then the graph cannot be colored with
+   2 vertices (or graph is not Bipartite)
+
+
+
+* Maximum Bipartite Matching
+
+
+* Hopcroft–Karp Algorithm for Maximum Matching
+
+
 * cc
-#+begin_src c++
+#+begin_src sh
 
 #+end_src
+
++INCLUDE: "./Files/" src c++
+
 
 * Footnotes
 
 [fn:1] http://www.ics.uci.edu/~eppstein/161/960220.html#sca
+
+[fn:2] http://en.wikipedia.org/wiki/Cut_(graph_theory)
 
 
 

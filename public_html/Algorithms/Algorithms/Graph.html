@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Graph Algorithms</title>
-<!-- 2017-03-05 Sun 22:57 -->
+<!-- 2017-04-09 Sun 23:21 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -87,7 +87,12 @@ for the JavaScript code in this tag.
 </ul>
 </li>
 <li><a href="#sec-12">Ford-Fulkerson Algorithm for Maximum Flow Problem</a></li>
-<li><a href="#sec-13">cc</a></li>
+<li><a href="#sec-13">Find minimum s-t cut in a flow network</a></li>
+<li><a href="#sec-14">Dinic’s algorithm for Maximum Flow</a></li>
+<li><a href="#sec-15">Check whether a given graph is Bipartite or not</a></li>
+<li><a href="#sec-16">Maximum Bipartite Matching</a></li>
+<li><a href="#sec-17">Hopcroft–Karp Algorithm for Maximum Matching</a></li>
+<li><a href="#sec-18">cc</a></li>
 </ul>
 </div>
 </div>
@@ -1455,6 +1460,53 @@ and t.
 </ol>
 
 <p>
+For example, consider the following graph.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/ford_fulkerson1.png" alt="ford_fulkerson1.png" />
+</p>
+</div>
+
+<p>
+The maximum possible flow in the above graph is 23.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/ford_fulkerson2.png" alt="ford_fulkerson2.png" />
+</p>
+</div>
+
+<p>
+<b>Residual Graph</b> of a flow network is a graph which indicates additional
+possible flow. If there is a path from source to sink in residual
+graph, then it is possible to add flow. Every edge of a residual graph
+has a value called <b>residual capacity</b> which is equal to original
+capacity of the edge minus current flow. Residual capacity is
+basically the current capacity of the edge.
+</p>
+
+<p>
+The important thing is, we need to update residual capacities in the
+residual graph. We subtract path flow from all edges along the path
+and we add path flow along the reverse edges We need to add path flow
+along reverse edges because may later need to send flow in reverse
+direction.
+</p>
+
+<p>
+The above implementation of Ford Fulkerson Algorithm is called
+<a href="https://en.wikipedia.org/wiki/Edmonds%E2%80%93Karp_algorithm">Edmonds-Karp Algorithm</a>. The idea of Edmonds-Karp is to use BFS in Ford
+Fulkerson implementation as BFS always picks a path with minimum
+number of edges. When BFS is used, the worst case time complexity can
+be reduced to O(VE<sup>2</sup>). The above implementation uses adjacency matrix
+representation though where BFS takes O(V<sup>2</sup>) time, the time complexity
+of the above implementation is O(EV<sup>3</sup>) 
+</p>
+
+<p>
 <a href="./Files/ford-fulkerson.cc">./Files/ford-fulkerson.cc</a>
 </p>
 
@@ -1536,12 +1588,236 @@ and t.
 </div>
 
 <div id="outline-container-sec-13" class="outline-2">
-<h2 id="sec-13">cc</h2>
+<h2 id="sec-13">Find minimum s-t cut in a flow network</h2>
 <div class="outline-text-2" id="text-13">
+<p>
+In a flow network, an s-t cut is a cut that requires the source ‘s’
+and the sink ‘t’ to be in different subsets, and it consists of
+edges going from the source’s side to the sink’s side. The capacity
+of an s-t cut is defined by the sum of capacity of each edge in the
+cut-set.<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup>
+</p>
+
+<p>
+The problem discussed here is to find minimum capacity s-t cut of the
+given network. Expected output is all edges of the minimum cut.
+</p>
+
+<p>
+For example, in the following flow network, example s-t cuts are {{0
+,1}, {0, 2}}, {{0, 2}, {1, 2}, {1, 3}}, etc. The minimum s-t cut is
+{{1, 3}, {4, 3}, {4 5}} which has capacity as 12+7+4 = 23.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/minCut.png" alt="minCut.png" />
+</p>
+</div>
+
+<p>
+Like Maximum Bipartite Matching, this is another problem which can
+solved using Ford-Fulkerson Algorithm. This is based on max-flow
+min-cut theorem.
+</p>
+
+<p>
+The max-flow min-cut theorem states that in a flow network, the amount
+of maximum flow is equal to capacity of the minimum cut. See CLRS book
+for proof of this theorem.
+</p>
+
+<p>
+From Ford-Fulkerson, we get capacity of minimum cut. How to print all
+edges that form the minimum cut? The idea is to use residual graph.
+</p>
+
+<p>
+Following are steps to print all edges of minimum cut.
+</p>
+<ol class="org-ol">
+<li>Run Ford-Fulkerson algorithm and consider the final residual graph.
+</li>
+<li>Find the set of vertices that are reachable from source in the
+residual graph.
+</li>
+<li>All edges which are from a reachable vertex to non-reachable vertex
+are minimum cut edges. Print all such edges.
+</li>
+</ol>
+
+<p>
+<a href="./Files/min_cut_flow.cc">./Files/min_cut_flow.cc</a>
+</p>
+
 <div class="org-src-container">
 
-<pre class="src src-c++"></pre>
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstring&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;queue&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;limits&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">V</span> 6
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Returns true if there is a path from source 's' to sink 'd' in</span>
+<span style="color: #ff7f24;">  residual graph. Also fills parent[] to store the path */</span>
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">Bfs</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">res_graph</span>[V][V], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">d</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">parent</span>) {
+  <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">visited</span>[V];
+  memset(visited, 0, <span style="color: #00ffff;">sizeof</span>(visited));
+  <span style="color: #98fb98;">queue</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">q</span>;
+  q.push(s);
+  visited[s] = <span style="color: #7fffd4;">true</span>;
+  parent[s] = -1;
+  <span style="color: #00ffff;">while</span> (!q.empty()) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = q.front();
+    q.pop();
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt; V; ++v) {
+      <span style="color: #00ffff;">if</span> (visited[v] == <span style="color: #7fffd4;">false</span> &amp;&amp; res_graph[u][v] &gt; 0) {
+        q.push(v);
+        parent[v] = u;
+        visited[v] = <span style="color: #7fffd4;">true</span>;
+      }
+    }
+  }
+  <span style="color: #00ffff;">return</span> (visited[d] == <span style="color: #7fffd4;">true</span>);
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Dfs</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">res_graph</span>[V][V], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">visited</span>) {
+  visited[s] = <span style="color: #7fffd4;">true</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; ++i) {
+    <span style="color: #00ffff;">if</span> (res_graph[s][i] &amp;&amp; !visited[i]) {
+      Dfs(res_graph, i, visited);
+    }
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">MinCut</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[V][V], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">d</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #eedd82;">v</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">res_graph</span>[V][V];
+  <span style="color: #00ffff;">for</span> (u = 0; u &lt; V; ++u) {
+    <span style="color: #00ffff;">for</span> (v = 0; v &lt; V; ++v) {
+      res_graph[u][v] = graph[u][v];
+    }
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">parent</span>[V];
+  <span style="color: #00ffff;">while</span> (Bfs(res_graph, s, d, parent)) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">path_flow</span> = <span style="color: #7fffd4;">numeric_limits</span>&lt;<span style="color: #98fb98;">int</span>&gt;::max();
+    <span style="color: #00ffff;">for</span> (v = d; v != s; v = parent[v]) {
+      u = parent[v];
+      path_flow = min(path_flow, res_graph[u][v]);
+    }
+    <span style="color: #00ffff;">for</span> (v = d; v != s; v = parent[v]) {
+      u = parent[v];
+      res_graph[u][v] -= path_flow;
+      res_graph[v][u] += path_flow;
+    }
+  }
+  <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">visited</span>[V];
+  memset(visited, <span style="color: #7fffd4;">false</span>, <span style="color: #00ffff;">sizeof</span>(visited));
+  Dfs(res_graph, s, visited);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; ++i) {
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = 0; j &lt; V; ++j) {
+      <span style="color: #00ffff;">if</span> (visited[i] &amp;&amp; !visited[j] &amp;&amp; graph[i][j]) {
+        cout &lt;&lt; i &lt;&lt; <span style="color: #ffa07a;">" - "</span> &lt;&lt; j &lt;&lt; endl;
+      }
+    }
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">graph</span>[V][V] = { {0, 16, 13, 0, 0, 0},
+                      {0, 0, 10, 12, 0, 0},
+                      {0, 4, 0, 0, 14, 0},
+                      {0, 0, 9, 0, 0, 20},
+                      {0, 0, 0, 7, 0, 4},
+                      {0, 0, 0, 0, 0, 0}
+  };
+  MinCut(graph, 0, 5);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
+</div>
+</div>
+
+<div id="outline-container-sec-14" class="outline-2">
+<h2 id="sec-14">Dinic’s algorithm for Maximum Flow</h2>
+<div class="outline-text-2" id="text-14">
+<p>
+<a href="http://www.geeksforgeeks.org/dinics-algorithm-maximum-flow/">http://www.geeksforgeeks.org/dinics-algorithm-maximum-flow/</a>
+</p>
+
+<p>
+<a href="http://e-maxx.ru/algo/dinic">http://e-maxx.ru/algo/dinic</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-15" class="outline-2">
+<h2 id="sec-15">Check whether a given graph is Bipartite or not</h2>
+<div class="outline-text-2" id="text-15">
+<p>
+A <a href="https://en.wikipedia.org/wiki/Bipartite_graph">Bipartite Graph</a> is a graph whose vertices can be divided into two
+independent sets, U and V such that every edge (u, v) either connects
+a vertex from U to V or a vertex from V to U. In other words, for
+every edge (u, v), either u belongs to U and v to V, or u belongs to V
+and v to U. We can also say that there is no edge that connects
+vertices of same set.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/Bipartite1.png" alt="Bipartite1.png" />
+</p>
+</div>
+
+<p>
+A bipartite graph is possible if the graph coloring is possible using
+two colors such that vertices in a set are colored with the same
+color.
+</p>
+
+<p>
+Following is a simple algorithm to find out whether a given graph is
+Birpartite or not using Breadth First Search (BFS).
+</p>
+<ol class="org-ol">
+<li>Assign RED color to the source vertex (putting into set U).
+</li>
+<li>Color all the neighbors with BLUE color (putting into set V).
+</li>
+<li>While assigning colors, if we find a neighbor which is colored with
+same color as current vertex, then the graph cannot be colored with
+2 vertices (or graph is not Bipartite)
+</li>
+</ol>
+</div>
+</div>
+
+
+
+<div id="outline-container-sec-16" class="outline-2">
+<h2 id="sec-16">Maximum Bipartite Matching</h2>
+</div>
+
+
+<div id="outline-container-sec-17" class="outline-2">
+<h2 id="sec-17">Hopcroft–Karp Algorithm for Maximum Matching</h2>
+</div>
+
+
+<div id="outline-container-sec-18" class="outline-2">
+<h2 id="sec-18">cc</h2>
+<div class="outline-text-2" id="text-18">
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+
+<p>
+<del>INCLUDE: "./Files/" src c+</del>
+</p>
 </div>
 </div>
 <div id="footnotes">
@@ -1552,12 +1828,16 @@ and t.
 <a href="http://www.ics.uci.edu/~eppstein/161/960220.html#sca">http://www.ics.uci.edu/~eppstein/161/960220.html#sca</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="http://en.wikipedia.org/wiki/Cut_(graph_theory)">http://en.wikipedia.org/wiki/Cut_(graph_theory)</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-03-05 Sun 22:57</p>
+<p class="date">Created: 2017-04-09 Sun 23:21</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

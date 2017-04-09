@@ -28,8 +28,17 @@ bool Bfs(int res_graph[V][V], int s, int d, int *parent) {
   }
   return (visited[d] == true);
 }
+
+void Dfs(int res_graph[V][V], int s, bool *visited) {
+  visited[s] = true;
+  for (int i = 0; i < V; ++i) {
+    if (res_graph[s][i] && !visited[i]) {
+      Dfs(res_graph, i, visited);
+    }
+  }
+}
         
-int FordFulkerson(int graph[V][V], int s, int d) {
+void MinCut(int graph[V][V], int s, int d) {
   int u, v;
   int res_graph[V][V];
   for (u = 0; u < V; ++u) {
@@ -38,7 +47,6 @@ int FordFulkerson(int graph[V][V], int s, int d) {
     }
   }
   int parent[V];
-  int max_flow = 0;
   while (Bfs(res_graph, s, d, parent)) {
     int path_flow = numeric_limits<int>::max();
     for (v = d; v != s; v = parent[v]) {
@@ -50,9 +58,17 @@ int FordFulkerson(int graph[V][V], int s, int d) {
       res_graph[u][v] -= path_flow;
       res_graph[v][u] += path_flow;
     }
-    max_flow += path_flow;
   }
-  return max_flow;
+  bool visited[V];
+  memset(visited, false, sizeof(visited));
+  Dfs(res_graph, s, visited);
+  for (int i = 0; i < V; ++i) {
+    for (int j = 0; j < V; ++j) {
+      if (visited[i] && !visited[j] && graph[i][j]) {
+        cout << i << " - " << j << endl;
+      }
+    }
+  }
 }
 
 int main() {
@@ -63,6 +79,6 @@ int main() {
                       {0, 0, 0, 7, 0, 4},
                       {0, 0, 0, 0, 0, 0}
   };
-  cout << "The maximum possible flow is " << FordFulkerson(graph, 0, 5);
+  MinCut(graph, 0, 5);
   return 0;
 }
