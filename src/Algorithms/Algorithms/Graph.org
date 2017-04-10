@@ -350,9 +350,46 @@ Following are steps to print all edges of minimum cut.
 #+INCLUDE: "./Files/min_cut_flow.cc" src c++
 
 * Dinic’s algorithm for Maximum Flow
-http://www.geeksforgeeks.org/dinics-algorithm-maximum-flow/
+Time complexity of Edmond Karp Implementation is O(VE^2). In this post,
+a new Dinic’s algorithm is discussed which is a faster algorithm and
+takes O(EV^2).
 
-http://e-maxx.ru/algo/dinic
+Like Edmond Karp’s algorithm, Dinic’s algorithm uses following
+concepts
+
+1. A flow is maximum if there is no s to t path in residual graph.
+2. BFS is used in a loop. There is a difference though in the way we
+   use BFS in both algorithms.
+
+In Edmond’s Karp algorithm, we use BFS to find an augmenting path and
+send flow across this path. In Dinic’s algorithm, we use BFS to check
+if more flow is possible and to construct level graph. In *level graph*,
+we assign levels to all nodes, level of a node is shortest distance
+(in terms of number of edges) of the node from source. Once level
+graph is constructed, we send multiple flows using this level graph.
+This is the reason it works better than Edmond Karp. In Edmond Karp,
+we send only flow that is send across the path found by BFS.
+
+Dinic’s algorithm:
+#+begin_src sh
+1) Initialize residual graph G as given graph.
+1) Do BFS of G to construct a level graph (or
+   assign levels to vertices) and also check if 
+   more flow is possible.
+    a) If more flow is not possible, then return.
+    b) Send multiple flows in G using level graph 
+       until blocking flow is reached. Here using 
+       level graph means, in every flow,
+       levels of path nodes should be 0, 1, 2...
+       (in order) from s to t. 
+#+end_src
+
+[[https://en.wikipedia.org/wiki/Dinic's_algorithm][+ Illustration of Dinic’s algorithm in the WiKi.]]
++ And more: http://e-maxx.ru/algo/dinic
+
+[[./Files/dinic_max_flow.cc]]
+
+#+INCLUDE: "./Files/dinic_max_flow.cc" src c++
 
 * Check whether a given graph is Bipartite or not
 A [[https://en.wikipedia.org/wiki/Bipartite_graph][Bipartite Graph]] is a graph whose vertices can be divided into two
@@ -376,13 +413,66 @@ Birpartite or not using Breadth First Search (BFS).
    same color as current vertex, then the graph cannot be colored with
    2 vertices (or graph is not Bipartite)
 
+[[./Files/is_bipartite.cc]]
 
+#+INCLUDE: "./Files/is_bipartite.cc" src c++
 
 * Maximum Bipartite Matching
+A matching in a Bipartite Graph is a set of the edges chosen in such a
+way that no two edges share an endpoint. A maximum matching is a
+matching of maximum size (maximum number of edges). In a maximum
+matching, if any edge is added to it, it is no longer a matching.
+There can be more than one maximum matchings for a given Bipartite
+Graph.
 
+[[./Files/maximum_matching1.png]]
+
+In bpm(), we one by one try all jobs that an applicant ‘u’ is
+interested in until we find a job, or all jobs are tried without luck.
+For every job we try, we do following.
+
+If a job is not assigned to anybody, we simply assign it to the
+applicant and return true. If a job is assigned to somebody else say
+x, then we recursively check whether x can be assigned some other job.
+To make sure that x doesn’t get the same job again, we mark the job
+‘v’ as seen before we make recursive call for x. If x can get other
+job, we change the applicant for job ‘v’ and return true. 
+
+[[./Files/max_bipartite_matching.cc]]
+
+#+INCLUDE: "./Files/max_bipartite_matching.cc" src c++
 
 * Hopcroft–Karp Algorithm for Maximum Matching
+Time complexity of the Ford Fulkerson based algorithm is O(V x E).
+Hopcroft Karp algorithm is an improvement that runs in O(√V x E)
+time.
 
+The Hopcroft Karp algorithm is based on below concept.
+
+A matching M is not maximum if there exists an augmenting path. It is
+also true other way, i.e, a matching is maximum if no augmenting path
+exists
+
+The idea is to use BFS (Breadth First Search) to find augmenting
+paths. Since BFS traverses level by level, it is used to divide the
+graph in layers of matching and not matching edges. A dummy vertex NIL
+is added that is connected to all vertices on left side and all
+vertices on right side. Following arrays are used to find augmenting
+path. Distance to NIL is initialized as INF (infinite). If we start
+from dummy vertex and come back to it using alternating path of
+distinct vertices, then there is an augmenting path.
+
+Once an augmenting path is found, DFS (Depth First Search) is used to
+add augmenting paths to current matching. DFS simply follows the
+distance array setup by BFS. It fills values in pairU[u] and pairV[v]
+if v is next to u in BFS.
+
+The below implementation is mainly adopted from the algorithm provided
+on Wiki page of [[https://en.wikipedia.org/wiki/Hopcroft%E2%80%93Karp_algorithm][Hopcroft Karp algorithm]].
+
+[[./Files/hopcroft-karp_for_max_matching.cc]]
+
+#+INCLUDE: "./Files/hopcroft-karp_for_max_matching.cc" src c++
 
 * cc
 #+begin_src sh

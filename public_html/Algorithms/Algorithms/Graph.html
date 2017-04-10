@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Graph Algorithms</title>
-<!-- 2017-04-09 Sun 23:21 -->
+<!-- 2017-04-10 Mon 23:42 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -1745,12 +1745,192 @@ are minimum cut edges. Print all such edges.
 <h2 id="sec-14">Dinic’s algorithm for Maximum Flow</h2>
 <div class="outline-text-2" id="text-14">
 <p>
-<a href="http://www.geeksforgeeks.org/dinics-algorithm-maximum-flow/">http://www.geeksforgeeks.org/dinics-algorithm-maximum-flow/</a>
+Time complexity of Edmond Karp Implementation is O(VE<sup>2</sup>). In this post,
+a new Dinic’s algorithm is discussed which is a faster algorithm and
+takes O(EV<sup>2</sup>).
 </p>
 
 <p>
-<a href="http://e-maxx.ru/algo/dinic">http://e-maxx.ru/algo/dinic</a>
+Like Edmond Karp’s algorithm, Dinic’s algorithm uses following
+concepts
 </p>
+
+<ol class="org-ol">
+<li>A flow is maximum if there is no s to t path in residual graph.
+</li>
+<li>BFS is used in a loop. There is a difference though in the way we
+use BFS in both algorithms.
+</li>
+</ol>
+
+<p>
+In Edmond’s Karp algorithm, we use BFS to find an augmenting path and
+send flow across this path. In Dinic’s algorithm, we use BFS to check
+if more flow is possible and to construct level graph. In <b>level graph</b>,
+we assign levels to all nodes, level of a node is shortest distance
+(in terms of number of edges) of the node from source. Once level
+graph is constructed, we send multiple flows using this level graph.
+This is the reason it works better than Edmond Karp. In Edmond Karp,
+we send only flow that is send across the path found by BFS.
+</p>
+
+<p>
+Dinic’s algorithm:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">1) Initialize residual graph G as given graph.
+1) Do BFS of G to construct a level graph (or
+   assign levels to vertices) and also check if 
+   more flow is possible.
+    a) If more flow is not possible, then return.
+    b) Send multiple flows<span style="color: #00ffff;"> in</span> G using level graph 
+       <span style="color: #00ffff;">until</span> blocking flow is reached. Here using 
+       level graph means,<span style="color: #00ffff;"> in</span> every flow,
+       levels of path nodes should be 0, 1, 2...
+       (<span style="color: #00ffff;">in</span> order) from s to t.
+</pre>
+</div>
+
+<p>
+<a href="https://en.wikipedia.org/wiki/Dinic's_algorithm">+ Illustration of Dinic’s algorithm in the WiKi.</a>
+</p>
+<ul class="org-ul">
+<li>And more: <a href="http://e-maxx.ru/algo/dinic">http://e-maxx.ru/algo/dinic</a>
+</li>
+</ul>
+
+<p>
+<a href="./Files/dinic_max_flow.cc">./Files/dinic_max_flow.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;vector&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;list&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;limits&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flow</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">c</span>;
+};
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">Graph</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">c</span>);
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">BFS</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span>);
+  <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">SendFlow</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flow</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">start</span>);
+  <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">DinicMaxFlow</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span>);
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>;
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">level</span>;
+  <span style="color: #98fb98;">vector</span>&lt;<span style="color: #98fb98;">Edge</span>&gt; *<span style="color: #eedd82;">adj</span>;
+};
+
+<span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">Graph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>) {
+  adj = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">vector</span>&lt;Edge&gt;[V];
+  <span style="color: #00ffff;">this</span>-&gt;V = V;
+  level = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[V];
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">c</span>) {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Forward edge : 0 flow and c capacity</span>
+  <span style="color: #98fb98;">Edge</span> <span style="color: #eedd82;">a</span>{v, 0, c};
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Back edge : 0 flow and 0 capacity</span>
+  <span style="color: #98fb98;">Edge</span> <span style="color: #eedd82;">b</span>{u, 0, 0};
+  adj[u].push_back(a);
+  adj[v].push_back(b);
+}
+
+<span style="color: #98fb98;">bool</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">BFS</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span>) {
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; ++i) {
+    level[i] = -1;
+  }
+  level[s] = 0;
+  <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">q</span>;
+  q.push_back(s);
+  <span style="color: #7fffd4;">vector</span>&lt;<span style="color: #98fb98;">Edge</span>&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it</span>;
+  <span style="color: #00ffff;">while</span> (!q.empty()) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = q.front();
+    q.pop_front();
+    <span style="color: #00ffff;">for</span> (it = adj[u].begin(); it != adj[u].end(); ++it) {
+      <span style="color: #98fb98;">Edge</span> &amp;<span style="color: #eedd82;">e</span> = *it;
+      <span style="color: #00ffff;">if</span> (level[e.v] &lt; 0 &amp;&amp; e.flow &lt; e.c) {
+        level[e.v] = level[u] + 1;
+        q.push_back(e.v);
+      }
+    }
+  }
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">IF we can not reach to the sink we</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">return false else true</span>
+  <span style="color: #00ffff;">return</span> level[t] &lt; 0 ? <span style="color: #7fffd4;">false</span> : <span style="color: #7fffd4;">true</span>;
+}
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A DFS based function to send flow after BFS has</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">figured out that there is a possible flow and</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">constructed levels. This function called multiple</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">times for a single call of BFS.</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">flow: Current flow send by parent function call</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">start[]: To keep track of next edge to be explored.</span>
+<span style="color: #ff7f24;">//           </span><span style="color: #ff7f24;">start[i] stores  count of edges explored</span>
+<span style="color: #ff7f24;">//           </span><span style="color: #ff7f24;">from i.</span>
+<span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">u: Current vertex</span>
+<span style="color: #ff7f24;">//  </span><span style="color: #ff7f24;">t: Sink</span>
+<span style="color: #98fb98;">int</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">SendFlow</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flow</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">start</span>) {
+  <span style="color: #00ffff;">if</span> (u == t) {
+    <span style="color: #00ffff;">return</span> flow;
+  }
+  <span style="color: #00ffff;">for</span> (; start[u] &lt; adj[u].size(); start[u]++) {
+    <span style="color: #98fb98;">Edge</span> &amp;<span style="color: #eedd82;">e</span> = adj[u][start[u]];
+    <span style="color: #00ffff;">if</span> (level[e.v] == level[u]+1 &amp;&amp; e.flow &lt; e.c) {
+      <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">curr_flow</span> = min(flow, e.c - e.flow);
+      <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">temp_flow</span> = SendFlow(e.v, curr_flow, t, start);
+      <span style="color: #00ffff;">if</span> (temp_flow &gt; 0) {
+        <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add flow  to current edge</span>
+        e.flow += temp_flow;
+        <span style="color: #00ffff;">return</span> temp_flow;
+      }
+    }
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #7fffd4;">Graph</span>::<span style="color: #87cefa;">DinicMaxFlow</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">s</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">t</span>) {
+  <span style="color: #00ffff;">if</span> (s == t) {
+    <span style="color: #00ffff;">return</span> -1;
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">total</span> = 0;
+  <span style="color: #00ffff;">while</span> (BFS(s , t) == <span style="color: #7fffd4;">true</span>) {
+    <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">start</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[V+1];
+    <span style="color: #00ffff;">while</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">flow</span> = SendFlow(s, <span style="color: #7fffd4;">numeric_limits</span>&lt;<span style="color: #98fb98;">int</span>&gt;::max(), t, start)) {
+      total += flow;
+    }
+  }
+  <span style="color: #00ffff;">return</span> total;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">Graph</span> <span style="color: #eedd82;">g</span>(6);
+  g.AddEdge(0, 1, 16 );
+  g.AddEdge(0, 2, 13 );
+  g.AddEdge(1, 2, 10 );
+  g.AddEdge(1, 3, 12 );
+  g.AddEdge(2, 1, 4 );
+  g.AddEdge(2, 4, 14);
+  g.AddEdge(3, 2, 9 );
+  g.AddEdge(3, 5, 20 );
+  g.AddEdge(4, 3, 7 );
+  g.AddEdge(4, 5, 4);
+  cout &lt;&lt; <span style="color: #ffa07a;">"Maximum flow "</span> &lt;&lt; g.DinicMaxFlow(0, 5) &lt;&lt; endl;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
 </div>
 </div>
 
@@ -1792,20 +1972,347 @@ same color as current vertex, then the graph cannot be colored with
 2 vertices (or graph is not Bipartite)
 </li>
 </ol>
+
+<p>
+<a href="./Files/is_bipartite.cc">./Files/is_bipartite.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;queue&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">V</span> 4
+
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">IsBipartiteUtil</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">G</span>[][V], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">src</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">color_arr</span>) {
+  color_arr[src] = 1;
+  <span style="color: #98fb98;">queue</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">q</span>;
+  q.push(src);
+  <span style="color: #00ffff;">while</span> (!q.empty()) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = q.front();
+    q.pop();
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt; V; ++v) {
+      <span style="color: #00ffff;">if</span> (G[u][v] &amp;&amp; color_arr[v] == -1) {
+        color_arr[v] = 1 - color_arr[u];
+        q.push(v);
+      } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (G[u][v] &amp;&amp; color_arr[v] == color_arr[u]) {
+        <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+      }
+    }
+  }
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+}
+
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">IsBipartite</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">G</span>[][V]) {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Create a color array to store colors assigned to all veritces.</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">color_arr</span>[V];
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; ++i) {
+    color_arr[i] = -1;
+  }
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">This code is to handle disconnected graoh</span>
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; V; ++i) {
+    <span style="color: #00ffff;">if</span> (color_arr[i] == -1) {
+      <span style="color: #00ffff;">if</span> (IsBipartiteUtil(G, i, color_arr) == <span style="color: #7fffd4;">false</span>) {
+        <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+      }
+    }
+  }
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">G</span>[][V] = {{0, 1, 0, 1},
+                {1, 0, 1, 0},
+                {0, 1, 0, 1},
+                {1, 0, 1, 0}};
+  IsBipartite(G) ? cout &lt;&lt; <span style="color: #ffa07a;">"Yes"</span> : cout &lt;&lt; <span style="color: #ffa07a;">"No"</span>;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
 </div>
-
-
+</div>
 
 <div id="outline-container-sec-16" class="outline-2">
 <h2 id="sec-16">Maximum Bipartite Matching</h2>
+<div class="outline-text-2" id="text-16">
+<p>
+A matching in a Bipartite Graph is a set of the edges chosen in such a
+way that no two edges share an endpoint. A maximum matching is a
+matching of maximum size (maximum number of edges). In a maximum
+matching, if any edge is added to it, it is no longer a matching.
+There can be more than one maximum matchings for a given Bipartite
+Graph.
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/maximum_matching1.png" alt="maximum_matching1.png" />
+</p>
 </div>
 
+<p>
+In bpm(), we one by one try all jobs that an applicant ‘u’ is
+interested in until we find a job, or all jobs are tried without luck.
+For every job we try, we do following.
+</p>
+
+<p>
+If a job is not assigned to anybody, we simply assign it to the
+applicant and return true. If a job is assigned to somebody else say
+x, then we recursively check whether x can be assigned some other job.
+To make sure that x doesn’t get the same job again, we mark the job
+‘v’ as seen before we make recursive call for x. If x can get other
+job, we change the applicant for job ‘v’ and return true. 
+</p>
+
+<p>
+<a href="./Files/max_bipartite_matching.cc">./Files/max_bipartite_matching.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstring&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">M</span> 6
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">N</span> 6
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">A DFS based recursive function that returns true if a</span>
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">matching for vertex u is possible</span>
+<span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">Bpm</span>(<span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">bp_graph</span>[M][N], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">bool</span> *<span style="color: #eedd82;">seen</span>, <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">match_r</span>) {
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt; N; ++v) {
+    <span style="color: #00ffff;">if</span> (bp_graph[u][v] &amp;&amp; !seen[v]) {
+      seen[v] = <span style="color: #7fffd4;">true</span>;
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If job 'v' is not assigned to an applicant OR</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">previously assigned applicant for job v (which is matchR[v]) </span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">has an alternate job available.</span>
+      <span style="color: #00ffff;">if</span> (match_r[v] &lt; 0 || Bpm(bp_graph, match_r[v], seen, match_r)) {
+          match_r[v] = u;
+          <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+      }
+    }
+  }
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">MaxBPM</span>(<span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">bp_graph</span>[M][N]) {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">An array to keep track of the applicants assigned to jobs.</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">match_r</span>[N];
+  memset(match_r, -1, <span style="color: #00ffff;">sizeof</span>(match_r));
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">result</span> = 0;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = 0; u &lt; M; ++u) {
+    <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">seen</span>[N];
+    memset(seen, 0, <span style="color: #00ffff;">sizeof</span>(seen));
+    <span style="color: #00ffff;">if</span> (Bpm(bp_graph, u, seen, match_r)) {
+      ++result;
+    }
+  }
+  <span style="color: #00ffff;">return</span> result;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">bool</span> <span style="color: #eedd82;">bp_graph</span>[M][N] = {{0, 1, 1, 0, 0, 0},
+                        {1, 0, 0, 1, 0, 0},
+                        {0, 0, 1, 0, 0, 0},
+                        {0, 0, 1, 1, 0, 0},
+                        {0, 0, 0, 0, 0, 0},
+                        {0, 0, 0, 0, 0, 1}};
+
+  cout &lt;&lt; <span style="color: #ffa07a;">"Maximum maching is "</span>
+       &lt;&lt; MaxBPM(bp_graph) &lt;&lt; endl;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
 
 <div id="outline-container-sec-17" class="outline-2">
 <h2 id="sec-17">Hopcroft–Karp Algorithm for Maximum Matching</h2>
-</div>
+<div class="outline-text-2" id="text-17">
+<p>
+Time complexity of the Ford Fulkerson based algorithm is O(V x E).
+Hopcroft Karp algorithm is an improvement that runs in O(√V x E)
+time.
+</p>
 
+<p>
+The Hopcroft Karp algorithm is based on below concept.
+</p>
+
+<p>
+A matching M is not maximum if there exists an augmenting path. It is
+also true other way, i.e, a matching is maximum if no augmenting path
+exists
+</p>
+
+<p>
+The idea is to use BFS (Breadth First Search) to find augmenting
+paths. Since BFS traverses level by level, it is used to divide the
+graph in layers of matching and not matching edges. A dummy vertex NIL
+is added that is connected to all vertices on left side and all
+vertices on right side. Following arrays are used to find augmenting
+path. Distance to NIL is initialized as INF (infinite). If we start
+from dummy vertex and come back to it using alternating path of
+distinct vertices, then there is an augmenting path.
+</p>
+
+<p>
+Once an augmenting path is found, DFS (Depth First Search) is used to
+add augmenting paths to current matching. DFS simply follows the
+distance array setup by BFS. It fills values in pairU[u] and pairV[v]
+if v is next to u in BFS.
+</p>
+
+<p>
+The below implementation is mainly adopted from the algorithm provided
+on Wiki page of <a href="https://en.wikipedia.org/wiki/Hopcroft%E2%80%93Karp_algorithm">Hopcroft Karp algorithm</a>.
+</p>
+
+<p>
+<a href="./Files/hopcroft-karp_for_max_matching.cc">./Files/hopcroft-karp_for_max_matching.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;climits&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;list&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;queue&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NIL</span> 0
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">INF</span> INT_MAX
+
+<span style="color: #00ffff;">class</span> <span style="color: #98fb98;">BipGraph</span> {
+ <span style="color: #00ffff;">public</span>:
+  <span style="color: #87cefa;">BipGraph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>);
+  <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Returns true if there is an augmenting path</span>
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">Bfs</span>();
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Adds augmenting path if there is one beginning with u</span>
+  <span style="color: #98fb98;">bool</span> <span style="color: #87cefa;">Dfs</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>);
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Returns size of maximum matcing</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #87cefa;">HopcroftKarp</span>();
+ <span style="color: #00ffff;">private</span>:
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">m and n are number of vertices on left</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">and right sides of Bipartite Graph</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>, <span style="color: #eedd82;">n</span>;
+  <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt; *<span style="color: #eedd82;">adj</span>;
+  <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">pair_u</span>, *<span style="color: #eedd82;">pair_v</span>, *<span style="color: #eedd82;">dist</span>;
+};
+
+<span style="color: #7fffd4;">BipGraph</span>::<span style="color: #87cefa;">BipGraph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>) {
+  <span style="color: #00ffff;">this</span>-&gt;m = m;
+  <span style="color: #00ffff;">this</span>-&gt;n = n;
+  adj = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;[m+1];
+}
+
+<span style="color: #98fb98;">void</span>  <span style="color: #7fffd4;">BipGraph</span>::<span style="color: #87cefa;">AddEdge</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span>) {
+  adj[u].push_back(v);
+  adj[v].push_back(u);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #7fffd4;">BipGraph</span>::<span style="color: #87cefa;">HopcroftKarp</span>() {
+  pair_u = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[m+1];
+  pair_v = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[n+1];
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">dist[u] stores distance of left side vertices</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">dist[u] is one more than dist[u'] if u is next</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">to u'in augmenting path</span>
+  dist = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>[m+1];
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = 0; u &lt;= m; ++u) {
+    pair_u[u] = NIL;
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt;= n; ++v) {
+    pair_v[v] = NIL;
+  }
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">result</span> = 0;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Keep updating the result while there is an</span>
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">augmenting path.</span>
+  <span style="color: #00ffff;">while</span> (Bfs()) {
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Find a free vertex</span>
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = 1; u &lt;= m; ++u) {
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If current vertex is free and there is</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">an augmenting path from current vertex</span>
+      <span style="color: #00ffff;">if</span> (pair_u[u] == NIL &amp;&amp; Dfs(u)) {
+        ++result;
+      }
+    }
+  }
+  <span style="color: #00ffff;">return</span> result;
+}
+
+<span style="color: #98fb98;">bool</span> <span style="color: #7fffd4;">BipGraph</span>::<span style="color: #87cefa;">Bfs</span>() {
+  <span style="color: #98fb98;">queue</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">que</span>;
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = 1; u &lt;= m; ++u) {
+    <span style="color: #00ffff;">if</span> (pair_u[u] == NIL) {
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If this is a free vertex, add it to queue</span>
+      dist[u] = 0;
+      que.push(u);
+    } <span style="color: #00ffff;">else</span> {
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Else set distance as infinite so that this vertex</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">is considered next time</span>
+      dist[u] = INF;
+    }
+  }
+  dist[NIL] = INF;
+  <span style="color: #00ffff;">while</span> (!que.empty()) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span> = que.front();
+    que.pop();
+    <span style="color: #00ffff;">if</span> (dist[u] &lt; dist[NIL]) {
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If this node is not NIL and can provide a shorter path to NIL</span>
+      <span style="color: #7fffd4;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it</span>;
+      <span style="color: #00ffff;">for</span> (it = adj[u].begin(); it != adj[u].end(); ++it) {
+        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = *it;
+        <span style="color: #00ffff;">if</span> (dist[pair_v[v]] == INF) {
+          dist[pair_v[v]] = dist[u] + 1;
+          que.push(pair_v[v]);
+        }
+      }
+    }
+  }
+  <span style="color: #00ffff;">return</span> (dist[NIL] != INF);
+}
+
+<span style="color: #98fb98;">bool</span> <span style="color: #7fffd4;">BipGraph</span>::<span style="color: #87cefa;">Dfs</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">u</span>) {
+  <span style="color: #00ffff;">if</span> (u != NIL) {
+    <span style="color: #7fffd4;">list</span>&lt;<span style="color: #98fb98;">int</span>&gt;::<span style="color: #98fb98;">iterator</span> <span style="color: #eedd82;">it</span>;
+    <span style="color: #00ffff;">for</span> (it = adj[u].begin(); it != adj[u].end(); ++it) {
+      <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = *it;
+      <span style="color: #00ffff;">if</span> (dist[pair_v[v]] == dist[u] + 1) {
+        <span style="color: #00ffff;">if</span> (Dfs(pair_v[v]) == <span style="color: #7fffd4;">true</span>) {
+          pair_v[v] = u;
+          pair_u[u] = v;
+          <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+        }
+      }
+    }
+    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">If there is no augmenting path beginning with u.</span>
+    dist[u] = INF;
+    <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">false</span>;
+  }
+  <span style="color: #00ffff;">return</span> <span style="color: #7fffd4;">true</span>;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">BipGraph</span> <span style="color: #eedd82;">g</span>(4, 4);
+  g.AddEdge(1, 2);
+  g.AddEdge(1, 3);
+  g.AddEdge(2, 1);
+  g.AddEdge(3, 2);
+  g.AddEdge(4, 2);
+  g.AddEdge(4, 4);
+  cout &lt;&lt; <span style="color: #ffa07a;">"Size of maximum matching is "</span> &lt;&lt; g.HopcroftKarp();
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
 
 <div id="outline-container-sec-18" class="outline-2">
 <h2 id="sec-18">cc</h2>
@@ -1837,7 +2344,7 @@ same color as current vertex, then the graph cannot be colored with
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-04-09 Sun 23:21</p>
+<p class="date">Created: 2017-04-10 Mon 23:42</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
