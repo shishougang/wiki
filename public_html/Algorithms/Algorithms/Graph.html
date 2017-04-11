@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Graph Algorithms</title>
-<!-- 2017-04-10 Mon 23:42 -->
+<!-- 2017-04-11 Tue 23:16 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -70,7 +70,11 @@ for the JavaScript code in this tag.
 <li><a href="#sec-2">Depth First Traversal for a Graph</a></li>
 <li><a href="#sec-3">Dijkstra’s shortest path algorithm</a></li>
 <li><a href="#sec-4">Floyd Warshall Algorithm (All Pairs Shortest Path)</a></li>
-<li><a href="#sec-5">Union-Find Algorithm(Detect Cycle in an Undirected Graph)</a></li>
+<li><a href="#sec-5">Union-Find Algorithm(Detect Cycle in an Undirected Graph)</a>
+<ul>
+<li><a href="#sec-5-1">Union By Rank and Path Compression</a></li>
+</ul>
+</li>
 <li><a href="#sec-6">Kruskal’s Minimum Spanning Tree Algorithm</a></li>
 <li><a href="#sec-7">Prim’s Minimum Spanning Tree</a></li>
 <li><a href="#sec-8">Topological Sorting</a></li>
@@ -96,6 +100,7 @@ for the JavaScript code in this tag.
 </ul>
 </div>
 </div>
+
 
 
 <div id="outline-container-sec-1" class="outline-2">
@@ -543,7 +548,139 @@ used for determining if two elements are in the same subset.
 </pre>
 </div>
 </div>
+
+<div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Union By Rank and Path Compression</h3>
+<div class="outline-text-3" id="text-5-1">
+<p>
+The idea is to always attach smaller depth tree under the root of the
+deeper tree. This technique is called <b>union by rank</b>.
+</p>
+
+<p>
+The second optimization to naive method is <b>Path Compression</b>. The idea
+is to flatten the tree when find() is called. When find() is called
+for an element x, root of the tree is returned. The find() operation
+traverses up from x to find root. The idea of path compression is to
+make the found root as parent of x so that we don’t have to traverse
+all intermediate nodes again.
+</p>
+
+<p>
+The two techniques complement each other. The time complexity of each
+operations becomes even smaller than O(Logn).
+</p>
+
+<p>
+<a href="./Files/union-by-rank-algorithm.cc">./Files/union-by-rank-algorithm.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdio&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstdlib&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cstring&gt;</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">NO_PARENT</span> -1
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">src</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dest</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span> {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">V-&gt; Number of vertices</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">E-&gt; Number of edges</span>
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">E</span>;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Edge</span>* <span style="color: #eedd82;">edge</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Subset</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">parent</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">rank</span>;
+};
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span>* <span style="color: #87cefa;">CreateGraph</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">E</span>) {
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span>* <span style="color: #eedd82;">graph</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Graph</span>;
+  graph-&gt;V = V;
+  graph-&gt;E = E;
+  graph-&gt;edge = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Edge</span>[E];
+  <span style="color: #00ffff;">return</span> graph;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">Find</span>(<span style="color: #98fb98;">Subset</span> *<span style="color: #eedd82;">subsets</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>) {
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">find root and make root as parent of i (path compression)</span>
+  <span style="color: #00ffff;">if</span> (subsets[i].parent != i) {
+    subsets[i].parent = Find(subsets, subsets[i].parent);
+  }
+  <span style="color: #00ffff;">return</span> subsets[i].parent;
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">Union</span>(<span style="color: #98fb98;">Subset</span> *<span style="color: #eedd82;">subsets</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">xroot</span> = Find(subsets, x);
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">yroot</span> = Find(subsets, y);
+  <span style="color: #00ffff;">if</span> (subsets[xroot].rank &lt; subsets[yroot].rank) {
+    subsets[xroot].parent = yroot;
+  } <span style="color: #00ffff;">else</span> <span style="color: #00ffff;">if</span> (subsets[xroot].rank &gt; subsets[yroot].rank) {
+    subsets[yroot].parent = xroot;
+  } <span style="color: #00ffff;">else</span> {
+    subsets[yroot].parent = xroot;
+    ++subsets[xroot].rank;
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">IsCycle</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span>* <span style="color: #eedd82;">graph</span>) {
+  <span style="color: #98fb98;">Subset</span> *<span style="color: #eedd82;">subsets</span> = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">Subset</span>[graph-&gt;V];
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">v</span> = 0; v &lt; graph-&gt;V; ++v) {
+    subsets[v].parent = v;
+    subsets[v].rank = 0;
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; graph-&gt;E; ++i) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">x</span> = Find(subsets, graph-&gt;edge[i].src);
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">y</span> = Find(subsets, graph-&gt;edge[i].dest);
+    <span style="color: #00ffff;">if</span> (x == y) {
+      <span style="color: #00ffff;">return</span> 1;
+    }
+    Union(subsets, x, y);
+  }
+  <span style="color: #00ffff;">return</span> 0;
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Let us create following graph</span>
+<span style="color: #ff7f24;">         0</span>
+<span style="color: #ff7f24;">        |  \</span>
+<span style="color: #ff7f24;">        |    \</span>
+<span style="color: #ff7f24;">        1-----2 */</span>    
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">V</span> = 3, <span style="color: #eedd82;">E</span> = 3;
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Graph</span>* <span style="color: #eedd82;">graph</span> = CreateGraph(V, E);
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 0-1</span>
+  graph-&gt;edge[0].src = 0;
+  graph-&gt;edge[0].dest = 1;
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 1-2</span>
+  graph-&gt;edge[1].src = 1;
+  graph-&gt;edge[1].dest = 2;
+
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">add edge 0-2</span>
+  graph-&gt;edge[2].src = 0;
+  graph-&gt;edge[2].dest = 2;
+
+  <span style="color: #00ffff;">if</span> (IsCycle(graph))
+    printf( <span style="color: #ffa07a;">"graph contains cycle\n"</span> );
+  <span style="color: #00ffff;">else</span>
+    printf( <span style="color: #ffa07a;">"graph doesn't contain cycle\n"</span> );
+  <span style="color: #00ffff;">delete</span> graph;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
+</div>
+</div>
+</div>
+
 <div id="outline-container-sec-6" class="outline-2">
 <h2 id="sec-6">Kruskal’s Minimum Spanning Tree Algorithm</h2>
 <div class="outline-text-2" id="text-6">
@@ -2344,7 +2481,7 @@ on Wiki page of <a href="https://en.wikipedia.org/wiki/Hopcroft%E2%80%93Karp_alg
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-04-10 Mon 23:42</p>
+<p class="date">Created: 2017-04-11 Tue 23:16</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
