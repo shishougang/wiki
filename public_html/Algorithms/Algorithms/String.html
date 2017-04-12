@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>String / Array</title>
-<!-- 2017-04-11 Tue 23:16 -->
+<!-- 2017-04-12 Wed 23:53 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -79,7 +79,13 @@ for the JavaScript code in this tag.
 <li><a href="#sec-3-1">More</a></li>
 </ul>
 </li>
-<li><a href="#sec-4">cc</a></li>
+<li><a href="#sec-4">Sparse Table for Range Minimum Query</a>
+<ul>
+<li><a href="#sec-4-1">Square Root Decomposition</a></li>
+<li><a href="#sec-4-2">Sparse Table Algorithm</a></li>
+</ul>
+</li>
+<li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
 </div>
@@ -662,8 +668,146 @@ preSum[R] – preSum[L]. Here processing every query takes O(1) time.
 </div>
 
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">cc</h2>
+<h2 id="sec-4">Sparse Table for Range Minimum Query</h2>
 <div class="outline-text-2" id="text-4">
+<p>
+We have an array arr[0 . . . n-1]. We should be able to efficiently
+find the minimum value from index L (query start) to R (query end)
+where 0 &lt;= L &lt;= R &lt;= n-1. Consider a situation when there are many
+range queries.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">Input:  arr[]   = {7, 2, 3, 0, 5, 10, 3, 12, 18};
+        query[] = [0, 4], [4, 7], [7, 8]
+
+Output: Minimum of [0, 4] is 0
+        Minimum of [4, 7] is 3
+        Minimum of [7, 8] is 12
+</pre>
+</div>
+</div>
+
+<div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">Square Root Decomposition</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+Preprocessing:
+</p>
+<ol class="org-ol">
+<li>Divide the range [0, n-1] into different blocks of √n each.
+</li>
+<li>Compute minimum of every block of size √n and store the results.
+</li>
+</ol>
+
+<p>
+Preprocessing takes O(√n * √n) = O(n) time and O(√n) space.
+</p>
+
+<p>
+Query:
+</p>
+<ol class="org-ol">
+<li>To query a range [L, R], we take minimum of all blocks that lie in
+this range. For left and right corner blocks which may partially
+overlap with given range, we linearly scan them to find minimum.
+</li>
+<li>Time complexity of query is O(√n).
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">Sparse Table Algorithm</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+Sparse table method supports query time O(1) with extra space O(n Log
+n).
+</p>
+
+<p>
+The idea is to precompute minimum of all subarrays of size 2<sup>j</sup> where j
+varies from 0 to Log n. We make a lookup table. Here
+lookup[i][j] contains minimum of range starting from i and of size 2j.
+For example <code>lookup[0][3]</code> contains minimum of range [0, 7] (starting
+with 0 and of size 23)
+</p>
+
+<p>
+<a href="./Files/sparse_table.cc">./Files/sparse_table.cc</a>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;cmath&gt;</span>
+
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">MAX</span> 500
+
+<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">lookup</span>[MAX][MAX];
+
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Query</span> {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span>, <span style="color: #eedd82;">r</span>;
+};
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">PreProcess</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">arr</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>) {
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; n; ++i) {
+    lookup[i][0] = i;
+  }
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = 1; (1&lt;&lt;j) &lt;= n; ++j) {
+    <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; (i+(1&lt;&lt;j)-1) &lt; n; ++i) {
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">i, j -&gt; i, i+2^j</span>
+      <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">i, j-1-&gt; i, i+2^(j-1)  i+2^(j-1), j -&gt; i+2^(j-1), i+2^j</span>
+      <span style="color: #00ffff;">if</span> (arr[lookup[i][j-1]] &lt; arr[lookup[i+(1&lt;&lt;(j-1))][j-1]]) {
+        lookup[i][j] = lookup[i][j-1];
+      } <span style="color: #00ffff;">else</span> {
+        lookup[i][j] = lookup[i+(1&lt;&lt;(j-1))][j-1];
+      }
+    }
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">Query</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">arr</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">r</span>) {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">j</span> = (<span style="color: #98fb98;">int</span>)log2(r-l+1);
+  <span style="color: #00ffff;">if</span> (arr[lookup[l][j]] &lt;= arr[lookup[r-(<span style="color: #98fb98;">int</span>)pow(2,j)+1][j]]) {
+    <span style="color: #00ffff;">return</span> arr[lookup[l][j]];
+  } <span style="color: #00ffff;">else</span> {
+    <span style="color: #00ffff;">return</span> arr[lookup[r-(<span style="color: #98fb98;">int</span>)pow(2,j)+1][j]];
+  }
+}
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">RMQ</span>(<span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">arr</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span>, <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Query</span> *<span style="color: #eedd82;">q</span>, <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span>) {
+  PreProcess(arr, n);
+  <span style="color: #00ffff;">for</span> (<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span> = 0; i &lt; m; ++i) {
+    <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">l</span> = q[i].l, <span style="color: #eedd82;">r</span> = q[i].r;
+    cout &lt;&lt; <span style="color: #ffa07a;">"Minimum of ["</span> &lt;&lt; l &lt;&lt; <span style="color: #ffa07a;">", "</span>
+         &lt;&lt; r &lt;&lt; <span style="color: #ffa07a;">"] is "</span>  &lt;&lt; Query(arr, l, r) &lt;&lt; endl;
+  }
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">a</span>[] = {7, 2, 3, 0, 5, 10, 3, 12, 18};
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n</span> = <span style="color: #00ffff;">sizeof</span>(a)/<span style="color: #00ffff;">sizeof</span>(a[0]);
+  <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">Query</span> <span style="color: #eedd82;">q</span>[] = {{0, 4}, {4, 7}, {7, 8}};
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">m</span> = <span style="color: #00ffff;">sizeof</span>(q)/<span style="color: #00ffff;">sizeof</span>(q[0]);
+  RMQ(a, n, q, m);
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">cc</h2>
+<div class="outline-text-2" id="text-5">
 <p>
 <del>INCLUDE: "./Files/" src c+</del>
 </p>
@@ -677,7 +821,7 @@ preSum[R] – preSum[L]. Here processing every query takes O(1) time.
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-04-11 Tue 23:16</p>
+<p class="date">Created: 2017-04-12 Wed 23:53</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
