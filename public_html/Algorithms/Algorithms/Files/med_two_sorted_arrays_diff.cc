@@ -78,7 +78,7 @@ float FindMedian(int *a, int n, int *b, int m) {
   
 int main() {
   int a[] = {9, 12, 15, 900};
-  int b[] = {5, 8, 10, 20};
+  int b[] = {8, 10, 20};
   int n = sizeof(a) / sizeof(a[0]);
   int m = sizeof(b) / sizeof(b[0]);
 
