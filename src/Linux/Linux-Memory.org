@@ -1,0 +1,88 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: Memory, Overcommit and OOM, Stack overflow
+#+OPTIONS: num:nil H:2
+
+
+
+* Some cases
+** OOM killer crashes[fn:1]
+To fix OOM crash the behavior of the kernel has to be changed, so it
+will no longer overcommit the memory for application requests. 
+
+#+begin_src sh
+vm.overcommit_memory = 2
+vm.overcommit_ratio = 80
+#+end_src
+
+* VM
+https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+
+http://russ.garrett.co.uk/2009/01/01/linux-kernel-tuning/
+** =overcommit_ratio=
+Which happened to be 50. And the machine just happened to have about
+5GB of RAM. Well look there, 5×50 is 250GB
+
+ If a process tries to malloc() more memory than available it will get
+ an error right away. This mode is set by changing the sysctl value
+ vm.overcommit_memory to 2.
+** =vm.overcommit_ratio=
+
+** =vm.min_free_kbytes = 65536=
+This tells the kernel to try and keep 64MB of RAM free at all times. It’s useful in two main cases:
+
++ Swap-less machines, where you don’t want incoming network traffic to
+  overwhelm the kernel and force an OOM before it has time to flush
+  any buffers.
+
++ x86 machines, for the same reason: the x86 architecture only allows
+  DMA transfers below approximately 900MB of RAM. So you can end up
+  with the bizarre situation of an OOM error with tons of RAM free.
+
+** =vm.min_free_kbytes= < lowmem
+vm.min_free_kbytes 设定值高于LowTotal 值，系统认为没有足够的lowmem，而
+触发OOM Killer，将进程强行杀掉。
+ 
+系统中内存分为lowmem和highmem，其中lowmem为寻址内存，当lowmem耗尽时，
+系统会触动OOM Killer将多余进程杀掉来释放内
+
+** =vm.swappiness = 0=
+It’s said that altering swappiness can help you when you’re running
+under high memory pressure with software that tries to do its own
+memory management (i.e. MySQL). We’ve had limited success with this
+and I’d much prefer to use software which doesn’t pretend to know more
+about your hardware than the OS (i.e. PostgreSQL). Not that I’m
+bitter.
+
+** =vm.overcommit_memory=1=
+The overcommit_memory sysctl isn’t something you’ll usually have to
+change if your software isn’t insane, but our netboot setup uses it so
+I thought I’d mention it. From the documentation:
+
+0. - Heuristic overcommit handling. Obvious overcommits of address
+   space are refused. Used for a typical system. It ensures a
+   seriously wild allocation fails while allowing overcommit to reduce
+   swap usage. root is allowed to allocate slighly more memory in this
+   mode. This is the default.
+1. - Always overcommit. Appropriate for some scientific applications.
+2. - Don’t overcommit. The total address space commit for the system
+   is not permitted to exceed swap + a configurable percentage
+   (default is 50) of physical RAM. Depending on the percentage you
+   use, in most situations this means a process will not be killed
+   while accessing pages but will receive errors on memory allocation
+   as appropriate.
+
+For more info on this, see the overcommit accounting documentation.
+https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+
+
+
+* cc
+
+#+begin_src sh
+
+#+end_src
+
+* Footnotes
+
+[fn:1] https://www.hskupin.info/2010/06/17/how-to-fix-the-oom-killer-crashe-under-linux/
+
