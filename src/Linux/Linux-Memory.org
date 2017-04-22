@@ -1,33 +1,173 @@
-#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
 #+TITLE: Memory, Overcommit and OOM, Stack overflow
 #+OPTIONS: num:nil H:2
 
 
+* Physical and virtual memory [fn:1]
+Traditionally, one has physical memory, that is, memory that is
+actually present in the machine, and virtual memory, that is, address
+space. 
+* Kinds of memory
+Kernel and user space work with virtual addresses (also called linear
+addresses) that are mapped to physical addresses by the memory
+management hardware. This mapping is defined by page tables, set up by
+the operating system.
 
-* Some cases
-** OOM killer crashes[fn:1]
-To fix OOM crash the behavior of the kernel has to be changed, so it
-will no longer overcommit the memory for application requests. 
+DMA devices use bus addresses. On an i386 PC, bus addresses are the
+same as physical addresses, but other architectures may have special
+address mapping hardware to convert bus addresses to physical
+addresses.
 
 #+begin_src sh
-vm.overcommit_memory = 2
-vm.overcommit_ratio = 80
+#include <asm/io.h>
+
+phys_addr = virt_to_phys(virt_addr);
+virt_addr = phys_to_virt(phys_addr);
+ bus_addr = virt_to_bus(virt_addr);
+virt_addr = bus_to_virt(bus_addr);
 #+end_src
 
-* VM
-https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+* Kernel memory allocation
+** Pages
+The basic unit of memory is the =page=. It is architecture-dependent,
+but typically =PAGE_SIZE = 4096=.
 
-http://russ.garrett.co.uk/2009/01/01/linux-kernel-tuning/
-** =overcommit_ratio=
+Usually, the page size is determined by the hardware: the relation
+between virtual addresses and physical addresses is given by page
+tables, and when a virtual address is referenced that does not (yet)
+correspond to a physical address, a /page fault/ occurs, and the
+operating system can take appropriate action
+
+** Buddy system
+The kernel uses a buddy system with power-of-two sizes. For order 0,
+1, 2, ..., 9 it has lists of areas containing 2^order pages. If a
+small area is needed and only a larger area is available, the larger
+area is split into two halves (buddies), possibly repeatedly. The
+number of free areas of each order can be seen in =/proc/buddyinfo=.
+When an area is freed, it is checked whether its buddy is free as
+well, and if so they are merged. Read the code in =mm/page_alloc.c=.
+
+** =get_free_page=
+The routine =__get_free_page()= will give us a page. The routine
+=__get_free_pages()= will give a number of consecutive pages. (A power
+of two, from 1 to 512 or so. The above buddy system is used.)
+** kmalloc
+The routine kmalloc() is good for an area of unknown, arbitrary,
+smallish length, in the range 32-131072 (more precisely: 1/128 of a
+page up to 32 pages), preferably below 4096. For the sizes, see
+=<linux/kmalloc_sizes.h>=. Because of fragmentation, it will be
+difficult to get large consecutive areas from =kmalloc()=. These days
+=kmalloc()= returns memory from one of a series of slab caches (see
+below) with names like "size-32", ..., "size-131072".
+
+** Priority
+There is a bit specifying whether we would like a hot or a cold page
+(that is, a page likely to be in the CPU cache, or a page not likely
+to be there). If the page will be used by the CPU, a hot page will be
+faster. If the page will be used for device DMA the CPU cache would be
+invalidated anyway, and a cold page does not waste precious cache
+contents.
+
+#+begin_src c
+//linux/gfp.h
+/* Zone modifiers in GFP_ZONEMASK (see linux/mmzone.h - low four bits) */
+#define __GFP_DMA       0x01
+
+/* Action modifiers - doesn't change the zoning */
+#define __GFP_WAIT      0x10    /* Can wait and reschedule? */
+#define __GFP_HIGH      0x20    /* Should access emergency pools? */
+#define __GFP_IO        0x40    /* Can start low memory physical IO? */
+#define __GFP_FS        0x100   /* Can call down to low-level FS? */
+#define __GFP_COLD      0x200   /* Cache-cold page required */
+
+#define GFP_NOIO        (__GFP_WAIT)
+#define GFP_NOFS        (__GFP_WAIT | __GFP_IO )
+#define GFP_ATOMIC      (__GFP_HIGH)
+#define GFP_USER        (__GFP_WAIT | __GFP_IO | __GFP_FS)
+#define GFP_KERNEL      (__GFP_WAIT | __GFP_IO | __GFP_FS)
+#+end_src
+
+Uses:
+
++ =GFP_KERNEL= is the default flag. Sleeping is allowed.
++ =GFP_ATOMIC= is used in interrupt handlers. Never sleeps.
++ =GFP_USER= for user mode allocations. Low priority, and may sleep. (Today equal to GFP_KERNEL.)
++ =GFP_NOIO= must not call down to drivers (since it is used from drivers).
++ =GFP_NOFS= must not call down to filesystems (since it is used from
+  filesystems -- see, e.g., dcache.c: =shrink_dcache_memory= and
+  inode.c: =shrink_icache_memory=).
+** vmalloc
+The routine =vmalloc()= has a similar purpose, but has a better chance
+of being able to return larger consecutive areas, and is more
+expensive. It uses page table manipulation to create an area of memory
+that is consecutive in virtual memory, but not necessarily in physical
+memory. Device I/O to such an area is a bad idea. It uses the above
+calls with =GFP_KERNEL= to get its memory, so cannot be used in
+interrupt context.
+** The slab cache
+The routine =kmalloc= is general purpose, and may waste up to 50%
+space. The pool is created using =kmem_cache_create()=, and allocation
+is by =kmem_cache_alloc()=.
+
+Statistics is found in =/proc/slabinfo=.
+* Overcommit and OOM
+Linux on the other hand is seriously broken. It will by default answer
+"yes" to most requests for memory, in the hope that programs ask for
+more than they actually need. If the hope is fulfilled Linux can run
+more programs in the same memory, or can run a program that requires
+more virtual memory than is available. And if not then very bad things
+happen.
+
+What happens is that the *OOM killer* (OOM = out-of-memory) is invoked,
+and it will select some process and kill it. One holds long
+discussions about the choice of the victim. Maybe not a root process,
+maybe not a process doing raw I/O, maybe not a process that has
+already spent weeks doing some computation. 
+
+To facilitate this, the kernel maintains =oom_score= for each of the
+processes. You can see the =oom_score= of each of the processes in the
+=/proc= filesystem under the pid directory
+
+=# cat /proc/10292/oom_score=
+
+Higher the value of =oom_score= of any process the higher is its
+likelihood of getting killed by the OOM Killer in an out-of-memory
+situation.
+
+More:
++ [[https://lwn.net/Articles/317814/][Taming the OOM killer]]
+** OOM Killer
+The functions, code excerpts and comments discussed below here are
+from =mm/oom_kill.c= unless otherwise noted.
+
+It is the job of the linux 'oom killer' to sacrifice one or more
+processes in order to free up memory for the system when all else
+fails. It will also kill any process sharing the same =mm_struct= as the
+selected process, for obvious reasons. Any particular process leader
+may be immunized against the oom killer if the value of its
+=/proc/<pid>/oomadj= is set to the constant =OOM_DISABLE= (currently
+defined as -17).
+
+The function which does the actual scoring of a process in the effort
+to find the best candidate for elimination is called badness(), which
+results from the following call chain:
+
+=_alloc_pages -> out_of_memory() -> select_bad_process() -> badness()=
+
+** Tuning Parameters
+For more info on this: 
++ [[https://www.kernel.org/doc/Documentation/sysctl/vm.txt][kernel doc]]
++ [[http://russ.garrett.co.uk/2009/01/01/linux-kernel-tuning/][kernel tuning]]
+
+*** =overcommit_ratio=
 Which happened to be 50. And the machine just happened to have about
 5GB of RAM. Well look there, 5×50 is 250GB
 
  If a process tries to malloc() more memory than available it will get
  an error right away. This mode is set by changing the sysctl value
  vm.overcommit_memory to 2.
-** =vm.overcommit_ratio=
-
-** =vm.min_free_kbytes = 65536=
+*** =vm.overcommit_ratio=
+*** =vm.min_free_kbytes = 65536=
 This tells the kernel to try and keep 64MB of RAM free at all times. It’s useful in two main cases:
 
 + Swap-less machines, where you don’t want incoming network traffic to
@@ -38,14 +178,14 @@ This tells the kernel to try and keep 64MB of RAM free at all times. It’s usef
   DMA transfers below approximately 900MB of RAM. So you can end up
   with the bizarre situation of an OOM error with tons of RAM free.
 
-** =vm.min_free_kbytes= < lowmem
+*** =vm.min_free_kbytes= < lowmem
 vm.min_free_kbytes 设定值高于LowTotal 值，系统认为没有足够的lowmem，而
 触发OOM Killer，将进程强行杀掉。
  
 系统中内存分为lowmem和highmem，其中lowmem为寻址内存，当lowmem耗尽时，
 系统会触动OOM Killer将多余进程杀掉来释放内
 
-** =vm.swappiness = 0=
+*** =vm.swappiness = 0=
 It’s said that altering swappiness can help you when you’re running
 under high memory pressure with software that tries to do its own
 memory management (i.e. MySQL). We’ve had limited success with this
@@ -53,7 +193,7 @@ and I’d much prefer to use software which doesn’t pretend to know more
 about your hardware than the OS (i.e. PostgreSQL). Not that I’m
 bitter.
 
-** =vm.overcommit_memory=1=
+*** =vm.overcommit_memory=1=
 The overcommit_memory sysctl isn’t something you’ll usually have to
 change if your software isn’t insane, but our netboot setup uses it so
 I thought I’d mention it. From the documentation:
@@ -71,18 +211,153 @@ I thought I’d mention it. From the documentation:
    while accessing pages but will receive errors on memory allocation
    as appropriate.
 
-For more info on this, see the overcommit accounting documentation.
-https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+* Turning off overcommit
+Since 2.5.30 the values are: 
++ 0 (default): as before: guess about how much overcommitment is reasonable, 
++ 1: never refuse any =malloc()=, 
++ 2: be precise about the overcommit - never commit a virtual address
+  space larger than swap space plus a fraction =overcommit_ratio= of
+  the physical memory. 
 
+Here =/proc/sys/vm/overcommit_ratio= (by default 50) is
+another user-settable parameter. It is possible to set
+=overcommit_ratio= to values larger than 100. 
 
+One can view the currently committed amount of memory in
+=/proc/meminfo=, in the field =Committed_AS=.
+** Some cases
+*** OOM killer crashes[fn:3]
+To fix OOM crash the behavior of the kernel has to be changed, so it
+will no longer overcommit the memory for application requests. 
 
+#+begin_src sh
+vm.overcommit_memory = 2
+vm.overcommit_ratio = 80
+#+end_src
+
+* Stack overflow
+Processes use memory on the stack and on the heap. Heap memory is
+provided by =malloc()= or the underlying mechanisms. The stack grows
+until it no longer can, and the process is hit by a SIGSEGV signal, a
+segmentation violation (because of the access of a location just
+beyond the end of the stack), and is killed. 
+
+A simple demo that catches SIGSEGV:
+
+#+begin_src c
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+
+void segfault(int dummy) {
+        printf("Help!\n");
+        exit(1);
+}
+
+int main() {
+        int *p = 0;
+
+        signal(SIGSEGV, segfault);
+        *p = 17;
+        return 0;
+}
+#+end_src
+Without the exit() here, this demo will loop because the illegal assignment is restarted.
+This simple demo fails to catch stack overflow, because there is no stack space for a call frame for the segfault() interrupt handler. If it is desired to catch stack overflow one first must set up an alternative stack. As follows:
+
+#+begin_src c
+...
+int main() {
+        char myaltstack[SIGSTKSZ];
+        struct sigaction act;
+        stack_t ss;
+
+        ss.ss_sp = myaltstack;
+        ss.ss_size = sizeof(myaltstack);
+        ss.ss_flags = 0;
+        if (sigaltstack(&ss, NULL))
+                errexit("sigaltstack failed");
+
+        act.sa_handler = segfault;
+        act.sa_flags = SA_ONSTACK;
+        if (sigaction(SIGSEGV, &act, NULL))
+                errexit("sigaction failed");
+...
+#+end_src
+
+* The Linux Page Cache and pdflush:[fn:2]
+** writes data out
+Linux usually writes data out of the page cache using a process called
+pdflush. At any moment, between 2 and 8 pdflush threads are running on
+the system. You can monitor how many are active by looking at
+=/proc/sys/vm/nr_pdflush_threads=. Whenever all existing pdflush threads
+are busy for at least one second, an additional pdflush daemon is
+spawned. The new ones try to write back data to device queues that are
+not congested, aiming to have each device that's active get its own
+thread flushing data to that device. Each time a second has passed
+without any pdflush activity, one of the threads is removed. There are
+tunables for adjusting the minimum and maximum number of pdflush
+processes, but it's very rare they need to be adjusted.
+** pdflush tunables
+Exactly what each pdflush thread does is controlled by a series of
+parameters in /proc/sys/vm:
+
+*** =/proc/sys/vm/dirty_writeback_centisecs=
+(default 500): In hundredths of a second, this is how often pdflush
+wakes up to write data to disk. The default wakes up the two (or more)
+active threads every five seconds.
+
+Because of all this, it's unlikely you'll gain much benefit from
+lowering the writeback time; the thread spawning code assures that
+they will automatically run themselves as often as is practical to try
+and meet the other requirements.
+
+*** =/proc/sys/vm/dirty_expire_centiseconds=
+The first thing pdflush works on is writing pages that have been dirty
+for longer than it deems acceptable.
+
+(default 3000): In hundredths of a second, how long data can be in the
+page cache before it's considered expired and must be written at the
+next opportunity. Note that this default is very long: a full 30
+seconds. That means that under normal circumstances, unless you write
+enough to trigger the other pdflush method, Linux won't actually
+commit anything you write until 30 seconds later.
+*** =/proc/sys/vm/dirty_background_ratio=
+(default 10): Maximum percentage of active that can be filled with
+dirty pages before pdflush begins to write them
+
+Note that some kernel versions may internally put a lower bound on
+this value at 5%.
+
+Most of the documentation you'll find about this parameter suggests
+it's in terms of total memory, but a look at the source code shows
+this isn't true. In terms of the meminfo output, the code actually
+looks at =MemFree + Cached - Mapped=-
+*** Summary: when does pdflush write?
+In the default configuration, then, data written to disk will sit in
+memory until either a) they're more than 30 seconds old, or b) the
+dirty pages have consumed more than 10% of the active, working memory.
+If you are writing heavily, once you reach the =dirty_background_ratio=
+driven figure worth of dirty memory, you may find that all your writes
+are driven by that limit.
+*** =/proc/sys/vm/dirty_ratio=
+=/proc/sys/vm/dirty_ratio= (default 40): Maximum percentage of total
+memory that can be filled with dirty pages before processes are forced
+to write dirty buffers themselves during their time slice instead of
+being allowed to do more writes.
+
+* Reference 
++ Understanding the Linux Virtual Memory Manager By Mel Gorman
 * cc
 
 #+begin_src sh
 
 #+end_src
-
 * Footnotes
 
-[fn:1] https://www.hskupin.info/2010/06/17/how-to-fix-the-oom-killer-crashe-under-linux/
+[fn:1] http://www.win.tue.nl/~aeb/linux/lk/lk-9.html
+
+[fn:2] http://www.westnet.com/~gsmith/content/linux-pdflush.htm
+
+[fn:3] https://www.hskupin.info/2010/06/17/how-to-fix-the-oom-killer-crashe-under-linux/
 

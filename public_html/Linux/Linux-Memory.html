@@ -4,13 +4,13 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Memory, Overcommit and OOM, Stack overflow</title>
-<!-- 2017-04-20 Thu 23:29 -->
+<!-- 2017-04-22 Sat 23:38 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
-<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
-<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
-<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<link href="../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../assets/stylesheet.css" />
 <script src="assets/js/bootstrap.min.js"></script>
 <script type="text/javascript">
 /*
@@ -66,63 +66,316 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">Some cases</a>
+<li><a href="#sec-1">Physical and virtual memory </a></li>
+<li><a href="#sec-2">Kinds of memory</a></li>
+<li><a href="#sec-3">Kernel memory allocation</a>
 <ul>
-<li><a href="#sec-1-1">OOM killer crashes</a></li>
+<li><a href="#sec-3-1">Pages</a></li>
+<li><a href="#sec-3-2">Buddy system</a></li>
+<li><a href="#sec-3-3"><code>get_free_page</code></a></li>
+<li><a href="#sec-3-4">kmalloc</a></li>
+<li><a href="#sec-3-5">Priority</a></li>
+<li><a href="#sec-3-6">vmalloc</a></li>
+<li><a href="#sec-3-7">The slab cache</a></li>
 </ul>
 </li>
-<li><a href="#sec-2">VM</a>
+<li><a href="#sec-4">Overcommit and OOM</a>
 <ul>
-<li><a href="#sec-2-1"><code>overcommit_ratio</code></a></li>
-<li><a href="#sec-2-2"><code>vm.overcommit_ratio</code></a></li>
-<li><a href="#sec-2-3"><code>vm.min_free_kbytes = 65536</code></a></li>
-<li><a href="#sec-2-4"><code>vm.min_free_kbytes</code> &lt; lowmem</a></li>
-<li><a href="#sec-2-5"><code>vm.swappiness = 0</code></a></li>
-<li><a href="#sec-2-6"><code>vm.overcommit_memory=1</code></a></li>
+<li><a href="#sec-4-1">OOM Killer</a></li>
+<li><a href="#sec-4-2">Tuning Parameters</a></li>
 </ul>
 </li>
-<li><a href="#sec-3">cc</a></li>
+<li><a href="#sec-5">Turning off overcommit</a>
+<ul>
+<li><a href="#sec-5-1">Some cases</a></li>
+</ul>
+</li>
+<li><a href="#sec-6">Stack overflow</a></li>
+<li><a href="#sec-7">The Linux Page Cache and pdflush:</a>
+<ul>
+<li><a href="#sec-7-1">writes data out</a></li>
+<li><a href="#sec-7-2">pdflush tunables</a></li>
+</ul>
+</li>
+<li><a href="#sec-8">Reference</a></li>
+<li><a href="#sec-9">cc</a></li>
 </ul>
 </div>
 </div>
-
 
 
 <div id="outline-container-sec-1" class="outline-2">
-<h2 id="sec-1">Some cases</h2>
+<h2 id="sec-1">Physical and virtual memory <sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h2>
 <div class="outline-text-2" id="text-1">
-</div><div id="outline-container-sec-1-1" class="outline-3">
-<h3 id="sec-1-1">OOM killer crashes<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h3>
-<div class="outline-text-3" id="text-1-1">
 <p>
-To fix OOM crash the behavior of the kernel has to be changed, so it
-will no longer overcommit the memory for application requests. 
+Traditionally, one has physical memory, that is, memory that is
+actually present in the machine, and virtual memory, that is, address
+space. 
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Kinds of memory</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Kernel and user space work with virtual addresses (also called linear
+addresses) that are mapped to physical addresses by the memory
+management hardware. This mapping is defined by page tables, set up by
+the operating system.
+</p>
+
+<p>
+DMA devices use bus addresses. On an i386 PC, bus addresses are the
+same as physical addresses, but other architectures may have special
+address mapping hardware to convert bus addresses to physical
+addresses.
 </p>
 
 <div class="org-src-container">
 
-<pre class="src src-sh">vm.overcommit_memory = 2
-vm.overcommit_ratio = 80
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">include &lt;asm/io.h&gt;</span>
+
+<span style="color: #eedd82;">phys_addr</span> = virt_to_phys(virt_addr);
+<span style="color: #eedd82;">virt_addr</span> = phys_to_virt(phys_addr);
+ <span style="color: #eedd82;">bus_addr</span> = virt_to_bus(virt_addr);
+<span style="color: #eedd82;">virt_addr</span> = bus_to_virt(bus_addr);
 </pre>
 </div>
 </div>
 </div>
-</div>
 
-<div id="outline-container-sec-2" class="outline-2">
-<h2 id="sec-2">VM</h2>
-<div class="outline-text-2" id="text-2">
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Kernel memory allocation</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">Pages</h3>
+<div class="outline-text-3" id="text-3-1">
 <p>
-<a href="https://www.kernel.org/doc/Documentation/sysctl/vm.txt">https://www.kernel.org/doc/Documentation/sysctl/vm.txt</a>
+The basic unit of memory is the <code>page</code>. It is architecture-dependent,
+but typically <code>PAGE_SIZE = 4096</code>.
 </p>
 
 <p>
-<a href="http://russ.garrett.co.uk/2009/01/01/linux-kernel-tuning/">http://russ.garrett.co.uk/2009/01/01/linux-kernel-tuning/</a>
+Usually, the page size is determined by the hardware: the relation
+between virtual addresses and physical addresses is given by page
+tables, and when a virtual address is referenced that does not (yet)
+correspond to a physical address, a <i>page fault</i> occurs, and the
+operating system can take appropriate action
 </p>
 </div>
-<div id="outline-container-sec-2-1" class="outline-3">
-<h3 id="sec-2-1"><code>overcommit_ratio</code></h3>
-<div class="outline-text-3" id="text-2-1">
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">Buddy system</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+The kernel uses a buddy system with power-of-two sizes. For order 0,
+1, 2, &#x2026;, 9 it has lists of areas containing 2<sup>order</sup> pages. If a
+small area is needed and only a larger area is available, the larger
+area is split into two halves (buddies), possibly repeatedly. The
+number of free areas of each order can be seen in <code>/proc/buddyinfo</code>.
+When an area is freed, it is checked whether its buddy is free as
+well, and if so they are merged. Read the code in <code>mm/page_alloc.c</code>.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3"><code>get_free_page</code></h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+The routine <code>__get_free_page()</code> will give us a page. The routine
+<code>__get_free_pages()</code> will give a number of consecutive pages. (A power
+of two, from 1 to 512 or so. The above buddy system is used.)
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">kmalloc</h3>
+<div class="outline-text-3" id="text-3-4">
+<p>
+The routine kmalloc() is good for an area of unknown, arbitrary,
+smallish length, in the range 32-131072 (more precisely: 1/128 of a
+page up to 32 pages), preferably below 4096. For the sizes, see
+<code>&lt;linux/kmalloc_sizes.h&gt;</code>. Because of fragmentation, it will be
+difficult to get large consecutive areas from <code>kmalloc()</code>. These days
+<code>kmalloc()</code> returns memory from one of a series of slab caches (see
+below) with names like "size-32", &#x2026;, "size-131072".
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3-5" class="outline-3">
+<h3 id="sec-3-5">Priority</h3>
+<div class="outline-text-3" id="text-3-5">
+<p>
+There is a bit specifying whether we would like a hot or a cold page
+(that is, a page likely to be in the CPU cache, or a page not likely
+to be there). If the page will be used by the CPU, a hot page will be
+faster. If the page will be used for device DMA the CPU cache would be
+invalidated anyway, and a cold page does not waste precious cache
+contents.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #ff7f24;">//</span><span style="color: #ff7f24;">linux/gfp.h</span>
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Zone modifiers in GFP_ZONEMASK (see linux/mmzone.h - low four bits) </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__GFP_DMA</span>       0x01
+
+<span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Action modifiers - doesn't change the zoning </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__GFP_WAIT</span>      0x10    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Can wait and reschedule? </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__GFP_HIGH</span>      0x20    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Should access emergency pools? </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__GFP_IO</span>        0x40    <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Can start low memory physical IO? </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__GFP_FS</span>        0x100   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Can call down to low-level FS? </span><span style="color: #ff7f24;">*/</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">__GFP_COLD</span>      0x200   <span style="color: #ff7f24;">/* </span><span style="color: #ff7f24;">Cache-cold page required </span><span style="color: #ff7f24;">*/</span>
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">GFP_NOIO</span>        (__GFP_WAIT)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">GFP_NOFS</span>        (__GFP_WAIT | __GFP_IO )
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">GFP_ATOMIC</span>      (__GFP_HIGH)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">GFP_USER</span>        (__GFP_WAIT | __GFP_IO | __GFP_FS)
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">GFP_KERNEL</span>      (__GFP_WAIT | __GFP_IO | __GFP_FS)
+</pre>
+</div>
+
+<p>
+Uses:
+</p>
+
+<ul class="org-ul">
+<li><code>GFP_KERNEL</code> is the default flag. Sleeping is allowed.
+</li>
+<li><code>GFP_ATOMIC</code> is used in interrupt handlers. Never sleeps.
+</li>
+<li><code>GFP_USER</code> for user mode allocations. Low priority, and may sleep. (Today equal to GFP<sub>KERNEL</sub>.)
+</li>
+<li><code>GFP_NOIO</code> must not call down to drivers (since it is used from drivers).
+</li>
+<li><code>GFP_NOFS</code> must not call down to filesystems (since it is used from
+filesystems &#x2013; see, e.g., dcache.c: <code>shrink_dcache_memory</code> and
+inode.c: <code>shrink_icache_memory</code>).
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-3-6" class="outline-3">
+<h3 id="sec-3-6">vmalloc</h3>
+<div class="outline-text-3" id="text-3-6">
+<p>
+The routine <code>vmalloc()</code> has a similar purpose, but has a better chance
+of being able to return larger consecutive areas, and is more
+expensive. It uses page table manipulation to create an area of memory
+that is consecutive in virtual memory, but not necessarily in physical
+memory. Device I/O to such an area is a bad idea. It uses the above
+calls with <code>GFP_KERNEL</code> to get its memory, so cannot be used in
+interrupt context.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-7" class="outline-3">
+<h3 id="sec-3-7">The slab cache</h3>
+<div class="outline-text-3" id="text-3-7">
+<p>
+The routine <code>kmalloc</code> is general purpose, and may waste up to 50%
+space. The pool is created using <code>kmem_cache_create()</code>, and allocation
+is by <code>kmem_cache_alloc()</code>.
+</p>
+
+<p>
+Statistics is found in <code>/proc/slabinfo</code>.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Overcommit and OOM</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+Linux on the other hand is seriously broken. It will by default answer
+"yes" to most requests for memory, in the hope that programs ask for
+more than they actually need. If the hope is fulfilled Linux can run
+more programs in the same memory, or can run a program that requires
+more virtual memory than is available. And if not then very bad things
+happen.
+</p>
+
+<p>
+What happens is that the <b>OOM killer</b> (OOM = out-of-memory) is invoked,
+and it will select some process and kill it. One holds long
+discussions about the choice of the victim. Maybe not a root process,
+maybe not a process doing raw I/O, maybe not a process that has
+already spent weeks doing some computation. 
+</p>
+
+<p>
+To facilitate this, the kernel maintains <code>oom_score</code> for each of the
+processes. You can see the <code>oom_score</code> of each of the processes in the
+<code>/proc</code> filesystem under the pid directory
+</p>
+
+<p>
+<code># cat /proc/10292/oom_score</code>
+</p>
+
+<p>
+Higher the value of <code>oom_score</code> of any process the higher is its
+likelihood of getting killed by the OOM Killer in an out-of-memory
+situation.
+</p>
+
+<p>
+More:
+</p>
+<ul class="org-ul">
+<li><a href="https://lwn.net/Articles/317814/">Taming the OOM killer</a>
+</li>
+</ul>
+</div>
+<div id="outline-container-sec-4-1" class="outline-3">
+<h3 id="sec-4-1">OOM Killer</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+The functions, code excerpts and comments discussed below here are
+from <code>mm/oom_kill.c</code> unless otherwise noted.
+</p>
+
+<p>
+It is the job of the linux 'oom killer' to sacrifice one or more
+processes in order to free up memory for the system when all else
+fails. It will also kill any process sharing the same <code>mm_struct</code> as the
+selected process, for obvious reasons. Any particular process leader
+may be immunized against the oom killer if the value of its
+<code>/proc/&lt;pid&gt;/oomadj</code> is set to the constant <code>OOM_DISABLE</code> (currently
+defined as -17).
+</p>
+
+<p>
+The function which does the actual scoring of a process in the effort
+to find the best candidate for elimination is called badness(), which
+results from the following call chain:
+</p>
+
+<p>
+<code>_alloc_pages -&gt; out_of_memory() -&gt; select_bad_process() -&gt; badness()</code>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4-2" class="outline-3">
+<h3 id="sec-4-2">Tuning Parameters</h3>
+<div class="outline-text-3" id="text-4-2">
+<p>
+For more info on this: 
+</p>
+<ul class="org-ul">
+<li><a href="https://www.kernel.org/doc/Documentation/sysctl/vm.txt">kernel doc</a>
+</li>
+<li><a href="http://russ.garrett.co.uk/2009/01/01/linux-kernel-tuning/">kernel tuning</a>
+</li>
+</ul>
+</div>
+
+<ul class="org-ul"><li><a id="sec-4-2-1" name="sec-4-2-1"></a><code>overcommit_ratio</code><br  /><div class="outline-text-4" id="text-4-2-1">
 <p>
 Which happened to be 50. And the machine just happened to have about
 5GB of RAM. Well look there, 5×50 is 250GB
@@ -134,14 +387,9 @@ an error right away. This mode is set by changing the sysctl value
 vm.overcommit<sub>memory</sub> to 2.
 </p>
 </div>
-</div>
-<div id="outline-container-sec-2-2" class="outline-3">
-<h3 id="sec-2-2"><code>vm.overcommit_ratio</code></h3>
-</div>
-
-<div id="outline-container-sec-2-3" class="outline-3">
-<h3 id="sec-2-3"><code>vm.min_free_kbytes = 65536</code></h3>
-<div class="outline-text-3" id="text-2-3">
+</li>
+<li><a id="sec-4-2-2" name="sec-4-2-2"></a><code>vm.overcommit_ratio</code><br  /></li>
+<li><a id="sec-4-2-3" name="sec-4-2-3"></a><code>vm.min_free_kbytes = 65536</code><br  /><div class="outline-text-4" id="text-4-2-3">
 <p>
 This tells the kernel to try and keep 64MB of RAM free at all times. It’s useful in two main cases:
 </p>
@@ -158,11 +406,9 @@ with the bizarre situation of an OOM error with tons of RAM free.
 </li>
 </ul>
 </div>
-</div>
+</li>
 
-<div id="outline-container-sec-2-4" class="outline-3">
-<h3 id="sec-2-4"><code>vm.min_free_kbytes</code> &lt; lowmem</h3>
-<div class="outline-text-3" id="text-2-4">
+<li><a id="sec-4-2-4" name="sec-4-2-4"></a><code>vm.min_free_kbytes</code> &lt; lowmem<br  /><div class="outline-text-4" id="text-4-2-4">
 <p>
 vm.min<sub>free</sub><sub>kbytes</sub> 设定值高于LowTotal 值，系统认为没有足够的lowmem，而触发OOM Killer，将进程强行杀掉。
 </p>
@@ -171,11 +417,9 @@ vm.min<sub>free</sub><sub>kbytes</sub> 设定值高于LowTotal 值，系统认�
 系统中内存分为lowmem和highmem，其中lowmem为寻址内存，当lowmem耗尽时，系统会触动OOM Killer将多余进程杀掉来释放内
 </p>
 </div>
-</div>
+</li>
 
-<div id="outline-container-sec-2-5" class="outline-3">
-<h3 id="sec-2-5"><code>vm.swappiness = 0</code></h3>
-<div class="outline-text-3" id="text-2-5">
+<li><a id="sec-4-2-5" name="sec-4-2-5"></a><code>vm.swappiness = 0</code><br  /><div class="outline-text-4" id="text-4-2-5">
 <p>
 It’s said that altering swappiness can help you when you’re running
 under high memory pressure with software that tries to do its own
@@ -185,11 +429,9 @@ about your hardware than the OS (i.e. PostgreSQL). Not that I’m
 bitter.
 </p>
 </div>
-</div>
+</li>
 
-<div id="outline-container-sec-2-6" class="outline-3">
-<h3 id="sec-2-6"><code>vm.overcommit_memory=1</code></h3>
-<div class="outline-text-3" id="text-2-6">
+<li><a id="sec-4-2-6" name="sec-4-2-6"></a><code>vm.overcommit_memory=1</code><br  /><div class="outline-text-4" id="text-4-2-6">
 <p>
 The overcommit<sub>memory</sub> sysctl isn’t something you’ll usually have to
 change if your software isn’t insane, but our netboot setup uses it so
@@ -213,20 +455,239 @@ while accessing pages but will receive errors on memory allocation
 as appropriate.
 </li>
 </ol>
+</div>
+</li></ul>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Turning off overcommit</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+Since 2.5.30 the values are: 
+</p>
+<ul class="org-ul">
+<li>0 (default): as before: guess about how much overcommitment is reasonable, 
+</li>
+<li>1: never refuse any <code>malloc()</code>, 
+</li>
+<li>2: be precise about the overcommit - never commit a virtual address
+space larger than swap space plus a fraction <code>overcommit_ratio</code> of
+the physical memory. 
+</li>
+</ul>
 
 <p>
-For more info on this, see the overcommit accounting documentation.
-<a href="https://www.kernel.org/doc/Documentation/sysctl/vm.txt">https://www.kernel.org/doc/Documentation/sysctl/vm.txt</a>
+Here <code>/proc/sys/vm/overcommit_ratio</code> (by default 50) is
+another user-settable parameter. It is possible to set
+<code>overcommit_ratio</code> to values larger than 100. 
+</p>
+
+<p>
+One can view the currently committed amount of memory in
+<code>/proc/meminfo</code>, in the field <code>Committed_AS</code>.
+</p>
+</div>
+<div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Some cases</h3>
+<div class="outline-text-3" id="text-5-1">
+</div><ul class="org-ul"><li><a id="sec-5-1-1" name="sec-5-1-1"></a>OOM killer crashes<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup><br  /><div class="outline-text-4" id="text-5-1-1">
+<p>
+To fix OOM crash the behavior of the kernel has to be changed, so it
+will no longer overcommit the memory for application requests. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">vm.overcommit_memory = 2
+vm.overcommit_ratio = 80
+</pre>
+</div>
+</div>
+</li></ul>
+</div>
+</div>
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Stack overflow</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+Processes use memory on the stack and on the heap. Heap memory is
+provided by <code>malloc()</code> or the underlying mechanisms. The stack grows
+until it no longer can, and the process is hit by a SIGSEGV signal, a
+segmentation violation (because of the access of a location just
+beyond the end of the stack), and is killed. 
+</p>
+
+<p>
+A simple demo that catches SIGSEGV:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdlib.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;signal.h&gt;</span>
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">segfault</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dummy</span>) {
+        printf(<span style="color: #ffa07a;">"Help!\n"</span>);
+        exit(1);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+        <span style="color: #98fb98;">int</span> *<span style="color: #eedd82;">p</span> = 0;
+
+        signal(SIGSEGV, segfault);
+        *p = 17;
+        <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+<p>
+Without the exit() here, this demo will loop because the illegal assignment is restarted.
+This simple demo fails to catch stack overflow, because there is no stack space for a call frame for the segfault() interrupt handler. If it is desired to catch stack overflow one first must set up an alternative stack. As follows:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c">...
+<span style="color: #98fb98;">int</span> main() {
+        <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">myaltstack</span>[SIGSTKSZ];
+        <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">sigaction</span> <span style="color: #eedd82;">act</span>;
+        <span style="color: #98fb98;">stack_t</span> <span style="color: #eedd82;">ss</span>;
+
+        ss.ss_sp = myaltstack;
+        ss.ss_size = <span style="color: #00ffff;">sizeof</span>(myaltstack);
+        ss.ss_flags = 0;
+        <span style="color: #00ffff;">if</span> (sigaltstack(&amp;ss, <span style="color: #7fffd4;">NULL</span>))
+                errexit(<span style="color: #ffa07a;">"sigaltstack failed"</span>);
+
+        act.sa_handler = segfault;
+        act.sa_flags = SA_ONSTACK;
+        <span style="color: #00ffff;">if</span> (sigaction(SIGSEGV, &amp;act, <span style="color: #7fffd4;">NULL</span>))
+                errexit(<span style="color: #ffa07a;">"sigaction failed"</span>);
+...
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">The Linux Page Cache and pdflush:<sup><a id="fnr.3" name="fnr.3" class="footref" href="#fn.3">3</a></sup></h2>
+<div class="outline-text-2" id="text-7">
+</div><div id="outline-container-sec-7-1" class="outline-3">
+<h3 id="sec-7-1">writes data out</h3>
+<div class="outline-text-3" id="text-7-1">
+<p>
+Linux usually writes data out of the page cache using a process called
+pdflush. At any moment, between 2 and 8 pdflush threads are running on
+the system. You can monitor how many are active by looking at
+<code>/proc/sys/vm/nr_pdflush_threads</code>. Whenever all existing pdflush threads
+are busy for at least one second, an additional pdflush daemon is
+spawned. The new ones try to write back data to device queues that are
+not congested, aiming to have each device that's active get its own
+thread flushing data to that device. Each time a second has passed
+without any pdflush activity, one of the threads is removed. There are
+tunables for adjusting the minimum and maximum number of pdflush
+processes, but it's very rare they need to be adjusted.
 </p>
 </div>
 </div>
+<div id="outline-container-sec-7-2" class="outline-3">
+<h3 id="sec-7-2">pdflush tunables</h3>
+<div class="outline-text-3" id="text-7-2">
+<p>
+Exactly what each pdflush thread does is controlled by a series of
+parameters in /proc/sys/vm:
+</p>
 </div>
 
+<ul class="org-ul"><li><a id="sec-7-2-1" name="sec-7-2-1"></a><code>/proc/sys/vm/dirty_writeback_centisecs</code><br  /><div class="outline-text-4" id="text-7-2-1">
+<p>
+(default 500): In hundredths of a second, this is how often pdflush
+wakes up to write data to disk. The default wakes up the two (or more)
+active threads every five seconds.
+</p>
 
+<p>
+Because of all this, it's unlikely you'll gain much benefit from
+lowering the writeback time; the thread spawning code assures that
+they will automatically run themselves as often as is practical to try
+and meet the other requirements.
+</p>
+</div>
+</li>
 
-<div id="outline-container-sec-3" class="outline-2">
-<h2 id="sec-3">cc</h2>
-<div class="outline-text-2" id="text-3">
+<li><a id="sec-7-2-2" name="sec-7-2-2"></a><code>/proc/sys/vm/dirty_expire_centiseconds</code><br  /><div class="outline-text-4" id="text-7-2-2">
+<p>
+The first thing pdflush works on is writing pages that have been dirty
+for longer than it deems acceptable.
+</p>
+
+<p>
+(default 3000): In hundredths of a second, how long data can be in the
+page cache before it's considered expired and must be written at the
+next opportunity. Note that this default is very long: a full 30
+seconds. That means that under normal circumstances, unless you write
+enough to trigger the other pdflush method, Linux won't actually
+commit anything you write until 30 seconds later.
+</p>
+</div>
+</li>
+<li><a id="sec-7-2-3" name="sec-7-2-3"></a><code>/proc/sys/vm/dirty_background_ratio</code><br  /><div class="outline-text-4" id="text-7-2-3">
+<p>
+(default 10): Maximum percentage of active that can be filled with
+dirty pages before pdflush begins to write them
+</p>
+
+<p>
+Note that some kernel versions may internally put a lower bound on
+this value at 5%.
+</p>
+
+<p>
+Most of the documentation you'll find about this parameter suggests
+it's in terms of total memory, but a look at the source code shows
+this isn't true. In terms of the meminfo output, the code actually
+looks at <code>MemFree + Cached - Mapped</code>-
+</p>
+</div>
+</li>
+<li><a id="sec-7-2-4" name="sec-7-2-4"></a>Summary: when does pdflush write?<br  /><div class="outline-text-4" id="text-7-2-4">
+<p>
+In the default configuration, then, data written to disk will sit in
+memory until either a) they're more than 30 seconds old, or b) the
+dirty pages have consumed more than 10% of the active, working memory.
+If you are writing heavily, once you reach the <code>dirty_background_ratio</code>
+driven figure worth of dirty memory, you may find that all your writes
+are driven by that limit.
+</p>
+</div>
+</li>
+<li><a id="sec-7-2-5" name="sec-7-2-5"></a><code>/proc/sys/vm/dirty_ratio</code><br  /><div class="outline-text-4" id="text-7-2-5">
+<p>
+<code>/proc/sys/vm/dirty_ratio</code> (default 40): Maximum percentage of total
+memory that can be filled with dirty pages before processes are forced
+to write dirty buffers themselves during their time slice instead of
+being allowed to do more writes.
+</p>
+</div>
+</li></ul>
+</div>
+</div>
+
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">Reference</h2>
+<div class="outline-text-2" id="text-8">
+<ul class="org-ul">
+<li>Understanding the Linux Virtual Memory Manager By Mel Gorman
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">cc</h2>
+<div class="outline-text-2" id="text-9">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -238,7 +699,15 @@ For more info on this, see the overcommit accounting documentation.
 <div id="text-footnotes">
 
 <div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="http://www.win.tue.nl/~aeb/linux/lk/lk-9.html">http://www.win.tue.nl/~aeb/linux/lk/lk-9.html</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
 <a href="https://www.hskupin.info/2010/06/17/how-to-fix-the-oom-killer-crashe-under-linux/">https://www.hskupin.info/2010/06/17/how-to-fix-the-oom-killer-crashe-under-linux/</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.3" name="fn.3" class="footnum" href="#fnr.3">3</a></sup> <p class="footpara">
+<a href="http://www.westnet.com/~gsmith/content/linux-pdflush.htm">http://www.westnet.com/~gsmith/content/linux-pdflush.htm</a>
 </p></div>
 
 
@@ -246,7 +715,7 @@ For more info on this, see the overcommit accounting documentation.
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-04-20 Thu 23:29</p>
+<p class="date">Created: 2017-04-22 Sat 23:38</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
