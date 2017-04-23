@@ -110,6 +110,45 @@ space. The pool is created using =kmem_cache_create()=, and allocation
 is by =kmem_cache_alloc()=.
 
 Statistics is found in =/proc/slabinfo=.
+*** /proc/slabinfo and slaptop
+/proc/slabinfo gives information about memory usage on the slab level.
+Linux kernels uses slab pools to manage memory above the page level.
+Commonly used objects have their own slab pools. Instead of parsing
+the highly verbose /proc/slabinfo file manually, the /usr/bin/slabtop
+program displays kernel slab cache information in real time. 
+
+#+begin_src sh
+$ sudo slabtop
+ Active / Total Objects (% used)    : 2043086 / 2077868 (98.3%)
+ Active / Total Slabs (% used)      : 66387 / 66387 (100.0%)
+ Active / Total Caches (% used)     : 73 / 102 (71.6%)
+ Active / Total Size (% used)       : 701264.41K / 707117.73K (99.2%)
+ Minimum / Average / Maximum Object : 0.01K / 0.34K / 15.75K
+
+  OBJS ACTIVE  USE OBJ SIZE  SLABS OBJ/SLAB CACHE SIZE NAME                   
+580209 579912  99%    0.19K  27629       21    110516K dentry
+491439 472694  96%    0.10K  12601       39     50404K buffer_head
+468138 468023  99%    0.96K  14186       33    453952K ext4_inode_cache
+151470 151470 100%    0.04K   1485      102      5940K ext4_extent_status
+ 75520  71867  95%    0.06K   1180       64      4720K kmalloc-64
+ 44961  40943  91%    0.19K   2141       21      8564K kmalloc-192
+ 37400  37400 100%    0.12K   1100       34      4400K fsnotify_event
+ 35868  34052  94%    0.55K   1281       28     20496K radix_tree_node
+ 34164  34164 100%    0.11K    949       36      3796K sysfs_dir_cache
+ 18480  16311  88%    0.07K    330       56      1320K anon_vma
+#+end_src
+Important parameters in =/proc/slabinfo= are as below :
+
++ OBJS — The total number of objects (memory blocks), including those
+  in use (allocated), and some spares not in use.
++ ACTIVE — The number of objects (memory blocks) that are in use
+  (allocated).
++ USE — Percentage of total objects that are active. ((ACTIVE/OBJS)(100))
++ OBJ SIZE — The size of the objects.
++ SLABS — The total number of slabs.
++ OBJ/SLAB — The number of objects that fit into a slab.
++ CACHE SIZE — The cache size of the slab.
++ NAME — The name of the slab.
 * Overcommit and OOM
 Linux on the other hand is seriously broken. It will by default answer
 "yes" to most requests for memory, in the hope that programs ask for
@@ -346,6 +385,43 @@ memory that can be filled with dirty pages before processes are forced
 to write dirty buffers themselves during their time slice instead of
 being allowed to do more writes.
 
+* optimize or reduce RAM size in embedded system[fn:4]
+** Arrays and Lookup Tables
+Check for look-up tables that haven't used the =const= declaration
+properly, which puts them in RAM instead of ROM.
+
+#+begin_src c
+const my_struct_t * param_lookup[] = {...};  // Table is in RAM!
+my_struct_t * const param_lookup[] = {...};  // In ROM
+const char * const strings[] = {...};    // Two const may be needed; also in ROM
+#+end_src
+** Stack and heap
+Perhaps your linker config reserves large amounts of RAM for heap and
+stack, larger than necessary for your application.
+
+If you don't use heap, you can possibly eliminate that.
+
+If you measure your stack usage and it's well under the allocation,
+you may be able to reduce the allocation. For ARM processors, there
+can be several stacks, for several of the operating modes, and you may
+find that the stacks allocated for the exception or interrupt
+operating modes are larger than needed.
+** Global vs local variables
+Check for unnecessary use of static or global variables, where a local
+variable (on the stack) can be used instead.
+** Smaller variables
+Variables that can be smaller, e.g. =int16_t= (=short=) or =int8_t= (=char=)
+instead of =int32_t= (=int=).
+** Enum variable size
+=enum= variable size may be bigger than necessary. I can't remember what
+ARM compilers typically do, but some compilers I've used in the past
+by default made =enum= variables 2 bytes even though the =enum= definition
+really only required 1 byte to store its range. Check compiler
+settings.
+** Algorithm implementation
+Rework your algorithms. Some algorithms have have a range of possible
+implementations with a speed/memory trade-off.
+
 * Reference 
 + Understanding the Linux Virtual Memory Manager By Mel Gorman
 * cc
@@ -360,4 +436,6 @@ being allowed to do more writes.
 [fn:2] http://www.westnet.com/~gsmith/content/linux-pdflush.htm
 
 [fn:3] https://www.hskupin.info/2010/06/17/how-to-fix-the-oom-killer-crashe-under-linux/
+
+[fn:4] http://stackoverflow.com/questions/5685454/how-to-optimize-or-reduce-ram-size-in-embedded-system-software
 

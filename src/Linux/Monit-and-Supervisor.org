@@ -1,0 +1,226 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: (Monit and Supervisor) managing and monitoring, processes
+#+OPTIONS: num:nil
+
+
+
+* Monit
+[[https://mmonit.com/monit/][monit]] 是一款功能强大的系统状态、进程、文件、目录和设备的监控软件，用于
+*nix平台， 它可以自动重启那些已经挂掉的程序，非常适合监控系统关键的进
+程和资源，如：nginx、apache、mysql和cpu占有率等。
+
++ [[https://mmonit.com/monit/documentation/monit.html][monit的官方文档]].
+
+** 安装
+#+begin_src sh
+sudo apt-get install monit
+#+end_src
+
+** 配置[fn:1]
+#+begin_src sh
+###############################################################################
+## Monit control file
+###############################################################################
+#
+# 检查周期，默认为2分钟，对于网站来说有点长，可以根据需要自行调节，这改成30秒。
+set daemon  30
+
+# 日志文件
+set logfile /var/log/monit.log
+
+#
+# 邮件通知服务器
+#
+#set mailserver mail.example.com
+set mailserver localhost
+
+#
+# 通知邮件的格式设置，下面是默认格式供参考
+#
+## Monit by default uses the following alert mail format:
+##
+## --8<--
+## From: monit@$HOST                         # sender
+## Subject: monit alert --  $EVENT $SERVICE  # subject
+##
+## $EVENT Service $SERVICE                   #
+##                                           #
+##  Date:        $DATE                   #
+##  Action:      $ACTION                 #
+##  Host:        $HOST                   # body
+##  Description: $DESCRIPTION            #
+##                                           #
+## Your faithful employee,                   #
+## monit                                     #
+## --8<--
+##
+## You can override the alert message format or its parts such as subject
+## or sender using the MAIL-FORMAT statement. Macros such as $DATE, etc.
+## are expanded on runtime. For example to override the sender:
+#
+# 简单的，这只改了一下发送人，有需要可以自己修改其它内容。
+set mail-format { from: webmaster@example.com }
+
+# 设置邮件通知接收者。建议发到gmail，方便邮件过滤。
+set alert userxxx@gmail.com
+
+set httpd port 2812 and            # 设置http监控页面的端口
+     use address www.example.com   # http监控页面的IP或域名
+     allow localhost               # 允许本地访问
+     allow 58.68.78.0/24           # 允许此IP段访问
+     ##allow 0.0.0.0/0.0.0.0       # 允许任何IP段，不建议这样干
+     allow userxxx:passwordxxx     # 访问用户名密码
+
+###############################################################################
+## Services
+###############################################################################
+#
+# 系统整体运行状况监控，默认的就可以，可以自己去微调
+#
+# 系统名称，可以是IP或域名
+check system www.example.com
+    if loadavg (1min) > 4 then alert
+    if loadavg (5min) > 2 then alert
+    if memory usage > 75% then alert
+    if cpu usage (user) > 70% then alert
+    if cpu usage (system) > 30% then alert
+    if cpu usage (wait) > 20% then alert
+
+#
+# 监控nginx
+#
+# 需要提供进程pid文件信息
+check process nginx with pidfile /var/run/nginx.pid
+    # 进程启动命令行，注：必须是命令全路径
+    start program = "/etc/init.d/nginx start"
+    # 进程关闭命令行
+    stop program  = "/etc/init.d/nginx stop"
+    # nginx进程状态测试，监测到nginx连不上了，则自动重启
+    if failed host www.example.com port 80 protocol http then restart
+    # 多次重启失败将不再尝试重启，这种就是系统出现严重错误的情况
+    if 3 restarts within 5 cycles then timeout
+    # 可选，设置分组信息
+    group server
+
+#   可选的ssl端口的监控，如果有的话
+#    if failed port 443 type tcpssl protocol http
+#       with timeout 15 seconds
+#       then restart
+
+#
+# 监控apache
+#
+check process apache with pidfile /var/run/apache2.pid
+    start program = "/etc/init.d/apache2 start"
+    stop program  = "/etc/init.d/apache2 stop"
+    # apache吃cpu和内存比较厉害，额外添加一些关于这方面的监控设置
+    if cpu > 50% for 2 cycles then alert
+    if cpu > 70% for 5 cycles then restart
+    if totalmem > 1500 MB for 10 cycles then restart
+    if children > 250 then restart
+    if loadavg(5min) greater than 10 for 20 cycles then stop
+    if failed host www.example.com port 8080 protocol http then restart
+    if 3 restarts within 5 cycles then timeout
+    group server
+    # 可选，依赖于nginx
+    depends on nginx
+
+#
+# 监控spawn-fcgi进程(其实就是fast-cgi进程)
+#
+check process spawn-fcgi with pidfile /var/run/spawn-fcgi.pid
+    # spawn-fcgi一定要带-P参数才会生成pid文件，默认是没有的
+    start program = "/usr/bin/spawn-fcgi -a 127.0.0.1 -p 8081 -C 10 -u userxxx -g groupxxx -P /var/run/spawn-fcgi.pid -f /usr/bin/php-cgi"
+    stop program = "/usr/bin/killall /usr/bin/php-cgi"
+    # fast-cgi走的不是http协议，monit的protocol参数也没有cgi对应的设置，这里去掉protocol http即可。
+    if failed host 127.0.0.1 port 8081 then restart
+    if 3 restarts within 5 cycles then timeout
+    group server
+    depends on nginx
+#+end_src
+** start、stop、restart
+#+begin_src sh
+sudo /etc/init.d/monit start
+sudo /etc/init.d/monit stop
+sudo /etc/init.d/monit restart
+#+end_src
+* Supervisor
+监控管理Python进程，常用的是supervisor. [[http://supervisord.org/][Supervisor]] 是一个用 Python 写
+的进程管理工具，可以很方便的用来启动、重启、关闭进程（不仅仅是 Python
+进程）。除了对单个进程的控制，还可以同时启动、关闭多个进程
+** 安装
+#+begin_src sh
+sudo pip install supervisor
+#+end_src
+** 配置[fn:2]
+#+begin_src sh
+echo_supervisord_conf > /etc/supervisord.conf
+#+end_src
+
+#+begin_src sh
+[unix_http_server]
+file=/tmp/supervisor.sock   ; UNIX socket 文件，supervisorctl 会使用
+;chmod=0700                 ; socket 文件的 mode，默认是 0700
+;chown=nobody:nogroup       ; socket 文件的 owner，格式： uid:gid
+
+;[inet_http_server]         ; HTTP 服务器，提供 web 管理界面
+;port=127.0.0.1:9001        ; Web 管理后台运行的 IP 和端口，如果开放到公网，需要注意安全性
+;username=user              ; 登录管理后台的用户名
+;password=123               ; 登录管理后台的密码
+
+[supervisord]
+logfile=/tmp/supervisord.log ; 日志文件，默认是 $CWD/supervisord.log
+logfile_maxbytes=50MB        ; 日志文件大小，超出会 rotate，默认 50MB
+logfile_backups=10           ; 日志文件保留备份数量默认 10
+loglevel=info                ; 日志级别，默认 info，其它: debug,warn,trace
+pidfile=/tmp/supervisord.pid ; pid 文件
+nodaemon=false               ; 是否在前台启动，默认是 false，即以 daemon 的方式启动
+minfds=1024                  ; 可以打开的文件描述符的最小值，默认 1024
+minprocs=200                 ; 可以打开的进程数的最小值，默认 200
+
+; the below section must remain in the config file for RPC
+; (supervisorctl/web interface) to work, additional interfaces may be
+; added by defining them in separate rpcinterface: sections
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+[supervisorctl]
+serverurl=unix:///tmp/supervisor.sock ; 通过 UNIX socket 连接 supervisord，路径与 unix_http_server 部分的 file 一致
+;serverurl=http://127.0.0.1:9001 ; 通过 HTTP 的方式连接 supervisord
+
+; 包含其他的配置文件
+[include]
+files = relative/directory/*.ini    ; 可以是 *.conf 或 *.ini
+#+end_src
+
+#+begin_src sh
+supervisord -c /etc/supervisord.conf
+#+end_src
+** 使用 supervisorctl
+Supervisorctl 是 supervisord 的一个命令行客户端工具，启动时需要指定与
+supervisord 使用同一份配置文件，否则与 supervisord 一样按照顺序查找配
+置文件。
+
+#+begin_src sh
+supervisorctl -c /etc/supervisord.conf
+
+> status    # 查看程序状态
+> stop usercenter   # 关闭 usercenter 程序
+> start usercenter  # 启动 usercenter 程序
+> restart usercenter    # 重启 usercenter 程序
+> reread    ＃ 读取有更新（增加）的配置文件，不会启动新添加的程序
+> update    ＃ 重启配置文件修改过的程序
+#+end_src
+
+* cc
+
+#+begin_src sh
+
+#+end_src
+
+* Footnotes
+
+[fn:1] https://feilong.me/2011/02/monitor-core-processes-with-monit
+
+[fn:2] http://liyangliang.me/posts/2015/06/using-supervisor/
+

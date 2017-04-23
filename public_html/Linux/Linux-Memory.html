@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Memory, Overcommit and OOM, Stack overflow</title>
-<!-- 2017-04-22 Sat 23:38 -->
+<!-- 2017-04-23 Sun 22:08 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -97,8 +97,18 @@ for the JavaScript code in this tag.
 <li><a href="#sec-7-2">pdflush tunables</a></li>
 </ul>
 </li>
-<li><a href="#sec-8">Reference</a></li>
-<li><a href="#sec-9">cc</a></li>
+<li><a href="#sec-8">optimize or reduce RAM size in embedded system</a>
+<ul>
+<li><a href="#sec-8-1">Arrays and Lookup Tables</a></li>
+<li><a href="#sec-8-2">Stack and heap</a></li>
+<li><a href="#sec-8-3">Global vs local variables</a></li>
+<li><a href="#sec-8-4">Smaller variables</a></li>
+<li><a href="#sec-8-5">Enum variable size</a></li>
+<li><a href="#sec-8-6">Algorithm implementation</a></li>
+</ul>
+</li>
+<li><a href="#sec-9">Reference</a></li>
+<li><a href="#sec-10">cc</a></li>
 </ul>
 </div>
 </div>
@@ -285,6 +295,63 @@ is by <code>kmem_cache_alloc()</code>.
 Statistics is found in <code>/proc/slabinfo</code>.
 </p>
 </div>
+<ul class="org-ul"><li><a id="sec-3-7-1" name="sec-3-7-1"></a>/proc/slabinfo and slaptop<br  /><div class="outline-text-4" id="text-3-7-1">
+<p>
+/proc/slabinfo gives information about memory usage on the slab level.
+Linux kernels uses slab pools to manage memory above the page level.
+Commonly used objects have their own slab pools. Instead of parsing
+the highly verbose /proc/slabinfo file manually, the /usr/bin/slabtop
+program displays kernel slab cache information in real time. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">$ sudo slabtop
+ Active / Total Objects (% used)    : 2043086 / 2077868 (98.3%)
+ Active / Total Slabs (% used)      : 66387 / 66387 (100.0%)
+ Active / Total Caches (% used)     : 73 / 102 (71.6%)
+ Active / Total Size (% used)       : 701264.41K / 707117.73K (99.2%)
+ Minimum / Average / Maximum Object : 0.01K / 0.34K / 15.75K
+
+  OBJS ACTIVE  USE OBJ SIZE  SLABS OBJ/SLAB CACHE SIZE NAME                   
+580209 579912  99%    0.19K  27629       21    110516K dentry
+491439 472694  96%    0.10K  12601       39     50404K buffer_head
+468138 468023  99%    0.96K  14186       33    453952K ext4_inode_cache
+151470 151470 100%    0.04K   1485      102      5940K ext4_extent_status
+ 75520  71867  95%    0.06K   1180       64      4720K kmalloc-64
+ 44961  40943  91%    0.19K   2141       21      8564K kmalloc-192
+ 37400  37400 100%    0.12K   1100       34      4400K fsnotify_event
+ 35868  34052  94%    0.55K   1281       28     20496K radix_tree_node
+ 34164  34164 100%    0.11K    949       36      3796K sysfs_dir_cache
+ 18480  16311  88%    0.07K    330       56      1320K anon_vma
+</pre>
+</div>
+<p>
+Important parameters in <code>/proc/slabinfo</code> are as below :
+</p>
+
+<ul class="org-ul">
+<li>OBJS — The total number of objects (memory blocks), including those
+in use (allocated), and some spares not in use.
+</li>
+<li>ACTIVE — The number of objects (memory blocks) that are in use
+(allocated).
+</li>
+<li>USE — Percentage of total objects that are active. ((ACTIVE/OBJS)(100))
+</li>
+<li>OBJ SIZE — The size of the objects.
+</li>
+<li>SLABS — The total number of slabs.
+</li>
+<li>OBJ/SLAB — The number of objects that fit into a slab.
+</li>
+<li>CACHE SIZE — The cache size of the slab.
+</li>
+<li>NAME — The name of the slab.
+</li>
+</ul>
+</div>
+</li></ul>
 </div>
 </div>
 <div id="outline-container-sec-4" class="outline-2">
@@ -677,17 +744,99 @@ being allowed to do more writes.
 </div>
 
 <div id="outline-container-sec-8" class="outline-2">
-<h2 id="sec-8">Reference</h2>
+<h2 id="sec-8">optimize or reduce RAM size in embedded system<sup><a id="fnr.4" name="fnr.4" class="footref" href="#fn.4">4</a></sup></h2>
 <div class="outline-text-2" id="text-8">
+</div><div id="outline-container-sec-8-1" class="outline-3">
+<h3 id="sec-8-1">Arrays and Lookup Tables</h3>
+<div class="outline-text-3" id="text-8-1">
+<p>
+Check for look-up tables that haven't used the <code>const</code> declaration
+properly, which puts them in RAM instead of ROM.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">const</span> <span style="color: #98fb98;">my_struct_t</span> * <span style="color: #eedd82;">param_lookup</span>[] = {...};  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Table is in RAM!</span>
+<span style="color: #98fb98;">my_struct_t</span> * <span style="color: #00ffff;">const</span> <span style="color: #eedd82;">param_lookup</span>[] = {...};  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">In ROM</span>
+<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">char</span> * <span style="color: #00ffff;">const</span> <span style="color: #eedd82;">strings</span>[] = {...};    <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Two const may be needed; also in ROM</span>
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-8-2" class="outline-3">
+<h3 id="sec-8-2">Stack and heap</h3>
+<div class="outline-text-3" id="text-8-2">
+<p>
+Perhaps your linker config reserves large amounts of RAM for heap and
+stack, larger than necessary for your application.
+</p>
+
+<p>
+If you don't use heap, you can possibly eliminate that.
+</p>
+
+<p>
+If you measure your stack usage and it's well under the allocation,
+you may be able to reduce the allocation. For ARM processors, there
+can be several stacks, for several of the operating modes, and you may
+find that the stacks allocated for the exception or interrupt
+operating modes are larger than needed.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-8-3" class="outline-3">
+<h3 id="sec-8-3">Global vs local variables</h3>
+<div class="outline-text-3" id="text-8-3">
+<p>
+Check for unnecessary use of static or global variables, where a local
+variable (on the stack) can be used instead.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-8-4" class="outline-3">
+<h3 id="sec-8-4">Smaller variables</h3>
+<div class="outline-text-3" id="text-8-4">
+<p>
+Variables that can be smaller, e.g. <code>int16_t</code> (<code>short</code>) or <code>int8_t</code> (<code>char</code>)
+instead of <code>int32_t</code> (<code>int</code>).
+</p>
+</div>
+</div>
+<div id="outline-container-sec-8-5" class="outline-3">
+<h3 id="sec-8-5">Enum variable size</h3>
+<div class="outline-text-3" id="text-8-5">
+<p>
+<code>enum</code> variable size may be bigger than necessary. I can't remember what
+ARM compilers typically do, but some compilers I've used in the past
+by default made <code>enum</code> variables 2 bytes even though the <code>enum</code> definition
+really only required 1 byte to store its range. Check compiler
+settings.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-8-6" class="outline-3">
+<h3 id="sec-8-6">Algorithm implementation</h3>
+<div class="outline-text-3" id="text-8-6">
+<p>
+Rework your algorithms. Some algorithms have have a range of possible
+implementations with a speed/memory trade-off.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">Reference</h2>
+<div class="outline-text-2" id="text-9">
 <ul class="org-ul">
 <li>Understanding the Linux Virtual Memory Manager By Mel Gorman
 </li>
 </ul>
 </div>
 </div>
-<div id="outline-container-sec-9" class="outline-2">
-<h2 id="sec-9">cc</h2>
-<div class="outline-text-2" id="text-9">
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10">cc</h2>
+<div class="outline-text-2" id="text-10">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -710,12 +859,16 @@ being allowed to do more writes.
 <a href="http://www.westnet.com/~gsmith/content/linux-pdflush.htm">http://www.westnet.com/~gsmith/content/linux-pdflush.htm</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.4" name="fn.4" class="footnum" href="#fnr.4">4</a></sup> <p class="footpara">
+<a href="http://stackoverflow.com/questions/5685454/how-to-optimize-or-reduce-ram-size-in-embedded-system-software">http://stackoverflow.com/questions/5685454/how-to-optimize-or-reduce-ram-size-in-embedded-system-software</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-04-22 Sat 23:38</p>
+<p class="date">Created: 2017-04-23 Sun 22:08</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

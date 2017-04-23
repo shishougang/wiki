@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>(Monit and Supervisor) managing and monitoring, processes</title>
+<!-- 2017-04-23 Sun 22:08 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">(Monit and Supervisor) managing and monitoring, processes</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Monit</a>
+<ul>
+<li><a href="#sec-1-1">安装</a></li>
+<li><a href="#sec-1-2">配置</a></li>
+<li><a href="#sec-1-3">start、stop、restart</a></li>
+</ul>
+</li>
+<li><a href="#sec-2">Supervisor</a>
+<ul>
+<li><a href="#sec-2-1">安装</a></li>
+<li><a href="#sec-2-2">配置</a></li>
+<li><a href="#sec-2-3">使用 supervisorctl</a></li>
+</ul>
+</li>
+<li><a href="#sec-3">cc</a></li>
+</ul>
+</div>
+</div>
+
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Monit</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+<a href="https://mmonit.com/monit/">monit</a> 是一款功能强大的系统状态、进程、文件、目录和设备的监控软件，用于
+*nix平台， 它可以自动重启那些已经挂掉的程序，非常适合监控系统关键的进程和资源，如：nginx、apache、mysql和cpu占有率等。
+</p>
+
+<ul class="org-ul">
+<li><a href="https://mmonit.com/monit/documentation/monit.html">monit的官方文档</a>.
+</li>
+</ul>
+</div>
+
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1">安装</h3>
+<div class="outline-text-3" id="text-1-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt-get install monit
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2">配置<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup></h3>
+<div class="outline-text-3" id="text-1-2">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;">###############################################################################</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">Monit control file</span>
+<span style="color: #ff7f24;">###############################################################################</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#26816;&#26597;&#21608;&#26399;&#65292;&#40664;&#35748;&#20026;2&#20998;&#38047;&#65292;&#23545;&#20110;&#32593;&#31449;&#26469;&#35828;&#26377;&#28857;&#38271;&#65292;&#21487;&#20197;&#26681;&#25454;&#38656;&#35201;&#33258;&#34892;&#35843;&#33410;&#65292;&#36825;&#25913;&#25104;30&#31186;&#12290;</span>
+<span style="color: #b0c4de;">set</span> daemon  30
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#26085;&#24535;&#25991;&#20214;</span>
+<span style="color: #b0c4de;">set</span> logfile /var/log/monit.log
+
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#37038;&#20214;&#36890;&#30693;&#26381;&#21153;&#22120;</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">set mailserver mail.example.com</span>
+<span style="color: #b0c4de;">set</span> mailserver localhost
+
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#36890;&#30693;&#37038;&#20214;&#30340;&#26684;&#24335;&#35774;&#32622;&#65292;&#19979;&#38754;&#26159;&#40664;&#35748;&#26684;&#24335;&#20379;&#21442;&#32771;</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">Monit by default uses the following alert mail format:</span>
+<span style="color: #ff7f24;">##</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">--8&lt;--</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">From: monit@$HOST                         # sender</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">Subject: monit alert --  $EVENT $SERVICE  # subject</span>
+<span style="color: #ff7f24;">##</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">$EVENT Service $SERVICE                   #</span>
+<span style="color: #ff7f24;">##                                           </span><span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;">##  </span><span style="color: #ff7f24;">Date:        $DATE                   #</span>
+<span style="color: #ff7f24;">##  </span><span style="color: #ff7f24;">Action:      $ACTION                 #</span>
+<span style="color: #ff7f24;">##  </span><span style="color: #ff7f24;">Host:        $HOST                   # body</span>
+<span style="color: #ff7f24;">##  </span><span style="color: #ff7f24;">Description: $DESCRIPTION            #</span>
+<span style="color: #ff7f24;">##                                           </span><span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">Your faithful employee,                   #</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">monit                                     #</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">--8&lt;--</span>
+<span style="color: #ff7f24;">##</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">You can override the alert message format or its parts such as subject</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">or sender using the MAIL-FORMAT statement. Macros such as $DATE, etc.</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">are expanded on runtime. For example to override the sender:</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#31616;&#21333;&#30340;&#65292;&#36825;&#21482;&#25913;&#20102;&#19968;&#19979;&#21457;&#36865;&#20154;&#65292;&#26377;&#38656;&#35201;&#21487;&#20197;&#33258;&#24049;&#20462;&#25913;&#20854;&#23427;&#20869;&#23481;&#12290;</span>
+<span style="color: #b0c4de;">set</span> mail-format { from: webmaster@example.com }
+
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#35774;&#32622;&#37038;&#20214;&#36890;&#30693;&#25509;&#25910;&#32773;&#12290;&#24314;&#35758;&#21457;&#21040;gmail&#65292;&#26041;&#20415;&#37038;&#20214;&#36807;&#28388;&#12290;</span>
+<span style="color: #b0c4de;">set</span> alert userxxx@gmail.com
+
+<span style="color: #b0c4de;">set</span> httpd port 2812 and            <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#35774;&#32622;http&#30417;&#25511;&#39029;&#38754;&#30340;&#31471;&#21475;</span>
+     use address www.example.com   <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">http&#30417;&#25511;&#39029;&#38754;&#30340;IP&#25110;&#22495;&#21517;</span>
+     allow localhost               <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#20801;&#35768;&#26412;&#22320;&#35775;&#38382;</span>
+     allow 58.68.78.0/24           <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#20801;&#35768;&#27492;IP&#27573;&#35775;&#38382;</span>
+     <span style="color: #ff7f24;">##</span><span style="color: #ff7f24;">allow 0.0.0.0/0.0.0.0       # &#20801;&#35768;&#20219;&#20309;IP&#27573;&#65292;&#19981;&#24314;&#35758;&#36825;&#26679;&#24178;</span>
+     allow userxxx:passwordxxx     <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#35775;&#38382;&#29992;&#25143;&#21517;&#23494;&#30721;</span>
+
+<span style="color: #ff7f24;">###############################################################################</span>
+<span style="color: #ff7f24;">## </span><span style="color: #ff7f24;">Services</span>
+<span style="color: #ff7f24;">###############################################################################</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#31995;&#32479;&#25972;&#20307;&#36816;&#34892;&#29366;&#20917;&#30417;&#25511;&#65292;&#40664;&#35748;&#30340;&#23601;&#21487;&#20197;&#65292;&#21487;&#20197;&#33258;&#24049;&#21435;&#24494;&#35843;</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#31995;&#32479;&#21517;&#31216;&#65292;&#21487;&#20197;&#26159;IP&#25110;&#22495;&#21517;</span>
+check system www.example.com
+    <span style="color: #00ffff;">if</span> loadavg (1min) &gt; 4 then alert
+    <span style="color: #00ffff;">if</span> loadavg (5min) &gt; 2 then alert
+    <span style="color: #00ffff;">if</span> memory usage &gt; 75% then alert
+    <span style="color: #00ffff;">if</span> cpu usage (user) &gt; 70% then alert
+    <span style="color: #00ffff;">if</span> cpu usage (system) &gt; 30% then alert
+    <span style="color: #00ffff;">if</span> cpu usage (<span style="color: #b0c4de;">wait</span>) &gt; 20% then alert
+
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#30417;&#25511;nginx</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#38656;&#35201;&#25552;&#20379;&#36827;&#31243;pid&#25991;&#20214;&#20449;&#24687;</span>
+check process nginx with pidfile /var/run/nginx.pid
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#36827;&#31243;&#21551;&#21160;&#21629;&#20196;&#34892;&#65292;&#27880;&#65306;&#24517;&#39035;&#26159;&#21629;&#20196;&#20840;&#36335;&#24452;</span>
+    start <span style="color: #eedd82;">program</span> = <span style="color: #ffa07a;">"/etc/init.d/nginx start"</span>
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#36827;&#31243;&#20851;&#38381;&#21629;&#20196;&#34892;</span>
+    stop <span style="color: #eedd82;">program</span>  = <span style="color: #ffa07a;">"/etc/init.d/nginx stop"</span>
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">nginx&#36827;&#31243;&#29366;&#24577;&#27979;&#35797;&#65292;&#30417;&#27979;&#21040;nginx&#36830;&#19981;&#19978;&#20102;&#65292;&#21017;&#33258;&#21160;&#37325;&#21551;</span>
+    <span style="color: #00ffff;">if</span> failed host www.example.com port 80 protocol http then restart
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#22810;&#27425;&#37325;&#21551;&#22833;&#36133;&#23558;&#19981;&#20877;&#23581;&#35797;&#37325;&#21551;&#65292;&#36825;&#31181;&#23601;&#26159;&#31995;&#32479;&#20986;&#29616;&#20005;&#37325;&#38169;&#35823;&#30340;&#24773;&#20917;</span>
+    <span style="color: #00ffff;">if</span> 3 restarts within 5 cycles then timeout
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#21487;&#36873;&#65292;&#35774;&#32622;&#20998;&#32452;&#20449;&#24687;</span>
+    group server
+
+<span style="color: #ff7f24;">#   </span><span style="color: #ff7f24;">&#21487;&#36873;&#30340;ssl&#31471;&#21475;&#30340;&#30417;&#25511;&#65292;&#22914;&#26524;&#26377;&#30340;&#35805;</span>
+<span style="color: #ff7f24;">#    </span><span style="color: #ff7f24;">if failed port 443 type tcpssl protocol http</span>
+<span style="color: #ff7f24;">#       </span><span style="color: #ff7f24;">with timeout 15 seconds</span>
+<span style="color: #ff7f24;">#       </span><span style="color: #ff7f24;">then restart</span>
+
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#30417;&#25511;apache</span>
+<span style="color: #ff7f24;">#</span>
+check process apache with pidfile /var/run/apache2.pid
+    start <span style="color: #eedd82;">program</span> = <span style="color: #ffa07a;">"/etc/init.d/apache2 start"</span>
+    stop <span style="color: #eedd82;">program</span>  = <span style="color: #ffa07a;">"/etc/init.d/apache2 stop"</span>
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">apache&#21507;cpu&#21644;&#20869;&#23384;&#27604;&#36739;&#21385;&#23475;&#65292;&#39069;&#22806;&#28155;&#21152;&#19968;&#20123;&#20851;&#20110;&#36825;&#26041;&#38754;&#30340;&#30417;&#25511;&#35774;&#32622;</span>
+    <span style="color: #00ffff;">if</span> cpu &gt; 50% for 2 cycles then alert
+    <span style="color: #00ffff;">if</span> cpu &gt; 70% for 5 cycles then restart
+    <span style="color: #00ffff;">if</span> totalmem &gt; 1500 MB for 10 cycles then restart
+    <span style="color: #00ffff;">if</span> children &gt; 250 then restart
+    <span style="color: #00ffff;">if</span> loadavg(5min) greater than 10 for 20 cycles then stop
+    <span style="color: #00ffff;">if</span> failed host www.example.com port 8080 protocol http then restart
+    <span style="color: #00ffff;">if</span> 3 restarts within 5 cycles then timeout
+    group server
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#21487;&#36873;&#65292;&#20381;&#36182;&#20110;nginx</span>
+    depends on nginx
+
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#30417;&#25511;spawn-fcgi&#36827;&#31243;(&#20854;&#23454;&#23601;&#26159;fast-cgi&#36827;&#31243;)</span>
+<span style="color: #ff7f24;">#</span>
+check process spawn-fcgi with pidfile /var/run/spawn-fcgi.pid
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">spawn-fcgi&#19968;&#23450;&#35201;&#24102;-P&#21442;&#25968;&#25165;&#20250;&#29983;&#25104;pid&#25991;&#20214;&#65292;&#40664;&#35748;&#26159;&#27809;&#26377;&#30340;</span>
+    start <span style="color: #eedd82;">program</span> = <span style="color: #ffa07a;">"/usr/bin/spawn-fcgi -a 127.0.0.1 -p 8081 -C 10 -u userxxx -g groupxxx -P /var/run/spawn-fcgi.pid -f /usr/bin/php-cgi"</span>
+    stop <span style="color: #eedd82;">program</span> = <span style="color: #ffa07a;">"/usr/bin/killall /usr/bin/php-cgi"</span>
+    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">fast-cgi&#36208;&#30340;&#19981;&#26159;http&#21327;&#35758;&#65292;monit&#30340;protocol&#21442;&#25968;&#20063;&#27809;&#26377;cgi&#23545;&#24212;&#30340;&#35774;&#32622;&#65292;&#36825;&#37324;&#21435;&#25481;protocol http&#21363;&#21487;&#12290;</span>
+    <span style="color: #00ffff;">if</span> failed host 127.0.0.1 port 8081 then restart
+    <span style="color: #00ffff;">if</span> 3 restarts within 5 cycles then timeout
+    group server
+    depends on nginx
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-1-3" class="outline-3">
+<h3 id="sec-1-3">start、stop、restart</h3>
+<div class="outline-text-3" id="text-1-3">
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo /etc/init.d/monit start
+sudo /etc/init.d/monit stop
+sudo /etc/init.d/monit restart
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Supervisor</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+监控管理Python进程，常用的是supervisor. <a href="http://supervisord.org/">Supervisor</a> 是一个用 Python 写的进程管理工具，可以很方便的用来启动、重启、关闭进程（不仅仅是 Python
+进程）。除了对单个进程的控制，还可以同时启动、关闭多个进程
+</p>
+</div>
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">安装</h3>
+<div class="outline-text-3" id="text-2-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo pip install supervisor
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">配置<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup></h3>
+<div class="outline-text-3" id="text-2-2">
+<div class="org-src-container">
+
+<pre class="src src-sh">echo_supervisord_conf &gt; /etc/supervisord.conf
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">[unix_http_server]
+<span style="color: #eedd82;">file</span>=/tmp/supervisor.sock   ; UNIX socket &#25991;&#20214;&#65292;supervisorctl &#20250;&#20351;&#29992;
+;<span style="color: #eedd82;">chmod</span>=0700                 ; socket &#25991;&#20214;&#30340; mode&#65292;&#40664;&#35748;&#26159; 0700
+;<span style="color: #eedd82;">chown</span>=nobody:nogroup       ; socket &#25991;&#20214;&#30340; owner&#65292;&#26684;&#24335;&#65306; uid:gid
+
+;[inet_http_server]         ; HTTP &#26381;&#21153;&#22120;&#65292;&#25552;&#20379; web &#31649;&#29702;&#30028;&#38754;
+;<span style="color: #eedd82;">port</span>=127.0.0.1:9001        ; Web &#31649;&#29702;&#21518;&#21488;&#36816;&#34892;&#30340; IP &#21644;&#31471;&#21475;&#65292;&#22914;&#26524;&#24320;&#25918;&#21040;&#20844;&#32593;&#65292;&#38656;&#35201;&#27880;&#24847;&#23433;&#20840;&#24615;
+;<span style="color: #eedd82;">username</span>=user              ; &#30331;&#24405;&#31649;&#29702;&#21518;&#21488;&#30340;&#29992;&#25143;&#21517;
+;<span style="color: #eedd82;">password</span>=123               ; &#30331;&#24405;&#31649;&#29702;&#21518;&#21488;&#30340;&#23494;&#30721;
+
+[supervisord]
+<span style="color: #eedd82;">logfile</span>=/tmp/supervisord.log ; &#26085;&#24535;&#25991;&#20214;&#65292;&#40664;&#35748;&#26159; $<span style="color: #eedd82;">CWD</span>/supervisord.log
+<span style="color: #eedd82;">logfile_maxbytes</span>=50MB        ; &#26085;&#24535;&#25991;&#20214;&#22823;&#23567;&#65292;&#36229;&#20986;&#20250; rotate&#65292;&#40664;&#35748; 50MB
+<span style="color: #eedd82;">logfile_backups</span>=10           ; &#26085;&#24535;&#25991;&#20214;&#20445;&#30041;&#22791;&#20221;&#25968;&#37327;&#40664;&#35748; 10
+<span style="color: #eedd82;">loglevel</span>=info                ; &#26085;&#24535;&#32423;&#21035;&#65292;&#40664;&#35748; info&#65292;&#20854;&#23427;: debug,warn,trace
+<span style="color: #eedd82;">pidfile</span>=/tmp/supervisord.pid ; pid &#25991;&#20214;
+<span style="color: #eedd82;">nodaemon</span>=false               ; &#26159;&#21542;&#22312;&#21069;&#21488;&#21551;&#21160;&#65292;&#40664;&#35748;&#26159; false&#65292;&#21363;&#20197; daemon &#30340;&#26041;&#24335;&#21551;&#21160;
+<span style="color: #eedd82;">minfds</span>=1024                  ; &#21487;&#20197;&#25171;&#24320;&#30340;&#25991;&#20214;&#25551;&#36848;&#31526;&#30340;&#26368;&#23567;&#20540;&#65292;&#40664;&#35748; 1024
+<span style="color: #eedd82;">minprocs</span>=200                 ; &#21487;&#20197;&#25171;&#24320;&#30340;&#36827;&#31243;&#25968;&#30340;&#26368;&#23567;&#20540;&#65292;&#40664;&#35748; 200
+
+; the below section must remain<span style="color: #00ffff;"> in</span> the config file for RPC
+; (supervisorctl/web interface) to work, additional interfaces may be
+; added by defining them<span style="color: #00ffff;"> in</span> separate rpcinterface: sections
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+[supervisorctl]
+<span style="color: #eedd82;">serverurl</span>=unix:///tmp/supervisor.sock ; &#36890;&#36807; UNIX socket &#36830;&#25509; supervisord&#65292;&#36335;&#24452;&#19982; unix_http_server &#37096;&#20998;&#30340; file &#19968;&#33268;
+;<span style="color: #eedd82;">serverurl</span>=http://127.0.0.1:9001 ; &#36890;&#36807; HTTP &#30340;&#26041;&#24335;&#36830;&#25509; supervisord
+
+; &#21253;&#21547;&#20854;&#20182;&#30340;&#37197;&#32622;&#25991;&#20214;
+[include]
+<span style="color: #eedd82;">files</span> = relative/directory/*.ini    ; &#21487;&#20197;&#26159; *.conf &#25110; *.ini
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">supervisord -c /etc/supervisord.conf
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">使用 supervisorctl</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+Supervisorctl 是 supervisord 的一个命令行客户端工具，启动时需要指定与
+supervisord 使用同一份配置文件，否则与 supervisord 一样按照顺序查找配置文件。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">supervisorctl -c /etc/supervisord.conf
+
+&gt; status    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#26597;&#30475;&#31243;&#24207;&#29366;&#24577;</span>
+&gt; stop usercenter   <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#20851;&#38381; usercenter &#31243;&#24207;</span>
+&gt; start usercenter  <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#21551;&#21160; usercenter &#31243;&#24207;</span>
+&gt; restart usercenter    <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">&#37325;&#21551; usercenter &#31243;&#24207;</span>
+&gt; reread    &#65283; &#35835;&#21462;&#26377;&#26356;&#26032;&#65288;&#22686;&#21152;&#65289;&#30340;&#37197;&#32622;&#25991;&#20214;&#65292;&#19981;&#20250;&#21551;&#21160;&#26032;&#28155;&#21152;&#30340;&#31243;&#24207;
+&gt; update    &#65283; &#37325;&#21551;&#37197;&#32622;&#25991;&#20214;&#20462;&#25913;&#36807;&#30340;&#31243;&#24207;
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">cc</h2>
+<div class="outline-text-2" id="text-3">
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="https://feilong.me/2011/02/monitor-core-processes-with-monit">https://feilong.me/2011/02/monitor-core-processes-with-monit</a>
+</p></div>
+
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="http://liyangliang.me/posts/2015/06/using-supervisor/">http://liyangliang.me/posts/2015/06/using-supervisor/</a>
+</p></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-04-23 Sun 22:08</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
