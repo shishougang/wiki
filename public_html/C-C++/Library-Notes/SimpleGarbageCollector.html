@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>A Simple Garbage Collector for C++</title>
+<!-- 2017-04-26 Wed 23:53 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">A Simple Garbage Collector for C++</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">The Pros and Cons of Manual Memory Management</a></li>
+<li><a href="#sec-3">The Pros and Cons of Garbage Collection</a></li>
+<li><a href="#sec-4">You Can Have It Both Ways</a></li>
+<li><a href="#sec-5">Creating a Garbage Collector in C++</a></li>
+<li><a href="#sec-6">Choosing a Garbage Collection Algorithm</a>
+<ul>
+<li><a href="#sec-6-1">Reference Counting</a></li>
+<li><a href="#sec-6-2">Mark and Sweep</a></li>
+<li><a href="#sec-6-3">Copying</a></li>
+</ul>
+</li>
+<li><a href="#sec-7">cc</a></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Overview</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+It is extracted from the &lt;The Art of C++&gt;. The Chapter 2 is <a href="https://www.cmlab.csie.ntu.edu.tw/~chenhsiu/tech/The_Art_of_C++_ch2.pdf">here</a>. The
+<a href="./Files/gc.h">source codes</a> are from the book.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">The Pros and Cons of Manual Memory Management</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+The main benefit of manually managing dynamic memory is efficiency.
+Because there is no garbage collector, no time is spent keeping track
+of active objects or periodically looking for unused memory. Instead,
+when the programmer knows that the allocated object is no longer
+needed, the programmer explicitly frees it and no additional overhead
+is incurred. Because it has none of the overhead associated with
+garbage collection, the manual approach enables more efficient code to
+be written This is one reason why it was necessary for C++ to support
+manual memory management: it enabled the creation of high-performance
+code.
+</p>
+
+<p>
+Another advantage to the manual approach is control. Although
+requiring the programmer to handle both the allocation and release of
+memory is a burden, the benefit is that the programmer gains complete
+control over both halves of the process. You know precisely when
+memory is being allocated and precisely when it is being released.
+Furthermore, when you release an object via delete, its destructor is
+executed at that point rather than at some later time, as can be the
+case with garbage collection. Thus, with the manual method you can
+control precisely when an allocated object is destroyed.
+</p>
+
+<p>
+Although it is efficient, manual memory management is susceptible to a
+rather annoying type of error: the memory leak. Because memory must be
+freed manually, it is possible (even easy) to forget to do so. Failing
+to release unused memory means that the memory will remain allocated
+even if it is no longer needed. Memory leaks cannot occur in a garbage
+collection environment because the garbage collector ensures that
+unused objects are eventually freed. Memory leaks are a particularly
+troublesome problem in Windows programming, where the failure to
+release unused resources slowly degrades performance.
+</p>
+
+<p>
+Other problems that can occur with C++’s manual approach include the
+premature releasing of memory that is still in use, and the accidental
+freeing of the same memory twice. Both of these errors can lead to
+serious trouble. Unfortunately, they may not show any immediate
+symptoms, making them hard to find.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">The Pros and Cons of Garbage Collection</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+There are several different ways to implement garbage collection, each
+offering different performance characteristics. However, all garbage
+collection systems share a set of common attributes that can be
+compared against the manual approach. The main advantages to garbage
+collection are simplicity and safety. In a garbage collection
+environment, you explicitly allocate memory via new, but you never
+explicitly free it. Instead, unused memory is automatically recycled.
+Thus, it is not possible to forget to release an object or to release
+an object prematurely. This simplifies programming and prevents an
+entire class of problems. Furthermore, it is not possible to
+accidentally free dynamically allocated memory twice. Thus, garbage
+collection provides an easy-to-use, error-free, reliable solution to
+the memory management problem.
+</p>
+
+<p>
+Unfortunately, the simplicity and safety of garbage collection come at
+a price. The first cost is the overhead incurred by the garbage
+collection mechanism. All garbage collection schemes consume some CPU
+cycles because the reclamation of unused memory is not a cost-free
+process. This overhead does not occur with the manual approach.
+</p>
+
+<p>
+A second cost is loss of control over when an object is destroyed.
+Unlike the manual approach, in which an object is destroyed (and its
+destructor called) at a known point in time—when a delete statement is
+executed on that object—garbage collection does not have such a hard
+and fast rule. Instead, when garbage collection is used, an object is
+not destroyed until the collector runs and recycles the object, which
+may not occur until some arbitrary time in the future. For example,
+the collector might not run until the amount of free memory drops
+below a certain point. Furthermore, it is not always possible to know
+the order in which objects will be destroyed by the garbage collector.
+In some cases, the inability to know precisely when an object is
+destroyed can cause trouble because it also means that your program
+can’t know precisely when the destructor for a dynamically allocated
+object is called.
+</p>
+
+<p>
+For garbage collection systems that run as a background task, this
+loss of control can escalate into a potentially more serious problem
+for some types of applications because it introduces what is
+essentially nondeterministic behavior into a program. A garbage
+collector that executes in the background reclaims unused memory at
+times that are, for all practical purposes, unknowable. For example,
+the collector will usually run only when free CPU time is available.
+Because this might vary from one program run to the next, from one
+computer to next, or from one operating system to the next, the
+precise point in program execution at which the garbage collector
+executes is effectively nondeterministic. This is not a problem for
+many programs, but it can cause havoc with real-time applications in
+which the unexpected allocation of CPU cycles to the garbage collector
+could cause an event to be missed.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">You Can Have It Both Ways</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+As the preceding discussions explained, both manual management and
+garbage collection maximize one feature at the expense of another. The
+manual approach maximizes efficiency and control at the expense of
+safety and ease of use. Garbage collection maximizes simplicity and
+safety but pays for it with a loss of runtime performance and control.
+Thus, garbage collection and manual memory management are essentially
+opposites, each maximizing the traits that the other sacrifices. This
+is why neither approach to dynamic memory management can be optimal
+for all programming situations.
+</p>
+
+<p>
+Although opposites, the two approaches are not mutually exclusive.
+They can coexist. Thus, it is possible for the C++ programmer to have
+access to both approaches, choosing the proper method for the task at
+hand. 
+</p>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Creating a Garbage Collector in C++</h2>
+<div class="outline-text-2" id="text-5">
+<p>
+A better solution is one in which the garbage collector can be used
+with any type of dynamically allocated object. To provide such a
+solution, the garbage collector must:
+</p>
+
+<ol class="org-ol">
+<li>Coexist with the built-in, manual method provided by C++.
+</li>
+<li>Not break any preexisting code. Moreover, it must have no impact
+whatsoever on existing code.
+</li>
+<li>Work transparently so that allocations that use garbage collection
+are operated on in the same way as those that don’t.
+</li>
+<li>Allocate memory using new in the same way that C++’s built-in
+approach does.
+</li>
+<li>Work with all data types, including the built-in types such as int
+and double.
+</li>
+<li>Be simple to use.
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Choosing a Garbage Collection Algorithm</h2>
+<div class="outline-text-2" id="text-6">
+<p>
+There are three archetypal approaches: reference counting, mark and
+sweep, and copying.
+</p>
+</div>
+<div id="outline-container-sec-6-1" class="outline-3">
+<h3 id="sec-6-1">Reference Counting</h3>
+<div class="outline-text-3" id="text-6-1">
+<p>
+In reference counting, each dynamically allocated piece of memory has
+associated with it a reference count. This count is incremented each
+time a reference to the memory is added and decremented each time a
+reference to the memory is removed. In C++ terms, this means that each
+time a pointer is set to point to a piece of allocated memory, the
+reference count associated with that memory is incremented. When the
+pointer is set to point elsewhere, the reference count is decremented.
+When the reference count drops to zero, the memory is unused and can
+be released.
+</p>
+
+<p>
+The <b>main advantage</b> of reference counting is simplicity—it is easy to
+understand and implement. Furthermore, it places no restrictions on
+the organization of the heap because the reference count is
+independent of an object’s physical location. Reference counting adds
+<b>overhead</b> to each pointer operation, but the collection phase is
+relatively low cost. The main <b>disadvantage</b> is that circular references
+prevent memory that is otherwise unused from being released. A
+<b>circular reference</b> occurs when two objects point to each other, either
+directly or indirectly. In this situation, neither object’s reference
+count ever drops to zero. Some solutions to the circular reference
+problem have been devised, but all add complexity and/or overhead.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-2" class="outline-3">
+<h3 id="sec-6-2">Mark and Sweep</h3>
+<div class="outline-text-3" id="text-6-2">
+<p>
+Mark and sweep involves two phases. In the first phase, all objects in
+the heap are set to their unmarked state. Then, all objects directly
+or indirectly accessible from program variables are marked as
+“in-use.” In phase two, all of allocated memory is scanned (that is,
+a sweep of memory is made), and all unmarked elements are released.
+</p>
+
+<p>
+There are two main advantages of mark and sweep. First, it easily
+handles circular references. Second, it adds virtually no runtime
+overhead prior to collection. It has two main disadvantages. First, a
+considerable amount of time might be spent collecting garbage because
+the entire heap must be scanned during collection. Thus, garbage
+collection may cause unacceptable runtime characteristics for some
+programs. Second, although mark and sweep is simple conceptually, it
+can be tricky to implement efficiently.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-3" class="outline-3">
+<h3 id="sec-6-3">Copying</h3>
+</div>
+</div>
+
+
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">cc</h2>
+<div class="outline-text-2" id="text-7">
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-python"></pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-04-26 Wed 23:53</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

@@ -1,0 +1,186 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: A Simple Garbage Collector for C++
+#+OPTIONS: num:nil H:2
+
+* Overview
+It is extracted from the <The Art of C++>. The Chapter 2 is [[https://www.cmlab.csie.ntu.edu.tw/~chenhsiu/tech/The_Art_of_C++_ch2.pdf][here]]. The
+[[./Files/gc.h][source codes]] are from the book.
+
+* The Pros and Cons of Manual Memory Management
+The main benefit of manually managing dynamic memory is efficiency.
+Because there is no garbage collector, no time is spent keeping track
+of active objects or periodically looking for unused memory. Instead,
+when the programmer knows that the allocated object is no longer
+needed, the programmer explicitly frees it and no additional overhead
+is incurred. Because it has none of the overhead associated with
+garbage collection, the manual approach enables more efficient code to
+be written This is one reason why it was necessary for C++ to support
+manual memory management: it enabled the creation of high-performance
+code.
+
+Another advantage to the manual approach is control. Although
+requiring the programmer to handle both the allocation and release of
+memory is a burden, the benefit is that the programmer gains complete
+control over both halves of the process. You know precisely when
+memory is being allocated and precisely when it is being released.
+Furthermore, when you release an object via delete, its destructor is
+executed at that point rather than at some later time, as can be the
+case with garbage collection. Thus, with the manual method you can
+control precisely when an allocated object is destroyed.
+
+Although it is efficient, manual memory management is susceptible to a
+rather annoying type of error: the memory leak. Because memory must be
+freed manually, it is possible (even easy) to forget to do so. Failing
+to release unused memory means that the memory will remain allocated
+even if it is no longer needed. Memory leaks cannot occur in a garbage
+collection environment because the garbage collector ensures that
+unused objects are eventually freed. Memory leaks are a particularly
+troublesome problem in Windows programming, where the failure to
+release unused resources slowly degrades performance.
+
+Other problems that can occur with C++’s manual approach include the
+premature releasing of memory that is still in use, and the accidental
+freeing of the same memory twice. Both of these errors can lead to
+serious trouble. Unfortunately, they may not show any immediate
+symptoms, making them hard to find.
+
+* The Pros and Cons of Garbage Collection
+There are several different ways to implement garbage collection, each
+offering different performance characteristics. However, all garbage
+collection systems share a set of common attributes that can be
+compared against the manual approach. The main advantages to garbage
+collection are simplicity and safety. In a garbage collection
+environment, you explicitly allocate memory via new, but you never
+explicitly free it. Instead, unused memory is automatically recycled.
+Thus, it is not possible to forget to release an object or to release
+an object prematurely. This simplifies programming and prevents an
+entire class of problems. Furthermore, it is not possible to
+accidentally free dynamically allocated memory twice. Thus, garbage
+collection provides an easy-to-use, error-free, reliable solution to
+the memory management problem.
+
+Unfortunately, the simplicity and safety of garbage collection come at
+a price. The first cost is the overhead incurred by the garbage
+collection mechanism. All garbage collection schemes consume some CPU
+cycles because the reclamation of unused memory is not a cost-free
+process. This overhead does not occur with the manual approach.
+
+A second cost is loss of control over when an object is destroyed.
+Unlike the manual approach, in which an object is destroyed (and its
+destructor called) at a known point in time—when a delete statement is
+executed on that object—garbage collection does not have such a hard
+and fast rule. Instead, when garbage collection is used, an object is
+not destroyed until the collector runs and recycles the object, which
+may not occur until some arbitrary time in the future. For example,
+the collector might not run until the amount of free memory drops
+below a certain point. Furthermore, it is not always possible to know
+the order in which objects will be destroyed by the garbage collector.
+In some cases, the inability to know precisely when an object is
+destroyed can cause trouble because it also means that your program
+can’t know precisely when the destructor for a dynamically allocated
+object is called.
+
+For garbage collection systems that run as a background task, this
+loss of control can escalate into a potentially more serious problem
+for some types of applications because it introduces what is
+essentially nondeterministic behavior into a program. A garbage
+collector that executes in the background reclaims unused memory at
+times that are, for all practical purposes, unknowable. For example,
+the collector will usually run only when free CPU time is available.
+Because this might vary from one program run to the next, from one
+computer to next, or from one operating system to the next, the
+precise point in program execution at which the garbage collector
+executes is effectively nondeterministic. This is not a problem for
+many programs, but it can cause havoc with real-time applications in
+which the unexpected allocation of CPU cycles to the garbage collector
+could cause an event to be missed.
+
+* You Can Have It Both Ways
+As the preceding discussions explained, both manual management and
+garbage collection maximize one feature at the expense of another. The
+manual approach maximizes efficiency and control at the expense of
+safety and ease of use. Garbage collection maximizes simplicity and
+safety but pays for it with a loss of runtime performance and control.
+Thus, garbage collection and manual memory management are essentially
+opposites, each maximizing the traits that the other sacrifices. This
+is why neither approach to dynamic memory management can be optimal
+for all programming situations.
+
+Although opposites, the two approaches are not mutually exclusive.
+They can coexist. Thus, it is possible for the C++ programmer to have
+access to both approaches, choosing the proper method for the task at
+hand. 
+* Creating a Garbage Collector in C++
+A better solution is one in which the garbage collector can be used
+with any type of dynamically allocated object. To provide such a
+solution, the garbage collector must:
+
+1. Coexist with the built-in, manual method provided by C++.
+2. Not break any preexisting code. Moreover, it must have no impact
+   whatsoever on existing code.
+3. Work transparently so that allocations that use garbage collection
+   are operated on in the same way as those that don’t.
+4. Allocate memory using new in the same way that C++’s built-in
+   approach does.
+5. Work with all data types, including the built-in types such as int
+   and double.
+6. Be simple to use.
+* Choosing a Garbage Collection Algorithm
+There are three archetypal approaches: reference counting, mark and
+sweep, and copying.
+** Reference Counting
+In reference counting, each dynamically allocated piece of memory has
+associated with it a reference count. This count is incremented each
+time a reference to the memory is added and decremented each time a
+reference to the memory is removed. In C++ terms, this means that each
+time a pointer is set to point to a piece of allocated memory, the
+reference count associated with that memory is incremented. When the
+pointer is set to point elsewhere, the reference count is decremented.
+When the reference count drops to zero, the memory is unused and can
+be released.
+
+The *main advantage* of reference counting is simplicity—it is easy to
+understand and implement. Furthermore, it places no restrictions on
+the organization of the heap because the reference count is
+independent of an object’s physical location. Reference counting adds
+*overhead* to each pointer operation, but the collection phase is
+relatively low cost. The main *disadvantage* is that circular references
+prevent memory that is otherwise unused from being released. A
+*circular reference* occurs when two objects point to each other, either
+directly or indirectly. In this situation, neither object’s reference
+count ever drops to zero. Some solutions to the circular reference
+problem have been devised, but all add complexity and/or overhead.
+
+** Mark and Sweep
+Mark and sweep involves two phases. In the first phase, all objects in
+the heap are set to their unmarked state. Then, all objects directly
+or indirectly accessible from program variables are marked as
+“in-use.” In phase two, all of allocated memory is scanned (that is,
+a sweep of memory is made), and all unmarked elements are released.
+
+There are two main advantages of mark and sweep. First, it easily
+handles circular references. Second, it adds virtually no runtime
+overhead prior to collection. It has two main disadvantages. First, a
+considerable amount of time might be spent collecting garbage because
+the entire heap must be scanned during collection. Thus, garbage
+collection may cause unacceptable runtime characteristics for some
+programs. Second, although mark and sweep is simple conceptually, it
+can be tricky to implement efficiently.
+
+** Copying
+
+
+* cc
+#+begin_src sh
+
+#+end_src
+
+#+begin_src python
+
+#+end_src
+
+#+begin_src c++
+
+#+end_src
+
+
