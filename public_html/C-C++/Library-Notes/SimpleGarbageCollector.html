@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>A Simple Garbage Collector for C++</title>
-<!-- 2017-04-26 Wed 23:53 -->
+<!-- 2017-04-27 Thu 23:29 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -58,6 +58,23 @@ for the JavaScript code in this tag.
  }
 /*]]>*///-->
 </script>
+<script type="text/javascript">
+    function rpl(expr,a,b) {
+      var i=0
+      while (i!=-1) {
+         i=expr.indexOf(a,i);
+         if (i>=0) {
+            expr=expr.substring(0,i)+b+expr.substring(i+a.length);
+            i+=b.length;
+         }
+      }
+      return expr
+    }
+
+    function show_org_source(){
+       document.location.href = rpl(document.location.href,"html","org.html");
+    }
+</script>
 </head>
 <body>
 <div id="content">
@@ -76,9 +93,10 @@ for the JavaScript code in this tag.
 <li><a href="#sec-6-1">Reference Counting</a></li>
 <li><a href="#sec-6-2">Mark and Sweep</a></li>
 <li><a href="#sec-6-3">Copying</a></li>
+<li><a href="#sec-6-4">Which Algorithm?</a></li>
 </ul>
 </li>
-<li><a href="#sec-7">cc</a></li>
+<li><a href="#sec-7">Algorithm package and example</a></li>
 </ul>
 </div>
 </div>
@@ -309,9 +327,9 @@ a sweep of memory is made), and all unmarked elements are released.
 </p>
 
 <p>
-There are two main advantages of mark and sweep. First, it easily
+There are two main <b>advantages</b> of mark and sweep. First, it easily
 handles circular references. Second, it adds virtually no runtime
-overhead prior to collection. It has two main disadvantages. First, a
+overhead prior to collection. It has two main <b>disadvantages</b>. First, a
 considerable amount of time might be spent collecting garbage because
 the entire heap must be scanned during collection. Thus, garbage
 collection may cause unacceptable runtime characteristics for some
@@ -323,33 +341,120 @@ can be tricky to implement efficiently.
 
 <div id="outline-container-sec-6-3" class="outline-3">
 <h3 id="sec-6-3">Copying</h3>
+<div class="outline-text-3" id="text-6-3">
+<p>
+The copying algorithm organizes free memory into two spaces. One is
+active (holding the current heap), and the other is idle. During
+garbage collection, in-use objects from the active space are
+identified and copied into the idle space. Then, the roles of the two
+spaces are reversed, with the idle space becoming active and the
+active space becoming idle. Copying offers the advantage of compacting
+the heap in the copy process. It has the disadvantage of allowing only
+half of free memory to be in use at any one time.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-6-4" class="outline-3">
+<h3 id="sec-6-4">Which Algorithm?</h3>
+<div class="outline-text-3" id="text-6-4">
+<p>
+Given that there are advantages and disadvantages to all of the three
+classical approaches to garbage collection, it might seem hard to
+choose one over the other. However, given the constraints enumerated
+earlier, there is a clear choice: <b>reference counting</b>. First and most
+importantly, reference counting can be easily “layered onto” the
+existing C++ dynamic allocation system. Second, it can be implemented
+in a straightforward manner and in a way that does not affect
+preexisting code. Third, it does not require any specific organization
+or structuring of the heap, thus the standard allocation system
+provided by C++ is unaffected.
+</p>
+
+<p>
+The one <b>drawback</b> to using reference counting is its difficulty in
+handling circular references. This isn’t an issue for many programs
+because intentional circular references are not all that common and
+can usually be avoided. (Even things that we call circular, such as a
+circular queue, don’t necessarily involve a circular pointer
+reference.) Of course, there are cases in which circular references
+are needed. It is also possible to create a circular reference without
+knowing you have done so, especially when working with third-party
+libraries. Therefore, the garbage collector must provide some means to
+gracefully handle a circular reference, should one exist.
+</p>
+
+<p>
+To handle the circular reference problem, the garbage collector
+developed in this chapter will release any remaining allocated memory
+when the program exits. This ensures that objects involved in a
+circular reference will be freed and their destructors called. It is
+important to understand that normally there will be no allocated
+objects remaining at program termination. This mechanism is explicitly
+for those objects that can’t be released because of a circular
+reference. (You might want to experiment with other means of handling
+the circular reference problem. It presents an interesting challenge.)
+</p>
+</div>
 </div>
 </div>
 
 
 <div id="outline-container-sec-7" class="outline-2">
-<h2 id="sec-7">cc</h2>
+<h2 id="sec-7">Algorithm package and example</h2>
 <div class="outline-text-2" id="text-7">
+<p>
+<a href="./Files/simple-garbage-collector.tar.gz">The algorithm package</a>.
+</p>
+
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-c++"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">"GCPtr.h"</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;iostream&gt;</span>
+<span style="color: #00ffff;">using</span> <span style="color: #00ffff;">namespace</span> <span style="color: #7fffd4;">std</span>;
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">argv</span>[]) {
+  <span style="color: #98fb98;">GCPtr</span>&lt;<span style="color: #98fb98;">int</span>&gt; <span style="color: #eedd82;">p</span>;
+  <span style="color: #00ffff;">try</span> {
+    p = <span style="color: #00ffff;">new</span> <span style="color: #98fb98;">int</span>;
+  } <span style="color: #00ffff;">catch</span>(<span style="color: #98fb98;">bad_alloc</span> <span style="color: #eedd82;">exc</span>) {
+    cout &lt;&lt; <span style="color: #ffa07a;">"Allocation failure!\n"</span>;
+    <span style="color: #00ffff;">return</span> 1;
+  }
+  *p = 88;
+  cout &lt;&lt; <span style="color: #ffa07a;">"Value at p is: "</span> &lt;&lt; *p &lt;&lt; endl;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">k</span> = *p;
+  cout &lt;&lt; <span style="color: #ffa07a;">"k is "</span> &lt;&lt; k &lt;&lt; endl;
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
 </div>
 
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
-</div>
+<pre class="src src-sh">$ ./a.out 
+Constructing GCPtr. 
+Value at p is: 88
+k is 88
 
-<div class="org-src-container">
+GCPtr going out of scope.
+Before garbage collection for gclist&lt;i, 0&gt;:
+memPtr     refcount    value
+[0x1f27040]       0        88
+[0]       0         ---
 
-<pre class="src src-c++"></pre>
+Deleting: 88
+After garbage collection for gclist&lt;i, 0&gt;:
+memPtr     refcount    value
+           -- Empty --
+</pre>
 </div>
 </div>
 </div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-04-26 Wed 23:53</p>
+<p class="date">Created: 2017-04-27 Thu 23:29</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

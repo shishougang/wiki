@@ -158,9 +158,9 @@ or indirectly accessible from program variables are marked as
 “in-use.” In phase two, all of allocated memory is scanned (that is,
 a sweep of memory is made), and all unmarked elements are released.
 
-There are two main advantages of mark and sweep. First, it easily
+There are two main *advantages* of mark and sweep. First, it easily
 handles circular references. Second, it adds virtually no runtime
-overhead prior to collection. It has two main disadvantages. First, a
+overhead prior to collection. It has two main *disadvantages*. First, a
 considerable amount of time might be spent collecting garbage because
 the entire heap must be scanned during collection. Thus, garbage
 collection may cause unacceptable runtime characteristics for some
@@ -168,19 +168,89 @@ programs. Second, although mark and sweep is simple conceptually, it
 can be tricky to implement efficiently.
 
 ** Copying
+The copying algorithm organizes free memory into two spaces. One is
+active (holding the current heap), and the other is idle. During
+garbage collection, in-use objects from the active space are
+identified and copied into the idle space. Then, the roles of the two
+spaces are reversed, with the idle space becoming active and the
+active space becoming idle. Copying offers the advantage of compacting
+the heap in the copy process. It has the disadvantage of allowing only
+half of free memory to be in use at any one time.
+
+** Which Algorithm?
+Given that there are advantages and disadvantages to all of the three
+classical approaches to garbage collection, it might seem hard to
+choose one over the other. However, given the constraints enumerated
+earlier, there is a clear choice: *reference counting*. First and most
+importantly, reference counting can be easily “layered onto” the
+existing C++ dynamic allocation system. Second, it can be implemented
+in a straightforward manner and in a way that does not affect
+preexisting code. Third, it does not require any specific organization
+or structuring of the heap, thus the standard allocation system
+provided by C++ is unaffected.
+
+The one *drawback* to using reference counting is its difficulty in
+handling circular references. This isn’t an issue for many programs
+because intentional circular references are not all that common and
+can usually be avoided. (Even things that we call circular, such as a
+circular queue, don’t necessarily involve a circular pointer
+reference.) Of course, there are cases in which circular references
+are needed. It is also possible to create a circular reference without
+knowing you have done so, especially when working with third-party
+libraries. Therefore, the garbage collector must provide some means to
+gracefully handle a circular reference, should one exist.
+
+To handle the circular reference problem, the garbage collector
+developed in this chapter will release any remaining allocated memory
+when the program exits. This ensures that objects involved in a
+circular reference will be freed and their destructors called. It is
+important to understand that normally there will be no allocated
+objects remaining at program termination. This mechanism is explicitly
+for those objects that can’t be released because of a circular
+reference. (You might want to experiment with other means of handling
+the circular reference problem. It presents an interesting challenge.)
 
 
-* cc
-#+begin_src sh
-
-#+end_src
-
-#+begin_src python
-
-#+end_src
+* Algorithm package and example
+[[./Files/simple-garbage-collector.tar.gz][The algorithm package]].
 
 #+begin_src c++
+#include "GCPtr.h"
+#include <iostream>
+using namespace std;
 
+int main(int argc, char *argv[]) {
+  GCPtr<int> p;
+  try {
+    p = new int;
+  } catch(bad_alloc exc) {
+    cout << "Allocation failure!\n";
+    return 1;
+  }
+  *p = 88;
+  cout << "Value at p is: " << *p << endl;
+  int k = *p;
+  cout << "k is " << k << endl;
+  return 0;
+}
+#+end_src
+
+#+begin_src sh
+$ ./a.out 
+Constructing GCPtr. 
+Value at p is: 88
+k is 88
+
+GCPtr going out of scope.
+Before garbage collection for gclist<i, 0>:
+memPtr     refcount    value
+[0x1f27040]       0        88
+[0]       0         ---
+
+Deleting: 88
+After garbage collection for gclist<i, 0>:
+memPtr     refcount    value
+           -- Empty --
 #+end_src
 
 
