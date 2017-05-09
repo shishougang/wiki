@@ -6,6 +6,96 @@
 * Overview
 Cyclic Redundancy Check循环冗余检验，是基于数据计算一组效验码，用于核
 对数据传输过程中是否被更改或传输错误。
+* The Basic Idea Behind CRC Algorithms
+The basic idea of CRC algorithms is simply to treat the message as an
+enormous binary number, to divide it by another fixed binary number,
+and to make the remainder from this division the checksum. Upon
+receipt of the message, the receiver can perform the same division and
+compare the remainder with the "checksum" (transmitted remainder).
+* Binary Arithmetic with No Carries
+Adding two numbers in CRC arithmetic is the same as adding numbers in
+ordinary binary arithmetic except there is no carry. This means that
+each pair of corresponding bits determine the corresponding output bit
+without reference to any other bit positions. For example:
+
+#+begin_src sh
+        10011011
+       +11001010
+        --------
+        01010001
+        --------
+#+end_src
+There are only four cases for each bit position:
+
+#+begin_src sh
+   0+0=0
+   0+1=1
+   1+0=1
+   1+1=0  (no carry)
+# Subtraction is identical:
+        10011011
+       -11001010
+        --------
+        01010001
+        --------
+#+end_src
+
+In fact, both addition and subtraction in CRC arithmetic is equivalent
+to the XOR operation, and the XOR operation is its own inverse. 
+
+Here's a fully worked division:
+#+begin_src sh
+            1100001010
+       _______________
+10011 ) 11010110110000
+        10011,,.,,....
+        -----,,.,,....
+         10011,.,,....
+         10011,.,,....
+         -----,.,,....
+          00001.,,....
+          00000.,,....
+          -----.,,....
+           00010,,....
+           00000,,....
+           -----,,....
+            00101,....
+            00000,....
+            -----,....
+             01011....
+             00000....
+             -----....
+              10110...
+              10011...
+              -----...
+               01010..
+               00000..
+               -----..
+                10100.
+                10011.
+                -----.
+                 01110
+                 00000
+                 -----
+                  1110 = Remainder
+#+end_src
+
+Thus we see that CRC arithmetic is primarily about XORing particular
+values at various shifting offsets.
+
+* Choosing A Poly
+Choosing a poly is somewhat of a black art and the reader is referred
+to[fn:1] (p.130-132) which has a very clear discussion of this issue. 
+
+Some popular polys are:
+
+| name        | Polys                                            |        Hex |
+|-------------+--------------------------------------------------+------------|
+| CRC12       | x^12 + x^11 + x^3 + x^2 + x + 1                  |      0x80F |
+| CRC16       | x^16 + x^15 + x^2 + 1                            |     0x8005 |
+| CRC16-CCITT | x^16 + x^12 + x^5 + 1                            |     0x1021 |
+| CRC32       | x^32 + x^26 + x^23 + x^22 + x^16 + x^12 +        | 0x04C11DB7 |
+|             | x^11+ x^10 + x^8 + x^7 + x^5 + x^4 + x^2 + x + 1 |            |
 
 
 
@@ -17,5 +107,10 @@ Cyclic Redundancy Check循环冗余检验，是基于数据计算一组效验码
 #+begin_src c++
 
 #+end_src
+
+* Footnotes
+
+[fn:1] Tanenbaum, A.S., "Computer Networks", Prentice Hall, 1981, ISBN: 0-13-164699-0. Comment: Section 3.5.3 on pages 128 to 132 provides a very clear description of CRC codes. However, it does not describe table-driven implementation techniques.
+
 
 
