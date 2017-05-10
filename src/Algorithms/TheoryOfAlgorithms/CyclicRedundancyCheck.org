@@ -97,6 +97,52 @@ Some popular polys are:
 | CRC32       | x^32 + x^26 + x^23 + x^22 + x^16 + x^12 +        | 0x04C11DB7 |
 |             | x^11+ x^10 + x^8 + x^7 + x^5 + x^4 + x^2 + x + 1 |            |
 
+* A Straightforward CRC Implementation
+#+begin_src sh
+            3   2   1   0   Bits
+          +---+---+---+---+
+ Pop! <-- |   |   |   |   | <----- Augmented message
+          +---+---+---+---+
+       1    0   1   1   1   = The Poly
+#+end_src
+To perform the division perform the following:
+
+#+begin_src sh
+   Load the register with zero bits.
+   Augment the message by appending W zero bits to the end of it.
+   While (more message bits)
+      Begin
+      Shift the register left by one bit, reading the next bit of the
+         augmented message into register bit position 0.
+      If (a 1 bit popped out of the register during step 3)
+         Register = Register XOR Poly.
+      End
+   The register now contains the remainder.
+#+end_src
+
+* A Table-Driven Implementation
+ The straightforward method operates at the bit level, it is rather awkward
+ to code (even in C), and inefficient to execute (it has to loop once
+ for each bit). To speed it up, we need to find a way to enable the
+ algorithm to process the message in units larger than one bit.
+
+For the purposes of discussion, let us switch from a 4-bit poly to a
+32-bit one. Our register looks much the same, except the boxes
+represent bytes instead of bits, and the Poly is 33 bits (one implicit
+1 bit at the top and 32 "active" bits) (W=32).
+
+#+begin_src sh
+             3    2    1    0   Bytes
+          +----+----+----+----+
+ Pop! <-- |    |    |    |    | <----- Augmented message
+          +----+----+----+----+
+         1<------32 bits------>
+#+end_src
+
+#+begin_src sh
+
+#+end_src
+
 
 
 * cc
