@@ -138,13 +138,78 @@ represent bytes instead of bits, and the Poly is 33 bits (one implicit
           +----+----+----+----+
          1<------32 bits------>
 #+end_src
+Consider for a moment that we use the top 8 bits of the register to
+calculate the value of the top bit of the register during the next 8
+iterations. Suppose that we drive the next 8 iterations using the
+calculated values (which we could perhaps store in a single byte
+register and shift out to pick off each bit). Then we note three
+things:
+
++ The top byte of the register now doesn't matter. No matter how many
+  times and at what offset the poly is XORed to the top 8 bits, they
+  will all be shifted out the right hand side during the next 8
+  iterations anyway.
++ The remaining bits will be shifted left one position and the
+  rightmost byte of the register will be shifted in the next byte
++ While all this is going on, the register will be subjected to a
+  series of XOR's in accordance with the bits of the pre-calculated
+  control byte.
+
+Perhaps you can see the solution now. Putting all the pieces together
+we have an algorithm that goes like this:
 
 #+begin_src sh
-
+   While (augmented message is not exhausted)
+      Begin
+      Examine the top byte of the register
+      Calculate the control byte from the top byte of the register
+      Sum all the Polys at various offsets that are to be XORed into
+         the register in accordance with the control byte
+      Shift the register left by one byte, reading a new message byte
+         into the rightmost byte of the register
+      XOR the summed polys to the register
+      End
 #+end_src
 
+As it stands this is not much better than the SIMPLE algorithm.
+However, it turns out that most of the calculation can be precomputed
+and assembled into a table. As a result, the above algorithm can be
+reduced to:
 
+#+begin_src sh
+While (augmented message is not exhaused)
+      Begin
+      Top = top_byte(Register);
+      Register = (Register << 24) | next_augmessage_byte;
+      Register = Register XOR precomputed_table[Top];
+      End
+#+end_src
 
+The above is a very efficient algorithm requiring just a shift, and
+OR, an XOR, and a table lookup per byte. 
+
+In C, the algorithm main loop looks like this:
+#+begin_src c
+     r=0;
+     while (len--)
+       {
+        byte t = (r >> 24) & 0xFF;
+        r = (r << 8) | *p++;
+        r^=table[t];
+       }
+#+end_src
+where len is the length of the augmented message in bytes, p points to
+the augmented message, r is the register, t is a temporary, and table
+is the computed table. This code can be made even more unreadable as
+follows:
+
+#+begin_src c
+r=0;
+   while (len--)
+          r = ((r << 8) | *p++) ^ t[(r >> 24) & 0xFF];
+#+end_src
+
+* A Slightly Mangled Table-Driven Implementation
 * cc
 #+begin_src sh
 

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Cyclic redundancy check</title>
-<!-- 2017-05-10 Wed 23:34 -->
+<!-- 2017-05-11 Thu 23:30 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -72,7 +72,8 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4">Choosing A Poly</a></li>
 <li><a href="#sec-5">A Straightforward CRC Implementation</a></li>
 <li><a href="#sec-6">A Table-Driven Implementation</a></li>
-<li><a href="#sec-7">cc</a></li>
+<li><a href="#sec-7">A Slightly Mangled Table-Driven Implementation</a></li>
+<li><a href="#sec-8">cc</a></li>
 </ul>
 </div>
 </div>
@@ -312,19 +313,110 @@ Pop! &lt;-- |    |    |    |    | &lt;----- Augmented message
         1&lt;------32 bits------&gt;
 </pre>
 </div>
+<p>
+Consider for a moment that we use the top 8 bits of the register to
+calculate the value of the top bit of the register during the next 8
+iterations. Suppose that we drive the next 8 iterations using the
+calculated values (which we could perhaps store in a single byte
+register and shift out to pick off each bit). Then we note three
+things:
+</p>
+
+<ul class="org-ul">
+<li>The top byte of the register now doesn't matter. No matter how many
+times and at what offset the poly is XORed to the top 8 bits, they
+will all be shifted out the right hand side during the next 8
+iterations anyway.
+</li>
+<li>The remaining bits will be shifted left one position and the
+rightmost byte of the register will be shifted in the next byte
+</li>
+<li>While all this is going on, the register will be subjected to a
+series of XOR's in accordance with the bits of the pre-calculated
+control byte.
+</li>
+</ul>
+
+<p>
+Perhaps you can see the solution now. Putting all the pieces together
+we have an algorithm that goes like this:
+</p>
 
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
-</div>
-</div>
+<pre class="src src-sh"><span style="color: #87cefa;">While</span> (augmented message is not exhausted)
+   Begin
+   Examine the top byte of the register
+   Calculate the control byte from the top byte of the register
+   Sum all the Polys at various offsets that are to be XORed into
+      the register<span style="color: #00ffff;"> in</span> accordance with the control byte
+   Shift the register left by one byte, reading a new message byte
+      into the rightmost byte of the register
+   XOR the summed polys to the register
+   End
+</pre>
 </div>
 
+<p>
+As it stands this is not much better than the SIMPLE algorithm.
+However, it turns out that most of the calculation can be precomputed
+and assembled into a table. As a result, the above algorithm can be
+reduced to:
+</p>
 
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #87cefa;">While</span> (augmented message is not exhaused)
+      Begin
+      <span style="color: #eedd82;">Top</span> = top_byte(Register);
+      <span style="color: #eedd82;">Register</span> = (Register &lt;&lt; 24) | next_augmessage_byte;
+<span style="color: #ffff00; font-weight: bold;">      Register = Register XOR precomputed_table[Top];</span>
+<span style="color: #ffff00; font-weight: bold;">      End</span>
+</pre>
+</div>
+
+<p>
+The above is a very efficient algorithm requiring just a shift, and
+OR, an XOR, and a table lookup per byte. 
+</p>
+
+<p>
+In C, the algorithm main loop looks like this:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c">r=0;
+<span style="color: #00ffff;">while</span> (len--)
+  {
+   <span style="color: #98fb98;">byte</span> <span style="color: #eedd82;">t</span> = (r &gt;&gt; 24) &amp; 0xFF;
+   r = (r &lt;&lt; 8) | *p++;
+   r^=table[t];
+  }
+</pre>
+</div>
+<p>
+where len is the length of the augmented message in bytes, p points to
+the augmented message, r is the register, t is a temporary, and table
+is the computed table. This code can be made even more unreadable as
+follows:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c">r=0;
+   <span style="color: #00ffff;">while</span> (len--)
+          r = ((r &lt;&lt; 8) | *p++) ^ t[(r &gt;&gt; 24) &amp; 0xFF];
+</pre>
+</div>
+</div>
+</div>
 
 <div id="outline-container-sec-7" class="outline-2">
-<h2 id="sec-7">cc</h2>
-<div class="outline-text-2" id="text-7">
+<h2 id="sec-7">A Slightly Mangled Table-Driven Implementation</h2>
+</div>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">cc</h2>
+<div class="outline-text-2" id="text-8">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -349,7 +441,7 @@ Tanenbaum, A.S., "Computer Networks", Prentice Hall, 1981, ISBN: 0-13-164699-0. 
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-05-10 Wed 23:34</p>
+<p class="date">Created: 2017-05-11 Thu 23:30</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

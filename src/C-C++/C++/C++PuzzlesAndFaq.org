@@ -298,13 +298,89 @@ function<double(void)> func =
                  foo, placeholders::_1);
 #+end_src
 
+* instantiate objects from a string holding their class name?[fn:2]
+** use a map
+#+begin_src c++
+template<typename T> Base * createInstance() { return new T; }
 
-* instantiate objects from a string holding their class name?
+typedef std::map<std::string, Base*(*)()> map_type;
 
+map_type map;
+map["DerivedA"] = &createInstance<DerivedA>;
+map["DerivedB"] = &createInstance<DerivedB>;
+#+end_src
+And then you can do
+#+begin_src c++
+return map[some_string]();
+#+end_src
+** to have the types register themselves
+
+#+begin_src c++
+// in base.hpp:
+template<typename T> Base * createT() { return new T; }
+
+struct BaseFactory {
+    typedef std::map<std::string, Base*(*)()> map_type;
+
+    static Base * createInstance(std::string const& s) {
+        map_type::iterator it = getMap()->find(s);
+        if(it == getMap()->end())
+            return 0;
+        return it->second();
+    }
+
+protected:
+    static map_type * getMap() {
+        // never delete'ed. (exist until program termination)
+        // because we can't guarantee correct destruction order 
+        if(!map) { map = new map_type; } 
+        return map; 
+    }
+
+private:
+    static map_type * map;
+};
+
+template<typename T>
+struct DerivedRegister : BaseFactory { 
+    DerivedRegister(std::string const& s) { 
+        getMap()->insert(std::make_pair(s, &createT<T>));
+    }
+};
+
+// in derivedb.hpp
+class DerivedB {
+    ...;
+private:
+    static DerivedRegister<DerivedB> reg;
+};
+
+// in derivedb.cpp:
+DerivedRegister<DerivedB> DerivedB::reg("DerivedB");
+#+end_src
+You could decide to create a macro for the registration
+#+begin_src c++
+#define REGISTER_DEC_TYPE(NAME) \
+    static DerivedRegister<NAME> reg
+
+#define REGISTER_DEF_TYPE(NAME) \
+    DerivedRegister<NAME> NAME::reg(#NAME)
+#+end_src
+
+* cc
+#+begin_src sh
+
+#+end_src
+
+#+begin_src c++
+
+#+end_src
 
 
 * Footnotes
 
 [fn:1] http://www.jaggersoft.com/pubs/StructsVsClasses.htm#inheritance differences
+
+[fn:2] http://stackoverflow.com/questions/582331/is-there-a-way-to-instantiate-objects-from-a-string-holding-their-class-name
 
 
