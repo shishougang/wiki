@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Cyclic redundancy check</title>
-<!-- 2017-05-11 Thu 23:30 -->
+<!-- 2017-05-12 Fri 22:22 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -73,7 +73,8 @@ for the JavaScript code in this tag.
 <li><a href="#sec-5">A Straightforward CRC Implementation</a></li>
 <li><a href="#sec-6">A Table-Driven Implementation</a></li>
 <li><a href="#sec-7">A Slightly Mangled Table-Driven Implementation</a></li>
-<li><a href="#sec-8">cc</a></li>
+<li><a href="#sec-8">More</a></li>
+<li><a href="#sec-9">cc</a></li>
 </ul>
 </div>
 </div>
@@ -413,10 +414,198 @@ follows:
 
 <div id="outline-container-sec-7" class="outline-2">
 <h2 id="sec-7">A Slightly Mangled Table-Driven Implementation</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+Despite the terse beauty of the above lines, those optimizing hackers
+couldn't leave it alone. The trouble, you see, is that this loop
+operates upon the AUGMENTED message and in order to use this code, you
+have to append W/8 zero bytes to the end of the message before
+pointing p at it. Depending on the run-time environment, this may or
+may not be a problem; if the block of data was handed to us by some
+other code, it could be a BIG problem. One alternative is simply to
+append the following line after the above loop, once for each zero
+byte:
+</p>
+
+<p>
+<b>最后还需要传入W/4次的0</b>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c"><span style="color: #00ffff;">for</span> (i=0; i&lt;W/4; i++)
+           r = (r &lt;&lt; 8) ^ t[(r &gt;&gt; 24) &amp; 0xFF];
+</pre>
 </div>
+
+<p>
+However, at the further expense of clarity (which, you must admit, is
+already a pretty scare commodity in this code) we can reorganize this
+small loop further so as to avoid the need to either augment the
+message with zero bytes, or to explicitly process zero bytes at the
+end as above. 
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">          3    2    1    0   Bytes
+       +----+----+----+----+
++-----&lt;|    |    |    |    | &lt;----- Augmented message
+|      +----+----+----+----+
+|                ^
+|                |
+|               XOR
+|                |
+|     0+----+----+----+----+
+v      +----+----+----+----+
+|      +----+----+----+----+
+|      +----+----+----+----+
+|      +----+----+----+----+
+|      +----+----+----+----+
+|      +----+----+----+----+
++-----&gt;+----+----+----+----+
+       +----+----+----+----+
+       +----+----+----+----+
+       +----+----+----+----+
+       +----+----+----+----+
+    255+----+----+----+----+
+</pre>
+</div>
+
+
+<p>
+<b>Algorithm</b>
+</p>
+
+<ol class="org-ol">
+<li>Shift the register left by one byte, reading in a new message byte.
+</li>
+<li>Use the top byte just rotated out of the register to index the
+table of 256 32-bit values.
+</li>
+<li>XOR the table value into the register.
+</li>
+<li>Goto 1 iff more augmented message bytes.
+</li>
+</ol>
+
+<p>
+Now, note the following facts:
+</p>
+
+<ul class="org-ul">
+<li><b>TAIL</b> <b>处理最后补入的0</b> The W/4 augmented zero bytes that appear at
+the end of the message will be pushed into the register from the
+right as all the other bytes are, but their values (0) will have no
+effect whatsoever on the register because 1) XORing with zero does
+not change the target byte, and 2) the four bytes are never
+propagated out the left side of the register where their zeroness
+might have some sort of influence. Thus, the sole function of the
+W/4 augmented zero bytes is to drive the calculation for another W/4
+byte cycles so that the end of the REAL data passes all the way
+through the register.
+</li>
+<li><b>HEAD</b> <b>若register初始是0,开始的4次循环仅仅是把0移出</b> If the initial
+value of the register is zero, the first four iterations of the loop
+will have the sole effect of shifting in the first four bytes of the
+message from the right. This is because the first 32 control bits
+are all zero and so nothing is XORed into the register. Even if the
+initial value is not zero, the first 4 byte iterations of the
+algorithm will have the sole effect of shifting the first 4 bytes of
+the message into the register and then XORing them with some
+constant value (that is a function of the initial value of the
+register).
+</li>
+</ul>
+
+<p>
+These facts, combined with the XOR property
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">(A xor B) xor <span style="color: #eedd82;">C</span> = A xor (B xor C)
+</pre>
+</div>
+
+<p>
+mean that message bytes need not actually travel through the W/4 bytes
+of the register. Instead, they can be XORed into the top byte just
+before it is used to index the lookup table. This leads to the
+following modified version of the algorithm.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"> +-----&lt;Message (non augmented)
+ |
+ v         3    2    1    0   Bytes
+ |      +----+----+----+----+
+XOR----&lt;|    |    |    |    |
+ |      +----+----+----+----+
+ |                ^
+ |                |
+ |               XOR
+ |                |
+ |     0+----+----+----+----+
+ v      +----+----+----+----+
+ |      +----+----+----+----+
+ |      +----+----+----+----+
+ |      +----+----+----+----+
+ |      +----+----+----+----+
+ |      +----+----+----+----+
+ +-----&gt;+----+----+----+----+
+        +----+----+----+----+
+        +----+----+----+----+
+        +----+----+----+----+
+        +----+----+----+----+
+     255+----+----+----+----+
+</pre>
+</div>
+
+<p>
+<b>Algorithm</b>
+</p>
+
+<ol class="org-ol">
+<li>Shift the register left by one byte, reading in a new message byte.
+</li>
+<li>XOR the top byte just rotated out of the register with the next
+message byte to yield an index into the table ([0,255]).
+</li>
+<li>XOR the table value into the register.
+</li>
+<li>Goto 1 iff more augmented message bytes.
+</li>
+</ol>
+
+<p>
+This is an <b>IDENTICAL</b> algorithm and will yield <b>IDENTICAL</b> results. The
+C code looks something like this:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++">r=0;
+<span style="color: #00ffff;">while</span> (len--)
+       r = (r&lt;&lt;8) ^ t[(r &gt;&gt; 24) ^ *++];
+</pre>
+</div>
+</div>
+</div>
+
+
 <div id="outline-container-sec-8" class="outline-2">
-<h2 id="sec-8">cc</h2>
+<h2 id="sec-8">More</h2>
 <div class="outline-text-2" id="text-8">
+<ul class="org-ul">
+<li><a href="http://www.repairfaq.org/filipg/LINK/F_crc_v3.html">A PAINLESS GUIDE TO CRC ERROR DETECTION ALGORITHMS</a>
+</li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">cc</h2>
+<div class="outline-text-2" id="text-9">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -441,7 +630,7 @@ Tanenbaum, A.S., "Computer Networks", Prentice Hall, 1981, ISBN: 0-13-164699-0. 
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-05-11 Thu 23:30</p>
+<p class="date">Created: 2017-05-12 Fri 22:22</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

@@ -210,6 +210,141 @@ r=0;
 #+end_src
 
 * A Slightly Mangled Table-Driven Implementation
+Despite the terse beauty of the above lines, those optimizing hackers
+couldn't leave it alone. The trouble, you see, is that this loop
+operates upon the AUGMENTED message and in order to use this code, you
+have to append W/8 zero bytes to the end of the message before
+pointing p at it. Depending on the run-time environment, this may or
+may not be a problem; if the block of data was handed to us by some
+other code, it could be a BIG problem. One alternative is simply to
+append the following line after the above loop, once for each zero
+byte:
+
+*最后还需要传入W/4次的0*
+#+begin_src c
+for (i=0; i<W/4; i++)
+           r = (r << 8) ^ t[(r >> 24) & 0xFF];
+#+end_src
+
+However, at the further expense of clarity (which, you must admit, is
+already a pretty scare commodity in this code) we can reorganize this
+small loop further so as to avoid the need to either augment the
+message with zero bytes, or to explicitly process zero bytes at the
+end as above. 
+
+#+begin_src sh
+              3    2    1    0   Bytes
+           +----+----+----+----+
+    +-----<|    |    |    |    | <----- Augmented message
+    |      +----+----+----+----+
+    |                ^
+    |                |
+    |               XOR
+    |                |
+    |     0+----+----+----+----+
+    v      +----+----+----+----+
+    |      +----+----+----+----+
+    |      +----+----+----+----+
+    |      +----+----+----+----+
+    |      +----+----+----+----+
+    |      +----+----+----+----+
+    +----->+----+----+----+----+
+           +----+----+----+----+
+           +----+----+----+----+
+           +----+----+----+----+
+           +----+----+----+----+
+        255+----+----+----+----+
+#+end_src
+
+
+*Algorithm*
+
+1. Shift the register left by one byte, reading in a new message byte.
+2. Use the top byte just rotated out of the register to index the
+   table of 256 32-bit values.
+3. XOR the table value into the register.
+4. Goto 1 iff more augmented message bytes.
+
+Now, note the following facts:
+
++ *TAIL* *处理最后补入的0* The W/4 augmented zero bytes that appear at
+  the end of the message will be pushed into the register from the
+  right as all the other bytes are, but their values (0) will have no
+  effect whatsoever on the register because 1) XORing with zero does
+  not change the target byte, and 2) the four bytes are never
+  propagated out the left side of the register where their zeroness
+  might have some sort of influence. Thus, the sole function of the
+  W/4 augmented zero bytes is to drive the calculation for another W/4
+  byte cycles so that the end of the REAL data passes all the way
+  through the register.
++ *HEAD* *若register初始是0,开始的4次循环仅仅是把0移出* If the initial
+  value of the register is zero, the first four iterations of the loop
+  will have the sole effect of shifting in the first four bytes of the
+  message from the right. This is because the first 32 control bits
+  are all zero and so nothing is XORed into the register. Even if the
+  initial value is not zero, the first 4 byte iterations of the
+  algorithm will have the sole effect of shifting the first 4 bytes of
+  the message into the register and then XORing them with some
+  constant value (that is a function of the initial value of the
+  register).
+
+These facts, combined with the XOR property
+#+begin_src sh
+   (A xor B) xor C = A xor (B xor C)
+#+end_src
+
+mean that message bytes need not actually travel through the W/4 bytes
+of the register. Instead, they can be XORed into the top byte just
+before it is used to index the lookup table. This leads to the
+following modified version of the algorithm.
+#+begin_src sh
+    +-----<Message (non augmented)
+    |
+    v         3    2    1    0   Bytes
+    |      +----+----+----+----+
+   XOR----<|    |    |    |    |
+    |      +----+----+----+----+
+    |                ^
+    |                |
+    |               XOR
+    |                |
+    |     0+----+----+----+----+
+    v      +----+----+----+----+
+    |      +----+----+----+----+
+    |      +----+----+----+----+
+    |      +----+----+----+----+
+    |      +----+----+----+----+
+    |      +----+----+----+----+
+    +----->+----+----+----+----+
+           +----+----+----+----+
+           +----+----+----+----+
+           +----+----+----+----+
+           +----+----+----+----+
+        255+----+----+----+----+
+#+end_src
+
+*Algorithm*
+
+1. Shift the register left by one byte, reading in a new message byte.
+2. XOR the top byte just rotated out of the register with the next
+   message byte to yield an index into the table ([0,255]).
+3. XOR the table value into the register.
+4. Goto 1 iff more augmented message bytes.
+
+This is an *IDENTICAL* algorithm and will yield *IDENTICAL* results. The
+C code looks something like this:
+
+#+begin_src c++
+   r=0;
+   while (len--)
+          r = (r<<8) ^ t[(r >> 24) ^ *++];
+#+end_src
+
+
+* More
++ [[http://www.repairfaq.org/filipg/LINK/F_crc_v3.html][A PAINLESS GUIDE TO CRC ERROR DETECTION ALGORITHMS]]
+
+
 * cc
 #+begin_src sh
 
