@@ -339,20 +339,102 @@ C code looks something like this:
    while (len--)
           r = (r<<8) ^ t[(r >> 24) ^ *++];
 #+end_src
+* "Reflected" Table-Driven Implementations
+*DEFINITION:* A value/register is reflected if it's bits are swapped
+around its centre. For example: 0101 is the 4-bit reflection of 1010.
 
+Turns out that UARTs (those handy little chips that perform serial IO)
+are in the habit of transmitting each byte with the least significant
+bit (bit 0) first and the most significant bit (bit 7) last (i.e.
+reflected).
+
+The bytes are processed in the same order, but the bits in each byte
+are swapped; bit 0 is now bit 7, bit 1 is now bit 6, and so on. 
+
+*不是对信息bytes的镜像,而是改变算法*
+In this situation, a normal sane software engineer would simply
+reflect each byte before processing it. However, it would seem that
+normal sane software engineers were thin on the ground when this early
+ground was being broken, because instead of reflecting the bytes,
+whoever was responsible held down the byte and reflected the world,
+leading to the following "reflected" algorithm which is identical to
+the previous one except that everything is reflected except the input
+bytes.
+
+#+begin_src sh
+        Message (non augmented) >-----+
+                                      |
+      Bytes   0    1    2    3        v
+           +----+----+----+----+      |
+           |    |    |    |    |>----XOR
+           +----+----+----+----+      |
+                     ^                |
+                     |                |
+                    XOR               |
+                     |                |
+           +----+----+----+----+0     |
+           +----+----+----+----+      v
+           +----+----+----+----+      |
+           +----+----+----+----+      |
+           +----+----+----+----+      |
+           +----+----+----+----+      |
+           +----+----+----+----+      |
+           +----+----+----+----+<-----+
+           +----+----+----+----+
+           +----+----+----+----+
+           +----+----+----+----+
+           +----+----+----+----+
+           +----+----+----+----+255
+#+end_src
+*Notes:*
+
++ The table is identical to the one in the previous algorithm except
+  that each entry has been *reflected*.
++ The initial value of the register is the same as in the previous
+  algorithm except that it has been *reflected*.
++ The bytes of the message are processed in the same order as before
+  (i.e. the message itself is *not reflected*).
++ The message bytes themselves don't need to be explicitly reflected,
+  because everything else has been!
+
+* Initial and Final Values
+In addition to the complexity already seen, CRC algorithms differ from
+each other in two other regards:
+
++ The initial value of the register.
++ The value to be XORed with the final register value.
+
+For example, the "CRC32" algorithm initializes its register to
+FFFFFFFF and XORs the final register value with FFFFFFFF.
+* Example
+#+INCLUDE: "./files/crc_example.c" src c
+* CRC Algorithms
++ A [[http://automationwiki.com/index.php?title=CRC-16-CCITT]["CRC16" (CRC-16-CCITT)]] implementation on AutomationWiki.
++ [[http://www.drdobbs.com/implementing-the-ccitt-cyclical-redundan/199904926][Implementing The CCITT Cyclical Redundancy Check]] on Dr Dobbs.
++ [[http://create.stephan-brumme.com/crc32/][Fast CRC32 Compare]]
++ [[https://users.ece.cmu.edu/~koopman/crc/][Best CRC Polynomials]]
++ [[http://www.networkdls.com/Software/View/CRC32][A C++ Class that encapsulates the official CRC32 algorithm]]
++ [[http://stackoverflow.com/questions/302914/crc32-c-or-c-implementation][CRC32 C or C++ implementation on the stackoverflow]]
++ A CRC algorithm in C: [[./files/crc.zip][crc.zip]]
+
+** A Parameterized Model For CRC Algorithms
+The algorithm is from [[http://www.repairfaq.org/filipg/LINK/F_crc_v34.html][A Parameterized Model For CRC Algorithms]].
+
++ *REFIN* This is a boolean parameter. If it is FALSE, input bytes are
+  processed with bit 7 being treated as the most significant bit (MSB)
+  and bit 0 being treated as the least significant bit. If this
+  parameter is FALSE, each byte is reflected before being processed.
++ *REFOUT* This is a boolean parameter. If it is set to FALSE, the
+  final value in the register is fed into the XOROUT stage directly,
+  otherwise, if this parameter is TRUE, the final register value is
+  reflected first.
+
+The crc algorithm and genarating a lookup table are in the
+[[./files/crcmodel.tar.gz][crcmodel.tar.gz]].
 
 * More
 + [[http://www.repairfaq.org/filipg/LINK/F_crc_v3.html][A PAINLESS GUIDE TO CRC ERROR DETECTION ALGORITHMS]]
-
-
-* cc
-#+begin_src sh
-
-#+end_src
-
-#+begin_src c++
-
-#+end_src
++ [[https://barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code][CRC Implementation Code in C/C++]]
 
 * Footnotes
 

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Cyclic redundancy check</title>
-<!-- 2017-05-12 Fri 22:22 -->
+<!-- 2017-05-13 Sat 11:59 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -73,8 +73,15 @@ for the JavaScript code in this tag.
 <li><a href="#sec-5">A Straightforward CRC Implementation</a></li>
 <li><a href="#sec-6">A Table-Driven Implementation</a></li>
 <li><a href="#sec-7">A Slightly Mangled Table-Driven Implementation</a></li>
-<li><a href="#sec-8">More</a></li>
-<li><a href="#sec-9">cc</a></li>
+<li><a href="#sec-8">"Reflected" Table-Driven Implementations</a></li>
+<li><a href="#sec-9">Initial and Final Values</a></li>
+<li><a href="#sec-10">Example</a></li>
+<li><a href="#sec-11">CRC Algorithms</a>
+<ul>
+<li><a href="#sec-11-1">A Parameterized Model For CRC Algorithms</a></li>
+</ul>
+</li>
+<li><a href="#sec-12">More</a></li>
 </ul>
 </div>
 </div>
@@ -590,31 +597,260 @@ C code looks something like this:
 </div>
 </div>
 </div>
-
-
 <div id="outline-container-sec-8" class="outline-2">
-<h2 id="sec-8">More</h2>
+<h2 id="sec-8">"Reflected" Table-Driven Implementations</h2>
 <div class="outline-text-2" id="text-8">
+<p>
+<b>DEFINITION:</b> A value/register is reflected if it's bits are swapped
+around its centre. For example: 0101 is the 4-bit reflection of 1010.
+</p>
+
+<p>
+Turns out that UARTs (those handy little chips that perform serial IO)
+are in the habit of transmitting each byte with the least significant
+bit (bit 0) first and the most significant bit (bit 7) last (i.e.
+reflected).
+</p>
+
+<p>
+The bytes are processed in the same order, but the bits in each byte
+are swapped; bit 0 is now bit 7, bit 1 is now bit 6, and so on. 
+</p>
+
+<p>
+<b>不是对信息bytes的镜像,而是改变算法</b>
+In this situation, a normal sane software engineer would simply
+reflect each byte before processing it. However, it would seem that
+normal sane software engineers were thin on the ground when this early
+ground was being broken, because instead of reflecting the bytes,
+whoever was responsible held down the byte and reflected the world,
+leading to the following "reflected" algorithm which is identical to
+the previous one except that everything is reflected except the input
+bytes.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">  Message (non augmented) &gt;-----+
+                                |
+Bytes   0    1    2    3        v
+     +----+----+----+----+      |
+     |    |    |    |    |&gt;----XOR
+     +----+----+----+----+      |
+               ^                |
+               |                |
+              XOR               |
+               |                |
+     +----+----+----+----+0     |
+     +----+----+----+----+      v
+     +----+----+----+----+      |
+     +----+----+----+----+      |
+     +----+----+----+----+      |
+     +----+----+----+----+      |
+     +----+----+----+----+      |
+     +----+----+----+----+&lt;-----+
+     +----+----+----+----+
+     +----+----+----+----+
+     +----+----+----+----+
+     +----+----+----+----+
+     +----+----+----+----+255
+</pre>
+</div>
+<p>
+<b>Notes:</b>
+</p>
+
 <ul class="org-ul">
-<li><a href="http://www.repairfaq.org/filipg/LINK/F_crc_v3.html">A PAINLESS GUIDE TO CRC ERROR DETECTION ALGORITHMS</a>
+<li>The table is identical to the one in the previous algorithm except
+that each entry has been <b>reflected</b>.
+</li>
+<li>The initial value of the register is the same as in the previous
+algorithm except that it has been <b>reflected</b>.
+</li>
+<li>The bytes of the message are processed in the same order as before
+(i.e. the message itself is <b>not reflected</b>).
+</li>
+<li>The message bytes themselves don't need to be explicitly reflected,
+because everything else has been!
 </li>
 </ul>
 </div>
 </div>
 
-
 <div id="outline-container-sec-9" class="outline-2">
-<h2 id="sec-9">cc</h2>
+<h2 id="sec-9">Initial and Final Values</h2>
 <div class="outline-text-2" id="text-9">
+<p>
+In addition to the complexity already seen, CRC algorithms differ from
+each other in two other regards:
+</p>
+
+<ul class="org-ul">
+<li>The initial value of the register.
+</li>
+<li>The value to be XORed with the final register value.
+</li>
+</ul>
+
+<p>
+For example, the "CRC32" algorithm initializes its register to
+FFFFFFFF and XORs the final register value with FFFFFFFF.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10">Example</h2>
+<div class="outline-text-2" id="text-10">
 <div class="org-src-container">
 
-<pre class="src src-sh"></pre>
+<pre class="src src-c"><span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdio.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;stdint.h&gt;</span>
+<span style="color: #b0c4de;">#include</span> <span style="color: #ffa07a;">&lt;string.h&gt;</span>
+
+
+<span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">typedef unsigned long  crc;</span>
+<span style="color: #00ffff;">typedef</span> <span style="color: #98fb98;">uint32_t</span> <span style="color: #98fb98;">crc</span>;
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">CRC_NAME</span>                        <span style="color: #ffa07a;">"CRC-32"</span>
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">POLYNOMIAL</span>                      0x04C11DB7
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">INITIAL_REMAINDER</span>       0xFFFFFFFF
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">FINAL_XOR_VALUE</span>         0xFFFFFFFF
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">REFLECT_DATA</span>            TRUE
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">REFLECT_REMAINDER</span>       TRUE
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">CHECK_VALUE</span>                     0xCBF43926
+
+
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">WIDTH</span>    (8 * <span style="color: #00ffff;">sizeof</span>(crc))
+<span style="color: #b0c4de;">#define</span> <span style="color: #eedd82;">TOPBIT</span>   (1 &lt;&lt; (WIDTH - 1))
+
+<span style="color: #b0c4de;">#if</span> (REFLECT_DATA == TRUE)
+<span style="color: #b0c4de;">#undef</span>  REFLECT_DATA
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">REFLECT_DATA</span>(<span style="color: #eedd82;">X</span>)                 ((<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>) reflect((X), 8))
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #b0c4de;">#undef</span>  REFLECT_DATA
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">REFLECT_DATA</span>(<span style="color: #eedd82;">X</span>)                 (X)
+<span style="color: #b0c4de;">#endif</span>
+
+<span style="color: #b0c4de;">#if</span> (REFLECT_REMAINDER == TRUE)
+<span style="color: #b0c4de;">#undef</span>  REFLECT_REMAINDER
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">REFLECT_REMAINDER</span>(<span style="color: #eedd82;">X</span>)    ((<span style="color: #98fb98;">crc</span>) reflect((X), WIDTH))
+<span style="color: #b0c4de;">#else</span>
+<span style="color: #b0c4de;">#undef</span>  REFLECT_REMAINDER
+<span style="color: #b0c4de;">#define</span> <span style="color: #87cefa;">REFLECT_REMAINDER</span>(<span style="color: #eedd82;">X</span>)    (X)
+<span style="color: #b0c4de;">#endif</span>
+
+<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #87cefa;">reflect</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #eedd82;">data</span>, <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">n_bits</span>) {
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>  <span style="color: #eedd82;">reflection</span> = 0x00000000;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>  <span style="color: #eedd82;">bit</span>;
+  <span style="color: #00ffff;">for</span> (bit = 0; bit &lt; n_bits; ++bit) {
+    <span style="color: #00ffff;">if</span> (data &amp; 0x1) {
+      reflection |= (1 &lt;&lt;((n_bits - 1) - bit));
+    }
+    data &gt;&gt;= 1;
+  }
+  <span style="color: #00ffff;">return</span> (reflection);
+}
+
+<span style="color: #98fb98;">crc</span>  <span style="color: #eedd82;">crc_table</span>[256];
+
+<span style="color: #98fb98;">void</span> <span style="color: #87cefa;">CrcInit</span>() {
+  <span style="color: #98fb98;">crc</span> <span style="color: #eedd82;">remainder</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">dividend</span>;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">bit</span>;
+  <span style="color: #ff7f24;">// </span><span style="color: #ff7f24;">Compute the remainder of each possible dividend.</span>
+  <span style="color: #00ffff;">for</span> (dividend = 0; dividend &lt; 256; ++dividend) {
+    remainder = dividend &lt;&lt; (WIDTH - 8);
+    <span style="color: #00ffff;">for</span> (bit = 8; bit &gt; 0; --bit) {
+      <span style="color: #00ffff;">if</span> (remainder &amp; TOPBIT) {
+        remainder = (remainder &lt;&lt; 1) ^ POLYNOMIAL;
+      } <span style="color: #00ffff;">else</span> {
+        remainder &lt;&lt;= 1;
+      }
+    }
+    crc_table[dividend] = remainder;
+  }
+}
+
+<span style="color: #98fb98;">crc</span> <span style="color: #87cefa;">CrcFast</span>(<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> <span style="color: #00ffff;">const</span> <span style="color: #eedd82;">message</span>[], <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">n_bytes</span>) {
+  <span style="color: #98fb98;">crc</span> <span style="color: #eedd82;">remainder</span> = INITIAL_REMAINDER;
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">data</span>;
+  <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">byte</span>;
+  <span style="color: #00ffff;">for</span> (byte = 0; byte &lt; n_bytes; ++byte) {
+    data = REFLECT_DATA(message[byte]) ^ (remainder &gt;&gt; (WIDTH - 8));
+    remainder = crc_table[data] ^ (remainder &lt;&lt; 8);
+  }
+  <span style="color: #00ffff;">return</span> (REFLECT_REMAINDER(remainder) ^ FINAL_XOR_VALUE);
+}
+
+<span style="color: #98fb98;">int</span> <span style="color: #87cefa;">main</span>() {
+  printf(<span style="color: #ffa07a;">"wid=%ld, top=0x%x\n"</span>, WIDTH, TOPBIT);
+  <span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>  <span style="color: #eedd82;">test</span>[] = <span style="color: #ffa07a;">"123456789"</span>;
+  CrcInit();
+  printf(<span style="color: #ffa07a;">"The crcFast() of \"123456789\" is 0x%X\n"</span>, CrcFast(test, strlen(test)));
+  <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-11" class="outline-2">
+<h2 id="sec-11">CRC Algorithms</h2>
+<div class="outline-text-2" id="text-11">
+<ul class="org-ul">
+<li>A <a href="http://automationwiki.com/index.php?title=CRC-16-CCITT">"CRC16" (CRC-16-CCITT)</a> implementation on AutomationWiki.
+</li>
+<li><a href="http://www.drdobbs.com/implementing-the-ccitt-cyclical-redundan/199904926">Implementing The CCITT Cyclical Redundancy Check</a> on Dr Dobbs.
+</li>
+<li><a href="http://create.stephan-brumme.com/crc32/">Fast CRC32 Compare</a>
+</li>
+<li><a href="https://users.ece.cmu.edu/~koopman/crc/">Best CRC Polynomials</a>
+</li>
+<li><a href="http://www.networkdls.com/Software/View/CRC32">A C++ Class that encapsulates the official CRC32 algorithm</a>
+</li>
+<li><a href="http://stackoverflow.com/questions/302914/crc32-c-or-c-implementation">CRC32 C or C++ implementation on the stackoverflow</a>
+</li>
+<li>A CRC algorithm in C: <a href="./files/crc.zip">crc.zip</a>
+</li>
+</ul>
 </div>
 
-<div class="org-src-container">
+<div id="outline-container-sec-11-1" class="outline-3">
+<h3 id="sec-11-1">A Parameterized Model For CRC Algorithms</h3>
+<div class="outline-text-3" id="text-11-1">
+<p>
+The algorithm is from <a href="http://www.repairfaq.org/filipg/LINK/F_crc_v34.html">A Parameterized Model For CRC Algorithms</a>.
+</p>
 
-<pre class="src src-c++"></pre>
+<ul class="org-ul">
+<li><b>REFIN</b> This is a boolean parameter. If it is FALSE, input bytes are
+processed with bit 7 being treated as the most significant bit (MSB)
+and bit 0 being treated as the least significant bit. If this
+parameter is FALSE, each byte is reflected before being processed.
+</li>
+<li><b>REFOUT</b> This is a boolean parameter. If it is set to FALSE, the
+final value in the register is fed into the XOROUT stage directly,
+otherwise, if this parameter is TRUE, the final register value is
+reflected first.
+</li>
+</ul>
+
+<p>
+The crc algorithm and genarating a lookup table are in the
+<a href="./files/crcmodel.tar.gz">crcmodel.tar.gz</a>.
+</p>
 </div>
+</div>
+</div>
+
+<div id="outline-container-sec-12" class="outline-2">
+<h2 id="sec-12">More</h2>
+<div class="outline-text-2" id="text-12">
+<ul class="org-ul">
+<li><a href="http://www.repairfaq.org/filipg/LINK/F_crc_v3.html">A PAINLESS GUIDE TO CRC ERROR DETECTION ALGORITHMS</a>
+</li>
+<li><a href="https://barrgroup.com/Embedded-Systems/How-To/CRC-Calculation-C-Code">CRC Implementation Code in C/C++</a>
+</li>
+</ul>
 </div>
 </div>
 <div id="footnotes">
@@ -630,7 +866,7 @@ Tanenbaum, A.S., "Computer Networks", Prentice Hall, 1981, ISBN: 0-13-164699-0. 
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-05-12 Fri 22:22</p>
+<p class="date">Created: 2017-05-13 Sat 11:59</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
