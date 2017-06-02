@@ -2,10 +2,59 @@
 #+TITLE: Git submodules
 #+OPTIONS: num:nil H:2
 
-https://git-scm.com/docs/git-submodule
+
+* Overview
+A submodule allows you to keep another Git repository in a
+subdirectory of your repository. The other repository has its own
+history, which does not interfere with the history of the current
+repository. This can be used to have external dependencies such as
+third party libraries for example.[fn:1]
+
+Submodules are composed from a so-called =gitlink= tree entry in the
+main repository that refers to a particular commit object within the
+inner repository that is completely separate. A record in the
+=.gitmodules= file at the root of the source tree
+assigns a logical name to the submodule and describes the default URL
+the submodule shall be cloned from.
+
+* Submodule fundamentals
+Since Git 1.7.8, submodules use a simple =.git file= with a single
+=gitdir:= line mentioning a relative path to the actual repo folder, now
+located inside the container’s =.git/modules=. This is mostly useful
+when the container has branches that don’t have the submodule at all:
+this avoid having to scrap the submodule’s repo when switching to
+such a container branch.
+
+Be that as it may, the container and the submodule truly act as
+independent repos: they each have their own history (log), status,
+diff, etc. Therefore be mindful of your current directory when reading
+your prompt or typing commands: depending on whether you’re inside
+the submodule or outside of it, the context and impact of your
+commands differ drastically!
+
+The submodule commit referenced by the container is stored using its
+*SHA1*, not a volatile reference (such as a branch name). Because of
+this, a submodule does not automatically upgrade.
+
+* Traps[fn:2]
++ Every time you add a submodule, change its remote’s URL, or change
+  the referenced commit for it, you demand *a manual update by every
+  collaborator*.
++ Forgetting this explicit update can result in silent regressions of
+  the submodule’s referenced commit.
++ Commands such as status and diff display precious little info about
+  submodules by default.
++ Because lifecycles are separate, updating a submodule inside its
+  container project requires *two commits and two pushes*.
++ Submodule heads are generally detached, so any local update requires
+  various *preparatory actions* to avoid creating a lost commit.
++ Removing a submodule requires several commands and tweaks, some of
+  which are *manual and unassisted*.
 
 
-https://medium.com/@porteneuve/mastering-git-submodules-34c65e940407
+
+* More Examples
++ [[https://medium.com/@porteneuve/mastering-git-submodules-34c65e940407][Mastering Git submodules]]
 
 
 
@@ -14,12 +63,13 @@ https://medium.com/@porteneuve/mastering-git-submodules-34c65e940407
 
 #+end_src
 
-#+begin_src python
 
-#+end_src
 
-#+begin_src c++
+* Footnotes
 
-#+end_src
+[fn:1] https://git-scm.com/docs/git-submodule
+
+[fn:2] https://medium.com/@porteneuve/mastering-git-submodules-34c65e940407
+
 
 
