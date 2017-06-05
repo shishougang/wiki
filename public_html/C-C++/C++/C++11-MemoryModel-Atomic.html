@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>C++11 Memory Model and Atomic</title>
-<!-- 2017-06-04 Sun 23:19 -->
+<!-- 2017-06-05 Mon 23:02 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -66,7 +66,14 @@ for the JavaScript code in this tag.
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents">
 <ul>
-<li><a href="#sec-1">C++11 Atomic</a></li>
+<li><a href="#sec-1">C++11 Atomic</a>
+<ul>
+<li><a href="#sec-1-1"><code>atomic</code> 类</a></li>
+<li><a href="#sec-1-2"><code>atomic</code> 类型的操作函数</a></li>
+<li><a href="#sec-1-3"><code>atomic_flag</code> 类</a></li>
+<li><a href="#sec-1-4">内存序列同步相关操作</a></li>
+</ul>
+</li>
 <li><a href="#sec-2">Memory Model and Order</a></li>
 <li><a href="#sec-3">More</a></li>
 <li><a href="#sec-4">rr</a></li>
@@ -93,8 +100,310 @@ C++11 Atomic可简单分为4部分:
 </li>
 </ol>
 </div>
+
+<div id="outline-container-sec-1-1" class="outline-3">
+<h3 id="sec-1-1"><code>atomic</code> 类</h3>
+<div class="outline-text-3" id="text-1-1">
+<p>
+主要分为四种模板类:
+</p>
+<ol class="org-ol">
+<li>基本 <code>std::atomic</code>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span>&lt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span> &gt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic</span>;
+</pre>
+</div>
+</li>
+<li>整形(Integral)的特化
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span>&lt;&gt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic</span>&lt;Integral&gt;;
+</pre>
+</div>
+</li>
+<li>bool的特化
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span>&lt;&gt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">bool</span>&gt;;
+</pre>
+</div>
+</li>
+<li>指针的特化
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">template</span>&lt; <span style="color: #00ffff;">class</span> <span style="color: #98fb98;">T</span> &gt;
+<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">T</span>*&gt;;
+</pre>
+</div>
+</li>
+</ol>
+
+<p>
+bool和integral类型:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #7fffd4;">std</span>::atomic_bool        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">bool</span>&gt;
+
+<span style="color: #7fffd4;">std</span>::<span style="color: #eedd82;">atomic_char</span>        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">char</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_schar       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">signed</span> <span style="color: #98fb98;">char</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uchar       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">char</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_short       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">short</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_ushort      <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">short</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">int</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">int</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_long        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">long</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_ulong       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_llong       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">long</span> <span style="color: #98fb98;">long</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_ullong      <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">unsigned</span> <span style="color: #98fb98;">long</span> <span style="color: #98fb98;">long</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_char16_t    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;char16_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_char32_t    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;char32_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_wchar_t     <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #98fb98;">wchar_t</span>&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int8_t      <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int8_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint8_t     <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint8_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int16_t     <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int16_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint16_t    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint16_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int32_t     <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int32_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint32_t    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint32_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int64_t     <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int64_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint64_t    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint64_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int_least8_t        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int_least8_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint_least8_t       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint_least8_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int_least16_t       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int_least16_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint_least16_t      <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint_least16_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int_least32_t       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int_least32_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint_least32_t      <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint_least32_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int_least64_t       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int_least64_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint_least64_t      <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint_least64_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int_fast8_t <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int_fast8_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint_fast8_t        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint_fast8_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int_fast16_t        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int_fast16_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint_fast16_t       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint_fast16_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int_fast32_t        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int_fast32_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint_fast32_t       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint_fast32_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_int_fast64_t        <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::int_fast64_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uint_fast64_t       <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uint_fast64_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_intptr_t    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::intptr_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uintptr_t   <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uintptr_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_size_t      <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::size_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_ptrdiff_t   <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::ptrdiff_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_intmax_t    <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::intmax_t&gt;
+<span style="color: #7fffd4;">std</span>::atomic_uintmax_t   <span style="color: #7fffd4;">std</span>::<span style="color: #98fb98;">atomic</span>&lt;<span style="color: #7fffd4;">std</span>::uintmax_t&gt;
+</pre>
 </div>
 
+<p>
+基本模板类定义:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">template &lt; class T &gt; struct atomic {
+    bool is_lock_free() const volatile;
+    bool is_lock_free() const;
+    void store(T, <span style="color: #eedd82;">memory_order</span> = memory_order_seq_cst) volatile;
+    void store(T, <span style="color: #eedd82;">memory_order</span> = memory_order_seq_cst);
+    T load(<span style="color: #eedd82;">memory_order</span> = memory_order_seq_cst) const volatile;
+    T load(<span style="color: #eedd82;">memory_order</span> = memory_order_seq_cst) const;
+    operator  T() const volatile;
+    operator  T() const;
+    T exchange(T, <span style="color: #eedd82;">memory_order</span> = memory_order_seq_cst) volatile;
+    T exchange(T, <span style="color: #eedd82;">memory_order</span> = memory_order_seq_cst);
+    bool compare_exchange_weak(T &amp;, T, memory_order, memory_order) volatile;
+    bool compare_exchange_weak(T &amp;, T, memory_order, memory_order);
+    bool compare_exchange_strong(T &amp;, T, memory_order, memory_order) volatile;
+    bool compare_exchange_strong(T &amp;, T, memory_order, memory_order);
+    bool compare_exchange_weak(T &amp;, T, <span style="color: #eedd82;">memory_order</span> = memory_order_seq_cst) volatile;
+    bool compare_exchange_weak(T &amp;, T, <span style="color: #eedd82;">memory_order</span> = memory_order_seq_cst);
+    bool compare_exchange_strong(T &amp;, T, <span style="color: #eedd82;">memory_order</span> = memory_order_seq_cst) volatile;
+    bool compare_exchange_strong(T &amp;, T, <span style="color: #eedd82;">memory_order</span> = memory_order_seq_cst);
+    atomic() = default;
+    constexpr atomic(T);
+    atomic(const atomic &amp;) = delete;
+    atomic &amp; <span style="color: #eedd82;">operator</span>=(const atomic &amp;) = delete;
+    atomic &amp; <span style="color: #eedd82;">operator</span>=(const atomic &amp;) <span style="color: #eedd82;">volatile</span> = delete;
+    T <span style="color: #eedd82;">operator</span>=(T) volatile;
+    T <span style="color: #eedd82;">operator</span>=(T);
+};
+</pre>
+</div>
+
+<p>
+Integral 特有的函数:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_add</span>(<span style="color: #98fb98;">integral</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_add</span>(<span style="color: #98fb98;">integral</span>, memory_order = memory_order_seq_cst);
+
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_sub</span>(<span style="color: #98fb98;">integral</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_sub</span>(<span style="color: #98fb98;">integral</span>, memory_order = memory_order_seq_cst);
+
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_and</span>(<span style="color: #98fb98;">integral</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_and</span>(<span style="color: #98fb98;">integral</span>, memory_order = memory_order_seq_cst);
+
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_or</span>(<span style="color: #98fb98;">integral</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_or</span>(<span style="color: #98fb98;">integral</span>, memory_order = memory_order_seq_cst);
+
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_xor</span>(<span style="color: #98fb98;">integral</span>, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #87cefa;">fetch_xor</span>(<span style="color: #98fb98;">integral</span>, memory_order = memory_order_seq_cst);
+
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>(<span style="color: #98fb98;">int</span>) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>(<span style="color: #98fb98;">int</span>);
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>(<span style="color: #98fb98;">int</span>) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>(<span style="color: #98fb98;">int</span>);
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>() <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>();
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>() <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>();
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">+=</span>(<span style="color: #98fb98;">integral</span>) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">+=</span>(<span style="color: #98fb98;">integral</span>);
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">-=</span>(<span style="color: #98fb98;">integral</span>) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">-=</span>(<span style="color: #98fb98;">integral</span>);
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">&amp;=</span>(<span style="color: #98fb98;">integral</span>) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">&amp;=</span>(<span style="color: #98fb98;">integral</span>);
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">|=</span>(<span style="color: #98fb98;">integral</span>) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">|=</span>(<span style="color: #98fb98;">integral</span>);
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">^=</span>(<span style="color: #98fb98;">integral</span>) <span style="color: #00ffff;">volatile</span>;
+<span style="color: #98fb98;">integral</span> <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">^=</span>(<span style="color: #98fb98;">integral</span>);
+</pre>
+</div>
+
+<p>
+指针特有的函数
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++">T* fetch_add(ptrdiff_t, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span>;
+T* fetch_add(ptrdiff_t, memory_order = memory_order_seq_cst);
+
+T* fetch_sub(ptrdiff_t, memory_order = memory_order_seq_cst) <span style="color: #00ffff;">volatile</span>;
+T* fetch_sub(ptrdiff_t, memory_order = memory_order_seq_cst);
+
+  T* <span style="color: #00ffff;">operator</span>=(<span style="color: #98fb98;">T</span>*) <span style="color: #00ffff;">volatile</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">=</span>(<span style="color: #98fb98;">T</span>*);
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>(<span style="color: #98fb98;">int</span>) <span style="color: #00ffff;">volatile</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>(<span style="color: #98fb98;">int</span>);
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>(<span style="color: #98fb98;">int</span>) <span style="color: #00ffff;">volatile</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>(<span style="color: #98fb98;">int</span>);
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>() <span style="color: #00ffff;">volatile</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">++</span>();
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>() <span style="color: #00ffff;">volatile</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">--</span>();
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">+=</span>(<span style="color: #98fb98;">ptrdiff_t</span>) <span style="color: #00ffff;">volatile</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">+=</span>(<span style="color: #98fb98;">ptrdiff_t</span>);
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">-=</span>(<span style="color: #98fb98;">ptrdiff_t</span>) <span style="color: #00ffff;">volatile</span>;
+  <span style="color: #98fb98;">T</span>* <span style="color: #00ffff;">operator</span><span style="color: #87cefa;">-=</span>(<span style="color: #98fb98;">ptrdiff_t</span>);
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-1-2" class="outline-3">
+<h3 id="sec-1-2"><code>atomic</code> 类型的操作函数</h3>
+<div class="outline-text-3" id="text-1-2">
+<p>
+除了 <code>atomic</code> 类的成员函数,也提供了对其操作的函数:
+</p>
+
+<ul class="org-ul">
+<li><code>atomic_is_lock_free</code>: checks if the atomic type's operations are
+lock-free
+</li>
+<li><code>atomic_store</code> and <code>atomic_store_explicit</code>: atomically replaces the
+value of the atomic object with a non-atomic argument
+</li>
+<li><code>atomic_load</code> and <code>atomic_load_explicit</code>: atomically obtains the
+value stored in an atomic object
+</li>
+<li><code>atomic_exchange</code> and <code>atomic_exchange_explicit</code>: atomically
+replaces the value of the atomic object with non-atomic argument and
+returns the old value of the atomic
+</li>
+<li><code>atomic_compare_exchange_weak</code>
+<code>atomic_compare_exchange_weak_explicit</code>
+<code>atomic_compare_exchange_strong</code>
+<code>atomic_compare_exchange_strong_explicit</code>: atomically compares the
+value of the atomic object with non-atomic argument and performs
+atomic exchange if equal or atomic load if not
+</li>
+<li><code>atomic_fetch_add</code>
+<code>atomic_fetch_add_explicit</code>: adds a non-atomic value to an atomic
+object and obtains the previous value of the atomic 
+</li>
+<li><code>atomic_fetch_sub</code>
+<code>atomic_fetch_sub_explicit</code>: subtracts a non-atomic value from an
+atomic object and obtains the previous value of the atomic 
+</li>
+<li><code>atomic_fetch_and</code>
+<code>atomic_fetch_and_explicit</code>: replaces the atomic object with the
+result of logical AND with a non-atomic argument and obtains the
+previous value of the atomic 
+</li>
+<li><code>atomic_fetch_or</code>
+<code>atomic_fetch_or_explicit</code>: replaces the atomic object with the
+result of logical OR with a non-atomic argument and obtains the
+previous value of the atomic 
+</li>
+<li><code>atomic_fetch_xor</code>
+<code>atomic_fetch_xor_explicit</code>: replaces the atomic object with the
+result of logical XOR with a non-atomic argument and obtains the
+previous value of the atomic 
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-1-3" class="outline-3">
+<h3 id="sec-1-3"><code>atomic_flag</code> 类</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+atomic<sub>flag</sub> 是一种原子布尔类型，不同于 <code>std::atomic&lt;bool&gt;</code>, 不提供load
+或store操作,只支持两种操作， <code>test_and_set</code> 和 <code>clear</code> 。
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++">atomic_flag() noexcept = <span style="color: #00ffff;">default</span>;
+atomic_flag (<span style="color: #00ffff;">const</span> <span style="color: #98fb98;">atomic_flag</span>&amp;<span style="color: #eedd82;">T</span>) = <span style="color: #00ffff;">delete</span>;
+</pre>
+</div>
+
+<p>
+<code>std::atomic_flag</code> 只有默认构造函数，拷贝构造函数已被禁用. 一般使用
+<code>ATOMIC_FLAG_INIT</code> 初始化为clear状态.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-1-4" class="outline-3">
+<h3 id="sec-1-4">内存序列同步相关操作</h3>
+<div class="outline-text-3" id="text-1-4">
+<ul class="org-ul">
+<li><code>memory_order</code>: defines memory ordering constraints for the given
+atomic operation 
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">memory_order</span> {
+    <span style="color: #eedd82;">memory_order_relaxed</span>,
+    <span style="color: #eedd82;">memory_order_consume</span>,
+    <span style="color: #eedd82;">memory_order_acquire</span>,
+    <span style="color: #eedd82;">memory_order_release</span>,
+    <span style="color: #eedd82;">memory_order_acq_rel</span>,
+    <span style="color: #eedd82;">memory_order_seq_cst</span>
+};
+</pre>
+</div>
+</li>
+<li><code>kill_dependency</code>: 
+</li>
+</ul>
+</div>
+</div>
+</div>
 
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">Memory Model and Order</h2>
@@ -161,11 +470,6 @@ Memory model (programming)
 
 <div class="org-src-container">
 
-<pre class="src src-python"></pre>
-</div>
-
-<div class="org-src-container">
-
 <pre class="src src-c++"></pre>
 </div>
 </div>
@@ -183,7 +487,7 @@ Memory model (programming)
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-06-04 Sun 23:19</p>
+<p class="date">Created: 2017-06-05 Mon 23:02</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

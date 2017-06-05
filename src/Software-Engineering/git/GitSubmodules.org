@@ -51,19 +51,70 @@ this, a submodule does not automatically upgrade.
 + Removing a submodule requires several commands and tweaks, some of
   which are *manual and unassisted*.
 
+* Configuration settings
+#+begin_src sh
+git config --global XXX XX
+#+end_src
++ diff.submodule = log (so you get clearer container diffs when
+  referenced submodule commits changed).
++ fetch.recurseSubmodules = on-demand (so you are confident new
+  referenced commits for known submodules get fetched with container
+  updates).
++ status.submoduleSummary = true (so git status gets useful again when
+  a referenced submodule commit changed).
+* Adding or cloning
++ Initial add: git submodule add <url> <path>
++ Initial container clone: git clone --recursive <url> [<path>]
+* Grabbing updates inside a submodule
+#+begin_src sh
+cd path/to/module
+git fetch
+git checkout -q <commit-sha1>
+cd -
+git commit -am “Updated submodule X to: blah blah”
+#+end_src
+* Grabbing container updates
+#+begin_src sh
+git pull
+git submodule sync --recursive
+git submodule update --init --recursive
+#+end_src
+* Updating a submodule inside container code
+#+begin_src sh
+git submodule update --remote --rebase -- path/to/module
+cd path/to/module
+Local work, testing, eventually staging
+git commit -am “Update to central submodule: blah blah”
+git push
+cd -
+git commit -am “Updated submodule X to: blah blah”
+#+end_src
+* Permanently removing a submodule (1.7.8+)
+#+begin_src sh
+git submodule deinit path/to/module
+git rm path/to/module
+git commit -am “Removed submodule X”
+#+end_src
 
+* Git commands
++ =git submodule foreach= lets you run arbitrary commands on all known
+  (initialized) submodules, recursively or not;
++ =git submodule status= is a specific status display for submodules,
+  recursive on request.
++ =git submodule summary= lists history ranges between the latest
+  referenced commits and the ones currently checked out.
++ =git mv= on a 1.7.8+ submodule directory (one with a =gitfile=) does the
+  right thing: it changes the relative path inside the =gitfile=,
+  updates the core.worktree reference in the submodule’s repo inside
+  =.git/modules=, and updates and stages =.gitmodules=.
 
 * More Examples
 + [[https://medium.com/@porteneuve/mastering-git-submodules-34c65e940407][Mastering Git submodules]]
-
-
 
 * cc
 #+begin_src sh
 
 #+end_src
-
-
 
 * Footnotes
 

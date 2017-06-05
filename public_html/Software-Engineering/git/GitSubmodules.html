@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>Git submodules</title>
-<!-- 2017-06-02 Fri 22:34 -->
+<!-- 2017-06-05 Mon 23:02 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -69,8 +69,15 @@ for the JavaScript code in this tag.
 <li><a href="#sec-1">Overview</a></li>
 <li><a href="#sec-2">Submodule fundamentals</a></li>
 <li><a href="#sec-3">Traps</a></li>
-<li><a href="#sec-4">More Examples</a></li>
-<li><a href="#sec-5">cc</a></li>
+<li><a href="#sec-4">Configuration settings</a></li>
+<li><a href="#sec-5">Adding or cloning</a></li>
+<li><a href="#sec-6">Grabbing updates inside a submodule</a></li>
+<li><a href="#sec-7">Grabbing container updates</a></li>
+<li><a href="#sec-8">Updating a submodule inside container code</a></li>
+<li><a href="#sec-9">Permanently removing a submodule (1.7.8+)</a></li>
+<li><a href="#sec-10">Git commands</a></li>
+<li><a href="#sec-11">More Examples</a></li>
+<li><a href="#sec-12">cc</a></li>
 </ul>
 </div>
 </div>
@@ -154,11 +161,119 @@ which are <b>manual and unassisted</b>.
 </div>
 </div>
 
-
-
 <div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">More Examples</h2>
+<h2 id="sec-4">Configuration settings</h2>
 <div class="outline-text-2" id="text-4">
+<div class="org-src-container">
+
+<pre class="src src-sh">git config --global XXX XX
+</pre>
+</div>
+<ul class="org-ul">
+<li>diff.submodule = log (so you get clearer container diffs when
+referenced submodule commits changed).
+</li>
+<li>fetch.recurseSubmodules = on-demand (so you are confident new
+referenced commits for known submodules get fetched with container
+updates).
+</li>
+<li>status.submoduleSummary = true (so git status gets useful again when
+a referenced submodule commit changed).
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Adding or cloning</h2>
+<div class="outline-text-2" id="text-5">
+<ul class="org-ul">
+<li>Initial add: git submodule add &lt;url&gt; &lt;path&gt;
+</li>
+<li>Initial container clone: git clone &#x2013;recursive &lt;url&gt; [&lt;path&gt;]
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">Grabbing updates inside a submodule</h2>
+<div class="outline-text-2" id="text-6">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #b0c4de;">cd</span> path/to/module
+git fetch
+git checkout -q &lt;commit-sha1&gt;
+<span style="color: #b0c4de;">cd</span> -
+git commit -am &#8220;Updated submodule X to: blah blah&#8221;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-7" class="outline-2">
+<h2 id="sec-7">Grabbing container updates</h2>
+<div class="outline-text-2" id="text-7">
+<div class="org-src-container">
+
+<pre class="src src-sh">git pull
+git submodule sync --recursive
+git submodule update --init --recursive
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-8" class="outline-2">
+<h2 id="sec-8">Updating a submodule inside container code</h2>
+<div class="outline-text-2" id="text-8">
+<div class="org-src-container">
+
+<pre class="src src-sh">git submodule update --remote --rebase -- path/to/module
+<span style="color: #b0c4de;">cd</span> path/to/module
+Local work, testing, eventually staging
+git commit -am &#8220;Update to central submodule: blah blah&#8221;
+git push
+<span style="color: #b0c4de;">cd</span> -
+git commit -am &#8220;Updated submodule X to: blah blah&#8221;
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-9" class="outline-2">
+<h2 id="sec-9">Permanently removing a submodule (1.7.8+)</h2>
+<div class="outline-text-2" id="text-9">
+<div class="org-src-container">
+
+<pre class="src src-sh">git submodule deinit path/to/module
+git rm path/to/module
+git commit -am &#8220;Removed submodule X&#8221;
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-10" class="outline-2">
+<h2 id="sec-10">Git commands</h2>
+<div class="outline-text-2" id="text-10">
+<ul class="org-ul">
+<li><code>git submodule foreach</code> lets you run arbitrary commands on all known
+(initialized) submodules, recursively or not;
+</li>
+<li><code>git submodule status</code> is a specific status display for submodules,
+recursive on request.
+</li>
+<li><code>git submodule summary</code> lists history ranges between the latest
+referenced commits and the ones currently checked out.
+</li>
+<li><code>git mv</code> on a 1.7.8+ submodule directory (one with a <code>gitfile</code>) does the
+right thing: it changes the relative path inside the <code>gitfile</code>,
+updates the core.worktree reference in the submodule’s repo inside
+<code>.git/modules</code>, and updates and stages <code>.gitmodules</code>.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-11" class="outline-2">
+<h2 id="sec-11">More Examples</h2>
+<div class="outline-text-2" id="text-11">
 <ul class="org-ul">
 <li><a href="https://medium.com/@porteneuve/mastering-git-submodules-34c65e940407">Mastering Git submodules</a>
 </li>
@@ -166,11 +281,9 @@ which are <b>manual and unassisted</b>.
 </div>
 </div>
 
-
-
-<div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">cc</h2>
-<div class="outline-text-2" id="text-5">
+<div id="outline-container-sec-12" class="outline-2">
+<h2 id="sec-12">cc</h2>
+<div class="outline-text-2" id="text-12">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -194,7 +307,7 @@ which are <b>manual and unassisted</b>.
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-06-02 Fri 22:34</p>
+<p class="date">Created: 2017-06-05 Mon 23:02</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
