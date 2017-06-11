@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>C++11 Memory Model and Atomic</title>
-<!-- 2017-06-09 Fri 22:19 -->
+<!-- 2017-06-11 Sun 23:29 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -76,8 +76,6 @@ for the JavaScript code in this tag.
 </li>
 <li><a href="#sec-2">Memory Model and Order</a></li>
 <li><a href="#sec-3">More</a></li>
-<li><a href="#sec-4">rr</a></li>
-<li><a href="#sec-5">cc</a></li>
 </ul>
 </div>
 </div>
@@ -419,6 +417,85 @@ instructions by the compiler is suppressed as order instructs.
 
 <div id="outline-container-sec-2" class="outline-2">
 <h2 id="sec-2">Memory Model and Order</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+在<a href="http://dreamrunner.org/blog/2014/06/28/qian-tan-memory-reordering/">浅谈Memory Reordering</a>中提及编译开发者和处理器制造商遵循的中心内存排序准则是: 不能改变单线程程序的行为. 从而产生了:
+</p>
+<ul class="org-ul">
+<li>Memory ordering at compile time: 编译优化造成
+</li>
+<li>Memory ordering at processor time: CPU允许乱序机器指令优化造成
+</li>
+</ul>
+
+<p>
+在多核多线程时代，当多线程共享某一变量时，不同线程对共享变量的读写就应该格外小心，不适当的乱序执行可能导致程序运行错误。所以必须对编译器和
+CPU 作出一定的约束才能合理正确地优化你的程序，这个约束就是 <b>内存模型
+(Memory Model)</b> .
+</p>
+
+<p>
+或者说,程序转化成机器指令执行时并不按照之前的原始代码顺序执行,所以内存模型是程序员、编译器，CPU 之间的准则约束,遵守这一准则约束后,大家各自做优化, 从而尽可能提高程序的性能。
+</p>
+
+<p>
+<a href="https://en.wikipedia.org/wiki/Memory_model_(programming)">wiki上的Memory model</a>给出一个比较抽象的描述: In computing, a memory
+model describes the interactions of threads through memory and their
+shared use of the data.
+</p>
+
+<p>
+C++11 中规定了 6 种访存次序(Memory Order)，如下：
+</p>
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">enum</span> <span style="color: #98fb98;">memory_order</span> {
+    <span style="color: #eedd82;">memory_order_relaxed</span>,
+    <span style="color: #eedd82;">memory_order_consume</span>,
+    <span style="color: #eedd82;">memory_order_acquire</span>,
+    <span style="color: #eedd82;">memory_order_release</span>,
+    <span style="color: #eedd82;">memory_order_acq_rel</span>,
+    <span style="color: #eedd82;">memory_order_seq_cst</span>
+};
+</pre>
+</div>
+
+<p>
+上面C++11 Atomic涉及 <code>memory_order</code> 的接口, 默认值是
+<code>std::memory_order_seq_cst</code> .
+</p>
+
+<p>
+可以把上述6种访存次序(内存序)分为3类，顺序一致性模型
+(<code>memory_order_seq_cst</code>)，Acquire-Release 模型
+(<code>memory_order_consume</code>, <code>memory_order_acquire</code>,
+<code>memory_order_release</code>, <code>memory_order_acq_rel</code>) 和 Relax 模型
+(<code>memory_order_relaxed</code>). 
+</p>
+
+<ul class="org-ul">
+<li><code>memory_order_relaxed</code>: all reorderings are okay<sup><a id="fnr.2" name="fnr.2" class="footref" href="#fn.2">2</a></sup>
+</li>
+<li><code>memory_order_acquire</code>: guarantees that subsequent loads are not
+moved before the current load or any preceding loads.
+</li>
+<li><code>memory_order_release</code>: preceding stores are not moved past the
+current store or any subsequent stores.
+</li>
+<li><code>memory_order_acq_rel</code>: combines the two previous guarantees.
+</li>
+<li><code>memory_order_consume</code>: potentially weaker form of
+memory<sub>order</sub><sub>acquire</sub> that enforces ordering of the current load
+before other operations that are data-dependent on it (for instance,
+when a load of a pointer is marked memory<sub>order</sub><sub>consume</sub>, subsequent
+operations that dereference this pointer won’t be moved before it
+(yes, even that is not guaranteed on all platforms!).
+</li>
+<li><code>memory_order_scq_cst</code>: 是 <code>memory_order_acq_rel</code> 的加强版，除了有
+<code>acq_rel</code> 语义，还保证是<a href="https://en.wikipedia.org/wiki/Sequential_consistency">sequencially-consistent</a>.
+</li>
+</ul>
+</div>
 </div>
 
 <div id="outline-container-sec-3" class="outline-2">
@@ -427,46 +504,20 @@ instructions by the compiler is suppressed as order instructs.
 <ul class="org-ul">
 <li><a href="https://github.com/forhappy/Cplusplus-Concurrency-In-Practice/blob/master/zh/chapter8-Memory-Model/web-resources.md">C++ 多线程与内存模型资料汇总</a>
 </li>
-</ul>
-
-<p>
-Herb Sutter的talk
-</p>
+<li>Herb Sutter的talk
 <ul class="org-ul">
 <li><a href="https://channel9.msdn.com/Shows/Going+Deep/Cpp-and-Beyond-2012-Herb-Sutter-atomic-Weapons-1-of-2">Atomic Weapons 1</a>
 </li>
-
 <li><a href="https://channel9.msdn.com/Shows/Going+Deep/Cpp-and-Beyond-2012-Herb-Sutter-atomic-Weapons-1-of-2">Atomic Weapon 2</a>
 </li>
 </ul>
-</div>
-</div>
-
-<div id="outline-container-sec-4" class="outline-2">
-<h2 id="sec-4">rr</h2>
-<div class="outline-text-2" id="text-4">
+</li>
+<li>[[<a href="https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/][C">https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/][C</a>++ atomics and memory ordering
+</li>
+</ul>
 <p>
-Memory model (programming)
+]]
 </p>
-
-<p>
-<a href="https://en.wikipedia.org/wiki/Memory_model_(programming)">https://en.wikipedia.org/wiki/Memory_model_(programming)</a>
-</p>
-</div>
-</div>
-
-<div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">cc</h2>
-<div class="outline-text-2" id="text-5">
-<div class="org-src-container">
-
-<pre class="src src-sh"></pre>
-</div>
-
-<div class="org-src-container">
-
-<pre class="src src-c++"></pre>
-</div>
 </div>
 </div>
 <div id="footnotes">
@@ -477,12 +528,16 @@ Memory model (programming)
 <a href="http://en.cppreference.com/w/cpp/atomic">http://en.cppreference.com/w/cpp/atomic</a>
 </p></div>
 
+<div class="footdef"><sup><a id="fn.2" name="fn.2" class="footnum" href="#fnr.2">2</a></sup> <p class="footpara">
+<a href="https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/">https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/</a>
+</p></div>
+
 
 </div>
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2017-06-09 Fri 22:19</p>
+<p class="date">Created: 2017-06-11 Sun 23:29</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

@@ -250,33 +250,72 @@ atomic_flag (const atomic_flag&T) = delete;
   instructions by the compiler is suppressed as order instructs. 
 
 * Memory Model and Order
+在[[http://dreamrunner.org/blog/2014/06/28/qian-tan-memory-reordering/][浅谈Memory Reordering]]中提及编译开发者和处理器制造商遵循的中心内存排
+序准则是: 不能改变单线程程序的行为. 从而产生了:
++ Memory ordering at compile time: 编译优化造成
++ Memory ordering at processor time: CPU允许乱序机器指令优化造成
+
+在多核多线程时代，当多线程共享某一变量时，不同线程对共享变量的读写就应
+该格外小心，不适当的乱序执行可能导致程序运行错误。所以必须对编译器和
+CPU 作出一定的约束才能合理正确地优化你的程序，这个约束就是 *内存模型
+(Memory Model)* .
+
+或者说,程序转化成机器指令执行时并不按照之前的原始代码顺序执行,所以内存
+模型是程序员、编译器，CPU 之间的准则约束,遵守这一准则约束后,大家各自做
+优化, 从而尽可能提高程序的性能。
+
+[[https://en.wikipedia.org/wiki/Memory_model_(programming)][wiki上的Memory model]]给出一个比较抽象的描述: In computing, a memory
+model describes the interactions of threads through memory and their
+shared use of the data.
+
+C++11 中规定了 6 种访存次序(Memory Order)，如下：
+#+begin_src c++
+enum memory_order {
+    memory_order_relaxed,
+    memory_order_consume,
+    memory_order_acquire,
+    memory_order_release,
+    memory_order_acq_rel,
+    memory_order_seq_cst
+};
+#+end_src
+
+上面C++11 Atomic涉及 =memory_order= 的接口, 默认值是
+=std::memory_order_seq_cst= .
+
+可以把上述6种访存次序(内存序)分为3类，顺序一致性模型
+(=memory_order_seq_cst=)，Acquire-Release 模型
+(=memory_order_consume=, =memory_order_acquire=,
+=memory_order_release=, =memory_order_acq_rel=) 和 Relax 模型
+(=memory_order_relaxed=). 
+
++ =memory_order_relaxed=: all reorderings are okay[fn:2]
++ =memory_order_acquire=: guarantees that subsequent loads are not
+  moved before the current load or any preceding loads.
++ =memory_order_release=: preceding stores are not moved past the
+  current store or any subsequent stores.
++ =memory_order_acq_rel=: combines the two previous guarantees.
++ =memory_order_consume=: potentially weaker form of
+  memory_order_acquire that enforces ordering of the current load
+  before other operations that are data-dependent on it (for instance,
+  when a load of a pointer is marked memory_order_consume, subsequent
+  operations that dereference this pointer won’t be moved before it
+  (yes, even that is not guaranteed on all platforms!).
++ =memory_order_scq_cst=: 是 =memory_order_acq_rel= 的加强版，除了有
+  =acq_rel= 语义，还保证是[[https://en.wikipedia.org/wiki/Sequential_consistency][sequencially-consistent]].
 
 * More
 + [[https://github.com/forhappy/Cplusplus-Concurrency-In-Practice/blob/master/zh/chapter8-Memory-Model/web-resources.md][C++ 多线程与内存模型资料汇总]]
-
-Herb Sutter的talk
-+ [[https://channel9.msdn.com/Shows/Going+Deep/Cpp-and-Beyond-2012-Herb-Sutter-atomic-Weapons-1-of-2][Atomic Weapons 1]]
-
-+ [[https://channel9.msdn.com/Shows/Going+Deep/Cpp-and-Beyond-2012-Herb-Sutter-atomic-Weapons-1-of-2][Atomic Weapon 2]]
-
-* rr
-
-Memory model (programming)
-
-https://en.wikipedia.org/wiki/Memory_model_(programming)
-
-* cc
-#+begin_src sh
-
-#+end_src
-
-#+begin_src c++
-
-#+end_src
-
++ Herb Sutter的talk
+  + [[https://channel9.msdn.com/Shows/Going+Deep/Cpp-and-Beyond-2012-Herb-Sutter-atomic-Weapons-1-of-2][Atomic Weapons 1]]
+  + [[https://channel9.msdn.com/Shows/Going+Deep/Cpp-and-Beyond-2012-Herb-Sutter-atomic-Weapons-1-of-2][Atomic Weapon 2]]
++ [[https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/][C++ atomics and memory ordering
+]]
 * Footnotes
 
 [fn:1] http://en.cppreference.com/w/cpp/atomic
+
+[fn:2] https://bartoszmilewski.com/2008/12/01/c-atomics-and-memory-ordering/
 
 
 
