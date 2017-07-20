@@ -1,0 +1,80 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: strace usage
+#+OPTIONS: num:nil H:2
+
+
+* Example =unlink= VS =rm=
+
+=unlink=
+#+begin_src sh
+$ touch file1
+$ strace -s 2000 -o unlink.log unlink file1
+#+end_src
+
+=rm=
+#+begin_src sh
+$ touch file1
+$ strace -s 2000 -o rm.log rm file1
+#+end_src
+
+With =unlink= it's invoking the =unlink()= system call:
+#+begin_src sh
+...
+mmap(NULL, 7216688, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7fb8fa621000
+close(3)                                = 0
+unlink("file1")                         = 0
+close(1)                                = 0
+close(2)                                = 0
+exit_group(0)                           = ?
+...
+#+end_src
+
+
+With =rm= it's a slightly different path:
+#+begin_src sh
+...
+ioctl(0, SNDCTL_TMR_TIMEBASE or SNDRV_TIMER_IOCTL_NEXT_DEVICE or TCGETS, {B38400 opost isig icanon echo ...}) = 0
+newfstatat(AT_FDCWD, "file1", {st_mode=S_IFREG|0664, st_size=0, ...}, AT_SYMLINK_NOFOLLOW) = 0
+geteuid()                               = 1000
+newfstatat(AT_FDCWD, "file1", {st_mode=S_IFREG|0664, st_size=0, ...}, AT_SYMLINK_NOFOLLOW) = 0
+faccessat(AT_FDCWD, "file1", W_OK)      = 0
+unlinkat(AT_FDCWD, "file1", 0)          = 0
+lseek(0, 0, SEEK_CUR)                   = -1 ESPIPE (Illegal seek)
+close(0)                                = 0
+close(1)                                = 0
+close(2)                                = 0
+exit_group(0)                           = ?
+...
+#+end_src
+
+The system calls =unlink()= and =unlinkat()= are essentially the same
+except for the differences described in this man page:
+http://linux.die.net/man/2/unlinkat.
+
+=int unlinkat(int dirfd, const char *pathname, int flags);=
+
+The =unlinkat()= system call operates in exactly the same way as either
+=unlink(2)= or =rmdir(2)= (depending on whether or not flags includes the
+=AT_REMOVEDIR= flag) except for the differences described in this manual
+page.
+
+If the pathname given in pathname is relative, then it is interpreted
+relative to the directory referred to by the file descriptor dirfd
+(rather than relative to the current working directory of the calling
+process, as is done by =unlink(2)= and =rmdir(2)= for a relative
+pathname).
+
+If the pathname given in pathname is relative and dirfd is the special
+value =AT_FDCWD=, then pathname is interpreted relative to the current
+working directory of the calling process (like =unlink(2)= and
+=rmdir(2)=).
+
+If the pathname given in pathname is absolute, then dirfd is ignored.
+
+* cc
+#+begin_src sh
+
+#+end_src
+
+
+

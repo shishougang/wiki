@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>strace usage</title>
+<!-- 2017-07-20 Thu 22:17 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">strace usage</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Example <code>unlink</code> VS <code>rm</code></a></li>
+<li><a href="#sec-2">cc</a></li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Example <code>unlink</code> VS <code>rm</code></h2>
+<div class="outline-text-2" id="text-1">
+<p>
+<code>unlink</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ touch file1
+$ strace -s 2000 -o unlink.log unlink file1
+</pre>
+</div>
+
+<p>
+<code>rm</code>
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">$ touch file1
+$ strace -s 2000 -o rm.log rm file1
+</pre>
+</div>
+
+<p>
+With <code>unlink</code> it's invoking the <code>unlink()</code> system call:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">...
+<span style="color: #87cefa;">mmap</span>(NULL, 7216688, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7fb8fa621000
+<span style="color: #87cefa;">close</span>(3)                                = 0
+<span style="color: #87cefa;">unlink</span>(<span style="color: #ffa07a;">"file1"</span>)                         = 0
+<span style="color: #87cefa;">close</span>(1)                                = 0
+<span style="color: #87cefa;">close</span>(2)                                = 0
+<span style="color: #87cefa;">exit_group</span>(0)                           = ?
+...
+</pre>
+</div>
+
+
+<p>
+With <code>rm</code> it's a slightly different path:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">...
+<span style="color: #87cefa;">ioctl</span>(0, SNDCTL_TMR_TIMEBASE or SNDRV_TIMER_IOCTL_NEXT_DEVICE or TCGETS, {B38400 opost isig icanon echo ...}) = 0
+<span style="color: #87cefa;">newfstatat</span>(AT_FDCWD, <span style="color: #ffa07a;">"file1"</span>, {<span style="color: #eedd82;">st_mode</span>=S_IFREG|0664, <span style="color: #eedd82;">st_size</span>=0, ...}, AT_SYMLINK_NOFOLLOW) = 0
+<span style="color: #87cefa;">geteuid</span>()                               = 1000
+<span style="color: #87cefa;">newfstatat</span>(AT_FDCWD, <span style="color: #ffa07a;">"file1"</span>, {<span style="color: #eedd82;">st_mode</span>=S_IFREG|0664, <span style="color: #eedd82;">st_size</span>=0, ...}, AT_SYMLINK_NOFOLLOW) = 0
+<span style="color: #87cefa;">faccessat</span>(AT_FDCWD, <span style="color: #ffa07a;">"file1"</span>, W_OK)      = 0
+<span style="color: #87cefa;">unlinkat</span>(AT_FDCWD, <span style="color: #ffa07a;">"file1"</span>, 0)          = 0
+<span style="color: #87cefa;">lseek</span>(0, 0, SEEK_CUR)                   = -1 ESPIPE (Illegal seek)
+<span style="color: #87cefa;">close</span>(0)                                = 0
+<span style="color: #87cefa;">close</span>(1)                                = 0
+<span style="color: #87cefa;">close</span>(2)                                = 0
+<span style="color: #87cefa;">exit_group</span>(0)                           = ?
+...
+</pre>
+</div>
+
+<p>
+The system calls <code>unlink()</code> and <code>unlinkat()</code> are essentially the same
+except for the differences described in this man page:
+<a href="http://linux.die.net/man/2/unlinkat">http://linux.die.net/man/2/unlinkat</a>.
+</p>
+
+<p>
+<code>int unlinkat(int dirfd, const char *pathname, int flags);</code>
+</p>
+
+<p>
+The <code>unlinkat()</code> system call operates in exactly the same way as either
+<code>unlink(2)</code> or <code>rmdir(2)</code> (depending on whether or not flags includes the
+<code>AT_REMOVEDIR</code> flag) except for the differences described in this manual
+page.
+</p>
+
+<p>
+If the pathname given in pathname is relative, then it is interpreted
+relative to the directory referred to by the file descriptor dirfd
+(rather than relative to the current working directory of the calling
+process, as is done by <code>unlink(2)</code> and <code>rmdir(2)</code> for a relative
+pathname).
+</p>
+
+<p>
+If the pathname given in pathname is relative and dirfd is the special
+value <code>AT_FDCWD</code>, then pathname is interpreted relative to the current
+working directory of the calling process (like <code>unlink(2)</code> and
+<code>rmdir(2)</code>).
+</p>
+
+<p>
+If the pathname given in pathname is absolute, then dirfd is ignored.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">cc</h2>
+<div class="outline-text-2" id="text-2">
+<div class="org-src-container">
+
+<pre class="src src-sh"></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-07-20 Thu 22:17</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
