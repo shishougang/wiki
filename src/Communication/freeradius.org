@@ -1,0 +1,105 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-1.org
+#+TITLE: Freeradius and daloRADIUS
+#+OPTIONS: num:nil H:2
+
+
+* Overview
++ freeradius: http://freeradius.org/, windows: http://freeradius.net/
++ daloRADIUS is an advanced RADIUS *web platform* aimed at managing
+  Hotspots and general-purpose ISP deployments. It features rich user
+  management, graphical reporting, accounting, and integrates with
+  GoogleMaps for geo-locating (GIS). http://www.daloradius.com/
+* Install FreeRADIUS On Ubuntu 
+** Install FreeRADIUS
+#+begin_src sh
+sudo apt-get install freeradius
+#+end_src
+** Verify FreeRADIUS version
+#+begin_src sh
+$ freeradius -v
+freeradius: FreeRADIUS Version 2.1.12, for host x86_64-pc-linux-gnu, built on Jul 26 2017 at 15:30:42
+#+end_src
+** Run a quick config check
+#+begin_src sh
+$ sudo freeradius -CX
+...
+Configuration appears to be OK.
+#+end_src
+** Review the Configuration Files
+The FreeRADIUS files are located in: =/etc/freeradius=.
+*** Max number of requests
+Increase the default value of 1024 if you’re planning on having more
+than 4 clients authenticating at a time.
+
+#+begin_src sh
+#  max_requests: The maximum number of requests which the server keeps
+#  track of.  This should be 256 multiplied by the number of clients.
+#  e.g. With 4 clients, this number should be 1024.
+#
+#  If this number is too low, then when the server becomes busy,
+#  it will not respond to any new requests, until the 'cleanup_delay'
+#  time has passed, and it has removed the old requests.
+#
+#  If this number is set too high, then the server will use a bit more
+#  memory for no real benefit.
+#
+#  If you aren't sure what it should be set to, it's better to set it
+#  too high than too low.  Setting it to 1000 per client is probably
+#  the highest it should be.
+#
+#  Useful range of values: 256 to infinity
+#
+max_requests = 1024
+#+end_src
+** Add Clients
+add into the file =clients.conf=
+#+begin_src sh
+  client P6-MOJO-1 {
+      ipaddr = 192.168.130.20
+      secret = strong-passphrase-here
+  }
+#+end_src
+** Define EAP Methods
+=eap.conf=: By default, FreeRadius will use MD5 which is not very strong.
+** Add Users
+Let’s add users which will authenticate to this RADIUS server. Edit
+the =users= file.
+
+#+begin_src sh
+test Cleartext-Password := "test"
+#+end_src
+
+#+begin_src sh
+Cleartext-Password = statement indicating we are going to assign a clear text password to this username. Notice that “:=“ is used for assignment.
+#+end_src
+** Start FreeRadius and check
+#+begin_src sh
+$ sudo service freeradius restart
+freeradius stop/waiting
+freeradius start/running, process 29805
+$ sudo service freeradius status
+freeradius start/running, process 29805
+#+end_src
+
+** Test Authentication
+Run a quick test to see if FreeRADIUS will accept the newly created
+username and password. 
+
+#+begin_src sh
+$ radtest test test 127.0.0.1 0 testing123
+Sending Access-Request of id 145 to 127.0.0.1 port 1812
+	User-Name = "test"
+	User-Password = "test"
+	NAS-IP-Address = 127.0.1.1
+	NAS-Port = 0
+	Message-Authenticator = 0x00000000000000000000000000000000
+rad_recv: Access-Accept packet from host 127.0.0.1 port 1812, id=145, length=20
+#+end_src
+
+* cc
+#+begin_src sh
+
+#+end_src
+
+
+
