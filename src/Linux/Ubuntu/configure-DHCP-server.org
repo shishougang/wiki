@@ -1,0 +1,96 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: configure a DHCP server in Ubuntu
+#+OPTIONS: num:nil H:2
+
+
+
+#+begin_src sh
+sudo apt-get install isc-dhcp-server
+#+end_src
+
+#+begin_src sh
+sudo vim /etc/default/isc-dhcp-server
+#+end_src
+
+get the following:
+#+begin_src sh
+#Defaults for dhcp initscript
+#sourced by /etc/init.d/dhcp
+#installed at /etc/default/isc-dhcp-server by the maintainer scripts
+#
+#This is a POSIX shell fragment
+#
+#On what interfaces should the DHCP server (dhcpd) serve DHCP requests"
+#Separate multiple interfaces with spaces, e.g. “eth0 eth1".
+INTERFACES="eth0"
+#+end_src
+Replace eth0 above with the name of your network interface that you
+want the server to lease addresses on. 
+
+
+#+begin_src sh
+sudo vim /etc/dhcp/dhcpd.conf
+#+end_src
+give you the output below.
+
+#+begin_src sh
+
+#Sample configuration file for ISC dhcpd for Debian
+#
+#Attention: If /etc/ltsp/dhcpd.conf exists, that will be used as
+#configuration file instead of this file.
+#
+#
+....
+option domain-name “example.org”;
+option domain-name-servers ns1.example.org, ns2.example.org;
+default-lease-time 600;
+max-lease-time 7200;
+log-facility local7;
+subnet 10.0.0.0 netmask 255.255.255.0 {
+range 10.0.0.150 10.0.0.253;
+option routers 10.0.0.2;
+option subnet-mask 255.255.255.0;
+option broadcast-address 10.0.0.254;
+option domain-name-servers 10.0.0.1, 10.0.0.2;
+option ntp-servers 10.0.0.1;
+option netbios-name-servers 10.0.0.1;
+option netbios-node-type 8;
+ ......
+}
+#+end_src
+
+1. Adjust your settings according to your network requirements.
+2. Range should be the range of ip addresses that you want the server
+   to give out to clients.
+
+
+Now restart the dhcp service by typing:
+
+
+#+begin_src sh
+sudo /etc/init.d/isc-dhcp-server restart
+# or 
+sudo service isc-dhcp-server restart
+#+end_src
+
+
+check:
+#+begin_src sh
+sudo netstat -uap
+
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address           Foreign Address State PID/Program name
+udp        0      0 10.0.0.255:netbios-dgm  *:*                   1016/nmbd
+udp        0      0 10.0.0.255:netbios-ns   *:*                   1016/nmbd
+udp        0      0 *:bootps                *:*                   4525/dhcpd
+udp        0      0 *:netbios-dgm           *:*                   1016/nmbd
+udp        0      0 *:netbios-ns            *:*                   1016/nmbd
+udp        0      0 chris-desktop:domain    *:*                   1273/named
+udp        0      0 chris-desktop.lo:domain *:*                   1273/named
+udp        0      0 chris-deskt:netbios-dgm *:*                   1016/nmbd
+udp        0      0 chris-deskto:netbios-ns *:*                   1016/nmbd
+udp6       0      0 [::]:domain             [::]:*                1273/named
+#+end_src
+
+

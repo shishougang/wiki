@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>configure a DHCP server in Ubuntu</title>
+<!-- 2017-10-19 Thu 20:43 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">configure a DHCP server in Ubuntu</h1>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo apt-get install isc-dhcp-server
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo vim /etc/default/isc-dhcp-server
+</pre>
+</div>
+
+<p>
+get the following:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Defaults for dhcp initscript</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">sourced by /etc/init.d/dhcp</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">installed at /etc/default/isc-dhcp-server by the maintainer scripts</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">This is a POSIX shell fragment</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">On what interfaces should the DHCP server (dhcpd) serve DHCP requests"</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Separate multiple interfaces with spaces, e.g. &#8220;eth0 eth1".</span>
+<span style="color: #eedd82;">INTERFACES</span>=<span style="color: #ffa07a;">"eth0"</span>
+</pre>
+</div>
+<p>
+Replace eth0 above with the name of your network interface that you
+want the server to lease addresses on. 
+</p>
+
+
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo vim /etc/dhcp/dhcpd.conf
+</pre>
+</div>
+<p>
+give you the output below.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Sample configuration file for ISC dhcpd for Debian</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">Attention: If /etc/ltsp/dhcpd.conf exists, that will be used as</span>
+<span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">configuration file instead of this file.</span>
+<span style="color: #ff7f24;">#</span>
+<span style="color: #ff7f24;">#</span>
+....
+option domain-name &#8220;example.org&#8221;;
+option domain-name-servers ns1.example.org, ns2.example.org;
+default-lease-time 600;
+max-lease-time 7200;
+log-facility local7;
+subnet 10.0.0.0 netmask 255.255.255.0 {
+range 10.0.0.150 10.0.0.253;
+option routers 10.0.0.2;
+option subnet-mask 255.255.255.0;
+option broadcast-address 10.0.0.254;
+option domain-name-servers 10.0.0.1, 10.0.0.2;
+option ntp-servers 10.0.0.1;
+option netbios-name-servers 10.0.0.1;
+option netbios-node-type 8;
+ ......
+}
+</pre>
+</div>
+
+<ol class="org-ol">
+<li>Adjust your settings according to your network requirements.
+</li>
+<li>Range should be the range of ip addresses that you want the server
+to give out to clients.
+</li>
+</ol>
+
+
+<p>
+Now restart the dhcp service by typing:
+</p>
+
+
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo /etc/init.d/isc-dhcp-server restart
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">or </span>
+sudo service isc-dhcp-server restart
+</pre>
+</div>
+
+
+<p>
+check:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">sudo netstat -uap
+
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address           Foreign Address State PID/Program name
+udp        0      0 10.0.0.255:netbios-dgm  *:*                   1016/nmbd
+udp        0      0 10.0.0.255:netbios-ns   *:*                   1016/nmbd
+udp        0      0 *:bootps                *:*                   4525/dhcpd
+udp        0      0 *:netbios-dgm           *:*                   1016/nmbd
+udp        0      0 *:netbios-ns            *:*                   1016/nmbd
+udp        0      0 chris-desktop:domain    *:*                   1273/named
+udp        0      0 chris-desktop.lo:domain *:*                   1273/named
+udp        0      0 chris-deskt:netbios-dgm *:*                   1016/nmbd
+udp        0      0 chris-deskto:netbios-ns *:*                   1016/nmbd
+udp6       0      0 [::]:domain             [::]:*                1273/named
+</pre>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2017-10-19 Thu 20:43</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
