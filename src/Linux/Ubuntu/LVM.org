@@ -17,46 +17,190 @@ LVM consist of 3 main concepts:
 
 + Physical  Volumes
 + Volume Groups
-= Logical Volumes
++ Logical Volumes
+
+** Physical Volume
+Physical Volume is a physical disk or a partition which is the source
+of the storage. We can also use RAID disks or partitions. Physical
+volume will be added into Volume Groups and this will add more disk
+space to the Volume Groups.
+
+** Volume Groups
+Volume Groups a logical disk where one or more Physical Disk will
+participate. This will create enough disk space in order to create
+Logical Volumes.Volume groups provides flexibility like adding,
+removing physical volume , resizing Logical Volume on the fly.
+
+** Logical Volume
+Logical Volumes are the virtual disk or partitions created from a
+Volume Groups. We can resize and snapshot the Logical Volume without
+any interruption.
+
+* Create LVM Using vgcreate, lvcreate, and lvextend lvm2 Commands
+install the lvm2 package
+#+begin_src sh
+$ sudo apt-get intall lvm2
+#+end_src
+
+** Select the Physical Storage Devices for LVM – Use pvcreate, pvscan, pvdisplay Commands
+#+begin_src sh
+$ sudo pvcreate /dev/sda6 /dev/sda7 
+Physical volume "/dev/sda6" successfully created                                                 
+Physical volume "/dev/sda7" successfully created
+#+end_src
+
+If the physical volumes are already created, you can view them using
+the =pvscan= command as shown below.
+
+#+begin_src sh
+$ sudo pvscan                                                                   
+  PV /dev/sda6                      lvm2 [1.86 GB]                                                 
+  PV /dev/sda7                      lvm2 [1.86 GB]                                                 
+  Total: 2 [3.72 GB] / in use: 0 [0   ] / in no VG: 2 [3.72 GB]  
+#+end_src
+
+You can view the list of physical volumes with attributes like size,
+physical extent size, total physical extent size, the free space,
+etc., using pvdisplay command as shown below.
+
+#+begin_src sh
+$ sudo pvdisplay 
+--- Physical volume --- 
+  PV Name             /dev/sda6 
+  VG Name             
+  PV Size               1.86 GB / not usable 2.12 MB 
+  Allocatable           yes 
+  PE Size (KByte)    4096 
+  Total PE              476 
+  Free PE               456 
+  Allocated PE          20 
+  PV UUID               m67TXf-EY6w-6LuX-NNB6-kU4L-wnk8-NjjZfv 
+ 
+  --- Physical volume --- 
+  PV Name             /dev/sda7 
+  VG Name             
+  PV Size               1.86 GB / not usable 2.12 MB 
+  Allocatable           yes 
+  PE Size (KByte)    4096 
+  Total PE              476 
+  Free PE               476 
+  Allocated PE          0 
+  PV UUID               b031x0-6rej-BcBu-bE2C-eCXG-jObu-0Boo0x 
+#+end_src
+
+** Create the Volume Group – Use vgcreate, vgdisplay Commands
+Volume groups are nothing but a pool of storage that consists of one
+or more physical volumes. Once you create the physical volume, you can
+create the volume group (VG) from these physical volumes (PV).
+
+The volume group vol_grp1 is created from the two physical volumes as
+shown below.
+#+begin_src sh
+$ sudo vgcreate vol_grp1 /dev/sda6 /dev/sda7                                  
+  Volume  group "vol_grp1" successfully created       
+#+end_src
+
+vgdisplay command lists the created volume groups.
+#+begin_src sh
+$ sudo vgdisplay 
+  --- Volume group ---              
+  VG Name                     vol_grp1  
+  System ID                         
+  Format                        lvm2        
+  Metadata Areas            2           
+  Metadata Sequence No  1           
+  VG Access                   read/write  
+  VG Status                    resizable   
+  MAX LV                       0           
+  Cur LV                        0           
+  Open LV                      0           
+  Max PV                       0           
+  Cur PV                        2           
+  Act PV                       2           
+  VG Size                      3.72 GB     
+  PE Size                      4.00 MB     
+  Total PE                     952         
+  Alloc PE / Size             0 / 0       
+  Free  PE / Size            952 / 3.72 GB 
+  VG UUID                     Kk1ufB-rT15-bSWe-5270-KDfZ-shUX-FUYBvR 
+#+end_src
+
+** Create Logical Volumes – Use lvcreate, lvdisplay command
+lvcreate command creates the logical volume with the size of 80MB.
+#+begin_src sh
+$ sudo lvcreate -l 20 -n logical_vol1 vol_grp1 
+  Logical volume "logical_vol1" created
+#+end_src
+
+Using Maximum Available Free Space in Volume Group
+#+begin_src sh
+lvcreate -l 100%FREE -n <lv name>  <vg name>
+#+end_src
 
 
+Use lvdisplay command as shown below, to view the available logical
+volumes with its attributes.
+
+#+begin_src sh
+$ sudo lvdisplay                                  
+  --- Logical volume ---                                             
+  LV Name                /dev/vol_grp1/logical_vol1              
+  VG Name                vol_grp1                                  
+  LV UUID                 ap8sZ2-WqE1-6401-Kupm-DbnO-2P7g-x1HwtQ      
+  LV Write Access      read/write                                  
+  LV Status              available                                   
+  # open                  0                                           
+  LV Size                  80.00 MB                                    
+  Current LE              20                                          
+  Segments               1                                           
+  Allocation               inherit                                     
+  Read ahead sectors  auto                                        
+  - currently set to     256                                         
+  Block device            252:0   
+#+end_src
+
+After creating the appropriate filesystem on the logical volumes, it
+becomes ready to use for the storage purpose.
+#+begin_src sh
+$ sudo  mkfs.ext3 /dev/vol_grp1/logical_vol1 
+#+end_src
+
+** Change the size of the logical volumes – Use lvextend Command
+We can extend the size of the logical volumes after creating it by
+using lvextend utility as shown below. The changes the size of the
+logical volume from 80MB to 100MB.
+
+#+begin_src sh
+$ sudo lvextend -L100 /dev/vol_grp1/logical_vol1 
+  Extending logical volume logical_vol1 to 100.00 MB 
+  Logical volume logical_vol1 successfully resized 
+#+end_src
 
 
-https://www.poftut.com/what-is-linux-lvm-logical-volume-management/
+We can also add additional size to a specific logical volume as shown
+below.
 
-https://www.thegeekstuff.com/2010/08/how-to-create-lvm/
+#+begin_src sh
+$ sudo lvextend -L+100 /dev/vol_grp1/logical_vol1 
+  Extending logical volume logical_vol1 to 200.00 MB 
+  Logical volume logical_vol1 successfully resized 
+#+end_src
 
-
-
-
-
-
+* Recovery of LVM partitions[fn:1]
+#+begin_src sh
+$ pvscan
+# get the group name
+$ gcfgrestore sales
+#+end_src
 
 * cc
 #+begin_src sh
 
 #+end_src
 
-#+begin_src python
+* Footnotes
 
-#+end_src
-
-#+begin_src c++
-
-#+end_src
-
-#+BEGIN_EXAMPLE
-
-#+END_EXAMPLE
-
-#+begin_html
-
-#+BEGIN_QUOTE
-#+END_QUOTE
+[fn:1] http://www.softpanorama.org/Commercial_linuxes/LVM/recovery_of_lvm_partitions.shtml
 
 
-#+BEGIN_VERSE
-#+END_VERSE
-
-#+end_html
 
