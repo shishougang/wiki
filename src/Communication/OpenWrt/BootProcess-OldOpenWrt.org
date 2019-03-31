@@ -1,0 +1,664 @@
+#+SETUPFILE: ~/.emacs.d/src/org-templates/level-2.org
+#+TITLE: The Boot Process(Old OpenWrt)
+#+OPTIONS: num:nil
+
+
+
+
+* Overview
+http://wiki.openwrt.org/doc/techref/process.boot
+
+* Preinit mount Preinit, Mount Root, and First Boot Scripts
+http://wiki.openwrt.org/doc/techref/preinit_mount
+
+** Boot Sequence
+The basic OpenWrt boot sequence is:
+
+1. boot loader loads kernel
+2. kernel loads
+3. kernel calls /etc/preinit (the kernel considers this to be the init (or root) process
+4. =/etc/preinit= prepares system for multiuser mode
+5. =/etc/preinit= execs =/sbin/init= which becomes the init (or root) process and launches multiuser
+6. /sbin/init launches processes according to /etc/inittab.
+7. Typically the first process launched is /etc/init.d/rcS which
+   causes the scripts in =/etc/rc.d= which begin with 'S' to be launched
+   (in glob sort order). The /etc/rc.d directory is populated with
+   symlinks to the scripts in /etc/init.d. Each script in /etc/init.d
+   accepts enable and disable arguments for creating and removing the
+   symlinks.
+8. These script initialize the system and also initialize daemons that
+   wait for input, so that when all the scripts have executed the
+   normal system is active. On first boot this initializing includes
+   the process of preparing the root filesystem for use.
+
+** Preinit
+Preinit brings the system from raw kernel to ready for multiuser. To do so it performs the following tasks:
+
+1. Sources "/etc/functions.sh" and /lib/functions/boot.sh for common functions for boot/mount
+2. Mounts essential kernel filesystems like procfs
+3. Initializes device tree (/dev)
+4. Initializes console (serial console if present, otherwise dummy so that the script interpreter works properly)
+5. Presents opportunity for the user to enter a special operating mode
+   called 'failsafe' (Failsafe mode is presented in a separate
+   section. Once failsafe mode is entered it doesn't exit. A reboot is
+   necessary to enter normal operating mode).
+
+6. Mounts the root filesystem (this involves a number steps, presented in a separate section)
+7. If it's the first time booting after flashing the firmware, and a
+   previous configuration was saved during the flashing process, that
+   configuration is restored.
+
+8. Becomes (though exec) 'init' which goes to multiuser mode
+
+** Failsafe
+1. Prepares network interface (optional) and notifies that failsafe mode is being entered
+2. Launches daemon to allow network logins
+3. Allows login via serial console, if there is one.
+4. When the serial console login process exits, failsafe doesn't exit,
+   instead it continues to wait for network logins (whether or not
+   they are actually possible).
+
+** Mount Root Filesystem
+=all_jffs2= refers to a 'jffs2' target in menuconfig; e.g. firmware
+has no squashfs, but is purely a rw filesystem (jffs2), while, jffs2
+in the following text refers to the jffs2 portion of a squashfs/jffs2
+system.
+
+1. If there is no mtd device with label =rootfs_data=, then mounts
+   =/dev/root= (e.g. squashfs or =all_jffs2= with no squashfs) as root
+   filesystem, and indicates that further steps should be skipped
+
+2. If mtd device =rootfs_data= has not already been formatted, mounts
+   a tmpfs (ramdisk) as root filesystem, and indicates that further
+   steps should be skipped.
+3. Mounts previously formatted jjfs2 partition on /jffs2 and indicates successful mount.
+4. Makes successfully mounted /jffs (if it exists) the new root
+   filesystem and moves the new root filesystem to /rom, and indicates
+   to skip further steps.
+5. This is only reached on an error condition; attempts to mount a
+   tmpfs (ramdisk) as root filesystem
+6. This is only reached if no other step succeeds; attempt to mount
+   =/dev/root= (e.g. =squashfs/all_jffs2=) as root filesystem.
+
+** First Boot
+*** =/sbin/firstboot= may be referenced in three ways.
++ It may be called as part of the system startup, in which cased it is
+  called as /sbin/firstboot switch2jffs.
++ It may be used as a standalone command with no parameters (.e.g.
+  /sbin/firstboot)
++ It may be sourced from another script
+
+*** Common
+1. Source =/lib/functions/boot.sh= for common functions (e.g. also used
+   by preinit)
+2. Source files used by hooks
+3. Determine how called, and branch to appropriate commands.
+*** Sourced rather than executed
+1. Determine (and set variable for) MTD =rootfs_data= partition
+2. Determine (and set variable for) rom partition
+3. Determine (and set variable for) jffs2 partition
+*** Executed with no parameters
++ Resets jffs2 to original settings, if possible.
++ If jffs2 is not mounted, erases mtd and attempts format, mount, and pivot jffs2 as root.
+ If jffs2 is mounted, firstboot runs hook jffs2reset
+
+1. Determine (and set variable for) MTD =rootfs_data= partition
+2. Determine (and set variable for) rom partition
+3. Determine (and set variable for) jffs2 partition
+4. Determine (and set variable to indicate) whether the mini overlay filesystem type is supported.
+5. If overlay is supported, remove all files on jffs2 and remount it.
+6. If overlay not supported, create directories and symlinks, copying only certain critical files
+
+Note: since r35712 the firstboot script requires an inputted 'y' as
+confirmation. If using firstboot in a reset button script, you need to
+get that y inputted, e.g. by using the yes command: yes | firstboot
+
+*** Executed with parameter 'switch2jffs'
+1. Determine (and set variable for) MTD =rootfs_data= partition
+2. Determine (and set variable for) rom partition
+3. Determine (and set variable for) jffs2 partition
+4. Determine if mini overlay is supported. If not run hook =no_fo=
+5. Otherwise, if mounted, skip the rest, otherwise mount under squashfs (=/rom/jffs=)
+6. Copy ramdisk to jffs2
+7. Move /jffs to / (root) and move / (root) to /rom
+8. Cleanup
+
+*** hook =no_fo=
+1. Switch to kernel fs, get rid of union overlay and bind from /tmp/root
+2. Mount jffs (and make it safe for union)
+3. If not mounted, mount; copy from squashfs, and pivot so that /jffs is now / (root)
+4. Copy files from ramdisk
+5. Get rid of unnecessary mounts (cleanup) 
+** Preinit Operation
+Preinit consists of a number of the scripts. The main script is
+/etc/preinit which reads in the scripts. The scripts define functions
+which they attach to hooks. These hooks are, when processed, launch
+the functions in the order they were added to the hooks.
+
+Currently there are five hooks used by the preinit system:
+
++ =preinit_essential=
++ =preinit_main=
++ failsafe
++ initramfs
++ =preinit_mount_root=
+
+These hooks are actually just string variables with the name of each
+function to be executed, separated by spaces. The hook variables have
+=_hook= appended to the hook name. Thus the name of the variable for the
+=preinit_essential= hook is =preinit_essential_hook=.
+
+*** Main Preinit Script
+The main preinit script is actually quite empty. It:
+
+1. Initializes some variables (including the hook variables)
+2. Defines the function =pi_hook_add=, which is used to add functions to a hook
+3. Defines the function =pi_run_hook=, which executes the functions that were added to a hook
+4. Sources (reads) the shell scripts under folder =/lib/preinit/=, in glob sort order
+5. Processes the hook =preinit_essential=
+6. Initializes variables used by =preinit_main=
+7. Processes the hook preinit_main
+
+*** Variables
+There are a number of variables that control options of preinit.
+Defaults are defined in the main script =/etc/preinit= defined by the
+base-files package. However the variables are customizable via make
+menuconfig, in section "Preinit configuration options". The OpenWrt
+build process will then create the file =/lib/preinit/00_preinit.conf=
+which will be sourced by the main script.
+
+The variables defined at present are:
+#+begin_src sh
+Variable	 Description
+pi_ifname	 The device name of the network interface used to emit network messages during preinit (except failsafe)
+pi_ip	 The IP address of the preinit network (see above)
+pi_broadcast	 The broadcast address of the preinit network (see above)
+pi_netmask	 The netmask for the preinit network (see above)
+fs_failsafe_wait_timeout	 How long to pause while allowing the user to choose to enter failsafe mode. Default is two (2) seconds.
+pi_suppress_stderr	 If this is "y", then output on standard error (stderr, file descriptor 2), is ignored during preinit. This is the default in previous versions of OpenWrt (which did not have this option)
+pi_init_suppress_stderr	 If pi_suppress_stderr is not "y" (i.e. stderr is not suppressed for preinit), then this option controls whether init, and process run by init, except those associated with a terminal device (e.g. tts/0, ttyS0, tty1, pts/0, or other similar devices) will have stderr suppressed (not that network terminals such as those from SSH are associated with a pseudo-terminal device such as pty0/pty1 and are thus unaffected). As with pi_suppress_stderr, the default, and behaviour from previous versions of OpenWrt is "y".
+pi_init_path	 The default search PATH for binaries for commands run by init. Default is /bin:/sbin:/usr/bin:/usr/sbin
+pi_init_cmd	 The command to run as init. Default is /sbin/init
+pi_preinit_no_failsafe_netmsg	 suppress netmsg to say that one can enter failsafe mode
+pi_preinit_net_messages	 If enabled, show more network messages than just the message that one can enter failsafe mode
+#+end_src
+
+There are also variables used in the operation of preinit. They are:
+#+begin_src sh
+Variable	 Description
+preinit_essential_hook	 Variable containing hook names to execute, in order, for hook preinit_essential
+preinit_main_hook	 Ditto, for preinit_main
+failsafe_hook	 Ditto, for failsafe
+initramfs_hook	 Ditto, for initramfs
+preinit_mount_root_hook	 Ditto, for preinit_mount_root
+pi_mount_skip_next	 During hook preinit_mount_root, skips most steps; usually set by a preceeding step
+pi_jffs2_mount_success	 During hook preinit_mount_root, used by steps following mount attempt to determine which action they should take
+#+end_src
+
+*** Hooks
+The following sections describe the files and functions used by the
+various hooks.
+
+NB: The files, even though divided by hook here are all in the single
+=/lib/preinit= directory, and are thus combined in the directory lists,
+and are processed in glob sort order, not by hook (when sourcing them,
+the hooks specify the order of the execution of functions, which is as
+listed below)
+
+
+**** Development
+For the purposes of development, you will locate the files under
+=$ROOTDIR/package/base-files/files/lib/preinit=, for the existing files,
+and you can add new files anywhere that ultimately ends up in
+=/lib/preinit= on the router (while in preinit, e.g. not by user edits
+after read-write is mounted).
+
+**** =preinit_essentials=
+The =preinit_essentials= hook takes care of mounting essential kernel
+filesystems such as proc, and initializing the console.
+
+Files containing the functions executed by this hook
+#+begin_src sh
+File	 Functions
+10_essential_fs	 do_mount_procfs, do_mount_sysfs, do_mount_tmpfs
+20_device_fs_mount	 do_mount_devfs, do_mount_hotplug, do_mount_udev, choose_device_fs
+30_device_daemons	 init_hotplug, init_udev, init_device_fs
+40_init_shm	 init_shm
+40_pts_mount	 do_mount_pts
+50_choose_console	 choose_console
+60_init_console	 init_console
+#+end_src
+Functions, in order, executed by this hook (doesn't list the functions only called by other functions)
+#+begin_src sh
+Function	 Description
+do_mount_procfs	 mounts /proc
+do_mount_sysfs	 mounts /sys
+do_mount_tmpfs	 mounts /tmp
+choose_device_fs	 determines type of device daemon and the appropriate filesystem to mount on /dev for that device daemon
+init_device_fs	 launches daemons (if any) responsible for population /dev, and/or creating hotplug events when devices are added/removed (and for initial coldplug events)
+init_shm	 makes sure /dev/shm exists
+init_pts	 makes sure /dev/pts exists
+do_mount_pts	 mounts devpts on /dev/pts (pseudo-terminals)
+choose_console	 determines devices for stdin, stdout, and stderr
+init_console	 activates stdin, stdout, and stderr of preinit (and subsequent init) (prior to this they are not present in the environment)
+#+end_src
+Functions which are called by other functions, rather than directly as part of a hook
+#+begin_src sh
+Function	 Description
+do_mount_devfs	 mount devfs on /dev
+do_mount_hotplug	 mount tmpfs on /dev (for hotplug)
+do_mount_udev	 mount tmpfs on /dev (for udev)
+init_hotplug	 set hotplug handler (actually initiated after console init)
+init_udev	 start udev
+#+end_src
+**** =preinit_main=
+
+The =preinit_main= hook performs all the functions required of
+preinit, except those functions, like console, that are essential even
+for preinit tasks.
+
+#+begin_src sh
+File	 Description
+10_indicate_preinit	 preinit_ip, preinit_ip_deconfig, preinit_net_echo, preinit_echo, pi_indicate_led, pi_indicate_preinit
+30_failsafe_wait	 fs_wait_for_key, failsafe_wait
+40_run_failsafe_hook	 run_failsafe_hook
+50_indicate_regular_preinit	 indicate_regular_preinit_boot
+60_init_hotplug	 init_hotplug
+70_initramfs_test	 initramfs_test
+80_mount_root	 do_mount_root
+90_restore_config	 restore_config
+99_10_run_init	 run_init
+#+end_src
+Functions, in order, executed by this hook (doesn't list the functions
+only called by other functions)
+
+#+begin_src sh
+Function	 Description
+init_hotplug	 Initialize hotplug, if needed (that is for devfs). Hotplug or a device daemon is needed so that devices are available for use for preinit
+preinit_ip	 Initialize network interface (if one has been defined for as available for preinit)
+pi_indicate_preinit	 Send messages to console, network, and/or led, depending on which, if any, of these is present which say that we are in preinit mode
+failsafe_wait	 Emits messages (to network and console) that indicate the user has the option to enter failsafe mode and wait for the configured period of time (default two seconds) for the user to select failsafe mode
+run_failsafe_hook	 If user chooses to enter failsafe mode, run the *failsafe* hook (which at present doesn't return, which means no more functions from preinit_main get run on this boot)
+indicate_regular_preinit_boot	 Emits messages to network, console, and/or LED depending on which (if any) is present, indicating that it's a regular boot not a failsafe boot
+initramfs_test	 If initramfs is present run the *initramfs* hook and exit
+do_mount_root	 Executes hook *preinit_mount_root*
+restore_config	 If a previous configuration was stored by sysupgrade, restore it to the rootfs
+run_init	 Exec the command defined by `pi_init_cmd` with the environment variables defined by `pi_init_env`, plus PATH `pi_init_path`
+#+end_src
+Functions which are called by other functions, rather than directly as
+part of a hook.
+
+#+begin_src sh
+Function	 Description
+preinit_ip_deconfig	 deconfigure interface used for preinit network messages etc
+preinit_net_echo	 emit a message on the preinit network interface
+preinit_echo	 emit a message on the (serial) console
+pi_indicate_led	 set LED status to indicate preinit mode
+fs_wait_for_key	 wait for reset button press, CTRL-C, or <some_key><ENTER>, with timeout
+#+end_src
+**** failsafe
+Do what needs to done to prepare failsafe mode and enter it.
+#+begin_src sh
+File	 Description
+10_indicate_failsafe	 indicate_failsafe_led, indicate_failsafe
+99_10_failsafe_login	 failsafe_netlogin, failsafe_shell
+#+end_src
+Functions, in order, executed by this hook (doesn't list the functions only called by other functions)
+#+begin_src sh
+Function	 Description
+indicate_failsafe	 Emit message/status to network, console, and/or LED (depending on which, if any, are present) indicating that the device is now in failsafe mode
+failsafe_netlogin	 Launch telnet daemon to allow telnet login on the defined network interface (if any)
+failsafe_shell	 Launch a shell for access via serial console (if present)
+#+end_src
+Functions which are called by other functions, rather than directly as part of a hook
+#+begin_src sh
+Function	 Description
+indicate_failsafe_led	 set LED status to indicate preinit mode
+#+end_src
+**** =preinit_mount_root=
+Mount the root filesystem
+#+begin_src sh
+File	 Description
+05_mount_skip	 check_skip
+10_check_for_mtd	 mount_no_mtd, check_for_mtd
+#+end_src
+Functions, in order, executed by this hook (doesn't list the functions only called by other functions)
+#+begin_src sh
+Function	 Description
+check_for_mtd	 Check for a mtd partition named rootfs_data. If not present mount kernel fs as root (e.g. all_jjfs2 or squashfs only) and skip rest.
+check_for_jffs2	 Check if jffs2 formatted yet. If not, mount ramoverlay and skip rest
+do_mount_jffs2	 find jffs2 partition and mount it, indicating result
+rootfs_pivot	 if jffs2 mounted, make it root (/) and old root (squashfs) /rom , skipping rest on success
+do_mount_no_jffs2	 If nothing was mounted so far, mount ramdisk (ram overlay), skipping rest on success
+do_mount_no_mtd	 If there was nothing mounted , mount /dev/root as root (/)
+#+end_src
+Functions which are called by other functions, rather than directly as part of a hook
+#+begin_src sh
+Function	 Description
+mount_no_mtd	 if there is not mtd partition named rootfs_data, mount /dev/root as / (root). E.g. this can occur if the firmware filesystem is entirely a jffs2 partition, with no squashfs)
+mount_no_jffs2	 mount ramdisk (ram overlay) if there is rootfs_data, but it has not been formatted yet)
+find_mount_jffs2	 find and mount rootfs_data jffs2 partition on /jffs
+jffs2_not_mounted	 returns true (0) if jffs2 is not mounted
+#+end_src
+
+** Firstboot Operation
+*** Main Firstboot Script
+1. Source common functions
+2. Source functions for hooks
+3. if block:
+if invoked as executable
+#+begin_src sh
+       if called with `switch2jffs` parameter (i.e. from rcS)
+           run hook `switch2jffs`
+       if called standalone (e.g. from commandline)
+           if there is a jffs2 partition mounted
+                run hook `jffs2reset`
+           else
+                erase rootfs_data mtd partition
+                format
+                and remount it
+           end
+       end
+ if sourced (that is not executed)
+      set some variables
+ end
+#+end_src
+*** Hooks
+**** switch2jffs
+Make the filesystem that we want to be the rootfs, to be the rootfs
+#+begin_src sh
+File	 Description
+10_determine_parts	deterimine_mtd_part, determine_rom_part, determine_jffs2_part, set_mtd_part, set_rom_part, set_jffs2_part
+20_has_mini_fo	check_for_mini_fo
+30_is_rootfs_mounted	skip_if_rootfs_mounted
+40_copy_ramoverlay	copy_ramoverlay
+50_pivot	with_fo_pivot
+99_10_with_fo_cleanup	 with_fo_cleanup
+#+end_src
+Functions, in order, executed by this hook (doesn't list the functions only called by other functions)
+#+begin_src sh
+Function	 Description
+determine_mtd_part	 exit if no mtd partition at all
+determine_rom_part	 exit if not squashfs partition (firstboot not for all_jffs2)
+determine_jffs2_part	 figure out the jffs2 partition (assuming we have an mtd part
+check_for_mini_fo	 determine if we have mini_fo overlay in kernel. If not run *no_fo* hook
+skip_if_rootfs_mounted	 attempt mount jffs2 on /rom/jffs2. If partition already mounted exit
+copy_ramoverlay	copy the data from the temporary rootfs (on the ramdisk overlay over the squashfs) to the new jffs2 partition
+with_fo_pivot	make current jffs2 partition the root partition and the current root /rom
+with_fo_cleanup	clean up unneeded mount of ramdisk, if possible
+#+end_src 
+Functions which are called by other functions, rather than directly as part of a hook
+#+begin_src 
+Function	 Description
+set_mtd_part	 set variables for mtd partition
+set_rom_part	 set variable for squashfs (rom) partition
+set_jffs_part	 set variable for jffs2 partition
+#+end_src
+**** =no_fo=
+Make the filesystem that we want to be the rootfs, to be the rootfs,
+given that we have no mini\_fo overlay filesystem
+
+#+begin_src sh
+File	 Description
+10_no_fo_clear_overlay	no_fo_clear_overlay
+20_no_fo_mount_jffs	 no_fo_mount_jffs
+30_no_fo_pivot	 no_fo_pivot
+40_no_fo_copy_ram_overlay	 no_fo_copy_ram_overlay
+99_10_no_fo_cleanup	 no_fo_cleanup
+#+end_src
+Functions, in order, executed by this hook (doesn't list the functions
+only called by other functions)
+
+#+begin_src sh
+Function	 Description
+no_fo_clear_overlay	 stop ramdisk overlaying the squashfs
+no_fo_mount_jffs	 attempt to mount jffs (work around problem with union). If already mounted exit
+no_fo_pivot	 make jffs root and old root /rom
+no_fo_copy_ram_overlay	 copy data from ram overlay to jffs2 overlay of squashfs
+no_fo_cleanup	 get rid of extra binds and mounts
+#+end_src
+**** jffs2reset
+Reset jffs2 to defaults
+#+begin_src sh
+File	 Description
+10_rest_has_mini_fo	 reset_check_for_mini_fo
+20_reset_clear_jffs	 reset_clear_jffs
+30_reset_copy_rom	 reset_copy_rom
+#+end_src
+Functions, in order, executed by this hook (doesn't list the functions
+only called by other functions)
+
+#+begin_src sh
+Function	 Description
+reset_check_for_mini_fo	 Determine if the kernel supports mini_fo overlay
+reset_clear_jffs	 if mini_fo is supported, erase all data in overlay and remount (resets back to 'pure' squashfs versions
+reset_copy_rom	 if mini_fo is not supported, make symlinks and copy critical files from squashfs to jffs
+#+end_src
+
+* Init Scripts Init script implementation reference
+http://wiki.openwrt.org/doc/techref/initscripts
+
+** create init scripts.  start and stop
+#+begin_src sh
+#!/bin/sh /etc/rc.common
+# Example script
+# Copyright (C) 2007 OpenWrt.org
+ 
+START=10
+STOP=15
+ 
+start() {        
+        echo start
+        # commands to launch application
+}                 
+ 
+stop() {          
+        echo stop
+        # commands to kill application 
+}
+#+end_src
+
+What this means:
+
++ START=10 - this means the file will be symlinked as
+  =/etc/rc.d/S10example= - in other words, it will start after the init
+  scripts with START=9 and below, but before START=11 and above.
+
++ STOP=15 - this means the file will be symlinked as
+  =/etc/rc.d/K15example= - this means it will be stopped after the init
+  scripts with STOP=14 and below, but before STOP=16 and above. This
+  is optional.
+
++ start() - these commands will be run when it is called with 'start'
+  or 'boot' as its parameter.
+
++ stop() - these commands will be run when it is called with 'stop' as its parameter.
+
+** boot
+#+begin_src sh
+boot() {
+        echo boot
+        # commands to run on boot
+}
+#+end_src
+… then these commands will be run on boot, instead of those in the
+start() section. This is handy for things that need to be done on
+boot, but not every time the program it calls restarts.
+** custom commands 
+using the =EXTRA_COMMANDS= variable, and provide help for those commands
+with the =EXTRA_HELP= variable, then adding sections for each of your
+custom commands:
+#+begin_src sh
+EXTRA_COMMANDS="custom"
+EXTRA_HELP="        custom  Help for the custom command"
+ 
+custom() {
+        echo "custom command"
+        # do your custom stuff
+}
+#+end_src
+
+** multiple custom commands
+#+begin_src sh
+EXTRA_COMMANDS="custom1 custom2 custom3"
+EXTRA_HELP=<<EOF
+        custom1 Help for the custom1 command
+        custom2 Help for the custom2 command
+        custom3 Help for the custom3 command
+EOF
+ 
+custom1 () {
+        echo "custom1"
+        # do the stuff for custom1
+}
+custom2 () {
+        echo "custom2"
+        # do the stuff for custom2
+}
+custom3 () {
+        echo "custom3"
+        # do the stuff for custom3
+}
+#+end_src
+
+** Enable and disable
+ *Dont forget to chmod +x /etc/init.d/example!*
+In order to automatically start the init script on boot, it must be
+installed into =/etc/rc.d/= .
+
+*** The current state can be queried with the "enabled" command:
+#+begin_src sh
+root@OpenWrt:/# /etc/init.d/example enabled && echo on
+on
+#+end_src
+
+* Block Mount Block Device Mounting
+http://wiki.openwrt.org/doc/techref/block_mount
+
+For general usage, see fstab: http://wiki.openwrt.org/doc/uci/fstab
+
+* Process Trinity
+** Bootloader
+1. the bootloader on the flash gets executed
+2. the bootloader performs the POST, which is a low-level hardware initialization
+3. the bootloader decompresses the Kernel image from it's (known!)
+   location on the flash storage into main memory (=RAM)
+4. the bootloader executes the Kernel with init=… option (default is /etc/preinit)
+** Kernel
+1. the Kernel further bootstraps itself (sic!)
+2. issues the command/ops-code start_kernel
+3. /etc/preinit does pre-initialization setups (create directories, mount fs, /proc, /sys, … )
+4. the Kernel mounts the rootfs (root file system), see .. and also udev
+5. if "INITRAMFS" is not defined, calls /sbin/init (the mother of all processes)
+6. finally some kernel thread becomes the userspace init process
+** Init
+The user space starts when kernel mounts rootfs and the very first
+program to run is (by default) /sbin/init. Please remember, that the
+interface between application and kernel is the clib and the syscalls
+it offers.
+
+1. init reads /etc/inittab for the "sysinit" entry (default is
+   "::sysinit:/etc/init.d/rcS S boot")
+2. init calls /etc/init.d/rcS S boot
+3. rcS executes the symlinks to the actual startup scripts located in
+   /etc/rc.d/S##xxxxxx with option "start":
+4. after rcS finishes, system should be up and running
+
+** Detailed boot sequence
+*** Boot loader
+To see how the kernel was started, you can view the options by reading
+the =/proc/cmdline= file. You can see what options were passed from grub
+by logging into the device and typing "cat /proc/cmdline".
+
+#+begin_src sh
+"root=/dev/hda2 rootfstype=ext2 init=/etc/preinit noinitrd console=ttyS0,38400,n,8,1 reboot=bios"
+#+end_src
+The options are:
+#+begin_src sh
+root: root device/partition where the rest of the OpenWrt system is located
+rootfstype: Format for the root partition - ext2 in this example
+init: The first program to call after the kernel is loaded and initialized
+noinitrd: All drivers for access to the rest of the system are built into the kernel, so no need to load an initial ramdisk with extra drivers
+console: Which device to accept console login commands from - talk to ttyS0 (first serial port) at 38400 speed using no flow control, eight data bits and one stop bit. See the kernel documentation for other options
+reboot: Not sure, but I believe that this option tells the kernel how to perform a reboot
+#+end_src
+
+[ NOTE: See the man page on grub for all of the grub parameters ] In
+this example, the entry "init=/etc/preinit" tells the kernel that the
+first program to run after initializing is "preinit" found in the
+"/etc" directory located on the disk "/dev/hda" and partition "hda2".
+
+*** =/etc/preinit= script
+The preinit script's primary purpose is initial checks and setups for
+the rest of the startup scripts. One primary job is to mount the /proc
+and /sys pseudo filesystems so access to status information and some
+control functions are made available. Another primary function is to
+prepare the /dev directory for access to things like console, tty, and
+media access devices. The final job of preinit is to start the init
+daemon process itself.
+
+*** Busybox init
+nit is considered the "Mother Of All Processes" since it controls
+things like starting daemons, changing runlevels, setting up the
+console/pseudo-consoles/tty access daemons, as well as some other
+housekeeping chores.
+
+Once init is started, it reads the =/etc/inittab= configuration file to
+tell it what process to start, monitor for certain activities, and
+when an activity is triggered to call the relevant program.
+
+The init program used by busybox is a minimalistic daemon. It does not
+have the knowledge of runlevels and such, so the config file is
+somewhat abbreviated from the normal init config file. If you are
+running a full linux desktop, you can "man inittab" and read about the
+normal init process and entries. Fields are separated by a colon and
+are defined as:
+
+#+begin_src sh
+[ID] : [Runlevel(s)] : [Action] : [Process to execute ]
+#+end_src
+
+For busybox init, the only fields needed are the "ID" (1st), "Action" (3rd) and "Process" (4th) entries. Busybox init has several caveats from a normal init: the ID field is used for controlling TTY/Console, and there are no defined runlevels. A minimalistic /etc/inittab would look like:
+#+begin_src sh
+::sysinit:/etc/init.d/rcS S boot
+::shutdown:/etc/init.d/rcS K stop
+tts/0::askfirst:/bin/ash –login
+ttyS0::askfirst:/bin/ash –login
+tty1::askfirst:/bin/ash –login
+#+end_src
+Lines 1 and 2 with a blank ID field indicate they are not specific to
+any terminal or console. The other lines are directed to specific
+terminals/consoles.
+
+Notice that both the "sysinit" and "shutdown" actions are calling the
+same program (the "/etc/init.d/rcS" script). The only difference is
+the options that are passed to the rcS script. This will become
+clearer later on.
+
+*** =/etc/rc.d/rcS= Script At Startup
+At this point, all basic setup has been done, all programs and
+system/configuration files are accessible, and we are now ready to
+start the rest of the processes.
+
+The rcS script is pretty simplistic in it's function - it's sole
+purpose is to execute all of the scripts in the =/etc/rc.d= directory
+with the appropriate options. if you paid attention to the sysinit
+entry, the rcS script was called with the "S" and "boot" options.
+Since we called rcS with 2 options ("S" and "boot"), the rcS script
+will substitute $1 with "S" and $2 with "boot". The relevant lines in
+rcS are:
+#+begin_src sh
+   -  for i in /etc/rc.d/$1* ; do
+  2.      [ -x $i ] && $i $2
+  3.  done
+#+end_src
+
+The basic breakdown is:
+
+1. Execute the following line once for every entry (file/link) in the
+   =/etc/rc.d= directory that begins with "S"
+2. If the file is executable, execute the file with the option "boot"
+3. Repeat at step 1, replacing $i with the next filename until there
+   are no more files to check
+
+

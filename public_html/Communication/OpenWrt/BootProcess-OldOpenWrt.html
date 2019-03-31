@@ -1,0 +1,1294 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>The Boot Process(Old OpenWrt)</title>
+<!-- 2019-04-01 Mon 03:46 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="Shi Shougang" />
+<link href="../../assets/bootstrap.min.css" rel="stylesheet" media="screen">
+<link href="../../assets/bootstrap-responsive.min.css" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="../../assets/stylesheet.css" />
+<script src="assets/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">The Boot Process(Old OpenWrt)</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">Overview</a></li>
+<li><a href="#sec-2">Preinit mount Preinit, Mount Root, and First Boot Scripts</a>
+<ul>
+<li><a href="#sec-2-1">Boot Sequence</a></li>
+<li><a href="#sec-2-2">Preinit</a></li>
+<li><a href="#sec-2-3">Failsafe</a></li>
+<li><a href="#sec-2-4">Mount Root Filesystem</a></li>
+<li><a href="#sec-2-5">First Boot</a>
+<ul>
+<li><a href="#sec-2-5-1"><code>/sbin/firstboot</code> may be referenced in three ways.</a></li>
+<li><a href="#sec-2-5-2">Common</a></li>
+<li><a href="#sec-2-5-3">Sourced rather than executed</a></li>
+<li><a href="#sec-2-5-4">Executed with no parameters</a></li>
+<li><a href="#sec-2-5-5">Executed with parameter 'switch2jffs'</a></li>
+<li><a href="#sec-2-5-6">hook <code>no_fo</code></a></li>
+</ul>
+</li>
+<li><a href="#sec-2-6">Preinit Operation</a>
+<ul>
+<li><a href="#sec-2-6-1">Main Preinit Script</a></li>
+<li><a href="#sec-2-6-2">Variables</a></li>
+<li><a href="#sec-2-6-3">Hooks</a>
+<ul>
+<li><a href="#sec-2-6-3-1">Development</a></li>
+<li><a href="#sec-2-6-3-2"><code>preinit_essentials</code></a></li>
+<li><a href="#sec-2-6-3-3"><code>preinit_main</code></a></li>
+<li><a href="#sec-2-6-3-4">failsafe</a></li>
+<li><a href="#sec-2-6-3-5"><code>preinit_mount_root</code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#sec-2-7">Firstboot Operation</a>
+<ul>
+<li><a href="#sec-2-7-1">Main Firstboot Script</a></li>
+<li><a href="#sec-2-7-2">Hooks</a>
+<ul>
+<li><a href="#sec-2-7-2-1">switch2jffs</a></li>
+<li><a href="#sec-2-7-2-2"><code>no_fo</code></a></li>
+<li><a href="#sec-2-7-2-3">jffs2reset</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#sec-3">Init Scripts Init script implementation reference</a>
+<ul>
+<li><a href="#sec-3-1">create init scripts.  start and stop</a></li>
+<li><a href="#sec-3-2">boot</a></li>
+<li><a href="#sec-3-3">custom commands</a></li>
+<li><a href="#sec-3-4">multiple custom commands</a></li>
+<li><a href="#sec-3-5">Enable and disable</a>
+<ul>
+<li><a href="#sec-3-5-1">The current state can be queried with the "enabled" command:</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#sec-4">Block Mount Block Device Mounting</a></li>
+<li><a href="#sec-5">Process Trinity</a>
+<ul>
+<li><a href="#sec-5-1">Bootloader</a></li>
+<li><a href="#sec-5-2">Kernel</a></li>
+<li><a href="#sec-5-3">Init</a></li>
+<li><a href="#sec-5-4">Detailed boot sequence</a>
+<ul>
+<li><a href="#sec-5-4-1">Boot loader</a></li>
+<li><a href="#sec-5-4-2"><code>/etc/preinit</code> script</a></li>
+<li><a href="#sec-5-4-3">Busybox init</a></li>
+<li><a href="#sec-5-4-4"><code>/etc/rc.d/rcS</code> Script At Startup</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+
+
+
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1">Overview</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+<a href="http://wiki.openwrt.org/doc/techref/process.boot">http://wiki.openwrt.org/doc/techref/process.boot</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2">Preinit mount Preinit, Mount Root, and First Boot Scripts</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+<a href="http://wiki.openwrt.org/doc/techref/preinit_mount">http://wiki.openwrt.org/doc/techref/preinit_mount</a>
+</p>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1">Boot Sequence</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+The basic OpenWrt boot sequence is:
+</p>
+
+<ol class="org-ol">
+<li>boot loader loads kernel
+</li>
+<li>kernel loads
+</li>
+<li>kernel calls /etc/preinit (the kernel considers this to be the init (or root) process
+</li>
+<li><code>/etc/preinit</code> prepares system for multiuser mode
+</li>
+<li><code>/etc/preinit</code> execs <code>/sbin/init</code> which becomes the init (or root) process and launches multiuser
+</li>
+<li>/sbin/init launches processes according to /etc/inittab.
+</li>
+<li>Typically the first process launched is /etc/init.d/rcS which
+causes the scripts in <code>/etc/rc.d</code> which begin with 'S' to be launched
+(in glob sort order). The /etc/rc.d directory is populated with
+symlinks to the scripts in /etc/init.d. Each script in /etc/init.d
+accepts enable and disable arguments for creating and removing the
+symlinks.
+</li>
+<li>These script initialize the system and also initialize daemons that
+wait for input, so that when all the scripts have executed the
+normal system is active. On first boot this initializing includes
+the process of preparing the root filesystem for use.
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2">Preinit</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+Preinit brings the system from raw kernel to ready for multiuser. To do so it performs the following tasks:
+</p>
+
+<ol class="org-ol">
+<li>Sources "/etc/functions.sh" and /lib/functions/boot.sh for common functions for boot/mount
+</li>
+<li>Mounts essential kernel filesystems like procfs
+</li>
+<li>Initializes device tree (/dev)
+</li>
+<li>Initializes console (serial console if present, otherwise dummy so that the script interpreter works properly)
+</li>
+<li>Presents opportunity for the user to enter a special operating mode
+called 'failsafe' (Failsafe mode is presented in a separate
+section. Once failsafe mode is entered it doesn't exit. A reboot is
+necessary to enter normal operating mode).
+</li>
+
+<li>Mounts the root filesystem (this involves a number steps, presented in a separate section)
+</li>
+<li>If it's the first time booting after flashing the firmware, and a
+previous configuration was saved during the flashing process, that
+configuration is restored.
+</li>
+
+<li>Becomes (though exec) 'init' which goes to multiuser mode
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3">Failsafe</h3>
+<div class="outline-text-3" id="text-2-3">
+<ol class="org-ol">
+<li>Prepares network interface (optional) and notifies that failsafe mode is being entered
+</li>
+<li>Launches daemon to allow network logins
+</li>
+<li>Allows login via serial console, if there is one.
+</li>
+<li>When the serial console login process exits, failsafe doesn't exit,
+instead it continues to wait for network logins (whether or not
+they are actually possible).
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4">Mount Root Filesystem</h3>
+<div class="outline-text-3" id="text-2-4">
+<p>
+<code>all_jffs2</code> refers to a 'jffs2' target in menuconfig; e.g. firmware
+has no squashfs, but is purely a rw filesystem (jffs2), while, jffs2
+in the following text refers to the jffs2 portion of a squashfs/jffs2
+system.
+</p>
+
+<ol class="org-ol">
+<li>If there is no mtd device with label <code>rootfs_data</code>, then mounts
+<code>/dev/root</code> (e.g. squashfs or <code>all_jffs2</code> with no squashfs) as root
+filesystem, and indicates that further steps should be skipped
+</li>
+
+<li>If mtd device <code>rootfs_data</code> has not already been formatted, mounts
+a tmpfs (ramdisk) as root filesystem, and indicates that further
+steps should be skipped.
+</li>
+<li>Mounts previously formatted jjfs2 partition on /jffs2 and indicates successful mount.
+</li>
+<li>Makes successfully mounted /jffs (if it exists) the new root
+filesystem and moves the new root filesystem to /rom, and indicates
+to skip further steps.
+</li>
+<li>This is only reached on an error condition; attempts to mount a
+tmpfs (ramdisk) as root filesystem
+</li>
+<li>This is only reached if no other step succeeds; attempt to mount
+<code>/dev/root</code> (e.g. <code>squashfs/all_jffs2</code>) as root filesystem.
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5">First Boot</h3>
+<div class="outline-text-3" id="text-2-5">
+</div><div id="outline-container-sec-2-5-1" class="outline-4">
+<h4 id="sec-2-5-1"><code>/sbin/firstboot</code> may be referenced in three ways.</h4>
+<div class="outline-text-4" id="text-2-5-1">
+<ul class="org-ul">
+<li>It may be called as part of the system startup, in which cased it is
+called as /sbin/firstboot switch2jffs.
+</li>
+<li>It may be used as a standalone command with no parameters (.e.g.
+/sbin/firstboot)
+</li>
+<li>It may be sourced from another script
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5-2" class="outline-4">
+<h4 id="sec-2-5-2">Common</h4>
+<div class="outline-text-4" id="text-2-5-2">
+<ol class="org-ol">
+<li>Source <code>/lib/functions/boot.sh</code> for common functions (e.g. also used
+by preinit)
+</li>
+<li>Source files used by hooks
+</li>
+<li>Determine how called, and branch to appropriate commands.
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-2-5-3" class="outline-4">
+<h4 id="sec-2-5-3">Sourced rather than executed</h4>
+<div class="outline-text-4" id="text-2-5-3">
+<ol class="org-ol">
+<li>Determine (and set variable for) MTD <code>rootfs_data</code> partition
+</li>
+<li>Determine (and set variable for) rom partition
+</li>
+<li>Determine (and set variable for) jffs2 partition
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-2-5-4" class="outline-4">
+<h4 id="sec-2-5-4">Executed with no parameters</h4>
+<div class="outline-text-4" id="text-2-5-4">
+<ul class="org-ul">
+<li>Resets jffs2 to original settings, if possible.
+</li>
+<li>If jffs2 is not mounted, erases mtd and attempts format, mount, and pivot jffs2 as root.
+If jffs2 is mounted, firstboot runs hook jffs2reset
+</li>
+
+<li>Determine (and set variable for) MTD <code>rootfs_data</code> partition
+</li>
+<li>Determine (and set variable for) rom partition
+</li>
+<li>Determine (and set variable for) jffs2 partition
+</li>
+<li>Determine (and set variable to indicate) whether the mini overlay filesystem type is supported.
+</li>
+<li>If overlay is supported, remove all files on jffs2 and remount it.
+</li>
+<li>If overlay not supported, create directories and symlinks, copying only certain critical files
+</li>
+</ul>
+
+<p>
+Note: since r35712 the firstboot script requires an inputted 'y' as
+confirmation. If using firstboot in a reset button script, you need to
+get that y inputted, e.g. by using the yes command: yes | firstboot
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5-5" class="outline-4">
+<h4 id="sec-2-5-5">Executed with parameter 'switch2jffs'</h4>
+<div class="outline-text-4" id="text-2-5-5">
+<ol class="org-ol">
+<li>Determine (and set variable for) MTD <code>rootfs_data</code> partition
+</li>
+<li>Determine (and set variable for) rom partition
+</li>
+<li>Determine (and set variable for) jffs2 partition
+</li>
+<li>Determine if mini overlay is supported. If not run hook <code>no_fo</code>
+</li>
+<li>Otherwise, if mounted, skip the rest, otherwise mount under squashfs (<code>/rom/jffs</code>)
+</li>
+<li>Copy ramdisk to jffs2
+</li>
+<li>Move /jffs to / (root) and move / (root) to /rom
+</li>
+<li>Cleanup
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5-6" class="outline-4">
+<h4 id="sec-2-5-6">hook <code>no_fo</code></h4>
+<div class="outline-text-4" id="text-2-5-6">
+<ol class="org-ol">
+<li>Switch to kernel fs, get rid of union overlay and bind from /tmp/root
+</li>
+<li>Mount jffs (and make it safe for union)
+</li>
+<li>If not mounted, mount; copy from squashfs, and pivot so that /jffs is now / (root)
+</li>
+<li>Copy files from ramdisk
+</li>
+<li>Get rid of unnecessary mounts (cleanup) 
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-6" class="outline-3">
+<h3 id="sec-2-6">Preinit Operation</h3>
+<div class="outline-text-3" id="text-2-6">
+<p>
+Preinit consists of a number of the scripts. The main script is
+/etc/preinit which reads in the scripts. The scripts define functions
+which they attach to hooks. These hooks are, when processed, launch
+the functions in the order they were added to the hooks.
+</p>
+
+<p>
+Currently there are five hooks used by the preinit system:
+</p>
+
+<ul class="org-ul">
+<li><code>preinit_essential</code>
+</li>
+<li><code>preinit_main</code>
+</li>
+<li>failsafe
+</li>
+<li>initramfs
+</li>
+<li><code>preinit_mount_root</code>
+</li>
+</ul>
+
+<p>
+These hooks are actually just string variables with the name of each
+function to be executed, separated by spaces. The hook variables have
+<code>_hook</code> appended to the hook name. Thus the name of the variable for the
+<code>preinit_essential</code> hook is <code>preinit_essential_hook</code>.
+</p>
+</div>
+
+<div id="outline-container-sec-2-6-1" class="outline-4">
+<h4 id="sec-2-6-1">Main Preinit Script</h4>
+<div class="outline-text-4" id="text-2-6-1">
+<p>
+The main preinit script is actually quite empty. It:
+</p>
+
+<ol class="org-ol">
+<li>Initializes some variables (including the hook variables)
+</li>
+<li>Defines the function <code>pi_hook_add</code>, which is used to add functions to a hook
+</li>
+<li>Defines the function <code>pi_run_hook</code>, which executes the functions that were added to a hook
+</li>
+<li>Sources (reads) the shell scripts under folder <code>/lib/preinit/</code>, in glob sort order
+</li>
+<li>Processes the hook <code>preinit_essential</code>
+</li>
+<li>Initializes variables used by <code>preinit_main</code>
+</li>
+<li>Processes the hook preinit<sub>main</sub>
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2-6-2" class="outline-4">
+<h4 id="sec-2-6-2">Variables</h4>
+<div class="outline-text-4" id="text-2-6-2">
+<p>
+There are a number of variables that control options of preinit.
+Defaults are defined in the main script <code>/etc/preinit</code> defined by the
+base-files package. However the variables are customizable via make
+menuconfig, in section "Preinit configuration options". The OpenWrt
+build process will then create the file <code>/lib/preinit/00_preinit.conf</code>
+which will be sourced by the main script.
+</p>
+
+<p>
+The variables defined at present are:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Variable         Description
+pi_ifname        The device name of the network interface used to emit network messages during preinit (except failsafe)
+pi_ip    The IP address of the preinit network (see above)
+pi_broadcast     The broadcast address of the preinit network (see above)
+pi_netmask       The netmask for the preinit network (see above)
+fs_failsafe_wait_timeout         How long to pause while allowing the user to choose to enter failsafe mode. Default is two (2) seconds.
+pi_suppress_stderr       If this is <span style="color: #ffa07a;">"y"</span>, then output on standard error (stderr, file descriptor 2), is ignored during preinit. This is the default<span style="color: #00ffff;"> in</span> previous versions of OpenWrt (<span style="color: #b0c4de;">which</span> did not have this option)
+pi_init_suppress_stderr  If pi_suppress_stderr is not <span style="color: #ffa07a;">"y"</span> (i.e. stderr is not suppressed for preinit), then this option controls whether init, and process run by init, except those associated with a terminal device (e.g. tts/0, ttyS0, tty1, pts/0, or other similar devices) will have stderr suppressed (not that network terminals such as those from SSH are associated with a pseudo-terminal device such as pty0/pty1 and are thus unaffected). As with pi_suppress_stderr, the default, and behaviour from previous versions of OpenWrt is <span style="color: #ffa07a;">"y"</span>.
+pi_init_path     The default search PATH for binaries for commands run by init. Default is /bin:/sbin:/usr/bin:/usr/sbin
+pi_init_cmd      The command to run as init. Default is /sbin/init
+pi_preinit_no_failsafe_netmsg    suppress netmsg to say that one can enter failsafe mode
+pi_preinit_net_messages  If enabled, show more network messages than just the message that one can enter failsafe mode
+</pre>
+</div>
+
+<p>
+There are also variables used in the operation of preinit. They are:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Variable         Description
+preinit_essential_hook   Variable containing hook names to execute,<span style="color: #00ffff;"> in</span> order, for hook preinit_essential
+preinit_main_hook        Ditto, for preinit_main
+failsafe_hook    Ditto, for failsafe
+initramfs_hook   Ditto, for initramfs
+preinit_mount_root_hook  Ditto, for preinit_mount_root
+pi_mount_skip_next       During hook preinit_mount_root, skips most steps; usually set by a preceeding step
+pi_jffs2_mount_success   During hook preinit_mount_root, used by steps following mount attempt to determine which action they should take
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-6-3" class="outline-4">
+<h4 id="sec-2-6-3">Hooks</h4>
+<div class="outline-text-4" id="text-2-6-3">
+<p>
+The following sections describe the files and functions used by the
+various hooks.
+</p>
+
+<p>
+NB: The files, even though divided by hook here are all in the single
+<code>/lib/preinit</code> directory, and are thus combined in the directory lists,
+and are processed in glob sort order, not by hook (when sourcing them,
+the hooks specify the order of the execution of functions, which is as
+listed below)
+</p>
+</div>
+
+
+<div id="outline-container-sec-2-6-3-1" class="outline-5">
+<h5 id="sec-2-6-3-1">Development</h5>
+<div class="outline-text-5" id="text-2-6-3-1">
+<p>
+For the purposes of development, you will locate the files under
+<code>$ROOTDIR/package/base-files/files/lib/preinit</code>, for the existing files,
+and you can add new files anywhere that ultimately ends up in
+<code>/lib/preinit</code> on the router (while in preinit, e.g. not by user edits
+after read-write is mounted).
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2-6-3-2" class="outline-5">
+<h5 id="sec-2-6-3-2"><code>preinit_essentials</code></h5>
+<div class="outline-text-5" id="text-2-6-3-2">
+<p>
+The <code>preinit_essentials</code> hook takes care of mounting essential kernel
+filesystems such as proc, and initializing the console.
+</p>
+
+<p>
+Files containing the functions executed by this hook
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">File     Functions
+10_essential_fs  do_mount_procfs, do_mount_sysfs, do_mount_tmpfs
+20_device_fs_mount       do_mount_devfs, do_mount_hotplug, do_mount_udev, choose_device_fs
+30_device_daemons        init_hotplug, init_udev, init_device_fs
+40_init_shm      init_shm
+40_pts_mount     do_mount_pts
+50_choose_console        choose_console
+60_init_console  init_console
+</pre>
+</div>
+<p>
+Functions, in order, executed by this hook (doesn't list the functions only called by other functions)
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+do_mount_procfs  mounts /proc
+do_mount_sysfs   mounts /sys
+do_mount_tmpfs   mounts /tmp
+choose_device_fs         determines type of device daemon and the appropriate filesystem to mount on /dev for that device daemon
+init_device_fs   launches daemons (<span style="color: #00ffff;">if</span> any) responsible for population /dev, and/or creating hotplug events when devices are added/removed (and for initial coldplug events)
+init_shm         makes sure /dev/shm exists
+init_pts         makes sure /dev/pts exists
+do_mount_pts     mounts devpts on /dev/pts (pseudo-terminals)
+choose_console   determines devices for stdin, stdout, and stderr
+init_console     activates stdin, stdout, and stderr of preinit (and subsequent init) (prior to this they are not present<span style="color: #00ffff;"> in</span> the environment)
+</pre>
+</div>
+<p>
+Functions which are called by other functions, rather than directly as part of a hook
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+do_mount_devfs   mount devfs on /dev
+do_mount_hotplug         mount tmpfs on /dev (<span style="color: #00ffff;">for</span> hotplug)
+do_mount_udev    mount tmpfs on /dev (<span style="color: #00ffff;">for</span> udev)
+init_hotplug     set hotplug handler (actually initiated after console init)
+init_udev        start udev
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-6-3-3" class="outline-5">
+<h5 id="sec-2-6-3-3"><code>preinit_main</code></h5>
+<div class="outline-text-5" id="text-2-6-3-3">
+<p>
+The <code>preinit_main</code> hook performs all the functions required of
+preinit, except those functions, like console, that are essential even
+for preinit tasks.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">File     Description
+10_indicate_preinit      preinit_ip, preinit_ip_deconfig, preinit_net_echo, preinit_echo, pi_indicate_led, pi_indicate_preinit
+30_failsafe_wait         fs_wait_for_key, failsafe_wait
+40_run_failsafe_hook     run_failsafe_hook
+50_indicate_regular_preinit      indicate_regular_preinit_boot
+60_init_hotplug  init_hotplug
+70_initramfs_test        initramfs_test
+80_mount_root    do_mount_root
+90_restore_config        restore_config
+99_10_run_init   run_init
+</pre>
+</div>
+<p>
+Functions, in order, executed by this hook (doesn't list the functions
+only called by other functions)
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+init_hotplug     Initialize hotplug, if needed (that is for devfs). Hotplug or a device daemon is needed so that devices are available for use for preinit
+preinit_ip       Initialize network interface (<span style="color: #00ffff;">if</span> one has been defined for as available for preinit)
+pi_indicate_preinit      Send messages to console, network, and/or led, depending on which, if any, of these is present which say that we are<span style="color: #00ffff;"> in</span> preinit mode
+failsafe_wait    Emits messages (to network and console) that indicate the user has the option to enter failsafe mode and wait for the configured period of time (default two seconds) <span style="color: #00ffff;">for</span> the user to select failsafe mode
+run_failsafe_hook        If user chooses to enter failsafe mode, run the *failsafe* hook (<span style="color: #b0c4de;">which</span> at present doesn<span style="color: #ffa07a;">'t return, which means no more functions from preinit_main get run on this boot)</span>
+<span style="color: #ffa07a;">indicate_regular_preinit_boot    Emits messages to network, console, and/or LED depending on which (if any) is present, indicating that it'</span>s a regular boot not a failsafe boot
+initramfs_test   If initramfs is present run the *initramfs* hook and exit
+do_mount_root    Executes hook *preinit_mount_root*
+restore_config   If a previous configuration was stored by sysupgrade, restore it to the rootfs
+run_init         Exec the command defined by <span style="color: #fa8072;">`pi_init_cmd`</span> with the environment variables defined by <span style="color: #fa8072;">`pi_init_env`</span>, plus PATH <span style="color: #fa8072;">`pi_init_path`</span>
+</pre>
+</div>
+<p>
+Functions which are called by other functions, rather than directly as
+part of a hook.
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+preinit_ip_deconfig      deconfigure interface used for preinit network messages etc
+preinit_net_echo         emit a message on the preinit network interface
+preinit_echo     emit a message on the (serial) console
+pi_indicate_led  set LED status to indicate preinit mode
+fs_wait_for_key  wait for reset button press, CTRL-C, or &lt;some_key&gt;&lt;ENTER&gt;, with timeout
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-6-3-4" class="outline-5">
+<h5 id="sec-2-6-3-4">failsafe</h5>
+<div class="outline-text-5" id="text-2-6-3-4">
+<p>
+Do what needs to done to prepare failsafe mode and enter it.
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">File     Description
+10_indicate_failsafe     indicate_failsafe_led, indicate_failsafe
+99_10_failsafe_login     failsafe_netlogin, failsafe_shell
+</pre>
+</div>
+<p>
+Functions, in order, executed by this hook (doesn't list the functions only called by other functions)
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+indicate_failsafe        Emit message/status to network, console, and/or LED (depending on which, if any, are present) indicating that the device is now<span style="color: #00ffff;"> in</span> failsafe mode
+failsafe_netlogin        Launch telnet daemon to allow telnet login on the defined network interface (<span style="color: #00ffff;">if</span> any)
+failsafe_shell   Launch a shell for access via serial console (<span style="color: #00ffff;">if</span> present)
+</pre>
+</div>
+<p>
+Functions which are called by other functions, rather than directly as part of a hook
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+indicate_failsafe_led    set LED status to indicate preinit mode
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-6-3-5" class="outline-5">
+<h5 id="sec-2-6-3-5"><code>preinit_mount_root</code></h5>
+<div class="outline-text-5" id="text-2-6-3-5">
+<p>
+Mount the root filesystem
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">File     Description
+05_mount_skip    check_skip
+10_check_for_mtd         mount_no_mtd, check_for_mtd
+</pre>
+</div>
+<p>
+Functions, in order, executed by this hook (doesn't list the functions only called by other functions)
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+check_for_mtd    Check for a mtd partition named rootfs_data. If not present mount kernel fs as root (e.g. all_jjfs2 or squashfs only) and skip rest.
+check_for_jffs2  Check if jffs2 formatted yet. If not, mount ramoverlay and skip rest
+do_mount_jffs2   find jffs2 partition and mount it, indicating result
+rootfs_pivot     if jffs2 mounted, make it root (/) and old root (squashfs) /rom , skipping rest on success
+do_mount_no_jffs2        If nothing was mounted so far, mount ramdisk (ram overlay), skipping rest on success
+do_mount_no_mtd  If there was nothing mounted , mount /dev/root as root (/)
+</pre>
+</div>
+<p>
+Functions which are called by other functions, rather than directly as part of a hook
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+mount_no_mtd     if there is not mtd partition named rootfs_data, mount /dev/root as / (root). E.g. this can occur if the firmware filesystem is entirely a jffs2 partition, with no squashfs)
+mount_no_jffs2   mount ramdisk (ram overlay) <span style="color: #00ffff;">if</span> there is rootfs_data, but it has not been formatted yet)
+find_mount_jffs2         find and mount rootfs_data jffs2 partition on /jffs
+jffs2_not_mounted        returns true (0) <span style="color: #00ffff;">if</span> jffs2 is not mounted
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-7" class="outline-3">
+<h3 id="sec-2-7">Firstboot Operation</h3>
+<div class="outline-text-3" id="text-2-7">
+</div><div id="outline-container-sec-2-7-1" class="outline-4">
+<h4 id="sec-2-7-1">Main Firstboot Script</h4>
+<div class="outline-text-4" id="text-2-7-1">
+<ol class="org-ol">
+<li>Source common functions
+</li>
+<li>Source functions for hooks
+</li>
+<li>if block:
+</li>
+</ol>
+<p>
+if invoked as executable
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">      <span style="color: #00ffff;">if</span> called with <span style="color: #fa8072;">`switch2jffs`</span> parameter (i.e. from rcS)
+          run hook <span style="color: #fa8072;">`switch2jffs`</span>
+      <span style="color: #00ffff;">if</span> called standalone (e.g. from commandline)
+          <span style="color: #00ffff;">if</span> there is a jffs2 partition mounted
+               run hook <span style="color: #fa8072;">`jffs2reset`</span>
+          <span style="color: #00ffff;">else</span>
+               erase rootfs_data mtd partition
+               format
+               and remount it
+          end
+      end
+<span style="color: #00ffff;">if</span> sourced (that is not executed)
+     <span style="color: #b0c4de;">set</span> some variables
+end
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-7-2" class="outline-4">
+<h4 id="sec-2-7-2">Hooks</h4>
+<div class="outline-text-4" id="text-2-7-2">
+</div><div id="outline-container-sec-2-7-2-1" class="outline-5">
+<h5 id="sec-2-7-2-1">switch2jffs</h5>
+<div class="outline-text-5" id="text-2-7-2-1">
+<p>
+Make the filesystem that we want to be the rootfs, to be the rootfs
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">File     Description
+10_determine_parts      deterimine_mtd_part, determine_rom_part, determine_jffs2_part, set_mtd_part, set_rom_part, set_jffs2_part
+20_has_mini_fo  check_for_mini_fo
+30_is_rootfs_mounted    skip_if_rootfs_mounted
+40_copy_ramoverlay      copy_ramoverlay
+50_pivot        with_fo_pivot
+99_10_with_fo_cleanup    with_fo_cleanup
+</pre>
+</div>
+<p>
+Functions, in order, executed by this hook (doesn't list the functions only called by other functions)
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+determine_mtd_part       exit if no mtd partition at all
+determine_rom_part       exit if not squashfs partition (firstboot not for all_jffs2)
+determine_jffs2_part     figure out the jffs2 partition (assuming we have an mtd part
+check_for_mini_fo        determine if we have mini_fo overlay<span style="color: #00ffff;"> in</span> kernel. If not run *no_fo* hook
+skip_if_rootfs_mounted   attempt mount jffs2 on /rom/jffs2. If partition already mounted exit
+copy_ramoverlay copy the data from the temporary rootfs (on the ramdisk overlay over the squashfs) to the new jffs2 partition
+with_fo_pivot   make current jffs2 partition the root partition and the current root /rom
+with_fo_cleanup clean up unneeded mount of ramdisk, if possible
+</pre>
+</div>
+<p>
+Functions which are called by other functions, rather than directly as part of a hook
+</p>
+<pre class="example">
+Function	 Description
+set_mtd_part	 set variables for mtd partition
+set_rom_part	 set variable for squashfs (rom) partition
+set_jffs_part	 set variable for jffs2 partition
+</pre>
+</div>
+</div>
+<div id="outline-container-sec-2-7-2-2" class="outline-5">
+<h5 id="sec-2-7-2-2"><code>no_fo</code></h5>
+<div class="outline-text-5" id="text-2-7-2-2">
+<p>
+Make the filesystem that we want to be the rootfs, to be the rootfs,
+given that we have no mini\<sub>fo</sub> overlay filesystem
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">File     Description
+10_no_fo_clear_overlay  no_fo_clear_overlay
+20_no_fo_mount_jffs      no_fo_mount_jffs
+30_no_fo_pivot   no_fo_pivot
+40_no_fo_copy_ram_overlay        no_fo_copy_ram_overlay
+99_10_no_fo_cleanup      no_fo_cleanup
+</pre>
+</div>
+<p>
+Functions, in order, executed by this hook (doesn't list the functions
+only called by other functions)
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+no_fo_clear_overlay      stop ramdisk overlaying the squashfs
+no_fo_mount_jffs         attempt to mount jffs (work around problem with union). If already mounted exit
+no_fo_pivot      make jffs root and old root /rom
+no_fo_copy_ram_overlay   copy data from ram overlay to jffs2 overlay of squashfs
+no_fo_cleanup    get rid of extra binds and mounts
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-7-2-3" class="outline-5">
+<h5 id="sec-2-7-2-3">jffs2reset</h5>
+<div class="outline-text-5" id="text-2-7-2-3">
+<p>
+Reset jffs2 to defaults
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">File     Description
+10_rest_has_mini_fo      reset_check_for_mini_fo
+20_reset_clear_jffs      reset_clear_jffs
+30_reset_copy_rom        reset_copy_rom
+</pre>
+</div>
+<p>
+Functions, in order, executed by this hook (doesn't list the functions
+only called by other functions)
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">Function         Description
+reset_check_for_mini_fo  Determine if the kernel supports mini_fo overlay
+reset_clear_jffs         if mini_fo is supported, erase all data<span style="color: #00ffff;"> in</span> overlay and remount (resets back to <span style="color: #ffa07a;">'pure'</span> squashfs versions
+reset_copy_rom   if mini_fo is not supported, make symlinks and copy critical files from squashfs to jffs
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3">Init Scripts Init script implementation reference</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+<a href="http://wiki.openwrt.org/doc/techref/initscripts">http://wiki.openwrt.org/doc/techref/initscripts</a>
+</p>
+</div>
+
+<div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1">create init scripts.  start and stop</h3>
+<div class="outline-text-3" id="text-3-1">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/bin/sh /etc/</span><span style="color: #00ffff;">rc.common</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Example script</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Copyright (C) 2007 OpenWrt.org</span>
+
+<span style="color: #eedd82;">START</span>=10
+<span style="color: #eedd82;">STOP</span>=15
+
+<span style="color: #87cefa;">start</span>() {        
+        <span style="color: #b0c4de;">echo</span> start
+        <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">commands to launch application</span>
+}                 
+
+<span style="color: #87cefa;">stop</span>() {          
+        <span style="color: #b0c4de;">echo</span> stop
+        <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">commands to kill application </span>
+}
+</pre>
+</div>
+
+<p>
+What this means:
+</p>
+
+<ul class="org-ul">
+<li>START=10 - this means the file will be symlinked as
+<code>/etc/rc.d/S10example</code> - in other words, it will start after the init
+scripts with START=9 and below, but before START=11 and above.
+</li>
+
+<li>STOP=15 - this means the file will be symlinked as
+<code>/etc/rc.d/K15example</code> - this means it will be stopped after the init
+scripts with STOP=14 and below, but before STOP=16 and above. This
+is optional.
+</li>
+
+<li>start() - these commands will be run when it is called with 'start'
+or 'boot' as its parameter.
+</li>
+
+<li>stop() - these commands will be run when it is called with 'stop' as its parameter.
+</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2">boot</h3>
+<div class="outline-text-3" id="text-3-2">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #87cefa;">boot</span>() {
+        <span style="color: #b0c4de;">echo</span> boot
+        <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">commands to run on boot</span>
+}
+</pre>
+</div>
+<p>
+… then these commands will be run on boot, instead of those in the
+start() section. This is handy for things that need to be done on
+boot, but not every time the program it calls restarts.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3">custom commands</h3>
+<div class="outline-text-3" id="text-3-3">
+<p>
+using the <code>EXTRA_COMMANDS</code> variable, and provide help for those commands
+with the <code>EXTRA_HELP</code> variable, then adding sections for each of your
+custom commands:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">EXTRA_COMMANDS</span>=<span style="color: #ffa07a;">"custom"</span>
+<span style="color: #eedd82;">EXTRA_HELP</span>=<span style="color: #ffa07a;">"        custom  Help for the custom command"</span>
+
+<span style="color: #87cefa;">custom</span>() {
+        <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"custom command"</span>
+        <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">do your custom stuff</span>
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4">multiple custom commands</h3>
+<div class="outline-text-3" id="text-3-4">
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #eedd82;">EXTRA_COMMANDS</span>=<span style="color: #ffa07a;">"custom1 custom2 custom3"</span>
+<span style="color: #eedd82;">EXTRA_HELP</span>=&lt;&lt;EOF
+<span style="color: #ffff00; font-weight: bold;">        custom1 Help for the custom1 command</span>
+<span style="color: #ffff00; font-weight: bold;">        custom2 Help for the custom2 command</span>
+<span style="color: #ffff00; font-weight: bold;">        custom3 Help for the custom3 command</span>
+<span style="color: #ffff00; font-weight: bold;">EOF</span>
+
+<span style="color: #87cefa;">custom1</span> () {
+        <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"custom1"</span>
+        <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">do the stuff for custom1</span>
+}
+<span style="color: #87cefa;">custom2</span> () {
+        <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"custom2"</span>
+        <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">do the stuff for custom2</span>
+}
+<span style="color: #87cefa;">custom3</span> () {
+        <span style="color: #b0c4de;">echo</span> <span style="color: #ffa07a;">"custom3"</span>
+        <span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">do the stuff for custom3</span>
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-5" class="outline-3">
+<h3 id="sec-3-5">Enable and disable</h3>
+<div class="outline-text-3" id="text-3-5">
+<p>
+ <b>Dont forget to chmod +x /etc/init.d/example!</b>
+In order to automatically start the init script on boot, it must be
+installed into <code>/etc/rc.d/</code> .
+</p>
+</div>
+
+<div id="outline-container-sec-3-5-1" class="outline-4">
+<h4 id="sec-3-5-1">The current state can be queried with the "enabled" command:</h4>
+<div class="outline-text-4" id="text-3-5-1">
+<div class="org-src-container">
+
+<pre class="src src-sh">root@OpenWrt:/# /etc/init.d/example enabled &amp;&amp; <span style="color: #b0c4de;">echo</span> on
+on
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4">Block Mount Block Device Mounting</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+<a href="http://wiki.openwrt.org/doc/techref/block_mount">http://wiki.openwrt.org/doc/techref/block_mount</a>
+</p>
+
+<p>
+For general usage, see fstab: <a href="http://wiki.openwrt.org/doc/uci/fstab">http://wiki.openwrt.org/doc/uci/fstab</a>
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5">Process Trinity</h2>
+<div class="outline-text-2" id="text-5">
+</div><div id="outline-container-sec-5-1" class="outline-3">
+<h3 id="sec-5-1">Bootloader</h3>
+<div class="outline-text-3" id="text-5-1">
+<ol class="org-ol">
+<li>the bootloader on the flash gets executed
+</li>
+<li>the bootloader performs the POST, which is a low-level hardware initialization
+</li>
+<li>the bootloader decompresses the Kernel image from it's (known!)
+location on the flash storage into main memory (=RAM)
+</li>
+<li>the bootloader executes the Kernel with init=… option (default is /etc/preinit)
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-5-2" class="outline-3">
+<h3 id="sec-5-2">Kernel</h3>
+<div class="outline-text-3" id="text-5-2">
+<ol class="org-ol">
+<li>the Kernel further bootstraps itself (sic!)
+</li>
+<li>issues the command/ops-code start<sub>kernel</sub>
+</li>
+<li>/etc/preinit does pre-initialization setups (create directories, mount fs, /proc, /sys, … )
+</li>
+<li>the Kernel mounts the rootfs (root file system), see .. and also udev
+</li>
+<li>if "INITRAMFS" is not defined, calls /sbin/init (the mother of all processes)
+</li>
+<li>finally some kernel thread becomes the userspace init process
+</li>
+</ol>
+</div>
+</div>
+<div id="outline-container-sec-5-3" class="outline-3">
+<h3 id="sec-5-3">Init</h3>
+<div class="outline-text-3" id="text-5-3">
+<p>
+The user space starts when kernel mounts rootfs and the very first
+program to run is (by default) /sbin/init. Please remember, that the
+interface between application and kernel is the clib and the syscalls
+it offers.
+</p>
+
+<ol class="org-ol">
+<li>init reads /etc/inittab for the "sysinit" entry (default is
+"::sysinit:/etc/init.d/rcS S boot")
+</li>
+<li>init calls /etc/init.d/rcS S boot
+</li>
+<li>rcS executes the symlinks to the actual startup scripts located in
+/etc/rc.d/S##xxxxxx with option "start":
+</li>
+<li>after rcS finishes, system should be up and running
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-5-4" class="outline-3">
+<h3 id="sec-5-4">Detailed boot sequence</h3>
+<div class="outline-text-3" id="text-5-4">
+</div><div id="outline-container-sec-5-4-1" class="outline-4">
+<h4 id="sec-5-4-1">Boot loader</h4>
+<div class="outline-text-4" id="text-5-4-1">
+<p>
+To see how the kernel was started, you can view the options by reading
+the <code>/proc/cmdline</code> file. You can see what options were passed from grub
+by logging into the device and typing "cat /proc/cmdline".
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ffa07a;">"root=/dev/hda2 rootfstype=ext2 init=/etc/preinit noinitrd console=ttyS0,38400,n,8,1 reboot=bios"</span>
+</pre>
+</div>
+<p>
+The options are:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">root: root device/partition where the rest of the OpenWrt system is located
+rootfstype: Format for the root partition - ext2<span style="color: #00ffff;"> in</span> this example
+init: The first program to call after the kernel is loaded and initialized
+noinitrd: All drivers for access to the rest of the system are built into the kernel, so no need to load an initial ramdisk with extra drivers
+console: Which device to accept console login commands from - talk to ttyS0 (first serial port) at 38400 speed using no flow control, eight data bits and one stop bit. See the kernel documentation for other options
+reboot: Not sure, but I believe that this option tells the kernel how to perform a reboot
+</pre>
+</div>
+
+<p>
+[ NOTE: See the man page on grub for all of the grub parameters ] In
+this example, the entry "init=/etc/preinit" tells the kernel that the
+first program to run after initializing is "preinit" found in the
+"/etc" directory located on the disk "/dev/hda" and partition "hda2".
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-4-2" class="outline-4">
+<h4 id="sec-5-4-2"><code>/etc/preinit</code> script</h4>
+<div class="outline-text-4" id="text-5-4-2">
+<p>
+The preinit script's primary purpose is initial checks and setups for
+the rest of the startup scripts. One primary job is to mount the /proc
+and /sys pseudo filesystems so access to status information and some
+control functions are made available. Another primary function is to
+prepare the /dev directory for access to things like console, tty, and
+media access devices. The final job of preinit is to start the init
+daemon process itself.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-4-3" class="outline-4">
+<h4 id="sec-5-4-3">Busybox init</h4>
+<div class="outline-text-4" id="text-5-4-3">
+<p>
+nit is considered the "Mother Of All Processes" since it controls
+things like starting daemons, changing runlevels, setting up the
+console/pseudo-consoles/tty access daemons, as well as some other
+housekeeping chores.
+</p>
+
+<p>
+Once init is started, it reads the <code>/etc/inittab</code> configuration file to
+tell it what process to start, monitor for certain activities, and
+when an activity is triggered to call the relevant program.
+</p>
+
+<p>
+The init program used by busybox is a minimalistic daemon. It does not
+have the knowledge of runlevels and such, so the config file is
+somewhat abbreviated from the normal init config file. If you are
+running a full linux desktop, you can "man inittab" and read about the
+normal init process and entries. Fields are separated by a colon and
+are defined as:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">[ID] : [Runlevel(s)] : [Action] : [Process to execute ]
+</pre>
+</div>
+
+<p>
+For busybox init, the only fields needed are the "ID" (1st), "Action" (3rd) and "Process" (4th) entries. Busybox init has several caveats from a normal init: the ID field is used for controlling TTY/Console, and there are no defined runlevels. A minimalistic /etc/inittab would look like:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh">::sysinit:/etc/init.d/rcS S boot
+::shutdown:/etc/init.d/rcS K stop
+tts/0::askfirst:/bin/ash &#8211;login
+ttyS0::askfirst:/bin/ash &#8211;login
+tty1::askfirst:/bin/ash &#8211;login
+</pre>
+</div>
+<p>
+Lines 1 and 2 with a blank ID field indicate they are not specific to
+any terminal or console. The other lines are directed to specific
+terminals/consoles.
+</p>
+
+<p>
+Notice that both the "sysinit" and "shutdown" actions are calling the
+same program (the "/etc/init.d/rcS" script). The only difference is
+the options that are passed to the rcS script. This will become
+clearer later on.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5-4-4" class="outline-4">
+<h4 id="sec-5-4-4"><code>/etc/rc.d/rcS</code> Script At Startup</h4>
+<div class="outline-text-4" id="text-5-4-4">
+<p>
+At this point, all basic setup has been done, all programs and
+system/configuration files are accessible, and we are now ready to
+start the rest of the processes.
+</p>
+
+<p>
+The rcS script is pretty simplistic in it's function - it's sole
+purpose is to execute all of the scripts in the <code>/etc/rc.d</code> directory
+with the appropriate options. if you paid attention to the sysinit
+entry, the rcS script was called with the "S" and "boot" options.
+Since we called rcS with 2 options ("S" and "boot"), the rcS script
+will substitute $1 with "S" and $2 with "boot". The relevant lines in
+rcS are:
+</p>
+<div class="org-src-container">
+
+<pre class="src src-sh"> -  for i<span style="color: #00ffff;"> in</span> /etc/rc.d/$<span style="color: #eedd82;">1</span>* ; <span style="color: #00ffff;">do</span>
+2.      [ -x $<span style="color: #eedd82;">i</span> ] &amp;&amp; $<span style="color: #eedd82;">i</span> $<span style="color: #eedd82;">2</span>
+3.  done
+</pre>
+</div>
+
+<p>
+The basic breakdown is:
+</p>
+
+<ol class="org-ol">
+<li>Execute the following line once for every entry (file/link) in the
+<code>/etc/rc.d</code> directory that begins with "S"
+</li>
+<li>If the file is executable, execute the file with the option "boot"
+</li>
+<li>Repeat at step 1, replacing $i with the next filename until there
+are no more files to check
+</li>
+</ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Shi Shougang</p>
+<p class="date">Created: 2019-04-01 Mon 03:46</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>
