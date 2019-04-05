@@ -25,17 +25,62 @@ Please press Enter to activate this console.
 #+end_src
 
 * Overview
+1. Boot
+   + Bootloader 比如U-Boot, 配置底层硬件,加载Linux kernel 和 device
+     tree blob, 最后传入kernel cmdline跳转到Linux kernel image.
+   + 高通的Secure boot会复杂点,先PBL(Primary Boot Loader), 然后
+     SBL1(Second BootLoader stage 1) 初始化buses、DDR、clocks等, SBL1
+     移交运行控制权给QSEE。QSEE建立安全运行环境，配置xPU，支持fuse, 之
+     后才转入APPSBL即为BootLoader, 跳转到HLOS(High LevelOperating
+     System) 即为Linux kernel.
 
-Secure boot
+2. Kernel init Hareware
 
-PBL(Primary Boot Loader)  
-SBL1(Second BootLoader stage 1) 
-初始化buses、DDR、clocks等
-QSEE/TrustZone  安全相关
- SBL1移交运行控制权给QSEE。QSEE建立安全运行环境，配置xPU，支持fuse。
+   Linux Kernel 将继续初始化外围硬件.
 
- APPSBL      即为BootLoader
-HLOS(High LevelOperating System) 即为Linux/
+3. Kernel -> Filesystem
+
+   Mount the root filesystem (通过kernel cmdline中的诸如参数 =root==, =rootfstype==).
+
+4. Kernel -> Init Process
+
+   最后kernel启动 =init= 进程 (PID 1).
+
+5. Run preinit
+
+   再procd接管前, preinit会对系统做一些前期的初始工作.
+
+6. Run procd
+   
+   一旦preinit完成,它将exec procd. 这将用procd取代原来pid1的init进程.
+   watchdog的file descriptor不会被关闭, 而是传入到procd进程.
+
+OpenWrt系统从第4步开始. 在OpenWrt系统中, 这个init初始化进程不是普通
+Linux中一个初始进程, 而是专为OpenWrt写的一个shell脚本.
+
+* preinit
+** =/etc/preinit=
+无论Linux什么版本, OpenWrt都会有类似如下的patch,
+
+#+INCLUDE: "./Files/921-use_preinit_as_init.patch" src c
+
+
+** =/sbin/init=
+
+** 回到  =/etc/preinit=
+
+* watchdog
+
+* procd
+
+** =STATE_EARLY=
+
+** =STATE_UBUS=
+
+** =STATE_INIT=
+
+** =STATE_RUNNING=
+
 
 
 
