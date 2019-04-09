@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>OpenWrt Boot Process (New OpenWrt)</title>
-<!-- 2019-04-05 Fri 11:30 -->
+<!-- 2019-04-09 Tue 10:47 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -83,7 +83,8 @@ for the JavaScript code in this tag.
 <li><a href="#sec-4-4"><code>STATE_RUNNING</code></a></li>
 </ul>
 </li>
-<li><a href="#sec-5">cc</a></li>
+<li><a href="#sec-5">Reference</a></li>
+<li><a href="#sec-6">cc</a></li>
 </ul>
 </div>
 </div>
@@ -179,7 +180,7 @@ Linux中一个初始进程, 而是专为OpenWrt写的一个shell脚本.
 <h3 id="sec-2-1"><code>/etc/preinit</code></h3>
 <div class="outline-text-3" id="text-2-1">
 <p>
-无论Linux什么版本, OpenWrt都会有类似如下的patch,
+无论Linux什么版本, OpenWrt都会有类似如下的patch,把OpenWrt的init进程放在地一个位置:
 </p>
 
 <div class="org-src-container">
@@ -198,12 +199,115 @@ Linux中一个初始进程, 而是专为OpenWrt写的一个shell脚本.
             !try_to_run_init_process(<span style="color: #ffa07a;">"/bin/sh"</span>))
 </pre>
 </div>
-</div>
+
+<p>
+<code>/etc/preinit</code> 如下:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">!/bin/</span><span style="color: #00ffff;">sh</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Copyright (C) 2006 OpenWrt.org</span>
+<span style="color: #ff7f24;"># </span><span style="color: #ff7f24;">Copyright (C) 2010 Vertical Communications</span>
+
+[ -z <span style="color: #ffa07a;">"$PREINIT"</span> ] &amp;&amp; <span style="color: #00ffff;">exec</span> /sbin/init
+
+<span style="color: #b0c4de;">export</span> <span style="color: #eedd82;">PATH</span>=/usr/sbin:/usr/bin:/sbin:/bin
+
+<span style="color: #eedd82;">pi_ifname</span>=
+<span style="color: #eedd82;">pi_ip</span>=192.168.1.1
+<span style="color: #eedd82;">pi_broadcast</span>=192.168.1.255
+<span style="color: #eedd82;">pi_netmask</span>=255.255.255.0
+
+<span style="color: #eedd82;">fs_failsafe_ifname</span>=
+<span style="color: #eedd82;">fs_failsafe_ip</span>=192.168.1.1
+<span style="color: #eedd82;">fs_failsafe_broadcast</span>=192.168.1.255
+<span style="color: #eedd82;">fs_failsafe_netmask</span>=255.255.255.0
+
+<span style="color: #eedd82;">fs_failsafe_wait_timeout</span>=0
+
+<span style="color: #eedd82;">pi_suppress_stderr</span>=<span style="color: #ffa07a;">"y"</span>
+<span style="color: #eedd82;">pi_init_suppress_stderr</span>=<span style="color: #ffa07a;">"y"</span>
+<span style="color: #eedd82;">pi_init_path</span>=<span style="color: #ffa07a;">"/usr/sbin:/usr/bin:/sbin:/bin"</span>
+<span style="color: #eedd82;">pi_init_cmd</span>=<span style="color: #ffa07a;">"/sbin/init"</span>
+
+. /lib/functions.sh
+. /lib/functions/preinit.sh
+. /lib/functions/system.sh
+
+boot_hook_init preinit_essential
+boot_hook_init preinit_main
+boot_hook_init failsafe
+boot_hook_init initramfs
+boot_hook_init preinit_mount_root
+
+<span style="color: #00ffff;">for</span> pi_source_file<span style="color: #00ffff;"> in</span> /lib/preinit/*; <span style="color: #00ffff;">do</span>
+        . $<span style="color: #eedd82;">pi_source_file</span>
+<span style="color: #00ffff;">done</span>
+
+boot_run_hook preinit_essential
+
+<span style="color: #eedd82;">pi_mount_skip_next</span>=false
+<span style="color: #eedd82;">pi_jffs2_mount_success</span>=false
+<span style="color: #eedd82;">pi_failsafe_net_message</span>=false
+
+boot_run_hook preinit_main
+</pre>
 </div>
 
+<p>
+这里第一行命令是:
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-sh">[ -z <span style="color: #ffa07a;">"$PREINIT"</span> ] &amp;&amp; <span style="color: #00ffff;">exec</span> /sbin/init
+</pre>
+</div>
+
+<p>
+<code>PREINIT</code> 还没有define, 所以执行 <code>/sbin/init</code>. 这个程序来自package
+procd.
+</p>
+</div>
+</div>
 
 <div id="outline-container-sec-2-2" class="outline-3">
 <h3 id="sec-2-2"><code>/sbin/init</code></h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+package procd中 <code>init.c</code> 的main函数基本流程如下:<sup><a id="fnr.1" name="fnr.1" class="footref" href="#fn.1">1</a></sup>
+</p>
+
+
+<div class="figure">
+<p><img src="./Files/openwrt_sbin_init.png" alt="openwrt_sbin_init.png" />
+</p>
+</div>
+
+<ol class="org-ol">
+<li><code>early()</code> 
+</li>
+
+<li><code>cmdline()</code>
+</li>
+
+<li><code>watchdog_init(1)</code>
+</li>
+
+<li><code>fork</code>
+</li>
+
+<li><code>uloop_init()</code>
+</li>
+
+<li><code>preinit()</code>
+</li>
+
+<li><code>uloop_run()</code>
+</li>
+</ol>
+</div>
 </div>
 
 <div id="outline-container-sec-2-3" class="outline-3">
@@ -238,9 +342,79 @@ Linux中一个初始进程, 而是专为OpenWrt写的一个shell脚本.
 
 
 
+
+
 <div id="outline-container-sec-5" class="outline-2">
-<h2 id="sec-5">cc</h2>
+<h2 id="sec-5">Reference</h2>
 <div class="outline-text-2" id="text-5">
+<p>
+<code>procd/initd/init.c</code>
+</p>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #98fb98;">int</span>
+<span style="color: #87cefa;">main</span>(<span style="color: #98fb98;">int</span> <span style="color: #eedd82;">argc</span>, <span style="color: #98fb98;">char</span> **<span style="color: #eedd82;">argv</span>)
+{
+        <span style="color: #98fb98;">pid_t</span> <span style="color: #eedd82;">pid</span>;
+
+        ulog_open(ULOG_KMSG, LOG_DAEMON, <span style="color: #ffa07a;">"init"</span>);
+
+        sigaction(SIGTERM, &amp;sa_shutdown, <span style="color: #7fffd4;">NULL</span>);
+        sigaction(SIGUSR1, &amp;sa_shutdown, <span style="color: #7fffd4;">NULL</span>);
+        sigaction(SIGUSR2, &amp;sa_shutdown, <span style="color: #7fffd4;">NULL</span>);
+
+        early();
+        cmdline();
+        watchdog_init(1);
+
+        pid = fork();
+        <span style="color: #00ffff;">if</span> (!pid) {
+                <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">kmod</span>[] = { <span style="color: #ffa07a;">"/sbin/kmodloader"</span>, <span style="color: #ffa07a;">"/etc/modules-boot.d/"</span>, <span style="color: #7fffd4;">NULL</span> };
+
+                <span style="color: #00ffff;">if</span> (debug &lt; 3) {
+                        <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">fd</span> = open(<span style="color: #ffa07a;">"/dev/null"</span>, O_RDWR);
+
+                        <span style="color: #00ffff;">if</span> (fd &gt; -1) {
+                                dup2(fd, STDIN_FILENO);
+                                dup2(fd, STDOUT_FILENO);
+                                dup2(fd, STDERR_FILENO);
+                                <span style="color: #00ffff;">if</span> (fd &gt; STDERR_FILENO)
+                                        close(fd);
+                        }
+                }
+                execvp(kmod[0], kmod);
+                ERROR(<span style="color: #ffa07a;">"Failed to start kmodloader\n"</span>);
+                exit(-1);
+        }
+        <span style="color: #00ffff;">if</span> (pid &lt;= 0) {
+                ERROR(<span style="color: #ffa07a;">"Failed to start kmodloader instance\n"</span>);
+        } <span style="color: #00ffff;">else</span> {
+                <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
+
+                <span style="color: #00ffff;">for</span> (i = 0; i &lt; 120; i++) {
+                        <span style="color: #00ffff;">if</span> (waitpid(pid, <span style="color: #7fffd4;">NULL</span>, WNOHANG) &gt; 0)
+                                <span style="color: #00ffff;">break</span>;
+                        sleep(1);
+                        watchdog_ping();
+                }
+        }
+        uloop_init();
+        preinit();
+        uloop_run();
+
+        <span style="color: #00ffff;">return</span> 0;
+}
+</pre>
+</div>
+</div>
+</div>
+
+
+
+<div id="outline-container-sec-6" class="outline-2">
+<h2 id="sec-6">cc</h2>
+<div class="outline-text-2" id="text-6">
 <div class="org-src-container">
 
 <pre class="src src-sh"></pre>
@@ -254,10 +428,20 @@ Linux中一个初始进程, 而是专为OpenWrt写的一个shell脚本.
 </div>
 </div>
 </div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" name="fn.1" class="footnum" href="#fnr.1">1</a></sup> <p class="footpara">
+<a href="https://clockworkbird9.wordpress.com/2016/09/29/openwrtlede-system-boot-sequence/">https://clockworkbird9.wordpress.com/2016/09/29/openwrtlede-system-boot-sequence/</a>
+</p></div>
+
+
 </div>
+</div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2019-04-05 Fri 11:30</p>
+<p class="date">Created: 2019-04-09 Tue 10:47</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

@@ -60,12 +60,88 @@ Linux中一个初始进程, 而是专为OpenWrt写的一个shell脚本.
 
 * preinit
 ** =/etc/preinit=
-无论Linux什么版本, OpenWrt都会有类似如下的patch,
+无论Linux什么版本, OpenWrt都会有类似如下的patch,把OpenWrt的init进程放在地一个位置:
 
 #+INCLUDE: "./Files/921-use_preinit_as_init.patch" src c
 
+=/etc/preinit= 如下:
+
+#+begin_src sh
+#!/bin/sh
+# Copyright (C) 2006 OpenWrt.org
+# Copyright (C) 2010 Vertical Communications
+
+[ -z "$PREINIT" ] && exec /sbin/init
+
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+pi_ifname=
+pi_ip=192.168.1.1
+pi_broadcast=192.168.1.255
+pi_netmask=255.255.255.0
+
+fs_failsafe_ifname=
+fs_failsafe_ip=192.168.1.1
+fs_failsafe_broadcast=192.168.1.255
+fs_failsafe_netmask=255.255.255.0
+
+fs_failsafe_wait_timeout=0
+
+pi_suppress_stderr="y"
+pi_init_suppress_stderr="y"
+pi_init_path="/usr/sbin:/usr/bin:/sbin:/bin"
+pi_init_cmd="/sbin/init"
+
+. /lib/functions.sh
+. /lib/functions/preinit.sh
+. /lib/functions/system.sh
+
+boot_hook_init preinit_essential
+boot_hook_init preinit_main
+boot_hook_init failsafe
+boot_hook_init initramfs
+boot_hook_init preinit_mount_root
+
+for pi_source_file in /lib/preinit/*; do
+	. $pi_source_file
+done
+
+boot_run_hook preinit_essential
+
+pi_mount_skip_next=false
+pi_jffs2_mount_success=false
+pi_failsafe_net_message=false
+
+boot_run_hook preinit_main
+#+end_src
+
+这里第一行命令是:
+
+#+begin_src sh
+[ -z "$PREINIT" ] && exec /sbin/init
+#+end_src
+
+=PREINIT= 还没有define, 所以执行 =/sbin/init=. 这个程序来自package
+procd.
 
 ** =/sbin/init=
+package procd中 =init.c= 的main函数基本流程如下:[fn:1]
+
+[[./Files/openwrt_sbin_init.png]]
+
+1. =early()= 
+
+2. =cmdline()=
+
+3. =watchdog_init(1)=
+
+4. =fork=
+
+5. =uloop_init()=
+
+6. =preinit()=
+
+7. =uloop_run()=
 
 ** 回到  =/etc/preinit=
 
@@ -84,6 +160,69 @@ Linux中一个初始进程, 而是专为OpenWrt写的一个shell脚本.
 
 
 
+
+
+* Reference
+
+=procd/initd/init.c=
+
+#+begin_src c++
+int
+main(int argc, char **argv)
+{
+	pid_t pid;
+
+	ulog_open(ULOG_KMSG, LOG_DAEMON, "init");
+
+	sigaction(SIGTERM, &sa_shutdown, NULL);
+	sigaction(SIGUSR1, &sa_shutdown, NULL);
+	sigaction(SIGUSR2, &sa_shutdown, NULL);
+
+	early();
+	cmdline();
+	watchdog_init(1);
+
+	pid = fork();
+	if (!pid) {
+		char *kmod[] = { "/sbin/kmodloader", "/etc/modules-boot.d/", NULL };
+
+		if (debug < 3) {
+			int fd = open("/dev/null", O_RDWR);
+
+			if (fd > -1) {
+				dup2(fd, STDIN_FILENO);
+				dup2(fd, STDOUT_FILENO);
+				dup2(fd, STDERR_FILENO);
+				if (fd > STDERR_FILENO)
+					close(fd);
+			}
+		}
+		execvp(kmod[0], kmod);
+		ERROR("Failed to start kmodloader\n");
+		exit(-1);
+	}
+	if (pid <= 0) {
+		ERROR("Failed to start kmodloader instance\n");
+	} else {
+		int i;
+
+		for (i = 0; i < 120; i++) {
+			if (waitpid(pid, NULL, WNOHANG) > 0)
+				break;
+			sleep(1);
+			watchdog_ping();
+		}
+	}
+	uloop_init();
+	preinit();
+	uloop_run();
+
+	return 0;
+}
+#+end_src
+
+
+
 * cc
 #+begin_src sh
 
@@ -94,3 +233,7 @@ Linux中一个初始进程, 而是专为OpenWrt写的一个shell脚本.
 #+begin_src c++
 
 #+end_src
+
+* Footnotes
+
+[fn:1] https://clockworkbird9.wordpress.com/2016/09/29/openwrtlede-system-boot-sequence/
