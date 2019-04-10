@@ -1,5 +1,5 @@
 #!/bin/sh
-git add .
+git add --all .
 if [ $# -eq 1 ]; then
     git commit -am "$1"
 else
