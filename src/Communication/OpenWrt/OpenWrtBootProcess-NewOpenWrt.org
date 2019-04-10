@@ -60,7 +60,7 @@ Linux中一个初始进程, 而是专为OpenWrt写的一个shell脚本.
 
 * preinit
 ** =/etc/preinit=
-无论Linux什么版本, OpenWrt都会有类似如下的patch,把OpenWrt的init进程放在地一个位置:
+无论Linux什么版本, OpenWrt都会有类似如下的patch,把OpenWrt的init进程放在第一个位置:
 
 #+INCLUDE: "./Files/921-use_preinit_as_init.patch" src c
 
@@ -130,37 +130,309 @@ package procd中 =init.c= 的main函数基本流程如下:[fn:1]
 [[./Files/openwrt_sbin_init.png]]
 
 1. =early()= 
+   + =early_mounts()=: mount /proc, /sys, /dev/, /tmp 等;
+   + =early_console()=: 初始化 =/dev/console=;
+   + =early_env();=: *PATH* 配置成 =/bin:/sbin:/usr/bin:/usr/sbin=;
+   + 打印出最上面bootlog实例中的一个message "Console is alive";
 
-2. =cmdline()=
+2. =cmdline()=: =get_cmdline_val("init_debug", line, sizeof(line));=
+   从 =/proc/cmdline= 中读取kernel boot commands,并解析出 =init_debug= 的
+   值
 
-3. =watchdog_init(1)=
+3. =watchdog_init(1)=: 先从env的 =WDTFD= 中获取watchdog的fd,若不存在,
+   就尝试打开 =/dev/watchdog=. 并初始化watchdog, 最后打印出最上面
+   bootlog实例中的message "- watchdog -"
 
-4. =fork=
+4. =fork= 一个新的进程来让 =/sbin/kmodloader= 从
+   =/etc/modules-boot.d/= 加载device drivers (注意,这里加载的是boot期
+   间的drivers而不是 =/etc/modules.d/=)
 
-5. =uloop_init()=
+5. =uloop_init()= 初始化uloop (event loop implementation, 来自package
+   libubox). 之后procd和 =sh /etc/preinit= 将由uloop管理;
 
-6. =preinit()=
+6. =preinit()= 
+   + 打印最上面的第三条信息 "- preinit -"
+   + fork一个新的进程执行 =/sbin/procd -h /etc/hotplug-preinit.json=,
+     并在完后执行一个callback function =plugd_proc_cb= (仅仅做了
+     =proc->pid = 0;= )
+   + =setenv("PREINIT", "1", 1);=
+   + fork一个新的进程执行 =sh /etc/preinit= , 并在完后执行一个callback
+    function =spawn_procd=, =spawn_procd= 将wdt_fd设置到env中的WDTFD,
+    从 =/tmp/debuglevel= 读取的 debug level设置到env中的DBGLVL. 最后
+    fork一个新进程执行 =/sbin/procd=
 
-7. =uloop_run()=
+7. =uloop_run()=: 最后由uloop接管
 
-** 回到  =/etc/preinit=
+** 再次执行 =/etc/preinit=
+init进程再次执行 =/etc/preinit=, 第一部分如下:
 
-* watchdog
+#+begin_src sh
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+pi_ifname=
+pi_ip=192.168.1.1
+pi_broadcast=192.168.1.255
+pi_netmask=255.255.255.0
+
+fs_failsafe_ifname=
+fs_failsafe_ip=192.168.1.1
+fs_failsafe_broadcast=192.168.1.255
+fs_failsafe_netmask=255.255.255.0
+
+fs_failsafe_wait_timeout=0
+
+pi_suppress_stderr="y"
+pi_init_suppress_stderr="y"
+pi_init_path="/usr/sbin:/usr/bin:/sbin:/bin"
+pi_init_cmd="/sbin/init"
+#+end_src
+如上仅仅定义些变量.
+
+从如下地方定义一些函数:
+#+begin_src sh
+. /lib/functions.sh
+. /lib/functions/preinit.sh
+. /lib/functions/system.sh
+#+end_src
+
+定义在 =/lib/functions/preinit.sh= 中的 =boot_hook_init= 被用来初始化
+如下hook
+
+#+begin_src sh
+boot_hook_init preinit_essential
+boot_hook_init preinit_main
+boot_hook_init failsafe
+boot_hook_init initramfs
+boot_hook_init preinit_mount_root
+#+end_src
+
+=/lib/preinit/= 下的脚本都被执行. 这些脚本主要通过 =boot_hook_add= 来
+添加各个hook函数
+#+begin_src sh
+for pi_source_file in /lib/preinit/*; do
+	. $pi_source_file
+done
+#+end_src
+
+最后分别执行 =preinit_essential= 和 =preinit_main= 中的hook函数.
+#+begin_src sh
+boot_run_hook preinit_essential
+boot_run_hook preinit_main
+#+end_src
 
 * procd
+OpenWrt使用 =procd= 来启动系统,管理进程和处理部分kernel与用户层的交互.
+
+=procd= 首先做一些初始化工作, =setsid();= 设置自己成为进程组的所有者,
+=uloop_init();= 为后续 =uloop_run= 做初始化, =procd_signal();= 设置好
+signals.
+
+#+begin_src sh
+void procd_signal(void)
+{
+	signal(SIGPIPE, SIG_IGN);
+	if (getpid() != 1)
+		return;
+	sigaction(SIGTERM, &sa_shutdown, NULL);
+	sigaction(SIGINT, &sa_shutdown, NULL);
+	sigaction(SIGUSR1, &sa_shutdown, NULL);
+	sigaction(SIGUSR2, &sa_shutdown, NULL);
+	sigaction(SIGSEGV, &sa_crash, NULL);
+	sigaction(SIGBUS, &sa_crash, NULL);
+	sigaction(SIGHUP, &sa_dummy, NULL);
+	sigaction(SIGKILL, &sa_dummy, NULL);
+	sigaction(SIGSTOP, &sa_dummy, NULL);
+	reboot(RB_DISABLE_CAD);
+}
+#+end_src
+
+=procd= 共有6个状态, =STATE_EARLY=, =STATE_UBUS=, =STATE_INIT=,
+=STATE_RUNNING=, =STATE_SHUTDOWN= 和 =STATE_HALT=, =procd= 的状态从第
+一个直到最后一个. 
+
+#+begin_src c++
+static void state_enter(void)
+{
+	char ubus_cmd[] = "/sbin/ubusd";
+
+	switch (state) {
+	case STATE_EARLY:
+		LOG("- early -\n");
+		watchdog_init(0);
+		hotplug("/etc/hotplug.json");
+		procd_coldplug();
+		break;
+
+	case STATE_UBUS:
+		// try to reopen incase the wdt was not available before coldplug
+		watchdog_init(0);
+		set_stdio("console");
+		LOG("- ubus -\n");
+		procd_connect_ubus();
+		service_init();
+		service_start_early("ubus", ubus_cmd);
+		break;
+
+	case STATE_INIT:
+		LOG("- init -\n");
+		procd_inittab();
+		procd_inittab_run("respawn");
+		procd_inittab_run("askconsole");
+		procd_inittab_run("askfirst");
+		procd_inittab_run("sysinit");
+
+		// switch to syslog log channel
+		ulog_open(ULOG_SYSLOG, LOG_DAEMON, "procd");
+		break;
+
+	case STATE_RUNNING:
+		LOG("- init complete -\n");
+		break;
+
+	case STATE_SHUTDOWN:
+		/* Redirect output to the console for the users' benefit */
+		set_console();
+		LOG("- shutdown -\n");
+		procd_inittab_run("shutdown");
+		sync();
+		break;
+
+	case STATE_HALT:
+		// To prevent killed processes from interrupting the sleep
+		signal(SIGCHLD, SIG_IGN);
+		LOG("- SIGTERM processes -\n");
+		kill(-1, SIGTERM);
+		sync();
+		sleep(1);
+		LOG("- SIGKILL processes -\n");
+		kill(-1, SIGKILL);
+		sync();
+		sleep(1);
+		if (reboot_event == RB_POWER_OFF)
+			LOG("- power down -\n");
+		else
+			LOG("- reboot -\n");
+
+		/* Allow time for last message to reach serial console, etc */
+		sleep(1);
+
+		/* We have to fork here, since the kernel calls do_exit(EXIT_SUCCESS)
+		 * in linux/kernel/sys.c, which can cause the machine to panic when
+		 * the init process exits... */
+		if (!vfork( )) { /* child */
+			reboot(reboot_event);
+			_exit(EXIT_SUCCESS);
+		}
+
+		while (1)
+			sleep(1);
+		break;
+
+	default:
+		ERROR("Unhandled state %d\n", state);
+		return;
+	};
+}
+#+end_src
 
 ** =STATE_EARLY=
++ =watchdog_init(0);= 初始化watchdog;
++ =hotplug("/etc/hotplug.json");= 将根据 =/etc/hotplug.json= 中定义的
+  规则来监视hotplug event;
++ =procd_coldplug();= 重新mount =/dev= , fork新进程来运行
+  =udevtrigger=, 它将产生coldplug events来让hotplug监视;
++ 当 ==udevtrigger= 完成, callback函数 =udevtrigger_complete= 中最后将
+  调用 =procd_state_next()= 来使得状态从 =STATE_EARLY= 到
+  =STATE_UBUS=.;
+
+#+begin_src c++
+static void coldplug_complete(struct uloop_timeout *t)
+{
+	DEBUG(4, "Coldplug complete\n");
+	hotplug_last_event(NULL);
+	procd_state_next();
+}
+#+end_src
 
 ** =STATE_UBUS=
++ =watchdog_init(0);= 再次初始化watchdog, 防止在coldplug之前watchdog不
+  可用;
++ =set_stdio("console");= 设置stdin/out/err 到 =/dev/console=;
++ =procd_connect_ubus();= 定义一个定时器不断去connect =ubusd= 即使这里
+  =ubusd= 还没创建好. 当 =procd= 之后连上 =ubusd=, 它将注册services,
+  =main_objec=, =system_object= 和 =watch_event= .;
++ =ubus_connect(ubus_socket);= 这里用的是
+  =/var/run/ubus.sock（UBUS_UNIX_SOCKET)=, 连上ubus后,
+  =procd_state_ubus_connect()= 进入 =STATE_INIT=;
++ =service_init();= 为之后services和validators的管理初始化ALV tree;
++ =service_start_early("ubus", ubus_cmd);= 开始 =ubusd= 后台服务;
+
+#+begin_src c++
+static void
+ubus_connect_cb(struct uloop_timeout *timeout)
+{
+	ctx = ubus_connect(ubus_socket);
+
+	if (!ctx) {
+		DEBUG(4, "Connection to ubus failed\n");
+		uloop_timeout_set(&ubus_timer, 1000);
+		return;
+	}
+
+	ctx->connection_lost = ubus_disconnect_cb;
+	ubus_init_service(ctx);
+	ubus_init_system(ctx);
+	watch_ubus(ctx);
+
+	DEBUG(2, "Connected to ubus, id=%08x\n", ctx->local_id);
+	ubus_add_uloop(ctx);
+	procd_state_ubus_connect();
+}
+#+end_src
 
 ** =STATE_INIT=
 
+
+#+begin_src c++
+static char *ask = "/sbin/askfirst";
+
+static void askfirst(struct init_action *a)
+{
+	int i;
+
+	if (!dev_exist(a->id) || (console && !strcmp(console, a->id))) {
+		DEBUG(4, "Skipping %s\n", a->id);
+		return;
+	}
+
+	a->tout.cb = respawn;
+	for (i = MAX_ARGS - 1; i >= 1; i--)
+		a->argv[i] = a->argv[i - 1];
+	a->argv[0] = ask;
+	a->respawn = 500;
+
+	a->proc.cb = child_exit;
+	fork_worker(a);
+}
+#+end_src
+
+#+begin_src c++
+static void runrc(struct init_action *a)
+{
+	if (!a->argv[1] || !a->argv[2]) {
+		ERROR("valid format is rcS <S|K> <param>\n");
+		return;
+	}
+
+	/* proceed even if no init or shutdown scripts run */
+	if (rcS(a->argv[1], a->argv[2], rcdone))
+		rcdone(NULL);
+}
+#+end_src
+
 ** =STATE_RUNNING=
-
-
-
-
-
+基本的系统起来了, procd在 =uloop_run()= 中执行, 开始管理daemons和
+services.
 
 * Reference
 
@@ -221,15 +493,76 @@ main(int argc, char **argv)
 }
 #+end_src
 
-
-
-* cc
-#+begin_src sh
-
+=struct init_handler handlers[]=
+#+begin_src c++
+static struct init_handler handlers[] = {
+	{
+		.name = "sysinit",
+		.cb = runrc,
+	}, {
+		.name = "shutdown",
+		.cb = runrc,
+	}, {
+		.name = "askfirst",
+		.cb = askfirst,
+		.multi = 1,
+	}, {
+		.name = "askconsole",
+		.cb = askconsole,
+		.multi = 1,
+	}, {
+		.name = "respawn",
+		.cb = rcrespawn,
+		.multi = 1,
+	}
+};
 #+end_src
 
+#+begin_src c++
+int rcS(char *pattern, char *param, void (*q_empty)(struct runqueue *))
+{
+	runqueue_init(&q);
+	q.empty_cb = q_empty;
+	q.max_running_tasks = 1;
 
+	return _rc(&q, "/etc/rc.d", pattern, "*", param);
+}
 
+static int _rc(struct runqueue *q, char *path, const char *file, char *pattern, char *param)
+{
+	char *dir = alloca(2 + strlen(path) + strlen(file) + strlen(pattern));
+	glob_t gl;
+	int j;
+
+	if (!dir) {
+		ERROR("Out of memory in %s.\n", file);
+		return -1;
+	}
+
+	DEBUG(2, "running %s/%s%s %s\n", path, file, pattern, param);
+	sprintf(dir, "%s/%s%s", path, file, pattern);
+	if (glob(dir, GLOB_NOESCAPE | GLOB_MARK, NULL, &gl)) {
+		DEBUG(2, "glob failed on %s\n", dir);
+		return -1;
+	}
+
+	for (j = 0; j < gl.gl_pathc; j++)
+		add_initd(q, gl.gl_pathv[j], param);
+
+	globfree(&gl);
+
+	return 0;
+}
+#+end_src
+
+#+begin_src c++
+static void rcdone(struct runqueue *q)
+{
+	procd_state_next();
+}
+#+end_src
+
+* cc
 #+begin_src c++
 
 #+end_src
