@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
 <title>OpenWrt Boot Process (New OpenWrt)</title>
-<!-- 2019-04-10 Wed 10:40 -->
+<!-- 2019-04-12 Fri 09:04 -->
 <meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta  name="generator" content="Org-mode" />
 <meta  name="author" content="Shi Shougang" />
@@ -287,7 +287,7 @@ package procd中 <code>init.c</code> 的main函数基本流程如下:<sup><a id=
 <ol class="org-ol">
 <li><code>early()</code> 
 <ul class="org-ul">
-<li><code>early_mounts()</code>: mount <i>proc, /sys, /dev</i>, /tmp 等;
+<li><code>early_mounts()</code>: mount /proc /sys/{,fs/cgroup} /dev/{,shm,pts} 等;
 </li>
 <li><code>early_console()</code>: 初始化 <code>/dev/console</code>;
 </li>
@@ -629,17 +629,114 @@ signals.
 <div id="outline-container-sec-3-3" class="outline-3">
 <h3 id="sec-3-3"><code>STATE_INIT</code></h3>
 <div class="outline-text-3" id="text-3-3">
+<p>
+根据 <code>handlers[]</code> 中定义, procd在inittab中支持5个命令:
+</p>
+<ul class="org-ul">
+<li>respawn - this works just like you expect it. It starts a process
+and will respawn it once it has completed.
+</li>
+<li>respawnlate - this works like the respawn but will start the process
+only when the procd init is completed.
+</li>
+<li>askfirst - this works just like respawn but will print the line
+“Please press Enter to activate this console.” before starting the
+process
+</li>
+<li>askconsole - this works like askfirst but, instead of running on the
+tty passed as a parameter, it will look for the tty defined in the
+kernel command line using <code>“console=”</code>
+</li>
+<li>askconsolelate - this works like the askconsole but will start the
+process only when the procd init is completed.
+</li>
+<li>sysinit - this will trigger procd to run the command, given as a
+parameter, only once. This is usually used to trigger execution of
+<code>/etc/rc.d/</code>
+</li>
+
+<li><code>procd_inittab();</code> 读取 <code>/etc/inittab</code> , 初始化actions表
+</li>
+<li><code>procd_inittab_run</code> 依次run
+<div class="org-src-container">
+
+<pre class="src src-c++">procd_inittab_run(<span style="color: #ffa07a;">"respawn"</span>);
+procd_inittab_run(<span style="color: #ffa07a;">"askconsole"</span>);
+procd_inittab_run(<span style="color: #ffa07a;">"askfirst"</span>);
+procd_inittab_run(<span style="color: #ffa07a;">"sysinit"</span>)
+</pre>
+</div>
+</li>
+<li><code>procd_inittab_run</code> 会与 <code>/etc/inittab</code> 创建的actions表对比, 只运行其中定义的
+<ul class="org-ul">
+<li><code>askconsole</code> –&gt; <code>askfirst()</code> 和 <code>sysinit</code> –&gt; <code>runrc()</code>
+</li>
+</ul>
+</li>
+</ul>
+
+<div class="org-src-container">
+
+<pre class="src src-sh"><span style="color: #ff7f24;">#</span><span style="color: #ff7f24;">/etc/inittab</span>
+
+::sysinit:/etc/init.d/rcS S boot
+::shutdown:/etc/init.d/rcS K shutdown
+::askconsole:/bin/ash --login
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-c++"><span style="color: #00ffff;">static</span> <span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">init_handler</span> <span style="color: #eedd82;">handlers</span>[] = {
+        {
+                .name = <span style="color: #ffa07a;">"sysinit"</span>,
+                .cb = runrc,
+        }, {
+                .name = <span style="color: #ffa07a;">"shutdown"</span>,
+                .cb = runrc,
+        }, {
+                .name = <span style="color: #ffa07a;">"askfirst"</span>,
+                .cb = askfirst,
+                .multi = 1,
+        }, {
+                .name = <span style="color: #ffa07a;">"askconsole"</span>,
+                .cb = askconsole,
+                .multi = 1,
+        }, {
+                .name = <span style="color: #ffa07a;">"respawn"</span>,
+                .cb = rcrespawn,
+                .multi = 1,
+        }
+};
+</pre>
+</div>
+
 <div class="org-src-container">
 
 <pre class="src src-c++"><span style="color: #00ffff;">static</span> <span style="color: #98fb98;">char</span> *<span style="color: #eedd82;">ask</span> = <span style="color: #ffa07a;">"/sbin/askfirst"</span>;
 
-<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">askfirst</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">init_action</span> *<span style="color: #eedd82;">a</span>)
+<span style="color: #00ffff;">static</span> <span style="color: #98fb98;">void</span> <span style="color: #87cefa;">askconsole</span>(<span style="color: #00ffff;">struct</span> <span style="color: #98fb98;">init_action</span> *<span style="color: #eedd82;">a</span>)
 {
+        <span style="color: #98fb98;">char</span> <span style="color: #eedd82;">line</span>[256], *<span style="color: #eedd82;">tty</span>, *<span style="color: #eedd82;">split</span>;
         <span style="color: #98fb98;">int</span> <span style="color: #eedd82;">i</span>;
 
-        <span style="color: #00ffff;">if</span> (!dev_exist(a-&gt;id) || (console &amp;&amp; !strcmp(console, a-&gt;id))) {
-                DEBUG(4, <span style="color: #ffa07a;">"Skipping %s\n"</span>, a-&gt;id);
-                <span style="color: #00ffff;">return</span>;
+        tty = get_cmdline_val(<span style="color: #ffa07a;">"console"</span>, line, <span style="color: #00ffff;">sizeof</span>(line));
+        <span style="color: #00ffff;">if</span> (tty != <span style="color: #7fffd4;">NULL</span>) {
+                split = strchr(tty, <span style="color: #ffa07a;">','</span>);
+                <span style="color: #00ffff;">if</span> (split != <span style="color: #7fffd4;">NULL</span>)
+                        *split = <span style="color: #ffa07a;">'\0'</span>;
+
+                <span style="color: #00ffff;">if</span> (!dev_exist(tty)) {
+                        DEBUG(4, <span style="color: #ffa07a;">"skipping %s\n"</span>, tty);
+                        <span style="color: #00ffff;">return</span>;
+                }
+
+                console = strdup(tty);
+                a-&gt;id = strdup(tty);
+        }
+        <span style="color: #00ffff;">else</span> {
+                console = <span style="color: #7fffd4;">NULL</span>;
+                a-&gt;id = <span style="color: #7fffd4;">NULL</span>;
         }
 
         a-&gt;tout.cb = respawn;
@@ -848,7 +945,7 @@ services.
 </div></div>
 <div id="postamble" class="status">
 <p class="author">Author: Shi Shougang</p>
-<p class="date">Created: 2019-04-10 Wed 10:40</p>
+<p class="date">Created: 2019-04-12 Fri 09:04</p>
 <p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.3.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
 <p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>

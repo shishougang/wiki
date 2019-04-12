@@ -4,6 +4,7 @@
 
 
 
+
 一个boot log的例子:
 #+begin_src sh
 [    2.602573] VFS: Mounted root (squashfs filesystem) readonly on device 31:2.
@@ -130,7 +131,7 @@ package procd中 =init.c= 的main函数基本流程如下:[fn:1]
 [[./Files/openwrt_sbin_init.png]]
 
 1. =early()= 
-   + =early_mounts()=: mount /proc, /sys, /dev/, /tmp 等;
+   + =early_mounts()=: mount /proc /sys/{,fs/cgroup} /dev/{,shm,pts} 等;
    + =early_console()=: 初始化 =/dev/console=;
    + =early_env();=: *PATH* 配置成 =/bin:/sbin:/usr/bin:/usr/sbin=;
    + 打印出最上面bootlog实例中的一个message "Console is alive";
@@ -391,18 +392,91 @@ ubus_connect_cb(struct uloop_timeout *timeout)
 #+end_src
 
 ** =STATE_INIT=
+根据 =handlers[]= 中定义, procd在inittab中支持5个命令:
++ respawn - this works just like you expect it. It starts a process
+  and will respawn it once it has completed.
++ respawnlate - this works like the respawn but will start the process
+  only when the procd init is completed.
++ askfirst - this works just like respawn but will print the line
+  “Please press Enter to activate this console.” before starting the
+  process
++ askconsole - this works like askfirst but, instead of running on the
+  tty passed as a parameter, it will look for the tty defined in the
+  kernel command line using =“console=”=
++ askconsolelate - this works like the askconsole but will start the
+  process only when the procd init is completed.
++ sysinit - this will trigger procd to run the command, given as a
+  parameter, only once. This is usually used to trigger execution of
+  =/etc/rc.d/=
 
++ =procd_inittab();= 读取 =/etc/inittab= , 初始化actions表
++ =procd_inittab_run= 依次run
+  #+begin_src c++
+		procd_inittab_run("respawn");
+		procd_inittab_run("askconsole");
+		procd_inittab_run("askfirst");
+		procd_inittab_run("sysinit")
+  #+end_src
++ =procd_inittab_run= 会与 =/etc/inittab= 创建的actions表对比, 只运行其中定义的
+  + =askconsole= –> =askfirst()= 和 =sysinit= –> =runrc()=
+
+#+begin_src sh
+#/etc/inittab
+
+::sysinit:/etc/init.d/rcS S boot
+::shutdown:/etc/init.d/rcS K shutdown
+::askconsole:/bin/ash --login
+#+end_src
+
+#+begin_src c++
+static struct init_handler handlers[] = {
+	{
+		.name = "sysinit",
+		.cb = runrc,
+	}, {
+		.name = "shutdown",
+		.cb = runrc,
+	}, {
+		.name = "askfirst",
+		.cb = askfirst,
+		.multi = 1,
+	}, {
+		.name = "askconsole",
+		.cb = askconsole,
+		.multi = 1,
+	}, {
+		.name = "respawn",
+		.cb = rcrespawn,
+		.multi = 1,
+	}
+};
+#+end_src
 
 #+begin_src c++
 static char *ask = "/sbin/askfirst";
 
-static void askfirst(struct init_action *a)
+static void askconsole(struct init_action *a)
 {
+	char line[256], *tty, *split;
 	int i;
 
-	if (!dev_exist(a->id) || (console && !strcmp(console, a->id))) {
-		DEBUG(4, "Skipping %s\n", a->id);
-		return;
+	tty = get_cmdline_val("console", line, sizeof(line));
+	if (tty != NULL) {
+		split = strchr(tty, ',');
+		if (split != NULL)
+			*split = '\0';
+
+		if (!dev_exist(tty)) {
+			DEBUG(4, "skipping %s\n", tty);
+			return;
+		}
+
+		console = strdup(tty);
+		a->id = strdup(tty);
+	}
+	else {
+		console = NULL;
+		a->id = NULL;
 	}
 
 	a->tout.cb = respawn;
